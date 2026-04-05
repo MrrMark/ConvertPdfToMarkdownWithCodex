@@ -214,6 +214,43 @@ def _merge_columns(rows: list[list[str]]) -> tuple[list[list[str]], int]:
     return current, merged_count
 
 
+def _realign_header_columns(rows: list[list[str]]) -> tuple[list[list[str]], int]:
+    if len(rows) < 2 or not rows[0]:
+        return rows, 0
+    header = rows[0][:]
+    body = [row[:] for row in rows[1:]]
+    width = len(header)
+    shifts = 0
+
+    for idx in range(width):
+        head = header[idx].strip()
+        if not head:
+            continue
+        body_non_empty_curr = sum(1 for row in body if row[idx].strip())
+        if body_non_empty_curr > 0:
+            continue
+
+        left_count = sum(1 for row in body if idx > 0 and row[idx - 1].strip()) if idx > 0 else 0
+        right_count = sum(1 for row in body if idx + 1 < width and row[idx + 1].strip()) if idx + 1 < width else 0
+        target: int | None = None
+
+        if idx > 0 and left_count > 0 and not header[idx - 1].strip() and left_count >= right_count:
+            target = idx - 1
+        elif idx + 1 < width and right_count > 0 and not header[idx + 1].strip():
+            target = idx + 1
+        elif idx > 0 and left_count > 0 and not header[idx - 1].strip():
+            target = idx - 1
+
+        if target is None:
+            continue
+        header[target] = head
+        header[idx] = ""
+        shifts += 1
+
+    realigned = [header] + body
+    return realigned, shifts
+
+
 def _split_notes(rows: list[list[str]]) -> tuple[list[list[str]], list[str], int]:
     if len(rows) < 2:
         return rows, [], 0
@@ -422,6 +459,7 @@ def _process_rows(raw_rows: list[list[str]], strategy: str) -> tuple[list[list[s
         return [], [], metrics
 
     rows, compacted = _compact_columns(rows)
+    rows, header_shifts = _realign_header_columns(rows)
     rows, merged = _merge_columns(rows)
     rows, notes, removed_rows = _split_notes(rows)
     rows, extra_compacted = _compact_columns(rows)
@@ -432,7 +470,7 @@ def _process_rows(raw_rows: list[list[str]], strategy: str) -> tuple[list[list[s
         empty_cell_ratio=round(_empty_ratio(rows), 4),
         all_empty_rows_removed=removed_rows,
         columns_compacted=compacted,
-        columns_merged=merged,
+        columns_merged=merged + header_shifts,
         quality_score=round(_quality_score(rows, removed_rows, compacted, merged), 4),
         data_density=round(_data_density(rows), 4),
         header_fill_ratio=round(_header_fill_ratio(rows), 4),
@@ -504,6 +542,33 @@ def extract_tables(
                     if any(_is_fragment_candidate(item, acc) for acc in pruned):
                         continue
                     pruned.append(item)
+                refined: list[TableExtractionCandidate] = []
+                for item in pruned:
+                    width = len(item.rows[0]) if item.rows and item.rows[0] else 0
+                    height = len(item.rows)
+                    if width == 1 and height <= 2:
+                        fragment_text = " ".join(cell.strip() for row in item.rows for cell in row if cell.strip()).lower()
+                        has_better_neighbor = False
+                        for other in pruned:
+                            if other is item:
+                                continue
+                            other_width = len(other.rows[0]) if other.rows and other.rows[0] else 0
+                            if other_width <= 1:
+                                continue
+                            same_page_band = abs(item.bbox[1] - other.bbox[1]) <= 90 or abs(item.bbox[3] - other.bbox[1]) <= 60
+                            x_overlap = _bbox_intersection(item.bbox, other.bbox) > 0 or (
+                                min(item.bbox[2], other.bbox[2]) - max(item.bbox[0], other.bbox[0]) > 20
+                            )
+                            if not (same_page_band and x_overlap):
+                                continue
+                            other_text = " ".join(cell.strip() for row in other.rows for cell in row if cell.strip()).lower()
+                            if fragment_text and fragment_text in other_text:
+                                has_better_neighbor = True
+                                break
+                        if has_better_neighbor:
+                            continue
+                    refined.append(item)
+                pruned = refined
                 deduped = pruned
 
                 page_blocks: list[TableBlock] = []

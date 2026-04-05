@@ -1,6 +1,7 @@
 from pdf2md.extractors.tables import (
     _compact_columns,
     _merge_columns,
+    _realign_header_columns,
     _split_notes,
     _quality_score,
     analyze_table_complexity,
@@ -84,3 +85,14 @@ def test_quality_score_improves_after_sparse_recovery() -> None:
     raw_score = _quality_score(raw, removed_rows=0, compacted=0, merged=0)
     dense_score = _quality_score(dense, removed_rows=1, compacted=2, merged=1)
     assert dense_score > raw_score
+
+
+def test_realign_header_columns_moves_header_to_data_column() -> None:
+    rows = [
+        ["", "Bits", "", "Description"],
+        ["63:0", "", "KV key", ""],
+    ]
+    aligned, shifts = _realign_header_columns(rows)
+    assert shifts == 2
+    assert aligned[0] == ["Bits", "", "Description", ""]
+    assert aligned[1] == ["63:0", "", "KV key", ""]
