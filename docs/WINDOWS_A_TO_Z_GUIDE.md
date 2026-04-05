@@ -93,6 +93,29 @@ git clone https://github.com/MrrMark/ConvertPdfToMarkdownWithCodex.git
 cd ConvertPdfToMarkdownWithCodex
 ```
 
+### 4-1) 회사 보안 환경: `git clone`이 막힌 경우
+
+사내 정책으로 `git clone`이 불가능해도 실행할 수 있습니다.
+
+대체 경로:
+
+1. 소스 ZIP 반입  
+- 인터넷 가능한 PC에서 저장소 ZIP 다운로드  
+- 사내 승인된 반입 채널(내부 파일서버, 승인 USB 등)로 전달  
+- 대상 PC에서 압축 해제
+
+2. 사내 미러/아티팩트 저장소 사용  
+- Nexus/Artifactory/내부 Git 미러에서 소스 패키지 다운로드  
+
+3. 릴리스 번들 사용(권장)  
+- 소스 ZIP + 의존성 wheel 묶음(`wheelhouse`) + 설치 스크립트 반입
+
+압축 해제 후 작업 폴더로 이동:
+
+```powershell
+cd C:\Work\ConvertPdfToMarkdownWithCodex
+```
+
 ---
 
 ## 5) 가상환경 생성/활성화
@@ -280,4 +303,44 @@ python -m venv .venv
 python -m pip install --upgrade pip
 pip install -e .[dev]
 python -m pdf2md .\sample.pdf -o .\output --pages 1-3 --keep-page-markers --image-mode referenced --table-mode auto
+```
+
+---
+
+## 15) `git clone` 없이 실행하는 실전 예시
+
+### A. 소스 ZIP만 있는 경우(인터넷 가능 환경)
+
+```powershell
+cd C:\Work\ConvertPdfToMarkdownWithCodex
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e .[dev]
+python -m pdf2md .\sample.pdf -o .\output
+```
+
+### B. 완전 오프라인 환경(의존성 wheel 반입)
+
+사전 준비(인터넷 가능한 환경):
+- 프로젝트 소스 ZIP
+- `wheelhouse` 폴더(필요 패키지 wheel 파일 모음)
+
+사내 PC 실행:
+
+```powershell
+cd C:\Work\ConvertPdfToMarkdownWithCodex
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install --no-index --find-links .\wheelhouse -e .
+python -m pdf2md .\sample.pdf -o .\output
+```
+
+### C. OCR까지 필요한 경우
+
+- `tesseract.exe`가 설치되어 있거나 PATH에 잡혀 있어야 합니다.
+- 보안 환경에서는 Portable/오프라인 설치 방식으로 반입 후 아래 확인:
+
+```powershell
+tesseract --version
 ```
