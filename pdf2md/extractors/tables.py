@@ -16,6 +16,7 @@ class TableBlock:
     mode: str
     markdown: str
     top: float
+    bbox: tuple[float, float, float, float]
 
 
 @dataclass
@@ -267,6 +268,7 @@ def extract_tables(
                             mode=mode,
                             markdown=f"{comment}\n{rendered}",
                             top=top,
+                            bbox=(x0, top, x1, bottom),
                         )
                     )
                     result.assets.append(

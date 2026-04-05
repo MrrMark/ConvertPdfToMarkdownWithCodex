@@ -8,8 +8,9 @@ from typing import Optional
 from pdf2md.config import Config
 from pdf2md.extractors.images import extract_images
 from pdf2md.extractors.ocr import run_ocr
+from pdf2md.extractors.structure_normalizer import BlockRegion, normalize_page_lines
 from pdf2md.extractors.tables import extract_tables
-from pdf2md.extractors.text import TextExtractionError, extract_page_text_layout
+from pdf2md.extractors.text import TextExtractionError, TextLine, extract_page_text_layout
 from pdf2md.models import Manifest, PageResult, Report, WarningEntry
 from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown
@@ -52,9 +53,15 @@ def _build_report(
     ocr_confidence_by_page: dict[str, dict[str, float]] | None = None,
     excluded_image_count: int = 0,
     excluded_images: list[dict] | None = None,
+    total_deduplicated_blocks: int = 0,
+    total_suppressed_lines: int = 0,
+    deduplicated_blocks: list[dict] | None = None,
+    suppressed_lines: list[dict] | None = None,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
     excluded_images = excluded_images or []
+    deduplicated_blocks = deduplicated_blocks or []
+    suppressed_lines = suppressed_lines or []
     return Report(
         started_at=started_at,
         finished_at=finished_at,
@@ -72,6 +79,10 @@ def _build_report(
             "ocr_confidence_by_page": ocr_confidence_by_page,
             "excluded_image_count": excluded_image_count,
             "excluded_images": excluded_images,
+            "total_deduplicated_blocks": total_deduplicated_blocks,
+            "total_suppressed_lines": total_suppressed_lines,
+            "deduplicated_blocks": deduplicated_blocks,
+            "suppressed_lines": suppressed_lines,
         },
     )
 
@@ -142,16 +153,14 @@ def run_conversion(config: Config) -> ConversionResult:
             warnings=warnings,
         )
 
-    page_text_lines: dict[int, list[str]] = {}
-    page_line_tops: dict[int, list[float]] = {}
+    page_layout_lines: dict[int, list[TextLine]] = {}
     page_texts: dict[int, str] = {}
     try:
         layout = extract_page_text_layout(config.input_pdf, selected_pages, config.password)
         for page in selected_pages:
             lines = layout.get(page, [])
-            page_text_lines[page] = [line.text for line in lines]
-            page_line_tops[page] = [line.top for line in lines]
-            page_texts[page] = "\n".join(page_text_lines[page]).strip()
+            page_layout_lines[page] = lines
+            page_texts[page] = "\n".join(item.text for item in lines).strip()
             page_results_map[page] = PageResult(
                 page=page,
                 status="success",
@@ -161,8 +170,7 @@ def run_conversion(config: Config) -> ConversionResult:
         warnings.append(WarningEntry(code="TEXT_EXTRACTION_FAILED", message=str(exc)))
         for page in selected_pages:
             failed_pages.append(page)
-            page_text_lines[page] = []
-            page_line_tops[page] = []
+            page_layout_lines[page] = []
             page_texts[page] = ""
             page_results_map[page] = PageResult(page=page, status="failed")
 
@@ -171,8 +179,16 @@ def run_conversion(config: Config) -> ConversionResult:
     engine_usage["ocr"] = ocr_result.used_ocr
     for page, text in ocr_result.page_texts.items():
         lines = [line.rstrip() for line in text.splitlines() if line.strip()]
-        page_text_lines[page] = lines
-        page_line_tops[page] = [float(idx * 12) for idx in range(len(lines))]
+        page_layout_lines[page] = [
+            TextLine(
+                text=line,
+                top=float(idx * 12),
+                bottom=float((idx + 1) * 12),
+                x0=0.0,
+                x1=max(float(len(line) * 6), 1.0),
+            )
+            for idx, line in enumerate(lines)
+        ]
         page_texts[page] = "\n".join(lines)
         if page in page_results_map:
             metrics = ocr_result.metrics_by_page.get(page)
@@ -196,6 +212,57 @@ def run_conversion(config: Config) -> ConversionResult:
     engine_usage["images"] = len(image_result.assets) > 0
     warnings.extend(table_result.warnings)
     warnings.extend(image_result.warnings)
+
+    block_regions_by_page: dict[int, list[BlockRegion]] = {}
+    for page, blocks in table_result.blocks_by_page.items():
+        for block in blocks:
+            block_regions_by_page.setdefault(page, []).append(
+                BlockRegion(
+                    block_type="table",
+                    block_index=block.index,
+                    bbox=block.bbox,
+                )
+            )
+    for page, blocks in image_result.blocks_by_page.items():
+        for block in blocks:
+            if block.bbox is None:
+                continue
+            block_regions_by_page.setdefault(page, []).append(
+                BlockRegion(
+                    block_type="image",
+                    block_index=block.index,
+                    bbox=block.bbox,
+                )
+            )
+
+    page_text_lines: dict[int, list[str]] = {}
+    page_line_tops: dict[int, list[float]] = {}
+    deduplicated_blocks_payload: list[dict] = []
+    suppressed_lines_payload: list[dict] = []
+    total_deduplicated_blocks = 0
+    total_suppressed_lines = 0
+    for page in selected_pages:
+        normalization = normalize_page_lines(
+            page=page,
+            lines=page_layout_lines.get(page, []),
+            block_regions=block_regions_by_page.get(page, []),
+        )
+        page_text_lines[page] = [line.text for line in normalization.lines]
+        page_line_tops[page] = [line.top for line in normalization.lines]
+        page_texts[page] = "\n".join(page_text_lines[page]).strip()
+        page_result = page_results_map.get(page)
+        if page_result is not None:
+            page_result.char_count = len(page_texts[page])
+            page_result.line_merge_count = normalization.line_merge_count
+            page_result.structure_line_count = normalization.structure_line_count
+            page_result.dedupe_count = normalization.dedupe_count
+            page_result.suppressed_line_count = normalization.suppressed_line_count
+        total_deduplicated_blocks += normalization.dedupe_count
+        total_suppressed_lines += normalization.suppressed_line_count
+        deduplicated_blocks_payload.extend(
+            [item.model_dump(mode="json") for item in normalization.deduplicated_blocks]
+        )
+        suppressed_lines_payload.extend([item.model_dump(mode="json") for item in normalization.suppressed_lines])
 
     page_blocks_with_anchor: dict[int, list[tuple[int, float, str]]] = {}
     for page, blocks in table_result.blocks_by_page.items():
@@ -297,6 +364,10 @@ def run_conversion(config: Config) -> ConversionResult:
         ocr_confidence_by_page=ocr_confidence_by_page,
         excluded_image_count=len(image_result.excluded_assets),
         excluded_images=[item.model_dump(mode="json") for item in image_result.excluded_assets],
+        total_deduplicated_blocks=total_deduplicated_blocks,
+        total_suppressed_lines=total_suppressed_lines,
+        deduplicated_blocks=deduplicated_blocks_payload,
+        suppressed_lines=suppressed_lines_payload,
     )
     if low_conf_pages:
         report.summary["low_confidence_pages"] = low_conf_pages

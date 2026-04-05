@@ -16,6 +16,9 @@ class TextExtractionError(RuntimeError):
 class TextLine:
     text: str
     top: float
+    bottom: float
+    x0: float
+    x1: float
 
 
 def normalize_text(raw_text: str) -> str:
@@ -41,7 +44,19 @@ def extract_page_text_layout(
                     text = normalize_text(line.get("text", ""))
                     if not text:
                         continue
-                    normalized_lines.append(TextLine(text=text, top=float(line.get("top", 0.0))))
+                    top = float(line.get("top", 0.0))
+                    bottom = float(line.get("bottom", top))
+                    x0 = float(line.get("x0", 0.0))
+                    x1 = float(line.get("x1", x0))
+                    normalized_lines.append(
+                        TextLine(
+                            text=text,
+                            top=top,
+                            bottom=bottom,
+                            x0=x0,
+                            x1=x1,
+                        )
+                    )
                 normalized_lines.sort(key=lambda item: item.top)
                 layout[page_number] = normalized_lines
     except Exception as exc:  # noqa: BLE001

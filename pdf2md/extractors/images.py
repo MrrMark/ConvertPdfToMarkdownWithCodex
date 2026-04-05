@@ -22,6 +22,7 @@ class ImageBlock:
     markdown: str
     top: float
     anchor_line_index: int
+    bbox: tuple[float, float, float, float] | None
 
 
 @dataclass
@@ -247,6 +248,7 @@ def extract_images(
                     markdown=markdown,
                     top=top,
                     anchor_line_index=0,
+                    bbox=tuple(bbox_payload) if bbox_payload else None,
                 )
             )
             result.assets.append(

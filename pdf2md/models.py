@@ -19,6 +19,14 @@ class TableMode(str, Enum):
     HTML_ONLY = "html-only"
 
 
+class LineType(str, Enum):
+    HEADING_INDEX = "HEADING_INDEX"
+    FIGURE_CAPTION = "FIGURE_CAPTION"
+    TABLE_CAPTION = "TABLE_CAPTION"
+    TOC_LINE = "TOC_LINE"
+    BODY_LINE = "BODY_LINE"
+
+
 class WarningEntry(BaseModel):
     code: str
     message: str
@@ -35,6 +43,10 @@ class PageResult(BaseModel):
     ocr_confidence_mean: Optional[float] = None
     ocr_confidence_median: Optional[float] = None
     low_conf_token_ratio: Optional[float] = None
+    line_merge_count: int = 0
+    structure_line_count: int = 0
+    dedupe_count: int = 0
+    suppressed_line_count: int = 0
 
 
 class ImageAsset(BaseModel):
@@ -66,6 +78,33 @@ class TableAsset(BaseModel):
     bbox: Optional[list[float]] = None
     anchor_line_index: Optional[int] = None
     anchor_top: Optional[float] = None
+
+
+class NormalizedLine(BaseModel):
+    page: int
+    index: int
+    text: str
+    line_type: LineType
+    top: float
+    bottom: float
+    x0: float
+    x1: float
+
+
+class DedupDecision(BaseModel):
+    page: int
+    line_index: int
+    line_type: LineType
+    text: str
+    reason: str
+
+
+class SuppressDecision(BaseModel):
+    page: int
+    line_index: int
+    block_type: str
+    block_index: int
+    reason: str
 
 
 class Manifest(BaseModel):
