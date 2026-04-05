@@ -186,6 +186,11 @@ sudo apt-get install -y poppler-utils tesseract-ocr
 
 > 실제 패키지명은 배포판/OS 환경에 따라 달라질 수 있으므로, 구현 단계에서 설치 체크 로직과 문서화를 함께 정리하는 것을 권장합니다.
 
+### Windows 설치/실행 가이드
+
+- Windows 전용 상세 문서: [docs/WINDOWS_A_TO_Z_GUIDE.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/WINDOWS_A_TO_Z_GUIDE.md)
+- 회사 보안 환경(온라인 설치 제한, `git clone` 제한) 대응 절차 포함
+
 ---
 
 ## 7. CLI 사용 예시
@@ -262,6 +267,12 @@ output/
 - warning / failure
 - OCR 적용 여부
 - 페이지별 처리 결과 요약
+- 표 품질 메타데이터(`table_quality`)
+  - `selected_strategy`, `empty_cell_ratio`, `all_empty_rows_removed`
+  - `columns_compacted`, `columns_merged`, `quality_score`
+- 문서 수준 테이블 집계
+  - `table_total`, `table_html_count`, `table_gfm_count`
+  - `table_recovered_count`, `table_unresolved_count`
 
 ---
 
@@ -299,6 +310,9 @@ output/
   </tbody>
 </table>
 ```
+
+`table-mode=auto`에서는 다중 추출 전략 비교 + 보수적 복구(빈 열 압축, 제한적 열 병합, notes 분리)를 거친 뒤
+GFM 또는 HTML fallback을 결정합니다.
 
 ### 이미지 참조
 
@@ -367,7 +381,8 @@ pytest
 
 ```bash
 pytest tests/test_cli.py -q
-pytest tests/test_markdown_golden.py -q
+pytest tests/test_markdown_serializer.py -q
+pytest tests/test_tables.py -q
 ```
 
 lint / format 도입 시 예시:

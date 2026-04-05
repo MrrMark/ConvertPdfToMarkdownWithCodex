@@ -167,6 +167,11 @@ python -m pdf2md .\sample.pdf -o .\output
 - `output\manifest.json`
 - `output\report.json`
 
+`report.json`에서 특히 확인할 항목:
+- `summary.table_quality`: 표별 품질 메타데이터
+- `summary.table_total`, `table_gfm_count`, `table_html_count`
+- `summary.table_recovered_count`, `table_unresolved_count`
+
 ---
 
 ## 8) 자주 쓰는 옵션
@@ -250,6 +255,8 @@ python -m pytest -q -p no:cacheprovider
 - `2`: 부분 성공 (일부 요소 warning/fallback 포함)
 
 `2`는 실패가 아니라, 부분 fallback이 포함된 정상적인 실행일 수 있습니다.
+최근 버전에서는 표 복구/보수 fallback 정책 때문에 `2`가 자주 나올 수 있으며, 이때는 `report.json`의
+`warnings`와 `summary.table_quality`를 함께 확인하세요.
 
 ---
 
@@ -276,6 +283,15 @@ pip install -e .[dev]
 ### D. 이미지가 없다는 warning (`IMAGE_NOT_FOUND`)
 - PDF에 embedded 이미지가 없으면 정상 경고일 수 있음
 - 스캔 PDF라도 이미지 객체가 표준 임베드 형식이 아닐 수 있음
+
+### F. 표가 기대보다 많거나 적게 추출됨
+- 최신 로직은 표 후보를 다중 전략으로 탐색하고 보수적으로 복구합니다.
+- 아래를 우선 확인하세요:
+  - `report.json > summary.table_total`
+  - `report.json > summary.table_recovered_count`
+  - `report.json > summary.table_unresolved_count`
+  - `report.json > warnings[].details.reasons`
+- `AMBIGUOUS_GRID`, `LOW_DATA_DENSITY` 경고가 많은 문서는 원본 PDF 구조가 불명확한 경우가 많습니다.
 
 ### E. 권한 문제
 - 회사 보안 정책으로 스크립트 실행 제한 가능
