@@ -39,8 +39,24 @@ def create_text_pdf(path: Path, page_texts: list[str]) -> None:
         writer.write(fp)
 
 
+def create_encrypted_text_pdf(path: Path, page_texts: list[str], password: str) -> None:
+    writer = PdfWriter()
+    for text in page_texts:
+        _build_text_page(writer, text)
+    writer.encrypt(password)
+    with path.open("wb") as fp:
+        writer.write(fp)
+
+
 @pytest.fixture
 def sample_pdf(tmp_path: Path) -> Path:
     pdf_path = tmp_path / "sample.pdf"
     create_text_pdf(pdf_path, ["Hello PDF Page 1", "Second page text"])
+    return pdf_path
+
+
+@pytest.fixture
+def encrypted_pdf(tmp_path: Path) -> Path:
+    pdf_path = tmp_path / "encrypted.pdf"
+    create_encrypted_text_pdf(pdf_path, ["Secret page"], password="secret")
     return pdf_path

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -11,8 +12,9 @@ import pdfplumber
 from pypdf import PdfReader
 
 from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, WarningEntry
+from pdf2md.utils.structure import is_caption_candidate
 
-CAPTION_PATTERN = re.compile(r"\b(figure|fig\.?|chart|도표|그림)\b", re.IGNORECASE)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -79,9 +81,23 @@ def _is_caption_nearby(lines: list[dict], top: float, bottom: float) -> bool:
         line_top = float(line.get("top", 0.0))
         if top - 28 <= line_top <= bottom + 28:
             text = str(line.get("text", "")).strip()
-            if CAPTION_PATTERN.search(text):
+            if is_caption_candidate(text):
                 return True
     return False
+
+
+def _extract_caption_text(lines: list[dict], top: float, bottom: float) -> str | None:
+    caption_candidates: list[tuple[float, str]] = []
+    for line in lines:
+        line_top = float(line.get("top", 0.0))
+        if top - 28 <= line_top <= bottom + 36:
+            text = str(line.get("text", "")).strip()
+            if is_caption_candidate(text):
+                caption_candidates.append((abs(line_top - bottom), text))
+    if not caption_candidates:
+        return None
+    caption_candidates.sort(key=lambda item: (item[0], item[1]))
+    return caption_candidates[0][1]
 
 
 def _is_decorative(
@@ -135,6 +151,7 @@ def extract_images(
     hashed_candidates: list[dict] = []
     for page_number in selected_pages:
         page = reader.pages[page_number - 1]
+        logger.debug("Extracting images for page=%s", page_number)
         try:
             raw_images = list(page.images)
         except Exception as exc:  # noqa: BLE001
@@ -208,6 +225,7 @@ def extract_images(
                 height = int(float(box["height"]))
 
         caption_nearby = _is_caption_nearby(page_text_lines.get(page_number, []), top, bottom)
+        caption_text = _extract_caption_text(page_text_lines.get(page_number, []), top, bottom) if caption_nearby else None
         is_decorative, reason = _is_decorative(
             width=width,
             height=height,
@@ -229,8 +247,9 @@ def extract_images(
             continue
 
         try:
-            disk_path.write_bytes(image_bytes)
             alt_text = f"Image page-{page_number:04d}-figure-{index:03d}"
+            if image_mode == ImageMode.REFERENCED:
+                disk_path.write_bytes(image_bytes)
             markdown = _build_markdown(
                 mode=image_mode,
                 alt_text=alt_text,
@@ -256,6 +275,9 @@ def extract_images(
                     page=page_number,
                     index=index,
                     path=rel_path,
+                    alt_text=alt_text,
+                    caption_text=caption_text,
+                    caption_source="nearby_caption" if caption_text else None,
                     bbox=bbox_payload,
                     width=width,
                     height=height,

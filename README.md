@@ -163,6 +163,15 @@ source .venv/bin/activate
 pip install -U pip
 ```
 
+일부 macOS/Linux 환경에서는 `python` 대신 `python3`만 제공될 수 있습니다.
+그 경우 아래처럼 실행하세요.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -U pip
+```
+
 ### 패키지 설치 예시
 
 ```bash
@@ -231,6 +240,31 @@ pdf2md input.pdf -o output/ --table-mode html-only
 pdf2md input.pdf -o output/ --no-page-markers
 ```
 
+### 실행 로그 보기
+
+```bash
+pdf2md input.pdf -o output/ --verbose
+pdf2md input.pdf -o output/ --debug
+```
+
+### 실전 예시: NVM Express Key Value PDF 변환
+
+```bash
+./.venv311/bin/python -m pdf2md \
+  pdf/NVM-Express-Key-Value-Command-Set-Specification-1.0d-2024.01.03-Ratified.pdf \
+  -o pdf/output_nvm_kv_md_v7 \
+  --keep-page-markers
+```
+
+실행 후 확인할 파일:
+
+- `pdf/output_nvm_kv_md_v7/document.md`
+- `pdf/output_nvm_kv_md_v7/manifest.json`
+- `pdf/output_nvm_kv_md_v7/report.json`
+
+이번 예시 문서에서는 종료 코드가 `2`였고, 이는 실패가 아니라 복잡 표 HTML fallback이 포함된
+`partial_success` 실행이었습니다.
+
 ---
 
 ## 8. 출력 구조
@@ -260,6 +294,9 @@ output/
 - 처리 옵션
 - 생성된 asset 목록
 - 페이지 수 및 산출물 메타데이터
+- `schema_version`
+- 이미지별 `alt_text`
+- 인접 캡션이 확실할 때만 `caption_text`, `caption_source`
 
 ### `report.json`
 
@@ -267,12 +304,28 @@ output/
 - warning / failure
 - OCR 적용 여부
 - 페이지별 처리 결과 요약
+- `schema_version`
+- 페이지별 `status`
+- `summary.page_status_counts`
 - 표 품질 메타데이터(`table_quality`)
   - `selected_strategy`, `empty_cell_ratio`, `all_empty_rows_removed`
   - `columns_compacted`, `columns_merged`, `quality_score`
 - 문서 수준 테이블 집계
   - `table_total`, `table_html_count`, `table_gfm_count`
   - `table_recovered_count`, `table_unresolved_count`
+- HTML fallback 추적
+  - `summary.table_fallback_count`
+  - `summary.table_fallbacks`
+
+### 종료 코드와 `report.json` 해석
+
+- `0`: 완전 성공
+- `1`: 치명적 실패
+- `2`: 부분 성공
+
+`2`는 실패가 아니라, 보수적 fallback 또는 경고가 포함된 성공 실행일 수 있습니다.
+예를 들어 복잡 표가 HTML fallback으로 직렬화되면 `report.json`의 `status`가
+`partial_success`가 될 수 있습니다.
 
 ---
 
@@ -321,6 +374,16 @@ GFM 또는 HTML fallback을 결정합니다.
 
 *Figure 1. 원문 캡션 또는 인접 설명*
 ```
+
+기본 동작은 여전히 기계적 alt text를 사용합니다.
+현재 구현에서는 인접 캡션이 확실한 경우에도 이를 asset metadata에만 기록하고,
+본문 Markdown을 자동으로 사람 친화적 캡션으로 재작성하지 않습니다.
+
+### 이미지 모드별 파일 생성 규칙
+
+- `referenced`: `assets/images/`에 실제 이미지 파일을 저장하고 Markdown에서 상대경로로 참조
+- `embedded`: base64 data URI를 사용하며 이미지 파일을 별도로 저장하지 않음
+- `placeholder`: Markdown comment만 남기고 이미지 파일을 저장하지 않음
 
 ---
 
@@ -374,15 +437,21 @@ GFM 또는 HTML fallback을 결정합니다.
 ## 12. 테스트 실행 예시
 
 ```bash
-pytest
+python -m pytest
 ```
 
 특정 테스트만 실행:
 
 ```bash
-pytest tests/test_cli.py -q
-pytest tests/test_markdown_serializer.py -q
-pytest tests/test_tables.py -q
+python -m pytest tests/test_cli.py -q
+python -m pytest tests/test_markdown_serializer.py -q
+python -m pytest tests/test_tables.py -q
+```
+
+가상환경이 `.venv311`인 경우 예시:
+
+```bash
+./.venv311/bin/python -m pytest
 ```
 
 lint / format 도입 시 예시:

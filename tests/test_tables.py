@@ -1,5 +1,6 @@
 from pdf2md.extractors.tables import (
     _compact_columns,
+    _serialize_html,
     _merge_columns,
     _realign_header_columns,
     _split_notes,
@@ -96,3 +97,14 @@ def test_realign_header_columns_moves_header_to_data_column() -> None:
     assert shifts == 2
     assert aligned[0] == ["Bits", "", "Description", ""]
     assert aligned[1] == ["63:0", "", "KV key", ""]
+
+
+def test_html_serializer_escapes_cell_content() -> None:
+    rendered = _serialize_html(
+        rows=[["<head>", "A&B"], ['<script>alert("x")</script>', "safe"]],
+        notes=["Note: 1 < 2 & 3"],
+    )
+    assert "&lt;head&gt;" in rendered
+    assert "A&amp;B" in rendered
+    assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;" in rendered
+    assert "Note: 1 &lt; 2 &amp; 3" in rendered

@@ -43,6 +43,18 @@ def test_near_duplicate_figure_caption_is_deduplicated() -> None:
     assert result.deduplicated_blocks[0].reason == "NEAR_DUPLICATE_CAPTION"
 
 
+def test_korean_table_caption_is_classified_as_structure_line() -> None:
+    result = normalize_page_lines(
+        page=2,
+        lines=[
+            _line("표 3: 테스트 데이터", 200),
+            _line("본문 줄", 220),
+        ],
+    )
+    assert result.lines[0].line_type is LineType.TABLE_CAPTION
+    assert result.lines[1].line_type is LineType.BODY_LINE
+
+
 def test_toc_line_is_not_reflowed() -> None:
     result = normalize_page_lines(
         page=3,

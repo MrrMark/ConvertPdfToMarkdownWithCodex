@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import html
+import logging
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,6 +32,7 @@ TABLE_STRATEGIES: list[tuple[str, dict[str, Any] | None]] = [
         },
     ),
 ]
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -77,6 +80,7 @@ class TableExtractionResult:
     assets: list[TableAsset] = field(default_factory=list)
     blocks_by_page: dict[int, list[TableBlock]] = field(default_factory=dict)
     table_quality: list[dict[str, Any]] = field(default_factory=list)
+    fallbacks: list[dict[str, Any]] = field(default_factory=list)
     table_counts: dict[str, int] = field(
         default_factory=lambda: {
             "table_total": 0,
@@ -377,12 +381,12 @@ def _serialize_html(rows: list[list[str]], notes: list[str]) -> str:
         return "<table></table>"
     lines: list[str] = ["<table>", "  <thead>", "    <tr>"]
     for cell in rows[0]:
-        lines.append(f"      <th>{cell}</th>")
+        lines.append(f"      <th>{html.escape(cell, quote=True)}</th>")
     lines.extend(["    </tr>", "  </thead>", "  <tbody>"])
     for row in rows[1:]:
         lines.append("    <tr>")
         for cell in row:
-            lines.append(f"      <td>{cell}</td>")
+            lines.append(f"      <td>{html.escape(cell, quote=True)}</td>")
         lines.append("    </tr>")
     lines.append("  </tbody>")
     if notes:
@@ -390,7 +394,7 @@ def _serialize_html(rows: list[list[str]], notes: list[str]) -> str:
         col_span = len(rows[0])
         for note in notes:
             lines.append("    <tr>")
-            lines.append(f'      <td colspan="{col_span}">{note}</td>')
+            lines.append(f'      <td colspan="{col_span}">{html.escape(note, quote=True)}</td>')
             lines.append("    </tr>")
         lines.append("  </tfoot>")
     lines.append("</table>")
@@ -490,6 +494,7 @@ def extract_tables(
         with pdfplumber.open(str(pdf_path), password=password) as pdf:
             for page_number in selected_pages:
                 page = pdf.pages[page_number - 1]
+                logger.debug("Extracting tables for page=%s", page_number)
                 candidates_by_bbox: dict[tuple[float, float, float, float], TableExtractionCandidate] = {}
                 for strategy, table_settings in TABLE_STRATEGIES:
                     if table_settings is None:
@@ -591,6 +596,17 @@ def extract_tables(
                                 page=page_number,
                                 details={"table_index": index, "reasons": reasons},
                             )
+                        )
+                    if mode == "html":
+                        result.fallbacks.append(
+                            {
+                                "page": page_number,
+                                "table_index": index,
+                                "mode": mode,
+                                "reasons": reasons,
+                                "selected_strategy": candidate.metrics.selected_strategy,
+                                "quality_score": candidate.metrics.quality_score,
+                            }
                         )
 
                     rendered = _serialize_gfm(candidate.rows) if mode == "gfm" else _serialize_html(candidate.rows, candidate.notes)

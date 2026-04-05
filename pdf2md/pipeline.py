@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -11,7 +12,7 @@ from pdf2md.extractors.ocr import run_ocr
 from pdf2md.extractors.structure_normalizer import BlockRegion, normalize_page_lines
 from pdf2md.extractors.tables import extract_tables
 from pdf2md.extractors.text import TextExtractionError, TextLine, extract_page_text_layout
-from pdf2md.models import Manifest, PageResult, Report, WarningEntry
+from pdf2md.models import ConversionStatus, Manifest, PageResult, PageStatus, Report, WarningEntry
 from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown
 from pdf2md.serializers.report import serialize_report
@@ -22,6 +23,7 @@ from pdf2md.utils.pdf import PdfOpenError, open_pdf_reader
 EXIT_SUCCESS = 0
 EXIT_FATAL = 1
 EXIT_PARTIAL = 2
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -45,7 +47,7 @@ def _find_anchor_index(line_tops: list[float], block_top: float) -> int:
 def _build_report(
     started_at: datetime,
     finished_at: datetime,
-    status: str,
+    status: ConversionStatus,
     warnings: list[WarningEntry],
     page_results: list[PageResult],
     failed_pages: list[int],
@@ -59,6 +61,7 @@ def _build_report(
     suppressed_lines: list[dict] | None = None,
     table_quality: list[dict] | None = None,
     table_counts: dict[str, int] | None = None,
+    table_fallbacks: list[dict] | None = None,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
     excluded_images = excluded_images or []
@@ -66,6 +69,7 @@ def _build_report(
     suppressed_lines = suppressed_lines or []
     table_quality = table_quality or []
     table_counts = table_counts or {}
+    table_fallbacks = table_fallbacks or []
     return Report(
         started_at=started_at,
         finished_at=finished_at,
@@ -88,6 +92,8 @@ def _build_report(
             "deduplicated_blocks": deduplicated_blocks,
             "suppressed_lines": suppressed_lines,
             "table_quality": table_quality,
+            "table_fallback_count": len(table_fallbacks),
+            "table_fallbacks": table_fallbacks,
             **table_counts,
         },
     )
@@ -96,6 +102,7 @@ def _build_report(
 def run_conversion(config: Config) -> ConversionResult:
     """Run conversion and write document.md, manifest.json, report.json."""
     started_at = datetime.now(timezone.utc)
+    logger.info("Starting conversion input=%s output_dir=%s", config.input_pdf, config.output_dir)
     warnings: list[WarningEntry] = []
     page_results_map: dict[int, PageResult] = {}
     failed_pages: list[int] = []
@@ -112,12 +119,13 @@ def run_conversion(config: Config) -> ConversionResult:
     try:
         reader = open_pdf_reader(config.input_pdf, config.password)
     except PdfOpenError as exc:
+        logger.error("Failed to open PDF: %s", exc)
         finished_at = datetime.now(timezone.utc)
         warnings.append(WarningEntry(code="PDF_OPEN_FAILED", message=str(exc)))
         report = _build_report(
             started_at=started_at,
             finished_at=finished_at,
-            status="failed",
+            status=ConversionStatus.FAILED,
             warnings=warnings,
             page_results=[],
             failed_pages=[],
@@ -134,16 +142,18 @@ def run_conversion(config: Config) -> ConversionResult:
         )
 
     total_pages = len(reader.pages)
+    logger.info("Opened PDF total_pages=%s", total_pages)
 
     try:
         selected_pages = config.selected_pages(total_pages)
     except ValueError as exc:
+        logger.error("Invalid page range: %s", exc)
         finished_at = datetime.now(timezone.utc)
         warnings.append(WarningEntry(code="INVALID_PAGE_RANGE", message=str(exc)))
         report = _build_report(
             started_at=started_at,
             finished_at=finished_at,
-            status="failed",
+            status=ConversionStatus.FAILED,
             warnings=warnings,
             page_results=[],
             failed_pages=[],
@@ -162,6 +172,7 @@ def run_conversion(config: Config) -> ConversionResult:
     page_layout_lines: dict[int, list[TextLine]] = {}
     page_texts: dict[int, str] = {}
     try:
+        logger.info("Extracting text for pages=%s", selected_pages)
         layout = extract_page_text_layout(config.input_pdf, selected_pages, config.password)
         for page in selected_pages:
             lines = layout.get(page, [])
@@ -169,17 +180,19 @@ def run_conversion(config: Config) -> ConversionResult:
             page_texts[page] = "\n".join(item.text for item in lines).strip()
             page_results_map[page] = PageResult(
                 page=page,
-                status="success",
+                status=PageStatus.SUCCESS,
                 char_count=len(page_texts[page]),
             )
     except TextExtractionError as exc:
+        logger.exception("Text extraction failed")
         warnings.append(WarningEntry(code="TEXT_EXTRACTION_FAILED", message=str(exc)))
         for page in selected_pages:
             failed_pages.append(page)
             page_layout_lines[page] = []
             page_texts[page] = ""
-            page_results_map[page] = PageResult(page=page, status="failed")
+            page_results_map[page] = PageResult(page=page, status=PageStatus.FAILED)
 
+    logger.info("Running OCR target_pages=%s force=%s", selected_pages, config.force_ocr)
     ocr_result = run_ocr(config.input_pdf, selected_pages, page_texts, config.force_ocr)
     warnings.extend(ocr_result.warnings)
     engine_usage["ocr"] = ocr_result.used_ocr
@@ -205,7 +218,9 @@ def run_conversion(config: Config) -> ConversionResult:
                 page_results_map[page].ocr_confidence_median = metrics.median
                 page_results_map[page].low_conf_token_ratio = metrics.low_conf_token_ratio
 
+    logger.info("Extracting tables")
     table_result = extract_tables(config.input_pdf, selected_pages, config.password, config.table_mode)
+    logger.info("Extracting images mode=%s", config.image_mode)
     image_result = extract_images(
         reader=reader,
         pdf_path=config.input_pdf,
@@ -248,6 +263,7 @@ def run_conversion(config: Config) -> ConversionResult:
     total_deduplicated_blocks = 0
     total_suppressed_lines = 0
     for page in selected_pages:
+        logger.debug("Normalizing page=%s", page)
         normalization = normalize_page_lines(
             page=page,
             lines=page_layout_lines.get(page, []),
@@ -305,6 +321,7 @@ def run_conversion(config: Config) -> ConversionResult:
         page_blocks_by_page=ordered_page_blocks,
     )
     markdown_path = config.output_dir / "document.md"
+    logger.info("Writing markdown path=%s", markdown_path)
     write_text(markdown_path, markdown)
 
     manifest = Manifest(
@@ -326,15 +343,16 @@ def run_conversion(config: Config) -> ConversionResult:
         warnings=warnings,
     )
     manifest_path = config.output_dir / "manifest.json"
+    logger.info("Writing manifest path=%s", manifest_path)
     write_json(manifest_path, serialize_manifest(manifest))
 
-    status = "success"
+    status = ConversionStatus.SUCCESS
     exit_code = EXIT_SUCCESS
     if failed_pages or any(w.code.endswith("_FAILED") for w in warnings):
-        status = "partial_success"
+        status = ConversionStatus.PARTIAL_SUCCESS
         exit_code = EXIT_PARTIAL
     elif any(w.code.startswith("OCR_") or w.code.startswith("TABLE_") or w.code.startswith("IMAGE_") for w in warnings):
-        status = "partial_success"
+        status = ConversionStatus.PARTIAL_SUCCESS
         exit_code = EXIT_PARTIAL
 
     finished_at = datetime.now(timezone.utc)
@@ -346,9 +364,19 @@ def run_conversion(config: Config) -> ConversionResult:
         warning_count_by_page[warning.page] = warning_count_by_page.get(warning.page, 0) + 1
     for page_result in page_results:
         page_result.warning_count = warning_count_by_page.get(page_result.page, 0)
+        if page_result.status is PageStatus.FAILED:
+            continue
+        if page_result.warning_count > 0:
+            page_result.status = PageStatus.PARTIAL_SUCCESS
     ocr_confidence_by_page = {}
     low_conf_pages: list[int] = []
+    page_status_counts = {
+        "success": 0,
+        "partial_success": 0,
+        "failed": 0,
+    }
     for page_result in page_results:
+        page_status_counts[page_result.status.value] += 1
         if page_result.ocr_confidence_mean is None:
             continue
         ocr_confidence_by_page[str(page_result.page)] = {
@@ -376,10 +404,13 @@ def run_conversion(config: Config) -> ConversionResult:
         suppressed_lines=suppressed_lines_payload,
         table_quality=table_result.table_quality,
         table_counts=table_result.table_counts,
+        table_fallbacks=table_result.fallbacks,
     )
     if low_conf_pages:
         report.summary["low_confidence_pages"] = low_conf_pages
+    report.summary["page_status_counts"] = page_status_counts
     report_path = config.output_dir / "report.json"
+    logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)
     write_json(report_path, serialize_report(report))
 
     return ConversionResult(

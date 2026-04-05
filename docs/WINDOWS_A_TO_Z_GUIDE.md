@@ -167,6 +167,16 @@ python -m pdf2md .\sample.pdf -o .\output
 - `output\manifest.json`
 - `output\report.json`
 
+최근 버전 기준 추가 확인 포인트:
+- `manifest.json > schema_version`
+- `manifest.json > images[].alt_text`
+- `manifest.json > images[].caption_text`, `caption_source` (인접 캡션이 확실한 경우만)
+- `report.json > schema_version`
+- `report.json > page_results[].status`
+- `report.json > summary.page_status_counts`
+- `report.json > summary.table_fallback_count`
+- `report.json > summary.table_fallbacks`
+
 `report.json`에서 특히 확인할 항목:
 - `summary.table_quality`: 표별 품질 메타데이터
 - `summary.table_total`, `table_gfm_count`, `table_html_count`
@@ -210,6 +220,13 @@ python -m pdf2md .\sample.pdf -o .\output --table-mode auto
 
 ```powershell
 python -m pdf2md .\sample.pdf -o .\output --force-ocr
+```
+
+로그를 자세히 보기:
+
+```powershell
+python -m pdf2md .\sample.pdf -o .\output --verbose
+python -m pdf2md .\sample.pdf -o .\output --debug
 ```
 
 ---
@@ -256,7 +273,8 @@ python -m pytest -q -p no:cacheprovider
 
 `2`는 실패가 아니라, 부분 fallback이 포함된 정상적인 실행일 수 있습니다.
 최근 버전에서는 표 복구/보수 fallback 정책 때문에 `2`가 자주 나올 수 있으며, 이때는 `report.json`의
-`warnings`와 `summary.table_quality`를 함께 확인하세요.
+`warnings`, `summary.table_quality`, `summary.table_fallback_count`,
+`summary.table_fallbacks`, `summary.page_status_counts`를 함께 확인하세요.
 
 ---
 
@@ -284,16 +302,23 @@ pip install -e .[dev]
 - PDF에 embedded 이미지가 없으면 정상 경고일 수 있음
 - 스캔 PDF라도 이미지 객체가 표준 임베드 형식이 아닐 수 있음
 
+### E. `embedded` 또는 `placeholder` 모드인데 `assets\images`가 비어 있음
+- 최근 동작에서는 정상입니다.
+- `referenced` 모드에서만 실제 이미지 파일을 저장합니다.
+- `embedded`는 Markdown 내부 data URI, `placeholder`는 comment만 남깁니다.
+
 ### F. 표가 기대보다 많거나 적게 추출됨
 - 최신 로직은 표 후보를 다중 전략으로 탐색하고 보수적으로 복구합니다.
 - 아래를 우선 확인하세요:
   - `report.json > summary.table_total`
   - `report.json > summary.table_recovered_count`
   - `report.json > summary.table_unresolved_count`
+  - `report.json > summary.table_fallback_count`
+  - `report.json > summary.table_fallbacks`
   - `report.json > warnings[].details.reasons`
 - `AMBIGUOUS_GRID`, `LOW_DATA_DENSITY` 경고가 많은 문서는 원본 PDF 구조가 불명확한 경우가 많습니다.
 
-### E. 권한 문제
+### G. 권한 문제
 - 회사 보안 정책으로 스크립트 실행 제한 가능
 - PowerShell 정책 또는 보안 솔루션 정책 확인
 

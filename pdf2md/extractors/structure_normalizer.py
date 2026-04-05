@@ -5,11 +5,8 @@ from dataclasses import dataclass, field
 
 from pdf2md.extractors.text import TextLine
 from pdf2md.models import DedupDecision, LineType, NormalizedLine, SuppressDecision
+from pdf2md.utils.structure import classify_structure_line
 
-HEADING_INDEX_PATTERN = re.compile(r"^\d+(?:\.\d+)+\s+\S")
-FIGURE_CAPTION_PATTERN = re.compile(r"^Figure\s+\d+\s*:", re.IGNORECASE)
-TABLE_CAPTION_PATTERN = re.compile(r"^Table\s+\d+\s*:", re.IGNORECASE)
-TOC_LEADER_PATTERN = re.compile(r"\.{5,}\s*\d+\s*$")
 SENTENCE_END_PATTERN = re.compile(r"[.:;?!]\s*$")
 HYPHEN_JOIN_START_PATTERN = re.compile(r"^[A-Za-z0-9]")
 
@@ -34,19 +31,6 @@ class NormalizationResult:
 
 def _normalize_for_compare(text: str) -> str:
     return " ".join(text.lower().split())
-
-
-def _classify_line(text: str) -> LineType:
-    normalized = text.strip()
-    if TOC_LEADER_PATTERN.search(normalized):
-        return LineType.TOC_LINE
-    if HEADING_INDEX_PATTERN.match(normalized):
-        return LineType.HEADING_INDEX
-    if FIGURE_CAPTION_PATTERN.match(normalized):
-        return LineType.FIGURE_CAPTION
-    if TABLE_CAPTION_PATTERN.match(normalized):
-        return LineType.TABLE_CAPTION
-    return LineType.BODY_LINE
 
 
 def _intersection_area(
@@ -122,7 +106,7 @@ def normalize_page_lines(
             result.suppressed_lines.append(suppress)
             continue
 
-        line_type = _classify_line(line.text)
+        line_type = classify_structure_line(line.text)
         normalized = NormalizedLine(
             page=page,
             index=idx,

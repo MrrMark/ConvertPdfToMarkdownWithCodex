@@ -7,6 +7,7 @@ from typing import Optional
 from pdf2md.config import Config
 from pdf2md.models import ImageMode, TableMode
 from pdf2md.pipeline import run_conversion
+from pdf2md.utils.logging import configure_logging
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -38,6 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[list[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    configure_logging(verbose=args.verbose, debug=args.debug)
 
     config = Config(
         input_pdf=Path(args.input_pdf),

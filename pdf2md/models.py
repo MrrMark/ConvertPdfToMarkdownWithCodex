@@ -19,6 +19,18 @@ class TableMode(str, Enum):
     HTML_ONLY = "html-only"
 
 
+class ConversionStatus(str, Enum):
+    SUCCESS = "success"
+    PARTIAL_SUCCESS = "partial_success"
+    FAILED = "failed"
+
+
+class PageStatus(str, Enum):
+    SUCCESS = "success"
+    PARTIAL_SUCCESS = "partial_success"
+    FAILED = "failed"
+
+
 class LineType(str, Enum):
     HEADING_INDEX = "HEADING_INDEX"
     FIGURE_CAPTION = "FIGURE_CAPTION"
@@ -36,7 +48,7 @@ class WarningEntry(BaseModel):
 
 class PageResult(BaseModel):
     page: int
-    status: str = "success"
+    status: PageStatus = PageStatus.SUCCESS
     char_count: int = 0
     warning_count: int = 0
     used_ocr: bool = False
@@ -53,6 +65,9 @@ class ImageAsset(BaseModel):
     page: int
     index: int
     path: str
+    alt_text: Optional[str] = None
+    caption_text: Optional[str] = None
+    caption_source: Optional[str] = None
     bbox: Optional[list[float]] = None
     width: Optional[int] = None
     height: Optional[int] = None
@@ -110,6 +125,7 @@ class SuppressDecision(BaseModel):
 class Manifest(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
+    schema_version: str = "1.0"
     input_file: str
     total_pages: int
     selected_pages: list[int]
@@ -124,10 +140,11 @@ class Manifest(BaseModel):
 class Report(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
+    schema_version: str = "1.0"
     started_at: datetime
     finished_at: datetime
     duration_ms: int
-    status: str
+    status: ConversionStatus
     engine_usage: dict[str, bool]
     failed_pages: list[int] = Field(default_factory=list)
     warnings: list[WarningEntry] = Field(default_factory=list)

@@ -1,23 +1,10 @@
 from __future__ import annotations
 
-import re
-
-HEADING_INDEX_PATTERN = re.compile(r"^\d+(?:\.\d+)+\s+\S")
-FIGURE_CAPTION_PATTERN = re.compile(r"^Figure\s+\d+\s*:", re.IGNORECASE)
-TABLE_CAPTION_PATTERN = re.compile(r"^Table\s+\d+\s*:", re.IGNORECASE)
-
-
-def _is_structure_line(text: str) -> bool:
-    stripped = text.strip()
-    return bool(
-        HEADING_INDEX_PATTERN.match(stripped)
-        or FIGURE_CAPTION_PATTERN.match(stripped)
-        or TABLE_CAPTION_PATTERN.match(stripped)
-    )
+from pdf2md.utils.structure import is_structure_line
 
 
 def _append_line(lines: list[str], text: str) -> None:
-    if _is_structure_line(text):
+    if is_structure_line(text):
         if lines and lines[-1] != "":
             lines.append("")
         lines.append(text)
