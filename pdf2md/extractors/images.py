@@ -168,12 +168,4 @@ def extract_images(
         if page_blocks:
             result.blocks_by_page[page_number] = page_blocks
 
-    if image_mode == ImageMode.REFERENCED and not result.assets:
-        result.warnings.append(
-            WarningEntry(
-                code="IMAGE_NOT_FOUND",
-                message="No embedded images were found for selected pages.",
-            )
-        )
-
     return result

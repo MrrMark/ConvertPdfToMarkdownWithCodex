@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from pdf2md.config import Config
-from pdf2md.pipeline import EXIT_PARTIAL, run_conversion
+from pdf2md.pipeline import EXIT_SUCCESS, run_conversion
 
 
 def test_pipeline_generates_outputs(sample_pdf: Path, tmp_path: Path) -> None:
@@ -16,7 +16,7 @@ def test_pipeline_generates_outputs(sample_pdf: Path, tmp_path: Path) -> None:
     )
 
     result = run_conversion(config)
-    assert result.exit_code == EXIT_PARTIAL
+    assert result.exit_code == EXIT_SUCCESS
 
     document_path = output_dir / "document.md"
     manifest_path = output_dir / "manifest.json"
@@ -34,4 +34,4 @@ def test_pipeline_generates_outputs(sample_pdf: Path, tmp_path: Path) -> None:
 
     assert manifest["input_file"] == "sample.pdf"
     assert manifest["selected_pages"] == [1, 2]
-    assert report["status"] == "partial_success"
+    assert report["status"] == "success"
