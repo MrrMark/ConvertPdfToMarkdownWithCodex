@@ -27,6 +27,47 @@
 git --version
 ```
 
+### 2-1) 회사 보안 환경: 온라인 설치가 막힌 경우
+
+사내 보안 정책으로 인해 인터넷에서 직접 설치가 불가능하면 아래 방식으로 진행하세요.
+
+#### 방법 A. 오프라인 설치 파일 반입
+
+1. 인터넷 가능한 PC에서 Git for Windows 설치 파일(`.exe`) 다운로드  
+2. 회사 정책에 맞는 반입 경로(내부 파일 반입 승인, 사내 저장소 등)로 파일 이동  
+3. 대상 PC에서 설치 실행  
+4. 설치 후 확인
+
+```powershell
+git --version
+```
+
+#### 방법 B. Portable Git(무설치) 사용
+
+설치 권한(관리자 권한)이 제한된 경우, Portable Git(`PortableGit-*.7z.exe`)를 사용할 수 있습니다.
+
+1. 인터넷 가능한 PC에서 Git for Windows Releases의 Portable 파일 다운로드  
+2. 사내 승인 경로로 대상 PC에 반입  
+3. 원하는 경로에 압축 해제 (예: `C:\Tools\PortableGit`)  
+4. 현재 세션 PATH에 추가
+
+```powershell
+$env:Path = "C:\Tools\PortableGit\cmd;$env:Path"
+git --version
+```
+
+5. 영구 적용(선택): 시스템 정책 허용 시 사용자 환경변수 PATH에 `C:\Tools\PortableGit\cmd` 추가
+
+#### 보안 검증(권장)
+
+반입한 설치 파일 무결성 검증:
+
+```powershell
+Get-FileHash .\Git-Installer.exe -Algorithm SHA256
+```
+
+공식 배포 페이지의 체크섬과 비교 후 설치하세요.
+
 ---
 
 ## 3) Python 3.11 설치
@@ -240,4 +281,3 @@ python -m pip install --upgrade pip
 pip install -e .[dev]
 python -m pdf2md .\sample.pdf -o .\output --pages 1-3 --keep-page-markers --image-mode referenced --table-mode auto
 ```
-
