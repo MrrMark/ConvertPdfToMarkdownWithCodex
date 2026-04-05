@@ -57,11 +57,15 @@ def _build_report(
     total_suppressed_lines: int = 0,
     deduplicated_blocks: list[dict] | None = None,
     suppressed_lines: list[dict] | None = None,
+    table_quality: list[dict] | None = None,
+    table_counts: dict[str, int] | None = None,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
     excluded_images = excluded_images or []
     deduplicated_blocks = deduplicated_blocks or []
     suppressed_lines = suppressed_lines or []
+    table_quality = table_quality or []
+    table_counts = table_counts or {}
     return Report(
         started_at=started_at,
         finished_at=finished_at,
@@ -83,6 +87,8 @@ def _build_report(
             "total_suppressed_lines": total_suppressed_lines,
             "deduplicated_blocks": deduplicated_blocks,
             "suppressed_lines": suppressed_lines,
+            "table_quality": table_quality,
+            **table_counts,
         },
     )
 
@@ -368,6 +374,8 @@ def run_conversion(config: Config) -> ConversionResult:
         total_suppressed_lines=total_suppressed_lines,
         deduplicated_blocks=deduplicated_blocks_payload,
         suppressed_lines=suppressed_lines_payload,
+        table_quality=table_result.table_quality,
+        table_counts=table_result.table_counts,
     )
     if low_conf_pages:
         report.summary["low_confidence_pages"] = low_conf_pages
