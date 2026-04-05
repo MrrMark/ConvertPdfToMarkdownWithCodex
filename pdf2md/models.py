@@ -32,6 +32,7 @@ class PageResult(BaseModel):
     char_count: int = 0
     warning_count: int = 0
     used_ocr: bool = False
+    ocr_confidence: Optional[float] = None
 
 
 class ImageAsset(BaseModel):

@@ -5,6 +5,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import pdfplumber
 from pypdf import PdfReader
 
 from pdf2md.models import ImageAsset, ImageMode, WarningEntry
@@ -15,6 +16,7 @@ class ImageBlock:
     page: int
     index: int
     markdown: str
+    top: float
 
 
 @dataclass
@@ -55,13 +57,33 @@ def _build_markdown(
 
 def extract_images(
     reader: PdfReader,
+    pdf_path: Path,
     selected_pages: list[int],
+    password: str | None,
     output_dir: Path,
     image_mode: ImageMode,
 ) -> ImageExtractionResult:
     result = ImageExtractionResult()
     images_root = output_dir / "assets" / "images"
     images_root.mkdir(parents=True, exist_ok=True)
+
+    page_image_boxes: dict[int, list[dict]] = {}
+    try:
+        with pdfplumber.open(str(pdf_path), password=password) as pdf:
+            for page_number in selected_pages:
+                page = pdf.pages[page_number - 1]
+                boxes = sorted(
+                    (page.images or []),
+                    key=lambda item: (float(item.get("top", 0.0)), float(item.get("x0", 0.0))),
+                )
+                page_image_boxes[page_number] = boxes
+    except Exception as exc:  # noqa: BLE001
+        result.warnings.append(
+            WarningEntry(
+                code="IMAGE_POSITION_MAPPING_FAILED",
+                message=f"Failed to read image positions from pdfplumber: {exc}",
+            )
+        )
 
     for page_number in selected_pages:
         page = reader.pages[page_number - 1]
@@ -89,6 +111,24 @@ def extract_images(
                 disk_path.write_bytes(image_bytes)
                 sha256 = hashlib.sha256(image_bytes).hexdigest()
                 alt_text = f"Image page-{page_number:04d}-figure-{index:03d}"
+                bbox_payload = None
+                width = None
+                height = None
+                top = float(index) * 1000.0
+                mapped = page_image_boxes.get(page_number, [])
+                if len(mapped) >= index:
+                    box = mapped[index - 1]
+                    x0 = float(box.get("x0", 0.0))
+                    y0 = float(box.get("top", 0.0))
+                    x1 = float(box.get("x1", 0.0))
+                    y1 = float(box.get("bottom", 0.0))
+                    top = y0
+                    bbox_payload = [x0, y0, x1, y1]
+                    if box.get("width") is not None:
+                        width = int(float(box["width"]))
+                    if box.get("height") is not None:
+                        height = int(float(box["height"]))
+
                 page_blocks.append(
                     ImageBlock(
                         page=page_number,
@@ -102,6 +142,7 @@ def extract_images(
                             page=page_number,
                             index=index,
                         ),
+                        top=top,
                     )
                 )
                 result.assets.append(
@@ -109,6 +150,9 @@ def extract_images(
                         page=page_number,
                         index=index,
                         path=rel_path,
+                        bbox=bbox_payload,
+                        width=width,
+                        height=height,
                         sha256=sha256,
                     )
                 )

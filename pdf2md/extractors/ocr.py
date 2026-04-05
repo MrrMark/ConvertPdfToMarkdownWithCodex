@@ -23,6 +23,7 @@ class OcrResult:
     page_texts: dict[int, str] = field(default_factory=dict)
     ocr_pages: list[int] = field(default_factory=list)
     used_ocr: bool = False
+    confidence_by_page: dict[int, float] = field(default_factory=dict)
 
 
 def run_ocr(
@@ -65,18 +66,39 @@ def run_ocr(
             bitmap = page.render(scale=2.0)
             pil_image = bitmap.to_pil()
             text = (pytesseract.image_to_string(pil_image) or "").strip()
+            data = pytesseract.image_to_data(pil_image, output_type=pytesseract.Output.DICT)
             page.close()
+            confidences: list[float] = []
+            for raw_conf in data.get("conf", []):
+                try:
+                    conf = float(raw_conf)
+                except Exception:  # noqa: BLE001
+                    continue
+                if conf >= 0:
+                    confidences.append(conf)
+            avg_conf = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
 
             if text:
                 result.page_texts[page_number] = text
                 result.ocr_pages.append(page_number)
                 result.used_ocr = True
+                result.confidence_by_page[page_number] = avg_conf
+                if avg_conf < 60.0:
+                    result.warnings.append(
+                        WarningEntry(
+                            code="OCR_LOW_CONFIDENCE",
+                            message=f"OCR confidence is low ({avg_conf}).",
+                            page=page_number,
+                            details={"avg_confidence": avg_conf},
+                        )
+                    )
             else:
                 result.warnings.append(
                     WarningEntry(
                         code="OCR_EMPTY_RESULT",
                         message="OCR returned empty text.",
                         page=page_number,
+                        details={"avg_confidence": avg_conf},
                     )
                 )
         except Exception as exc:  # noqa: BLE001

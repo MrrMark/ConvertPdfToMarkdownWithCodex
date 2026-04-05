@@ -40,7 +40,9 @@ def _build_report(
     page_results: list[PageResult],
     failed_pages: list[int],
     engine_usage: dict[str, bool],
+    ocr_confidence_by_page: dict[str, float] | None = None,
 ) -> Report:
+    ocr_confidence_by_page = ocr_confidence_by_page or {}
     return Report(
         started_at=started_at,
         finished_at=finished_at,
@@ -55,6 +57,7 @@ def _build_report(
             "warning_count": len(warnings),
             "failed_page_count": len(set(failed_pages)),
             "partial_success": status == "partial_success",
+            "ocr_confidence_by_page": ocr_confidence_by_page,
         },
     )
 
@@ -153,28 +156,41 @@ def run_conversion(config: Config) -> ConversionResult:
         if page in page_results_map:
             page_results_map[page].used_ocr = True
             page_results_map[page].char_count = len(text)
+            page_results_map[page].ocr_confidence = ocr_result.confidence_by_page.get(page)
 
     table_result = extract_tables(config.input_pdf, selected_pages, config.password, config.table_mode)
-    image_result = extract_images(reader, selected_pages, config.output_dir, config.image_mode)
+    image_result = extract_images(
+        reader=reader,
+        pdf_path=config.input_pdf,
+        selected_pages=selected_pages,
+        password=config.password,
+        output_dir=config.output_dir,
+        image_mode=config.image_mode,
+    )
     engine_usage["tables"] = len(table_result.assets) > 0
     engine_usage["images"] = len(image_result.assets) > 0
     warnings.extend(table_result.warnings)
     warnings.extend(image_result.warnings)
 
-    table_blocks_by_page = {
-        page: [block.markdown for block in blocks]
-        for page, blocks in table_result.blocks_by_page.items()
-    }
-    image_blocks_by_page = {
-        page: [block.markdown for block in blocks]
-        for page, blocks in image_result.blocks_by_page.items()
+    page_blocks_with_top: dict[int, list[tuple[float, str]]] = {}
+    for page, blocks in table_result.blocks_by_page.items():
+        page_blocks_with_top.setdefault(page, [])
+        for block in blocks:
+            page_blocks_with_top[page].append((block.top, block.markdown))
+    for page, blocks in image_result.blocks_by_page.items():
+        page_blocks_with_top.setdefault(page, [])
+        for block in blocks:
+            page_blocks_with_top[page].append((block.top, block.markdown))
+
+    ordered_page_blocks = {
+        page: [content for _, content in sorted(entries, key=lambda item: item[0])]
+        for page, entries in page_blocks_with_top.items()
     }
 
     markdown = serialize_markdown(
         page_texts,
         keep_page_markers=config.keep_page_markers,
-        table_blocks_by_page=table_blocks_by_page,
-        image_blocks_by_page=image_blocks_by_page,
+        page_blocks_by_page=ordered_page_blocks,
     )
     markdown_path = config.output_dir / "document.md"
     write_text(markdown_path, markdown)
@@ -210,6 +226,11 @@ def run_conversion(config: Config) -> ConversionResult:
 
     finished_at = datetime.now(timezone.utc)
     page_results = [page_results_map[page] for page in sorted(page_results_map)]
+    ocr_confidence_by_page = {
+        str(page_result.page): float(page_result.ocr_confidence)
+        for page_result in page_results
+        if page_result.ocr_confidence is not None
+    }
     report = _build_report(
         started_at=started_at,
         finished_at=finished_at,
@@ -218,6 +239,7 @@ def run_conversion(config: Config) -> ConversionResult:
         page_results=page_results,
         failed_pages=failed_pages,
         engine_usage=engine_usage,
+        ocr_confidence_by_page=ocr_confidence_by_page,
     )
     report_path = config.output_dir / "report.json"
     write_json(report_path, serialize_report(report))

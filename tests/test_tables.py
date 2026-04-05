@@ -1,4 +1,4 @@
-from pdf2md.extractors.tables import is_simple_table
+from pdf2md.extractors.tables import analyze_table_complexity, is_simple_table
 
 
 def test_is_simple_table_true_for_rectangular_single_line_cells() -> None:
@@ -15,3 +15,14 @@ def test_is_simple_table_false_for_multiline_cell() -> None:
         ["line1\nline2", "b"],
     ]
     assert is_simple_table(rows) is False
+
+
+def test_analyze_table_complexity_detects_sparse_and_long_cells() -> None:
+    rows = [
+        ["", ""],
+        ["A" * 130, ""],
+    ]
+    simple, reasons = analyze_table_complexity(rows)
+    assert simple is False
+    assert "empty_header" in reasons
+    assert "very_long_cells" in reasons

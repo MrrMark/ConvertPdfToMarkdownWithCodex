@@ -15,6 +15,7 @@ class TableBlock:
     index: int
     mode: str
     markdown: str
+    top: float
 
 
 @dataclass
@@ -30,20 +31,61 @@ def _sanitize_cell(value: Any) -> str:
     return text
 
 
-def is_simple_table(rows: list[list[str]]) -> bool:
-    """Return True only when table is safe enough for GFM serialization."""
+def analyze_table_complexity(rows: list[list[str]]) -> tuple[bool, list[str]]:
+    """Return (is_simple, reasons) for conservative GFM safety checks."""
+    reasons: list[str] = []
     if not rows:
-        return False
+        return False, ["empty_table"]
+    if len(rows) < 2:
+        reasons.append("not_enough_rows")
     width = len(rows[0])
     if width == 0:
-        return False
+        reasons.append("zero_columns")
+    if width > 12:
+        reasons.append("too_many_columns")
+
     for row in rows:
         if len(row) != width:
-            return False
+            reasons.append("non_rectangular")
+            break
+
+    header = rows[0] if rows else []
+    if header and all(cell.strip() == "" for cell in header):
+        reasons.append("empty_header")
+
+    multiline_cells = 0
+    long_cells = 0
+    sparse_rows = 0
+    list_like_cells = 0
+    for row in rows:
+        non_empty = 0
         for cell in row:
+            stripped = cell.strip()
+            if stripped:
+                non_empty += 1
             if "\n" in cell:
-                return False
-    return True
+                multiline_cells += 1
+            if len(stripped) > 120:
+                long_cells += 1
+            if stripped.startswith(("- ", "* ", "1. ", "2. ", "3. ")):
+                list_like_cells += 1
+        if width > 0 and non_empty <= max(1, width // 3):
+            sparse_rows += 1
+
+    if multiline_cells > 0:
+        reasons.append("multiline_cells")
+    if long_cells > 0:
+        reasons.append("very_long_cells")
+    if sparse_rows >= max(1, len(rows) // 2):
+        reasons.append("sparse_rows")
+    if list_like_cells > 0:
+        reasons.append("list_like_cells")
+
+    return len(reasons) == 0, reasons
+
+
+def is_simple_table(rows: list[list[str]]) -> bool:
+    return analyze_table_complexity(rows)[0]
 
 
 def _serialize_gfm(rows: list[list[str]]) -> str:
@@ -74,13 +116,14 @@ def _serialize_html(rows: list[list[str]]) -> str:
 
 
 def _pick_mode(table_mode: TableMode, rows: list[list[str]]) -> tuple[str, Optional[str]]:
-    simple = is_simple_table(rows)
+    simple, reasons = analyze_table_complexity(rows)
     if table_mode == TableMode.HTML_ONLY:
         return "html", None
     if table_mode == TableMode.GFM_ONLY:
         if simple:
             return "gfm", None
-        return "html", "Requested gfm-only but table was unsafe for GFM; used HTML fallback."
+        reason_text = ",".join(reasons) if reasons else "unknown"
+        return "html", f"Requested gfm-only but table was unsafe for GFM ({reason_text}); used HTML fallback."
     if simple:
         return "gfm", None
     return "html", None
@@ -98,36 +141,56 @@ def extract_tables(
         with pdfplumber.open(str(pdf_path), password=password) as pdf:
             for page_number in selected_pages:
                 page = pdf.pages[page_number - 1]
-                raw_tables = page.extract_tables() or []
+                table_candidates = page.find_tables() or []
                 page_blocks: list[TableBlock] = []
 
-                for index, raw in enumerate(raw_tables, start=1):
+                for index, table_obj in enumerate(table_candidates, start=1):
+                    raw = table_obj.extract() or []
                     rows = [[_sanitize_cell(cell) for cell in row] for row in (raw or []) if row is not None]
                     if not rows:
                         continue
 
                     mode, fallback_reason = _pick_mode(table_mode, rows)
+                    simple, reasons = analyze_table_complexity(rows)
                     if fallback_reason:
                         result.warnings.append(
                             WarningEntry(
                                 code="TABLE_GFM_UNSAFE_FALLBACK_HTML",
                                 message=fallback_reason,
                                 page=page_number,
-                                details={"table_index": index},
+                                details={"table_index": index, "reasons": reasons},
+                            )
+                        )
+                    elif mode == "html" and table_mode == TableMode.AUTO and not simple:
+                        result.warnings.append(
+                            WarningEntry(
+                                code="TABLE_COMPLEXITY_HTML_FALLBACK",
+                                message="Table was treated as complex and serialized as HTML fallback.",
+                                page=page_number,
+                                details={"table_index": index, "reasons": reasons},
                             )
                         )
 
                     rendered = _serialize_gfm(rows) if mode == "gfm" else _serialize_html(rows)
                     comment = f"<!-- table: page={page_number} index={index} mode={mode} -->"
+                    x0, top, x1, bottom = table_obj.bbox
                     page_blocks.append(
                         TableBlock(
                             page=page_number,
                             index=index,
                             mode=mode,
                             markdown=f"{comment}\n{rendered}",
+                            top=float(top),
                         )
                     )
-                    result.assets.append(TableAsset(page=page_number, index=index, mode=mode))
+                    result.assets.append(
+                        TableAsset(
+                            page=page_number,
+                            index=index,
+                            mode=mode,
+                            bbox=[float(x0), float(top), float(x1), float(bottom)],
+                        )
+                    )
 
                 if page_blocks:
                     result.blocks_by_page[page_number] = page_blocks
