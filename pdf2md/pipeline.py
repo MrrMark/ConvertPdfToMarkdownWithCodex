@@ -9,7 +9,7 @@ from pdf2md.config import Config
 from pdf2md.extractors.images import extract_images
 from pdf2md.extractors.ocr import run_ocr
 from pdf2md.extractors.tables import extract_tables
-from pdf2md.extractors.text import TextExtractionError, extract_page_texts
+from pdf2md.extractors.text import TextExtractionError, extract_page_text_layout
 from pdf2md.models import Manifest, PageResult, Report, WarningEntry
 from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown
@@ -32,6 +32,15 @@ class ConversionResult:
     warnings: list[WarningEntry]
 
 
+def _find_anchor_index(line_tops: list[float], block_top: float) -> int:
+    if not line_tops:
+        return 0
+    for idx, top in enumerate(line_tops):
+        if block_top <= top:
+            return idx
+    return len(line_tops)
+
+
 def _build_report(
     started_at: datetime,
     finished_at: datetime,
@@ -40,9 +49,12 @@ def _build_report(
     page_results: list[PageResult],
     failed_pages: list[int],
     engine_usage: dict[str, bool],
-    ocr_confidence_by_page: dict[str, float] | None = None,
+    ocr_confidence_by_page: dict[str, dict[str, float]] | None = None,
+    excluded_image_count: int = 0,
+    excluded_images: list[dict] | None = None,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
+    excluded_images = excluded_images or []
     return Report(
         started_at=started_at,
         finished_at=finished_at,
@@ -58,6 +70,8 @@ def _build_report(
             "failed_page_count": len(set(failed_pages)),
             "partial_success": status == "partial_success",
             "ocr_confidence_by_page": ocr_confidence_by_page,
+            "excluded_image_count": excluded_image_count,
+            "excluded_images": excluded_images,
         },
     )
 
@@ -128,35 +142,46 @@ def run_conversion(config: Config) -> ConversionResult:
             warnings=warnings,
         )
 
+    page_text_lines: dict[int, list[str]] = {}
+    page_line_tops: dict[int, list[float]] = {}
     page_texts: dict[int, str] = {}
     try:
-        page_texts = extract_page_texts(config.input_pdf, selected_pages, config.password)
+        layout = extract_page_text_layout(config.input_pdf, selected_pages, config.password)
+        for page in selected_pages:
+            lines = layout.get(page, [])
+            page_text_lines[page] = [line.text for line in lines]
+            page_line_tops[page] = [line.top for line in lines]
+            page_texts[page] = "\n".join(page_text_lines[page]).strip()
+            page_results_map[page] = PageResult(
+                page=page,
+                status="success",
+                char_count=len(page_texts[page]),
+            )
     except TextExtractionError as exc:
         warnings.append(WarningEntry(code="TEXT_EXTRACTION_FAILED", message=str(exc)))
         for page in selected_pages:
             failed_pages.append(page)
+            page_text_lines[page] = []
+            page_line_tops[page] = []
             page_texts[page] = ""
             page_results_map[page] = PageResult(page=page, status="failed")
-
-    for page in selected_pages:
-        text = page_texts.get(page, "")
-        if page in page_results_map and page_results_map[page].status == "failed":
-            continue
-        page_results_map[page] = PageResult(
-            page=page,
-            status="success",
-            char_count=len(text),
-        )
 
     ocr_result = run_ocr(config.input_pdf, selected_pages, page_texts, config.force_ocr)
     warnings.extend(ocr_result.warnings)
     engine_usage["ocr"] = ocr_result.used_ocr
     for page, text in ocr_result.page_texts.items():
-        page_texts[page] = text
+        lines = [line.rstrip() for line in text.splitlines() if line.strip()]
+        page_text_lines[page] = lines
+        page_line_tops[page] = [float(idx * 12) for idx in range(len(lines))]
+        page_texts[page] = "\n".join(lines)
         if page in page_results_map:
+            metrics = ocr_result.metrics_by_page.get(page)
             page_results_map[page].used_ocr = True
-            page_results_map[page].char_count = len(text)
-            page_results_map[page].ocr_confidence = ocr_result.confidence_by_page.get(page)
+            page_results_map[page].char_count = len(page_texts[page])
+            if metrics:
+                page_results_map[page].ocr_confidence_mean = metrics.mean
+                page_results_map[page].ocr_confidence_median = metrics.median
+                page_results_map[page].low_conf_token_ratio = metrics.low_conf_token_ratio
 
     table_result = extract_tables(config.input_pdf, selected_pages, config.password, config.table_mode)
     image_result = extract_images(
@@ -172,23 +197,37 @@ def run_conversion(config: Config) -> ConversionResult:
     warnings.extend(table_result.warnings)
     warnings.extend(image_result.warnings)
 
-    page_blocks_with_top: dict[int, list[tuple[float, str]]] = {}
+    page_blocks_with_anchor: dict[int, list[tuple[int, float, str]]] = {}
     for page, blocks in table_result.blocks_by_page.items():
-        page_blocks_with_top.setdefault(page, [])
+        line_tops = page_line_tops.get(page, [])
         for block in blocks:
-            page_blocks_with_top[page].append((block.top, block.markdown))
-    for page, blocks in image_result.blocks_by_page.items():
-        page_blocks_with_top.setdefault(page, [])
-        for block in blocks:
-            page_blocks_with_top[page].append((block.top, block.markdown))
+            anchor_index = _find_anchor_index(line_tops, block.top)
+            page_blocks_with_anchor.setdefault(page, []).append((anchor_index, block.top, block.markdown))
+            for asset in table_result.assets:
+                if asset.page == block.page and asset.index == block.index:
+                    asset.anchor_line_index = anchor_index
+                    asset.anchor_top = block.top
+                    break
 
-    ordered_page_blocks = {
-        page: [content for _, content in sorted(entries, key=lambda item: item[0])]
-        for page, entries in page_blocks_with_top.items()
-    }
+    for page, blocks in image_result.blocks_by_page.items():
+        line_tops = page_line_tops.get(page, [])
+        for block in blocks:
+            anchor_index = _find_anchor_index(line_tops, block.top)
+            block.anchor_line_index = anchor_index
+            page_blocks_with_anchor.setdefault(page, []).append((anchor_index, block.top, block.markdown))
+            for asset in image_result.assets:
+                if asset.page == block.page and asset.index == block.index:
+                    asset.anchor_line_index = anchor_index
+                    asset.anchor_top = block.top
+                    break
+
+    ordered_page_blocks: dict[int, list[tuple[int, str]]] = {}
+    for page, entries in page_blocks_with_anchor.items():
+        entries.sort(key=lambda item: (item[0], item[1]))
+        ordered_page_blocks[page] = [(anchor_idx, markdown) for anchor_idx, _, markdown in entries]
 
     markdown = serialize_markdown(
-        page_texts,
+        page_text_lines=page_text_lines,
         keep_page_markers=config.keep_page_markers,
         page_blocks_by_page=ordered_page_blocks,
     )
@@ -208,6 +247,7 @@ def run_conversion(config: Config) -> ConversionResult:
             "version": config.version,
         },
         images=image_result.assets,
+        excluded_images=image_result.excluded_assets,
         tables=table_result.assets,
         ocr_pages=sorted(ocr_result.ocr_pages),
         warnings=warnings,
@@ -226,11 +266,26 @@ def run_conversion(config: Config) -> ConversionResult:
 
     finished_at = datetime.now(timezone.utc)
     page_results = [page_results_map[page] for page in sorted(page_results_map)]
-    ocr_confidence_by_page = {
-        str(page_result.page): float(page_result.ocr_confidence)
-        for page_result in page_results
-        if page_result.ocr_confidence is not None
-    }
+    warning_count_by_page: dict[int, int] = {}
+    for warning in warnings:
+        if warning.page is None:
+            continue
+        warning_count_by_page[warning.page] = warning_count_by_page.get(warning.page, 0) + 1
+    for page_result in page_results:
+        page_result.warning_count = warning_count_by_page.get(page_result.page, 0)
+    ocr_confidence_by_page = {}
+    low_conf_pages: list[int] = []
+    for page_result in page_results:
+        if page_result.ocr_confidence_mean is None:
+            continue
+        ocr_confidence_by_page[str(page_result.page)] = {
+            "ocr_confidence_mean": float(page_result.ocr_confidence_mean),
+            "ocr_confidence_median": float(page_result.ocr_confidence_median or 0.0),
+            "low_conf_token_ratio": float(page_result.low_conf_token_ratio or 0.0),
+        }
+        if (page_result.low_conf_token_ratio or 0.0) > 0.25:
+            low_conf_pages.append(page_result.page)
+
     report = _build_report(
         started_at=started_at,
         finished_at=finished_at,
@@ -240,7 +295,11 @@ def run_conversion(config: Config) -> ConversionResult:
         failed_pages=failed_pages,
         engine_usage=engine_usage,
         ocr_confidence_by_page=ocr_confidence_by_page,
+        excluded_image_count=len(image_result.excluded_assets),
+        excluded_images=[item.model_dump(mode="json") for item in image_result.excluded_assets],
     )
+    if low_conf_pages:
+        report.summary["low_confidence_pages"] = low_conf_pages
     report_path = config.output_dir / "report.json"
     write_json(report_path, serialize_report(report))
 

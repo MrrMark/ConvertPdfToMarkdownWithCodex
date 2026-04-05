@@ -27,61 +27,103 @@ class TableExtractionResult:
 
 def _sanitize_cell(value: Any) -> str:
     text = "" if value is None else str(value)
-    text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
-    return text
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("\t", " ")
+    return " ".join(text.split()).strip()
+
+
+def _bbox_area(bbox: tuple[float, float, float, float]) -> float:
+    x0, y0, x1, y1 = bbox
+    return max(0.0, x1 - x0) * max(0.0, y1 - y0)
+
+
+def _bbox_intersection(
+    a: tuple[float, float, float, float],
+    b: tuple[float, float, float, float],
+) -> float:
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    ix0 = max(ax0, bx0)
+    iy0 = max(ay0, by0)
+    ix1 = min(ax1, bx1)
+    iy1 = min(ay1, by1)
+    return max(0.0, ix1 - ix0) * max(0.0, iy1 - iy0)
+
+
+def _is_contained(inner: tuple[float, float, float, float], outer: tuple[float, float, float, float]) -> bool:
+    ix = _bbox_intersection(inner, outer)
+    ia = _bbox_area(inner)
+    return ia > 0 and (ix / ia) >= 0.9
+
+
+def _prune_empty_columns(rows: list[list[str]]) -> list[list[str]]:
+    if not rows or not rows[0]:
+        return rows
+    width = len(rows[0])
+    counts = [0] * width
+    header = rows[0]
+    for r in rows:
+        for idx, cell in enumerate(r):
+            if idx < width and cell.strip():
+                counts[idx] += 1
+    keep_indices = [idx for idx in range(width) if counts[idx] >= 2 or header[idx].strip()]
+    if not keep_indices or len(keep_indices) == width:
+        return rows
+    return [[row[idx] for idx in keep_indices] for row in rows]
 
 
 def analyze_table_complexity(rows: list[list[str]]) -> tuple[bool, list[str]]:
-    """Return (is_simple, reasons) for conservative GFM safety checks."""
-    reasons: list[str] = []
+    reasons: set[str] = set()
     if not rows:
-        return False, ["empty_table"]
+        return False, ["AMBIGUOUS_GRID"]
     if len(rows) < 2:
-        reasons.append("not_enough_rows")
+        reasons.add("AMBIGUOUS_GRID")
     width = len(rows[0])
     if width == 0:
-        reasons.append("zero_columns")
+        reasons.add("AMBIGUOUS_GRID")
     if width > 12:
-        reasons.append("too_many_columns")
+        reasons.add("SPARSE_LAYOUT")
 
     for row in rows:
         if len(row) != width:
-            reasons.append("non_rectangular")
+            reasons.add("AMBIGUOUS_GRID")
             break
 
     header = rows[0] if rows else []
-    if header and all(cell.strip() == "" for cell in header):
-        reasons.append("empty_header")
+    if header and all(not c.strip() for c in header):
+        reasons.add("SPARSE_LAYOUT")
 
+    col_non_empty = [0] * width if width > 0 else []
     multiline_cells = 0
     long_cells = 0
     sparse_rows = 0
-    list_like_cells = 0
     for row in rows:
         non_empty = 0
-        for cell in row:
+        for idx, cell in enumerate(row):
             stripped = cell.strip()
             if stripped:
                 non_empty += 1
+                if idx < len(col_non_empty):
+                    col_non_empty[idx] += 1
             if "\n" in cell:
                 multiline_cells += 1
             if len(stripped) > 120:
                 long_cells += 1
-            if stripped.startswith(("- ", "* ", "1. ", "2. ", "3. ")):
-                list_like_cells += 1
-        if width > 0 and non_empty <= max(1, width // 3):
+        if width > 0 and (non_empty / width) < 0.35:
             sparse_rows += 1
 
     if multiline_cells > 0:
-        reasons.append("multiline_cells")
+        reasons.add("MULTILINE_CELL")
     if long_cells > 0:
-        reasons.append("very_long_cells")
-    if sparse_rows >= max(1, len(rows) // 2):
-        reasons.append("sparse_rows")
-    if list_like_cells > 0:
-        reasons.append("list_like_cells")
+        reasons.add("AMBIGUOUS_GRID")
+    if len(rows) > 0 and sparse_rows / len(rows) >= 0.5:
+        reasons.add("SPARSE_LAYOUT")
+    if width > 0:
+        near_empty_cols = sum(1 for c in col_non_empty if c <= 1)
+        if near_empty_cols / width >= 0.3:
+            reasons.add("AMBIGUOUS_GRID")
 
-    return len(reasons) == 0, reasons
+    return len(reasons) == 0, sorted(reasons)
 
 
 def is_simple_table(rows: list[list[str]]) -> bool:
@@ -115,18 +157,46 @@ def _serialize_html(rows: list[list[str]]) -> str:
     return "\n".join(lines)
 
 
-def _pick_mode(table_mode: TableMode, rows: list[list[str]]) -> tuple[str, Optional[str]]:
+def _header_pattern_score(rows: list[list[str]]) -> float:
+    if not rows:
+        return 0.0
+    header = rows[0]
+    filled = sum(1 for cell in header if cell.strip())
+    if not header:
+        return 0.0
+    ratio = filled / len(header)
+    return max(0.0, min(ratio, 1.0))
+
+
+def _candidate_score(page: pdfplumber.page.Page, table_obj, rows: list[list[str]]) -> float:
+    score = 0.0
+    if len(rows) >= 2:
+        score += 0.25
+    if len(rows[0]) >= 2 if rows else False:
+        score += 0.15
+    score += 0.2 * _header_pattern_score(rows)
+    edge_count = len(page.edges or [])
+    if edge_count > 0:
+        score += 0.2
+    area = _bbox_area(tuple(float(v) for v in table_obj.bbox))
+    page_area = float(page.width * page.height)
+    if page_area > 0 and (area / page_area) >= 0.01:
+        score += 0.2
+    return score
+
+
+def _pick_mode(table_mode: TableMode, rows: list[list[str]]) -> tuple[str, Optional[str], list[str]]:
     simple, reasons = analyze_table_complexity(rows)
     if table_mode == TableMode.HTML_ONLY:
-        return "html", None
+        return "html", None, reasons
     if table_mode == TableMode.GFM_ONLY:
         if simple:
-            return "gfm", None
-        reason_text = ",".join(reasons) if reasons else "unknown"
-        return "html", f"Requested gfm-only but table was unsafe for GFM ({reason_text}); used HTML fallback."
+            return "gfm", None, reasons
+        reason_text = ",".join(reasons) if reasons else "AMBIGUOUS_GRID"
+        return "html", f"Requested gfm-only but table was unsafe for GFM ({reason_text}); used HTML fallback.", reasons
     if simple:
-        return "gfm", None
-    return "html", None
+        return "gfm", None, reasons
+    return "html", None, reasons
 
 
 def extract_tables(
@@ -141,17 +211,33 @@ def extract_tables(
         with pdfplumber.open(str(pdf_path), password=password) as pdf:
             for page_number in selected_pages:
                 page = pdf.pages[page_number - 1]
-                table_candidates = page.find_tables() or []
-                page_blocks: list[TableBlock] = []
-
-                for index, table_obj in enumerate(table_candidates, start=1):
-                    raw = table_obj.extract() or []
-                    rows = [[_sanitize_cell(cell) for cell in row] for row in (raw or []) if row is not None]
-                    if not rows:
+                raw_candidates = page.find_tables() or []
+                scored: list[tuple[float, object, list[list[str]]]] = []
+                for table_obj in raw_candidates:
+                    raw_rows = table_obj.extract() or []
+                    rows = [[_sanitize_cell(cell) for cell in row] for row in raw_rows if row is not None]
+                    rows = _prune_empty_columns(rows)
+                    if not rows or not rows[0]:
                         continue
+                    score = _candidate_score(page, table_obj, rows)
+                    if score < 0.35:
+                        continue
+                    scored.append((score, table_obj, rows))
 
-                    mode, fallback_reason = _pick_mode(table_mode, rows)
-                    simple, reasons = analyze_table_complexity(rows)
+                scored.sort(key=lambda item: (_bbox_area(tuple(item[1].bbox)), item[0]), reverse=True)
+                deduped: list[tuple[float, object, list[list[str]]]] = []
+                for item in scored:
+                    bbox = tuple(float(v) for v in item[1].bbox)
+                    if any(_is_contained(bbox, tuple(float(v) for v in prev[1].bbox)) for prev in deduped):
+                        continue
+                    deduped.append(item)
+                    if len(deduped) >= 20:
+                        break
+                deduped.sort(key=lambda item: float(item[1].bbox[1]))
+
+                page_blocks: list[TableBlock] = []
+                for index, (_, table_obj, rows) in enumerate(deduped, start=1):
+                    mode, fallback_reason, reasons = _pick_mode(table_mode, rows)
                     if fallback_reason:
                         result.warnings.append(
                             WarningEntry(
@@ -161,7 +247,7 @@ def extract_tables(
                                 details={"table_index": index, "reasons": reasons},
                             )
                         )
-                    elif mode == "html" and table_mode == TableMode.AUTO and not simple:
+                    elif mode == "html" and table_mode == TableMode.AUTO:
                         result.warnings.append(
                             WarningEntry(
                                 code="TABLE_COMPLEXITY_HTML_FALLBACK",
@@ -173,14 +259,14 @@ def extract_tables(
 
                     rendered = _serialize_gfm(rows) if mode == "gfm" else _serialize_html(rows)
                     comment = f"<!-- table: page={page_number} index={index} mode={mode} -->"
-                    x0, top, x1, bottom = table_obj.bbox
+                    x0, top, x1, bottom = [float(v) for v in table_obj.bbox]
                     page_blocks.append(
                         TableBlock(
                             page=page_number,
                             index=index,
                             mode=mode,
                             markdown=f"{comment}\n{rendered}",
-                            top=float(top),
+                            top=top,
                         )
                     )
                     result.assets.append(
@@ -188,7 +274,7 @@ def extract_tables(
                             page=page_number,
                             index=index,
                             mode=mode,
-                            bbox=[float(x0), float(top), float(x1), float(bottom)],
+                            bbox=[x0, top, x1, bottom],
                         )
                     )
 

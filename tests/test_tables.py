@@ -24,5 +24,5 @@ def test_analyze_table_complexity_detects_sparse_and_long_cells() -> None:
     ]
     simple, reasons = analyze_table_complexity(rows)
     assert simple is False
-    assert "empty_header" in reasons
-    assert "very_long_cells" in reasons
+    assert "SPARSE_LAYOUT" in reasons
+    assert "AMBIGUOUS_GRID" in reasons

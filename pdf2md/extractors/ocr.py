@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
+import shutil
+import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
-import shutil
 
 from pdf2md.models import WarningEntry
 
@@ -16,6 +18,15 @@ try:
 except Exception:  # noqa: BLE001
     pytesseract = None
 
+ALNUM_PATTERN = re.compile(r"[A-Za-z0-9]")
+
+
+@dataclass
+class OcrMetrics:
+    mean: float
+    median: float
+    low_conf_token_ratio: float
+
 
 @dataclass
 class OcrResult:
@@ -23,7 +34,37 @@ class OcrResult:
     page_texts: dict[int, str] = field(default_factory=dict)
     ocr_pages: list[int] = field(default_factory=list)
     used_ocr: bool = False
-    confidence_by_page: dict[int, float] = field(default_factory=dict)
+    metrics_by_page: dict[int, OcrMetrics] = field(default_factory=dict)
+
+
+def _extract_confidence_metrics(data: dict) -> OcrMetrics:
+    confidences: list[float] = []
+    low_count = 0
+    total_count = 0
+    texts = data.get("text", [])
+    confs = data.get("conf", [])
+    for idx, raw_conf in enumerate(confs):
+        token = texts[idx] if idx < len(texts) else ""
+        token = str(token).strip()
+        if not token or not ALNUM_PATTERN.search(token):
+            continue
+        try:
+            conf = float(raw_conf)
+        except Exception:  # noqa: BLE001
+            continue
+        if conf < 0:
+            continue
+        confidences.append(conf)
+        total_count += 1
+        if conf < 60.0:
+            low_count += 1
+
+    if not confidences:
+        return OcrMetrics(mean=0.0, median=0.0, low_conf_token_ratio=1.0)
+    mean = round(sum(confidences) / len(confidences), 2)
+    median = round(float(statistics.median(confidences)), 2)
+    low_ratio = round(low_count / total_count, 4) if total_count else 1.0
+    return OcrMetrics(mean=mean, median=median, low_conf_token_ratio=low_ratio)
 
 
 def run_ocr(
@@ -68,28 +109,37 @@ def run_ocr(
             text = (pytesseract.image_to_string(pil_image) or "").strip()
             data = pytesseract.image_to_data(pil_image, output_type=pytesseract.Output.DICT)
             page.close()
-            confidences: list[float] = []
-            for raw_conf in data.get("conf", []):
-                try:
-                    conf = float(raw_conf)
-                except Exception:  # noqa: BLE001
-                    continue
-                if conf >= 0:
-                    confidences.append(conf)
-            avg_conf = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
 
+            metrics = _extract_confidence_metrics(data)
             if text:
                 result.page_texts[page_number] = text
                 result.ocr_pages.append(page_number)
                 result.used_ocr = True
-                result.confidence_by_page[page_number] = avg_conf
-                if avg_conf < 60.0:
+                result.metrics_by_page[page_number] = metrics
+                if metrics.mean < 50.0 or metrics.low_conf_token_ratio > 0.5:
                     result.warnings.append(
                         WarningEntry(
-                            code="OCR_LOW_CONFIDENCE",
-                            message=f"OCR confidence is low ({avg_conf}).",
+                            code="OCR_CONFIDENCE_CRITICAL",
+                            message=f"OCR confidence is critical (mean={metrics.mean}, low_ratio={metrics.low_conf_token_ratio}).",
                             page=page_number,
-                            details={"avg_confidence": avg_conf},
+                            details={
+                                "ocr_confidence_mean": metrics.mean,
+                                "ocr_confidence_median": metrics.median,
+                                "low_conf_token_ratio": metrics.low_conf_token_ratio,
+                            },
+                        )
+                    )
+                elif metrics.mean < 75.0 or metrics.low_conf_token_ratio > 0.25:
+                    result.warnings.append(
+                        WarningEntry(
+                            code="OCR_CONFIDENCE_WARN",
+                            message=f"OCR confidence is degraded (mean={metrics.mean}, low_ratio={metrics.low_conf_token_ratio}).",
+                            page=page_number,
+                            details={
+                                "ocr_confidence_mean": metrics.mean,
+                                "ocr_confidence_median": metrics.median,
+                                "low_conf_token_ratio": metrics.low_conf_token_ratio,
+                            },
                         )
                     )
             else:
@@ -98,7 +148,11 @@ def run_ocr(
                         code="OCR_EMPTY_RESULT",
                         message="OCR returned empty text.",
                         page=page_number,
-                        details={"avg_confidence": avg_conf},
+                        details={
+                            "ocr_confidence_mean": metrics.mean,
+                            "ocr_confidence_median": metrics.median,
+                            "low_conf_token_ratio": metrics.low_conf_token_ratio,
+                        },
                     )
                 )
         except Exception as exc:  # noqa: BLE001

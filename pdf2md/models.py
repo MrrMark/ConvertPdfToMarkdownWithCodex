@@ -32,13 +32,27 @@ class PageResult(BaseModel):
     char_count: int = 0
     warning_count: int = 0
     used_ocr: bool = False
-    ocr_confidence: Optional[float] = None
+    ocr_confidence_mean: Optional[float] = None
+    ocr_confidence_median: Optional[float] = None
+    low_conf_token_ratio: Optional[float] = None
 
 
 class ImageAsset(BaseModel):
     page: int
     index: int
     path: str
+    bbox: Optional[list[float]] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    sha256: Optional[str] = None
+    anchor_line_index: Optional[int] = None
+    anchor_top: Optional[float] = None
+
+
+class ExcludedImageAsset(BaseModel):
+    page: int
+    index: int
+    reason: str
     bbox: Optional[list[float]] = None
     width: Optional[int] = None
     height: Optional[int] = None
@@ -50,6 +64,8 @@ class TableAsset(BaseModel):
     index: int
     mode: str
     bbox: Optional[list[float]] = None
+    anchor_line_index: Optional[int] = None
+    anchor_top: Optional[float] = None
 
 
 class Manifest(BaseModel):
@@ -60,6 +76,7 @@ class Manifest(BaseModel):
     selected_pages: list[int]
     options: dict[str, Any]
     images: list[ImageAsset] = Field(default_factory=list)
+    excluded_images: list[ExcludedImageAsset] = Field(default_factory=list)
     tables: list[TableAsset] = Field(default_factory=list)
     ocr_pages: list[int] = Field(default_factory=list)
     warnings: list[WarningEntry] = Field(default_factory=list)
