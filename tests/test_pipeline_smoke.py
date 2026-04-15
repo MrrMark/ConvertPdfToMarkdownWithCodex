@@ -35,3 +35,22 @@ def test_pipeline_generates_outputs(sample_pdf: Path, tmp_path: Path) -> None:
     assert manifest["input_file"] == "sample.pdf"
     assert manifest["selected_pages"] == [1, 2]
     assert report["status"] == "success"
+
+
+def test_pipeline_uses_custom_output_filenames(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "custom-out"
+    config = Config(
+        input_pdf=sample_pdf,
+        output_dir=output_dir,
+        markdown_filename="sample.md",
+        manifest_filename="sample_manifest.json",
+        report_filename="sample_report.json",
+        assets_dirname="sample_assets",
+    )
+
+    result = run_conversion(config)
+    assert result.exit_code == EXIT_SUCCESS
+    assert (output_dir / "sample.md").exists()
+    assert (output_dir / "sample_manifest.json").exists()
+    assert (output_dir / "sample_report.json").exists()
+    assert (output_dir / "sample_assets" / "images").exists()

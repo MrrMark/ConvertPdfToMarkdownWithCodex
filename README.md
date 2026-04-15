@@ -210,6 +210,26 @@ sudo apt-get install -y poppler-utils tesseract-ocr
 pdf2md input.pdf -o output/
 ```
 
+### 폴더 내 PDF 일괄 순차 변환
+
+```bash
+pdf2md --input-dir ./pdfs
+```
+
+배치 모드에서는 지정한 입력 폴더 내부에 `output/` 폴더를 만들고, 각 PDF마다 아래 구조로 결과를 생성합니다.
+
+- `./pdfs/output/<pdf_stem>/<pdf_stem>.md`
+- `./pdfs/output/<pdf_stem>/<pdf_stem>_manifest.json`
+- `./pdfs/output/<pdf_stem>/<pdf_stem>_report.json`
+- `./pdfs/output/<pdf_stem>/<pdf_stem>_assets/images/...`
+
+배치 모드 주의사항:
+
+- 입력 대상은 지정 폴더 바로 아래의 PDF 파일만 포함합니다.
+- 배치 모드에서는 `-o/--output-dir` 을 사용하지 않습니다.
+- PDF가 하나도 없으면 에러로 종료합니다.
+- 같은 stem을 가진 PDF가 둘 이상 있으면 충돌 방지를 위해 에러로 종료합니다.
+
 ### 일부 페이지만 변환
 
 ```bash
@@ -286,7 +306,7 @@ Markdown에 직접 반영됩니다.
 
 ## 8. 출력 구조
 
-기본 출력 예시는 아래와 같습니다.
+단일 PDF 기본 출력 예시는 아래와 같습니다.
 
 ```text
 output/
@@ -297,6 +317,28 @@ output/
       page-0002-figure-002.png
   manifest.json
   report.json
+```
+
+배치 변환 출력 예시는 아래와 같습니다.
+
+```text
+pdfs/
+  a.pdf
+  b.pdf
+  output/
+    a/
+      a.md
+      a_manifest.json
+      a_report.json
+      a_assets/
+        images/
+    b/
+      b.md
+      b_manifest.json
+      b_report.json
+      b_assets/
+        images/
+    batch_report.json
 ```
 
 ### `document.md`
@@ -349,6 +391,15 @@ output/
   - `summary.structure_marker_recovered_exact_count`
   - `summary.structure_marker_recovered_context_count`
   - `summary.structure_marker_suppressed_count`
+
+### `batch_report.json`
+
+- 배치 모드에서만 생성되는 집계 파일
+- 처리 대상 PDF 목록
+- 문서별 상태: `success`, `partial_success`, `failed`
+- 문서별 출력 경로와 파일 경로
+- 문서별 종료 코드
+- 전체 성공/부분성공/실패 집계
 
 ### 종료 코드와 `report.json` 해석
 

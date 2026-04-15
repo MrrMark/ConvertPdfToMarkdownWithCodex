@@ -167,6 +167,31 @@ python -m pdf2md .\sample.pdf -o .\output
 - `output\manifest.json`
 - `output\report.json`
 
+### 7-1) 폴더 내 PDF 일괄 순차 변환
+
+예시 입력 폴더: `.\pdfs`
+
+```powershell
+python -m pdf2md --input-dir .\pdfs
+```
+
+배치 모드 결과는 입력 폴더 내부 `output` 아래에 생성됩니다.
+
+예:
+
+- `pdfs\output\alpha\alpha.md`
+- `pdfs\output\alpha\alpha_manifest.json`
+- `pdfs\output\alpha\alpha_report.json`
+- `pdfs\output\alpha\alpha_assets\images\...`
+- `pdfs\output\batch_report.json`
+
+배치 모드 주의사항:
+
+- 대상은 지정 폴더 바로 아래 PDF 파일만 포함합니다.
+- 배치 모드에서는 `-o/--output-dir` 을 사용하지 않습니다.
+- PDF가 없는 폴더는 에러 처리됩니다.
+- 같은 파일 stem을 가진 PDF가 둘 이상 있으면 충돌 방지를 위해 에러 처리됩니다.
+
 최근 버전 기준 추가 확인 포인트:
 - `manifest.json > schema_version`
 - `manifest.json > images[].alt_text`
@@ -193,6 +218,14 @@ python -m pdf2md .\sample.pdf -o .\output
 - `summary.structure_marker_recovered_exact_count`
 - `summary.structure_marker_recovered_context_count`
 - `summary.structure_marker_suppressed_count`
+
+배치 모드에서는 추가로 아래 파일도 확인하세요:
+
+- `output\batch_report.json`
+  - 문서별 상태
+  - 문서별 출력 경로
+  - 문서별 종료 코드
+  - 전체 성공/실패 집계
 
 ---
 
@@ -272,6 +305,12 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr
 ```powershell
 python -m pdf2md .\sample.pdf -o .\output --verbose
 python -m pdf2md .\sample.pdf -o .\output --debug
+```
+
+배치 모드 예시:
+
+```powershell
+python -m pdf2md --input-dir .\pdfs
 ```
 
 ---
