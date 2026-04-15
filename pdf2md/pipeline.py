@@ -44,6 +44,43 @@ def _find_anchor_index(line_tops: list[float], block_top: float) -> int:
     return len(line_tops)
 
 
+def _apply_structure_recoveries(
+    *,
+    page: int,
+    lines: list[TextLine],
+    recoveries: list[dict],
+) -> list[TextLine]:
+    if not recoveries:
+        return lines
+    updated = [TextLine(text=line.text, top=line.top, bottom=line.bottom, x0=line.x0, x1=line.x1) for line in lines]
+    for recovery in recoveries:
+        title_text = str(recovery.get("title_text", "")).strip()
+        recovered_text = str(recovery.get("recovered_text", "")).strip()
+        target_top = float(recovery.get("top", 0.0))
+        if not title_text or not recovered_text:
+            continue
+        best_idx: int | None = None
+        best_score: tuple[float, int] | None = None
+        for idx, line in enumerate(updated):
+            if title_text != line.text.strip():
+                continue
+            score = (abs(line.top - target_top), idx)
+            if best_score is None or score < best_score:
+                best_score = score
+                best_idx = idx
+        if best_idx is None:
+            continue
+        line = updated[best_idx]
+        if line.text.startswith(f"{recovered_text} "):
+            continue
+        line.text = f"{recovered_text} {line.text}".strip()
+    return updated
+
+
+def _count_excluded_reason(excluded_assets: list, reason: str) -> int:
+    return sum(1 for item in excluded_assets if item.reason == reason)
+
+
 def _build_report(
     started_at: datetime,
     finished_at: datetime,
@@ -237,6 +274,26 @@ def run_conversion(config: Config) -> ConversionResult:
     engine_usage["images"] = len(image_result.assets) > 0
     warnings.extend(table_result.warnings)
     warnings.extend(image_result.warnings)
+    structure_marker_recovered_exact_count = _count_excluded_reason(
+        image_result.excluded_assets,
+        "STRUCTURE_MARKER_RECOVERED_EXACT",
+    )
+    structure_marker_recovered_context_count = _count_excluded_reason(
+        image_result.excluded_assets,
+        "STRUCTURE_MARKER_RECOVERED_CONTEXT_VALIDATED",
+    )
+    structure_marker_suppressed_no_candidate_count = _count_excluded_reason(
+        image_result.excluded_assets,
+        "STRUCTURE_MARKER_SUPPRESSED_NO_CANDIDATE",
+    )
+    structure_marker_suppressed_ambiguous_count = _count_excluded_reason(
+        image_result.excluded_assets,
+        "STRUCTURE_MARKER_SUPPRESSED_AMBIGUOUS",
+    )
+    structure_marker_recovered_count = structure_marker_recovered_exact_count + structure_marker_recovered_context_count
+    structure_marker_suppressed_count = (
+        structure_marker_suppressed_no_candidate_count + structure_marker_suppressed_ambiguous_count
+    )
 
     block_regions_by_page: dict[int, list[BlockRegion]] = {}
     for page, blocks in table_result.blocks_by_page.items():
@@ -268,9 +325,14 @@ def run_conversion(config: Config) -> ConversionResult:
     total_suppressed_lines = 0
     for page in selected_pages:
         logger.debug("Normalizing page=%s", page)
-        normalization = normalize_page_lines(
+        recovered_lines = _apply_structure_recoveries(
             page=page,
             lines=page_layout_lines.get(page, []),
+            recoveries=[item for item in image_result.structure_recoveries if item.get("page") == page],
+        )
+        normalization = normalize_page_lines(
+            page=page,
+            lines=recovered_lines,
             block_regions=block_regions_by_page.get(page, []),
         )
         page_text_lines[page] = [line.text for line in normalization.lines]
@@ -414,6 +476,12 @@ def run_conversion(config: Config) -> ConversionResult:
     if low_conf_pages:
         report.summary["low_confidence_pages"] = low_conf_pages
     report.summary["page_status_counts"] = page_status_counts
+    report.summary["structure_marker_suppressed_count"] = structure_marker_suppressed_count
+    report.summary["structure_marker_recovered_count"] = structure_marker_recovered_count
+    report.summary["structure_marker_recovered_exact_count"] = structure_marker_recovered_exact_count
+    report.summary["structure_marker_recovered_context_count"] = structure_marker_recovered_context_count
+    report.summary["structure_marker_suppressed_no_candidate_count"] = structure_marker_suppressed_no_candidate_count
+    report.summary["structure_marker_suppressed_ambiguous_count"] = structure_marker_suppressed_ambiguous_count
     report_path = config.output_dir / "report.json"
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)
     write_json(report_path, serialize_report(report))

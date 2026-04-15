@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 from pdf2md.models import LineType
 
 HEADING_INDEX_PATTERN = re.compile(r"^\d+(?:\.\d+)+\s+\S")
+LEADING_HEADING_INDEX_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")
 FIGURE_CAPTION_PATTERN = re.compile(r"^(?:Figure|Fig\.?|그림|도표)\s+\d+\s*[:.]?", re.IGNORECASE)
 TABLE_CAPTION_PATTERN = re.compile(r"^(?:Table|표)\s+\d+\s*[:.]?", re.IGNORECASE)
 TOC_LEADER_PATTERN = re.compile(r"\.{5,}\s*\d+\s*$")
 CAPTION_NEARBY_PATTERN = re.compile(r"\b(figure|fig\.?|chart|table|그림|도표|표)\b", re.IGNORECASE)
+CAPTION_LINE_PATTERN = re.compile(r"^(?:Figure|Fig\.?|Table|그림|도표|표)\s+\d+\s*[:.]?", re.IGNORECASE)
 
 
 def classify_structure_line(text: str) -> LineType:
@@ -32,4 +35,14 @@ def is_structure_line(text: str) -> bool:
 
 def is_caption_candidate(text: str) -> bool:
     """Return True when nearby text strongly suggests a figure/table caption label."""
-    return bool(CAPTION_NEARBY_PATTERN.search(text.strip()))
+    normalized = text.strip()
+    return bool(CAPTION_LINE_PATTERN.match(normalized))
+
+
+def extract_leading_heading_index(text: str) -> Optional[str]:
+    """Extract a leading numeric heading index from a line when present."""
+    normalized = text.strip()
+    match = LEADING_HEADING_INDEX_PATTERN.match(normalized)
+    if match is None:
+        return None
+    return match.group(1)
