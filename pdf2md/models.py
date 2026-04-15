@@ -15,8 +15,24 @@ class ImageMode(str, Enum):
 
 class TableMode(str, Enum):
     AUTO = "auto"
+    MARKDOWN = "markdown"
+    HTML = "html"
     GFM_ONLY = "gfm-only"
     HTML_ONLY = "html-only"
+
+    def manifest_value(self) -> str:
+        if self is TableMode.HTML_ONLY:
+            return TableMode.HTML.value
+        return self.value
+
+    def requested_mode(self) -> str:
+        if self in {TableMode.HTML, TableMode.HTML_ONLY}:
+            return TableMode.HTML.value
+        if self is TableMode.MARKDOWN:
+            return TableMode.MARKDOWN.value
+        if self is TableMode.GFM_ONLY:
+            return TableMode.GFM_ONLY.value
+        return TableMode.AUTO.value
 
 
 class ConversionStatus(str, Enum):

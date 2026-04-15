@@ -12,7 +12,7 @@ from pdf2md.extractors.ocr import run_ocr
 from pdf2md.extractors.structure_normalizer import BlockRegion, normalize_page_lines
 from pdf2md.extractors.tables import extract_tables
 from pdf2md.extractors.text import TextExtractionError, TextLine, extract_page_text_layout
-from pdf2md.models import ConversionStatus, Manifest, PageResult, PageStatus, Report, WarningEntry
+from pdf2md.models import ConversionStatus, ImageMode, Manifest, PageResult, PageStatus, Report, TableMode, WarningEntry
 from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown
 from pdf2md.serializers.report import serialize_report
@@ -62,6 +62,7 @@ def _build_report(
     table_quality: list[dict] | None = None,
     table_counts: dict[str, int] | None = None,
     table_fallbacks: list[dict] | None = None,
+    table_mode_requested: str | None = None,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
     excluded_images = excluded_images or []
@@ -94,6 +95,7 @@ def _build_report(
             "table_quality": table_quality,
             "table_fallback_count": len(table_fallbacks),
             "table_fallbacks": table_fallbacks,
+            "table_mode_requested": table_mode_requested,
             **table_counts,
         },
     )
@@ -103,6 +105,8 @@ def run_conversion(config: Config) -> ConversionResult:
     """Run conversion and write document.md, manifest.json, report.json."""
     started_at = datetime.now(timezone.utc)
     logger.info("Starting conversion input=%s output_dir=%s", config.input_pdf, config.output_dir)
+    image_mode = config.image_mode if isinstance(config.image_mode, ImageMode) else ImageMode(config.image_mode)
+    table_mode = config.table_mode if isinstance(config.table_mode, TableMode) else TableMode(config.table_mode)
     warnings: list[WarningEntry] = []
     page_results_map: dict[int, PageResult] = {}
     failed_pages: list[int] = []
@@ -219,15 +223,15 @@ def run_conversion(config: Config) -> ConversionResult:
                 page_results_map[page].low_conf_token_ratio = metrics.low_conf_token_ratio
 
     logger.info("Extracting tables")
-    table_result = extract_tables(config.input_pdf, selected_pages, config.password, config.table_mode)
-    logger.info("Extracting images mode=%s", config.image_mode)
+    table_result = extract_tables(config.input_pdf, selected_pages, config.password, table_mode)
+    logger.info("Extracting images mode=%s", image_mode)
     image_result = extract_images(
         reader=reader,
         pdf_path=config.input_pdf,
         selected_pages=selected_pages,
         password=config.password,
         output_dir=config.output_dir,
-        image_mode=config.image_mode,
+        image_mode=image_mode,
     )
     engine_usage["tables"] = len(table_result.assets) > 0
     engine_usage["images"] = len(image_result.assets) > 0
@@ -329,8 +333,8 @@ def run_conversion(config: Config) -> ConversionResult:
         total_pages=total_pages,
         selected_pages=selected_pages,
         options={
-            "image_mode": config.image_mode,
-            "table_mode": config.table_mode,
+            "image_mode": image_mode,
+            "table_mode": table_mode.manifest_value(),
             "force_ocr": config.force_ocr,
             "keep_page_markers": config.keep_page_markers,
             "pages": config.pages,
@@ -405,6 +409,7 @@ def run_conversion(config: Config) -> ConversionResult:
         table_quality=table_result.table_quality,
         table_counts=table_result.table_counts,
         table_fallbacks=table_result.fallbacks,
+        table_mode_requested=table_mode.requested_mode(),
     )
     if low_conf_pages:
         report.summary["low_confidence_pages"] = low_conf_pages

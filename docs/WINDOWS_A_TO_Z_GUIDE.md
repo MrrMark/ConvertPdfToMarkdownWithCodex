@@ -176,6 +176,9 @@ python -m pdf2md .\sample.pdf -o .\output
 - `report.json > summary.page_status_counts`
 - `report.json > summary.table_fallback_count`
 - `report.json > summary.table_fallbacks`
+- `report.json > summary.table_mode_requested`
+- `report.json > summary.table_markdown_forced_count`
+- `report.json > summary.table_html_forced_count`
 
 `report.json`에서 특히 확인할 항목:
 - `summary.table_quality`: 표별 품질 메타데이터
@@ -215,6 +218,30 @@ python -m pdf2md .\sample.pdf -o .\output --image-mode referenced
 ```powershell
 python -m pdf2md .\sample.pdf -o .\output --table-mode auto
 ```
+
+HTML 표 강제:
+
+```powershell
+python -m pdf2md .\sample.pdf -o .\output --table-mode html
+```
+
+Markdown 표 강제:
+
+```powershell
+python -m pdf2md .\sample.pdf -o .\output --table-mode markdown
+```
+
+운영 권장:
+
+- 일반 RAG / AI Code Assistant 기본값: `--table-mode auto`
+- 토큰 효율 최우선: `--table-mode markdown`
+- 복잡 표 구조 보존 최우선: `--table-mode html`
+
+문서 유형별 추천:
+
+- 기술 스펙 / 프로토콜 문서: `auto` 또는 `html`
+- 본문 중심 문서: `markdown`
+- 표 구조 정확도가 중요한 검색 인덱스: `html`
 
 강제 OCR:
 
@@ -309,12 +336,16 @@ pip install -e .[dev]
 
 ### F. 표가 기대보다 많거나 적게 추출됨
 - 최신 로직은 표 후보를 다중 전략으로 탐색하고 보수적으로 복구합니다.
+- `markdown` 모드에서는 복잡 표도 Markdown으로 강제되므로 일부 구조 손실이 있을 수 있습니다.
 - 아래를 우선 확인하세요:
   - `report.json > summary.table_total`
   - `report.json > summary.table_recovered_count`
   - `report.json > summary.table_unresolved_count`
   - `report.json > summary.table_fallback_count`
   - `report.json > summary.table_fallbacks`
+  - `report.json > summary.table_mode_requested`
+  - `report.json > summary.table_markdown_forced_count`
+  - `report.json > summary.table_html_forced_count`
   - `report.json > warnings[].details.reasons`
 - `AMBIGUOUS_GRID`, `LOW_DATA_DENSITY` 경고가 많은 문서는 원본 PDF 구조가 불명확한 경우가 많습니다.
 

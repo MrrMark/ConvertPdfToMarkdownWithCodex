@@ -231,7 +231,13 @@ pdf2md input.pdf -o output/ --image-mode placeholder
 ### 테이블을 HTML 우선으로 출력
 
 ```bash
-pdf2md input.pdf -o output/ --table-mode html-only
+pdf2md input.pdf -o output/ --table-mode html
+```
+
+### 테이블을 Markdown으로 강제 출력
+
+```bash
+pdf2md input.pdf -o output/ --table-mode markdown
 ```
 
 ### 페이지 마커 제거
@@ -307,6 +313,7 @@ output/
 - `schema_version`
 - 페이지별 `status`
 - `summary.page_status_counts`
+- `summary.table_mode_requested`
 - 표 품질 메타데이터(`table_quality`)
   - `selected_strategy`, `empty_cell_ratio`, `all_empty_rows_removed`
   - `columns_compacted`, `columns_merged`, `quality_score`
@@ -316,6 +323,9 @@ output/
 - HTML fallback 추적
   - `summary.table_fallback_count`
   - `summary.table_fallbacks`
+- 강제 모드 집계
+  - `summary.table_markdown_forced_count`
+  - `summary.table_html_forced_count`
 
 ### 종료 코드와 `report.json` 해석
 
@@ -366,6 +376,44 @@ output/
 
 `table-mode=auto`에서는 다중 추출 전략 비교 + 보수적 복구(빈 열 압축, 제한적 열 병합, notes 분리)를 거친 뒤
 GFM 또는 HTML fallback을 결정합니다.
+
+### 표 모드 요약
+
+- `auto`: 단순 표는 GFM, 복잡 표는 HTML fallback
+- `html`: 모든 표를 HTML로 출력
+- `markdown`: 복잡 표도 coercion을 거쳐 Markdown 표로 강제 출력
+- `html-only`: legacy alias, 내부적으로 `html`로 정규화
+- `gfm-only`: legacy compatibility mode, unsafe한 표는 여전히 HTML fallback
+
+### RAG / AI Code Assistant 운영 가이드
+
+LLM RAG 등록이나 AI Code Assistant 컨텍스트 최적화 목적이라면 기본 권장 모드는 `auto`입니다.
+
+- `auto`
+  - 기본 권장 모드
+  - 단순 표는 Markdown으로 가볍게 유지하고, 복잡 표는 HTML fallback으로 구조를 보존합니다.
+  - 토큰 효율과 구조 보존의 균형이 가장 좋습니다.
+- `markdown`
+  - 토큰 효율 최우선 모드
+  - 모든 표를 Markdown으로 통일해 downstream chunking/embedding 처리가 단순해집니다.
+  - 다만 복잡 표는 구조 손실이 발생할 수 있으므로, 본문 중심 문서나 컨텍스트 길이 절감이 더 중요한 경우에만 권장합니다.
+- `html`
+  - 표 구조 보존 최우선 모드
+  - 복잡 표가 많은 스펙 문서, 비트필드 표, 열 간 관계가 중요한 표에 적합합니다.
+  - 대신 태그가 많아 토큰 비용이 가장 큽니다.
+
+권장 기본값:
+
+- 일반 RAG / AI Code Assistant: `auto`
+- 토큰 효율 최우선: `markdown`
+- 복잡 표 구조 보존 최우선: `html`
+
+문서 유형별 추천:
+
+- 기술 스펙 / 프로토콜 문서 / 명세서: `auto` 또는 `html`
+- 본문 설명 위주의 일반 문서: `markdown`
+- 표 QA 정확도가 중요한 검색 인덱스: `html`
+- 코드 어시스턴트에 짧은 컨텍스트를 자주 넣는 용도: `markdown` 또는 `auto`
 
 ### 이미지 참조
 
