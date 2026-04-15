@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from pathlib import Path
 
 
 def test_cli_runs_and_writes_outputs(sample_pdf: Path, tmp_path: Path) -> None:
@@ -145,3 +146,103 @@ def test_cli_accepts_markdown_table_mode(sample_pdf: Path, tmp_path: Path) -> No
     assert completed.returncode == 0
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["options"]["table_mode"] == "markdown"
+
+
+def test_cli_batch_mode_generates_per_pdf_outputs(
+    sample_pdf: Path,
+    encrypted_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    input_dir = tmp_path / "batch-input"
+    input_dir.mkdir()
+    first_pdf = input_dir / "alpha.pdf"
+    second_pdf = input_dir / "beta.pdf"
+    first_pdf.write_bytes(sample_pdf.read_bytes())
+    second_pdf.write_bytes(encrypted_pdf.read_bytes())
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        "--input-dir",
+        str(input_dir),
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 2
+    output_root = input_dir / "output"
+    assert (output_root / "alpha" / "alpha.md").exists()
+    assert (output_root / "alpha" / "alpha_manifest.json").exists()
+    assert (output_root / "alpha" / "alpha_report.json").exists()
+    assert (output_root / "alpha" / "alpha_assets" / "images").exists()
+    assert (output_root / "beta" / "beta_report.json").exists()
+    batch_report = json.loads((output_root / "batch_report.json").read_text(encoding="utf-8"))
+    assert batch_report["summary"]["total_documents"] == 2
+    assert batch_report["summary"]["success_count"] == 1
+    assert batch_report["summary"]["failed_count"] == 1
+    alpha_entry = next(item for item in batch_report["documents"] if Path(item["input_pdf"]).name == "alpha.pdf")
+    beta_entry = next(item for item in batch_report["documents"] if Path(item["input_pdf"]).name == "beta.pdf")
+    assert alpha_entry["files"]["markdown"].endswith("alpha/alpha.md")
+    assert beta_entry["status"] == "failed"
+
+
+def test_cli_batch_mode_rejects_output_dir(sample_pdf: Path, tmp_path: Path) -> None:
+    input_dir = tmp_path / "batch-input"
+    input_dir.mkdir()
+    (input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        "--input-dir",
+        str(input_dir),
+        "-o",
+        str(tmp_path / "unused"),
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 2
+    assert "--output-dir is not supported" in completed.stderr
+
+
+def test_cli_batch_mode_requires_pdfs(tmp_path: Path) -> None:
+    input_dir = tmp_path / "empty-input"
+    input_dir.mkdir()
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        "--input-dir",
+        str(input_dir),
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 2
+    assert "No PDF files found in directory" in completed.stderr
+
+
+def test_cli_rejects_single_and_batch_inputs_together(sample_pdf: Path, tmp_path: Path) -> None:
+    input_dir = tmp_path / "batch-input"
+    input_dir.mkdir()
+    (input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "--input-dir",
+        str(input_dir),
+        "-o",
+        str(tmp_path / "out"),
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 2
+    assert "Use either input_pdf or --input-dir" in completed.stderr

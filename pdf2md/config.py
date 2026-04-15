@@ -23,6 +23,10 @@ class Config(BaseModel):
     debug: bool = False
     verbose: bool = False
     version: str = Field(default="0.1.0")
+    markdown_filename: str = "document.md"
+    manifest_filename: str = "manifest.json"
+    report_filename: str = "report.json"
+    assets_dirname: str = "assets"
 
     def selected_pages(self, total_pages: int) -> list[int]:
         return parse_page_range(self.pages, total_pages)

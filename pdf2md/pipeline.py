@@ -139,7 +139,7 @@ def _build_report(
 
 
 def run_conversion(config: Config) -> ConversionResult:
-    """Run conversion and write document.md, manifest.json, report.json."""
+    """Run conversion and write markdown, manifest, and report outputs."""
     started_at = datetime.now(timezone.utc)
     logger.info("Starting conversion input=%s output_dir=%s", config.input_pdf, config.output_dir)
     image_mode = config.image_mode if isinstance(config.image_mode, ImageMode) else ImageMode(config.image_mode)
@@ -155,7 +155,7 @@ def run_conversion(config: Config) -> ConversionResult:
         "images": False,
     }
 
-    ensure_output_dirs(config.output_dir)
+    ensure_output_dirs(config.output_dir, config.assets_dirname)
 
     try:
         reader = open_pdf_reader(config.input_pdf, config.password)
@@ -172,7 +172,7 @@ def run_conversion(config: Config) -> ConversionResult:
             failed_pages=[],
             engine_usage=engine_usage,
         )
-        report_path = config.output_dir / "report.json"
+        report_path = config.output_dir / config.report_filename
         write_json(report_path, serialize_report(report))
         return ConversionResult(
             exit_code=EXIT_FATAL,
@@ -200,7 +200,7 @@ def run_conversion(config: Config) -> ConversionResult:
             failed_pages=[],
             engine_usage=engine_usage,
         )
-        report_path = config.output_dir / "report.json"
+        report_path = config.output_dir / config.report_filename
         write_json(report_path, serialize_report(report))
         return ConversionResult(
             exit_code=EXIT_FATAL,
@@ -269,6 +269,7 @@ def run_conversion(config: Config) -> ConversionResult:
         password=config.password,
         output_dir=config.output_dir,
         image_mode=image_mode,
+        assets_dirname=config.assets_dirname,
     )
     engine_usage["tables"] = len(table_result.assets) > 0
     engine_usage["images"] = len(image_result.assets) > 0
@@ -386,7 +387,7 @@ def run_conversion(config: Config) -> ConversionResult:
         keep_page_markers=config.keep_page_markers,
         page_blocks_by_page=ordered_page_blocks,
     )
-    markdown_path = config.output_dir / "document.md"
+    markdown_path = config.output_dir / config.markdown_filename
     logger.info("Writing markdown path=%s", markdown_path)
     write_text(markdown_path, markdown)
 
@@ -408,7 +409,7 @@ def run_conversion(config: Config) -> ConversionResult:
         ocr_pages=sorted(ocr_result.ocr_pages),
         warnings=warnings,
     )
-    manifest_path = config.output_dir / "manifest.json"
+    manifest_path = config.output_dir / config.manifest_filename
     logger.info("Writing manifest path=%s", manifest_path)
     write_json(manifest_path, serialize_manifest(manifest))
 
@@ -482,7 +483,7 @@ def run_conversion(config: Config) -> ConversionResult:
     report.summary["structure_marker_recovered_context_count"] = structure_marker_recovered_context_count
     report.summary["structure_marker_suppressed_no_candidate_count"] = structure_marker_suppressed_no_candidate_count
     report.summary["structure_marker_suppressed_ambiguous_count"] = structure_marker_suppressed_ambiguous_count
-    report_path = config.output_dir / "report.json"
+    report_path = config.output_dir / config.report_filename
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)
     write_json(report_path, serialize_report(report))
 

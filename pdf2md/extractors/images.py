@@ -635,9 +635,10 @@ def extract_images(
     password: str | None,
     output_dir: Path,
     image_mode: ImageMode,
+    assets_dirname: str = "assets",
 ) -> ImageExtractionResult:
     result = ImageExtractionResult()
-    images_root = output_dir / "assets" / "images"
+    images_root = output_dir / assets_dirname / "images"
     images_root.mkdir(parents=True, exist_ok=True)
 
     page_image_boxes: dict[int, list[dict]] = {}
@@ -716,7 +717,7 @@ def extract_images(
 
         extension = _guess_extension(getattr(image, "name", ""))
         filename = f"page-{page_number:04d}-figure-{index:03d}.{extension}"
-        rel_path = f"assets/images/{filename}"
+        rel_path = f"{assets_dirname}/images/{filename}"
         disk_path = images_root / filename
 
         bbox_payload = None
