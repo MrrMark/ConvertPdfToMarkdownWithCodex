@@ -4,7 +4,8 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from pathlib import Path
+
+from pdf2md.config import default_output_dir_for_input
 
 
 def test_cli_runs_and_writes_outputs(sample_pdf: Path, tmp_path: Path) -> None:
@@ -27,6 +28,25 @@ def test_cli_runs_and_writes_outputs(sample_pdf: Path, tmp_path: Path) -> None:
     assert (output_dir / "document.md").exists()
     assert (output_dir / "manifest.json").exists()
     assert (output_dir / "report.json").exists()
+
+
+def test_cli_uses_default_output_dir_when_output_dir_is_omitted(sample_pdf: Path) -> None:
+    default_output_dir = default_output_dir_for_input(sample_pdf)
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "--pages",
+        "1",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    assert (default_output_dir / "document.md").exists()
+    assert (default_output_dir / "manifest.json").exists()
+    assert (default_output_dir / "report.json").exists()
 
 
 def test_cli_no_page_markers(sample_pdf: Path, tmp_path: Path) -> None:
@@ -178,13 +198,121 @@ def test_cli_batch_mode_generates_per_pdf_outputs(
     assert (output_root / "alpha" / "alpha_assets" / "images").exists()
     assert (output_root / "beta" / "beta_report.json").exists()
     batch_report = json.loads((output_root / "batch_report.json").read_text(encoding="utf-8"))
+    assert batch_report["schema_version"] == "1.0"
     assert batch_report["summary"]["total_documents"] == 2
     assert batch_report["summary"]["success_count"] == 1
     assert batch_report["summary"]["failed_count"] == 1
+    assert batch_report["summary"]["skipped_count"] == 0
     alpha_entry = next(item for item in batch_report["documents"] if Path(item["input_pdf"]).name == "alpha.pdf")
     beta_entry = next(item for item in batch_report["documents"] if Path(item["input_pdf"]).name == "beta.pdf")
     assert alpha_entry["files"]["markdown"].endswith("alpha/alpha.md")
     assert beta_entry["status"] == "failed"
+    assert alpha_entry["duration_ms"] >= 0
+    assert isinstance(alpha_entry["warning_count"], int)
+    assert isinstance(alpha_entry["table_count"], int)
+    assert isinstance(alpha_entry["image_count"], int)
+    assert isinstance(alpha_entry["used_ocr"], bool)
+
+
+def test_cli_batch_mode_skip_existing_marks_document_skipped(sample_pdf: Path, tmp_path: Path) -> None:
+    input_dir = tmp_path / "batch-input-skip"
+    input_dir.mkdir()
+    (input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+    output_root = input_dir / "output"
+    document_output_dir = output_root / "alpha"
+    document_output_dir.mkdir(parents=True)
+    (document_output_dir / "alpha.md").write_text("existing markdown\n", encoding="utf-8")
+    (document_output_dir / "alpha_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "input_file": "alpha.pdf",
+                "total_pages": 1,
+                "selected_pages": [1],
+                "options": {},
+                "images": [],
+                "excluded_images": [],
+                "tables": [],
+                "ocr_pages": [],
+                "warnings": [],
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (document_output_dir / "alpha_report.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "started_at": "2024-01-02T03:04:05Z",
+                "finished_at": "2024-01-02T03:04:05Z",
+                "duration_ms": 0,
+                "status": "success",
+                "engine_usage": {"pypdf": True, "pdfplumber": True, "ocr": False, "tables": False, "images": False},
+                "failed_pages": [],
+                "warnings": [],
+                "page_results": [],
+                "summary": {
+                    "processed_pages": 0,
+                    "warning_count": 0,
+                    "failed_page_count": 0,
+                    "partial_success": False,
+                    "ocr_confidence_by_page": {},
+                    "excluded_image_count": 0,
+                    "excluded_images": [],
+                    "total_deduplicated_blocks": 0,
+                    "total_suppressed_lines": 0,
+                    "deduplicated_blocks": [],
+                    "suppressed_lines": [],
+                    "table_quality": [],
+                    "table_fallback_count": 0,
+                    "table_fallbacks": [],
+                    "table_mode_requested": "auto",
+                    "table_total": 0,
+                    "table_html_count": 0,
+                    "table_gfm_count": 0,
+                    "table_recovered_count": 0,
+                    "table_unresolved_count": 0,
+                    "table_markdown_forced_count": 0,
+                    "table_html_forced_count": 0,
+                    "low_confidence_pages": [],
+                    "page_status_counts": {"success": 0, "partial_success": 0, "failed": 0},
+                    "structure_marker_suppressed_count": 0,
+                    "structure_marker_recovered_count": 0,
+                    "structure_marker_recovered_exact_count": 0,
+                    "structure_marker_recovered_context_count": 0,
+                    "structure_marker_suppressed_no_candidate_count": 0,
+                    "structure_marker_suppressed_ambiguous_count": 0,
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        "--input-dir",
+        str(input_dir),
+        "--skip-existing",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    assert (document_output_dir / "alpha.md").read_text(encoding="utf-8") == "existing markdown\n"
+    batch_report = json.loads((output_root / "batch_report.json").read_text(encoding="utf-8"))
+    assert batch_report["summary"]["skipped_count"] == 1
+    assert batch_report["documents"][0]["status"] == "skipped"
+    assert batch_report["documents"][0]["skipped"] is True
 
 
 def test_cli_batch_mode_rejects_output_dir(sample_pdf: Path, tmp_path: Path) -> None:

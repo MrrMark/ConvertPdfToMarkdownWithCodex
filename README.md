@@ -16,11 +16,11 @@ PDF 문서를 **신뢰성 있게 Markdown으로 변환**하기 위한 CLI/라이
 
 ### 목표
 
-- PDF 1개를 입력받아 Markdown 1개와 관련 asset 디렉터리를 생성
+- 단일 PDF 또는 폴더 내 여러 PDF를 입력받아 Markdown, asset, report 산출물을 생성
 - 디지털 PDF와 스캔 PDF(OCR 필요) 모두 처리
 - 본문 순서, 제목, 문단, 목록, 표, 이미지 위치를 가능한 범위에서 안정적으로 복원
 - 동일 입력 + 동일 옵션이면 동일 출력이 나오도록 deterministic 설계
-- CLI와 Python API를 모두 제공
+- 우선 지원 인터페이스는 CLI이며, 내부 파이프라인은 라이브러리처럼 재사용 가능하도록 유지
 - `manifest.json`, `report.json`으로 재처리 가능한 메타데이터 제공
 
 ### 비목표
@@ -56,7 +56,6 @@ PDF 문서를 **신뢰성 있게 Markdown으로 변환**하기 위한 CLI/라이
 ### 텍스트
 
 - `pdfplumber` 중심으로 텍스트 추출
-- 필요 시 `pdftotext -layout` 보조 활용
 - 공백 정리는 최소화하되 의미 손실 금지
 - OCR 결과도 과도하게 정리하지 않음
 
@@ -96,11 +95,11 @@ PDF 문서를 **신뢰성 있게 Markdown으로 변환**하기 위한 CLI/라이
 
 ### 핵심
 
-- Python 3.11+
+- Python 3.11+ 목표
 - `pypdf`
 - `pdfplumber`
 - `pydantic`
-- `typer` 또는 `argparse`
+- `argparse`
 
 ### 보조 도구
 
@@ -113,6 +112,13 @@ PDF 문서를 **신뢰성 있게 Markdown으로 변환**하기 위한 CLI/라이
 - `pytest`
 - golden output 비교 테스트
 - CLI smoke test
+
+### Python 지원 정책
+
+- 공식 지원 범위: `Python 3.11+`
+- 최소 지원 검증축: `Python 3.11`
+- 최신 안정화 검증축: 현재 시점의 최신 안정화 `Python 3.14`
+- 로컬 기본 `python3`가 더 낮은 버전을 가리키는 경우, 버전 명시 실행기 또는 venv의 `python`을 사용
 
 ---
 
@@ -172,6 +178,14 @@ source .venv/bin/activate
 python3 -m pip install -U pip
 ```
 
+지원 버전을 명확히 맞추려면 아래처럼 실행기를 고정하는 것을 권장합니다.
+
+```bash
+python3.11 -m venv .venv311
+source .venv311/bin/activate
+python -m pip install -U pip
+```
+
 ### 패키지 설치 예시
 
 ```bash
@@ -206,14 +220,30 @@ sudo apt-get install -y poppler-utils tesseract-ocr
 
 ### 가장 기본 실행
 
+macOS/Linux 예시:
+
 ```bash
-pdf2md input.pdf -o output/
+python3 -m pdf2md input.pdf
+```
+
+위 명령은 입력 PDF와 같은 디렉터리에 `<pdf_stem>_output/` 폴더를 기본 생성합니다.
+
+엔트리포인트가 설치되어 있으면 아래처럼 실행해도 됩니다.
+
+```bash
+pdf2md input.pdf
+```
+
+출력 폴더를 직접 지정하려면:
+
+```bash
+python3 -m pdf2md input.pdf -o output/
 ```
 
 ### 폴더 내 PDF 일괄 순차 변환
 
 ```bash
-pdf2md --input-dir ./pdfs
+python3 -m pdf2md --input-dir ./pdfs
 ```
 
 배치 모드에서는 지정한 입력 폴더 내부에 `output/` 폴더를 만들고, 각 PDF마다 아래 구조로 결과를 생성합니다.
@@ -233,31 +263,89 @@ pdf2md --input-dir ./pdfs
 ### 일부 페이지만 변환
 
 ```bash
-pdf2md input.pdf -o output/ --pages 1-3,5,7-9
+python3 -m pdf2md input.pdf -o output/ --pages 1-3,5,7-9
 ```
 
 ### 강제 OCR
 
 ```bash
-pdf2md input.pdf -o output/ --force-ocr
+python3 -m pdf2md input.pdf -o output/ --force-ocr
 ```
 
 ### 이미지 placeholder 모드
 
 ```bash
-pdf2md input.pdf -o output/ --image-mode placeholder
+python3 -m pdf2md input.pdf -o output/ --image-mode placeholder
 ```
 
 ### 테이블을 HTML 우선으로 출력
 
 ```bash
-pdf2md input.pdf -o output/ --table-mode html
+python3 -m pdf2md input.pdf -o output/ --table-mode html
 ```
 
 ### 테이블을 Markdown으로 강제 출력
 
 ```bash
-pdf2md input.pdf -o output/ --table-mode markdown
+python3 -m pdf2md input.pdf -o output/ --table-mode markdown
+```
+
+### 기존 배치 산출물이 있으면 건너뛰기
+
+```bash
+python3 -m pdf2md --input-dir ./pdfs --skip-existing
+```
+
+## 8. Python 버전 검증
+
+최소 지원 버전과 최신 안정화 버전을 모두 검증하려면 아래 순서를 권장합니다.
+
+### 최소 지원 버전 검증
+
+```bash
+python3.11 -m venv .venv311
+source .venv311/bin/activate
+python -m pip install -U pip
+python -m pip install -e .[dev]
+python -m pytest
+python -m pdf2md --help
+deactivate
+```
+
+### 최신 안정화 버전 검증
+
+macOS/Homebrew 예시:
+
+```bash
+brew install python@3.14
+python3.14 -m venv .venv314
+source .venv314/bin/activate
+python -m pip install -U pip
+python -m pip install -e .[dev]
+python -m pytest
+python -m pdf2md --help
+deactivate
+```
+
+반복 실행이 필요하면 아래 스크립트를 사용할 수 있습니다.
+
+```bash
+./scripts/validate_python_matrix.sh
+```
+
+### 테이블 모드 권장 사용처
+
+| mode | 권장 상황 |
+| --- | --- |
+| `auto` | 기본 권장. 단순 표는 GFM, 복잡 표는 HTML fallback |
+| `html` | 표 구조 보존이 최우선일 때 |
+| `markdown` | 다운스트림이 GFM 중심이고 약간의 품질 손실을 감수할 때 |
+
+### 실행기 표기 정책
+
+- 이 README의 기본 예시는 macOS/Linux 기준으로 `python3 -m pdf2md`를 사용합니다.
+- Windows에서는 보통 `python -m pdf2md`를 사용합니다.
+- 설치형 엔트리포인트가 잡혀 있으면 `pdf2md ...`로 실행할 수 있습니다.
 ```
 
 ### 페이지 마커 제거

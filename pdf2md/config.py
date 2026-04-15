@@ -22,6 +22,7 @@ class Config(BaseModel):
     keep_page_markers: bool = False
     debug: bool = False
     verbose: bool = False
+    skip_existing: bool = False
     version: str = Field(default="0.1.0")
     markdown_filename: str = "document.md"
     manifest_filename: str = "manifest.json"
@@ -30,3 +31,8 @@ class Config(BaseModel):
 
     def selected_pages(self, total_pages: int) -> list[int]:
         return parse_page_range(self.pages, total_pages)
+
+
+def default_output_dir_for_input(input_pdf: Path) -> Path:
+    """Return the default single-file output directory for an input PDF."""
+    return input_pdf.parent / f"{input_pdf.stem}_output"
