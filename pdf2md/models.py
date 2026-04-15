@@ -96,6 +96,13 @@ class ExcludedImageAsset(BaseModel):
     page: int
     index: int
     reason: str
+    classification: Optional[str] = None
+    recovered_text: Optional[str] = None
+    recovered_confidence: Optional[float] = None
+    ocr_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    recovery_strategy: Optional[str] = None
+    context_validated: bool = False
+    parent_heading_index: Optional[str] = None
     bbox: Optional[list[float]] = None
     width: Optional[int] = None
     height: Optional[int] = None

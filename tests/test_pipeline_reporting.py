@@ -87,6 +87,12 @@ def test_pipeline_report_schema_and_partial_status(sample_pdf: Path, tmp_path: P
     assert report["summary"]["table_mode_requested"] == "auto"
     assert report["summary"]["page_status_counts"]["partial_success"] == 1
     assert report["summary"]["page_status_counts"]["success"] == 1
+    assert report["summary"]["structure_marker_suppressed_count"] == 0
+    assert report["summary"]["structure_marker_recovered_count"] == 0
+    assert report["summary"]["structure_marker_recovered_exact_count"] == 0
+    assert report["summary"]["structure_marker_recovered_context_count"] == 0
+    assert report["summary"]["structure_marker_suppressed_no_candidate_count"] == 0
+    assert report["summary"]["structure_marker_suppressed_ambiguous_count"] == 0
 
 
 def test_pipeline_outputs_are_deterministic_with_fixed_clock(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
@@ -127,3 +133,40 @@ def test_manifest_uses_canonical_html_mode_for_legacy_alias(sample_pdf: Path, tm
     report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
     assert manifest["options"]["table_mode"] == "html"
     assert report["summary"]["table_mode_requested"] == "html"
+
+
+def test_pipeline_applies_structure_marker_recovery_without_inserting_image_block(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def fake_extract_images(*args, **kwargs) -> ImageExtractionResult:
+        return ImageExtractionResult(
+            structure_recoveries=[
+                {
+                    "page": 1,
+                    "top": 770.0,
+                    "title_text": "Hello PDF Page 1",
+                    "recovered_text": "2.2.1",
+                    "confidence": 97.0,
+                    "recovery_strategy": "ocr_exact",
+                    "context_validated": False,
+                    "source_candidates": [{"text": "2.2.1", "votes": 4, "confidence": 97.0}],
+                    "parent_heading_index": "2.2",
+                }
+            ]
+        )
+
+    monkeypatch.setattr(pipeline_module, "extract_images", fake_extract_images)
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "structure-recovery"
+    result = run_conversion(Config(input_pdf=sample_pdf, output_dir=output_dir, keep_page_markers=True))
+
+    assert result.exit_code == EXIT_SUCCESS
+    document = (output_dir / "document.md").read_text(encoding="utf-8")
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert "2.2.1 Hello PDF Page 1" in document
+    assert "![Image" not in document
+    assert "structure_marker_recovered_count" in report["summary"]

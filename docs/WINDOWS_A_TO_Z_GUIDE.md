@@ -171,6 +171,11 @@ python -m pdf2md .\sample.pdf -o .\output
 - `manifest.json > schema_version`
 - `manifest.json > images[].alt_text`
 - `manifest.json > images[].caption_text`, `caption_source` (인접 캡션이 확실한 경우만)
+- `manifest.json > excluded_images[].classification`
+- `manifest.json > excluded_images[].recovered_text`
+- `manifest.json > excluded_images[].ocr_candidates`
+- `manifest.json > excluded_images[].recovery_strategy`
+- `manifest.json > excluded_images[].context_validated`
 - `report.json > schema_version`
 - `report.json > page_results[].status`
 - `report.json > summary.page_status_counts`
@@ -184,6 +189,10 @@ python -m pdf2md .\sample.pdf -o .\output
 - `summary.table_quality`: 표별 품질 메타데이터
 - `summary.table_total`, `table_gfm_count`, `table_html_count`
 - `summary.table_recovered_count`, `table_unresolved_count`
+- `summary.structure_marker_recovered_count`
+- `summary.structure_marker_recovered_exact_count`
+- `summary.structure_marker_recovered_context_count`
+- `summary.structure_marker_suppressed_count`
 
 ---
 
@@ -242,6 +251,15 @@ python -m pdf2md .\sample.pdf -o .\output --table-mode markdown
 - 기술 스펙 / 프로토콜 문서: `auto` 또는 `html`
 - 본문 중심 문서: `markdown`
 - 표 구조 정확도가 중요한 검색 인덱스: `html`
+
+구조 인덱스가 중요한 기술 문서 운영 팁:
+
+- 최신 버전에서는 tiny 좌측 여백 구조 마커를 가능한 경우 `2.2.1`, `4.1.7` 같은 텍스트로 복구합니다.
+- 문서 품질 점검 시 표 fallback뿐 아니라 구조 마커 복구도 같이 확인하는 것이 좋습니다.
+- 확인 위치:
+  - `document.md`: 구조 번호가 실제 heading처럼 자연스럽게 보이는지
+  - `manifest.json`: `recovered_text`, `recovery_strategy`, `ocr_candidates`
+  - `report.json`: `structure_marker_recovered_count`, `structure_marker_suppressed_count`
 
 강제 OCR:
 
