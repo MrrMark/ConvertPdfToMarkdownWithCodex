@@ -56,6 +56,8 @@ def test_pipeline_report_schema_and_partial_status(sample_pdf: Path, tmp_path: P
                 "table_gfm_count": 0,
                 "table_recovered_count": 0,
                 "table_unresolved_count": 1,
+                "table_markdown_forced_count": 0,
+                "table_html_forced_count": 0,
             },
         )
         return result
@@ -82,6 +84,7 @@ def test_pipeline_report_schema_and_partial_status(sample_pdf: Path, tmp_path: P
     assert manifest["schema_version"] == "1.0"
     assert report["status"] == "partial_success"
     assert report["summary"]["table_fallback_count"] == 1
+    assert report["summary"]["table_mode_requested"] == "auto"
     assert report["summary"]["page_status_counts"]["partial_success"] == 1
     assert report["summary"]["page_status_counts"]["success"] == 1
 
@@ -102,3 +105,25 @@ def test_pipeline_outputs_are_deterministic_with_fixed_clock(sample_pdf: Path, t
     assert (first / "document.md").read_text(encoding="utf-8") == (second / "document.md").read_text(encoding="utf-8")
     assert (first / "manifest.json").read_text(encoding="utf-8") == (second / "manifest.json").read_text(encoding="utf-8")
     assert (first / "report.json").read_text(encoding="utf-8") == (second / "report.json").read_text(encoding="utf-8")
+
+
+def test_manifest_uses_canonical_html_mode_for_legacy_alias(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "legacy-html-mode"
+    result = run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=output_dir,
+            image_mode=ImageMode.REFERENCED,
+            table_mode=TableMode.HTML_ONLY,
+        )
+    )
+
+    assert result.exit_code == EXIT_SUCCESS
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["table_mode"] == "html"
+    assert report["summary"]["table_mode_requested"] == "html"

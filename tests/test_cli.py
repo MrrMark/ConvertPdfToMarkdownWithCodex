@@ -105,3 +105,43 @@ def test_cli_encrypted_pdf_with_password_succeeds(encrypted_pdf: Path, tmp_path:
 
     assert completed.returncode == 0
     assert (output_dir / "document.md").exists()
+
+
+def test_cli_accepts_html_table_mode(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-out-html-mode"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--table-mode",
+        "html",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["table_mode"] == "html"
+
+
+def test_cli_accepts_markdown_table_mode(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-out-markdown-mode"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--table-mode",
+        "markdown",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["table_mode"] == "markdown"

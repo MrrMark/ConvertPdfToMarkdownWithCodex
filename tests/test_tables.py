@@ -1,13 +1,19 @@
+from types import SimpleNamespace
+
 from pdf2md.extractors.tables import (
     _compact_columns,
+    _pick_mode,
     _serialize_html,
+    _serialize_markdown_forced,
     _merge_columns,
     _realign_header_columns,
     _split_notes,
     _quality_score,
     analyze_table_complexity,
+    extract_tables,
     is_simple_table,
 )
+from pdf2md.models import TableMode
 
 
 def test_is_simple_table_true_for_rectangular_single_line_cells() -> None:
@@ -108,3 +114,110 @@ def test_html_serializer_escapes_cell_content() -> None:
     assert "A&amp;B" in rendered
     assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;" in rendered
     assert "Note: 1 &lt; 2 &amp; 3" in rendered
+
+
+def test_pick_mode_supports_new_html_and_markdown_modes() -> None:
+    rows = [["A", "B"], ["1", "2"]]
+    html_mode, _, _ = _pick_mode(TableMode.HTML, rows)
+    markdown_mode, _, _ = _pick_mode(TableMode.MARKDOWN, rows)
+    assert html_mode == "html"
+    assert markdown_mode == "markdown"
+
+
+def test_markdown_forced_serializer_fills_blank_headers_and_escapes_content() -> None:
+    rendered = _serialize_markdown_forced(
+        rows=[["", "Description"], ["Line|1", "alpha\nbeta"], ["", ""]],
+        notes=["Notes: preserve original"],
+    )
+    assert "| Column 1 | Description |" in rendered
+    assert "Line\\|1" in rendered
+    assert "alpha<br>beta" in rendered
+    assert "Notes: preserve original" in rendered
+    assert "<table>" not in rendered
+
+
+class _FakeTable:
+    def __init__(self, bbox: tuple[float, float, float, float], rows: list[list[str]]) -> None:
+        self.bbox = bbox
+        self._rows = rows
+
+    def extract(self) -> list[list[str]]:
+        return self._rows
+
+
+class _FakePage:
+    width = 595.0
+    height = 842.0
+
+    def __init__(self, rows: list[list[str]]) -> None:
+        self._rows = rows
+
+    def find_tables(self, table_settings=None):  # noqa: ANN001
+        return [_FakeTable((10.0, 20.0, 100.0, 150.0), self._rows)]
+
+
+class _FakePdf:
+    def __init__(self, rows: list[list[str]]) -> None:
+        self.pages = [_FakePage(rows)]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):  # noqa: ANN001
+        return None
+
+
+def test_extract_tables_markdown_mode_never_uses_html(monkeypatch) -> None:
+    rows = [["Bits", "Description"], ["63:0", "A" * 130]]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.MARKDOWN,
+    )
+
+    block = result.blocks_by_page[1][0].markdown
+    assert "<table>" not in block
+    assert "| Bits | Description |" in block
+    assert result.assets[0].mode == "gfm"
+    assert result.warnings[0].code == "TABLE_COMPLEXITY_MARKDOWN_COERCED"
+
+
+def test_extract_tables_html_alias_matches_html_only(monkeypatch) -> None:
+    rows = [["Col1", "Col2"], ["A", "B"]]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
+
+    html_result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.HTML,
+    )
+    legacy_result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.HTML_ONLY,
+    )
+
+    assert html_result.blocks_by_page[1][0].markdown == legacy_result.blocks_by_page[1][0].markdown
+    assert html_result.assets[0].mode == "html"
+
+
+def test_extract_tables_legacy_gfm_only_still_falls_back_to_html(monkeypatch) -> None:
+    rows = [["Bits", "Description"], ["63:0", "A" * 130]]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.GFM_ONLY,
+    )
+
+    block = result.blocks_by_page[1][0].markdown
+    assert "<table>" in block
+    assert result.assets[0].mode == "html"
+    assert result.warnings[0].code == "TABLE_GFM_UNSAFE_FALLBACK_HTML"

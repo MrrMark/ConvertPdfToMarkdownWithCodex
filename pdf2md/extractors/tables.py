@@ -88,6 +88,8 @@ class TableExtractionResult:
             "table_gfm_count": 0,
             "table_recovered_count": 0,
             "table_unresolved_count": 0,
+            "table_markdown_forced_count": 0,
+            "table_html_forced_count": 0,
         }
     )
 
@@ -366,13 +368,16 @@ def is_simple_table(rows: list[list[str]]) -> bool:
 
 
 def _serialize_gfm(rows: list[list[str]]) -> str:
+    def render_cell(cell: str) -> str:
+        return cell.replace("\n", "<br>").replace("|", "\\|")
+
     header = rows[0]
     body = rows[1:]
     lines: list[str] = []
-    lines.append("| " + " | ".join(cell.replace("|", "\\|") for cell in header) + " |")
+    lines.append("| " + " | ".join(render_cell(cell) for cell in header) + " |")
     lines.append("| " + " | ".join("---" for _ in header) + " |")
     for row in body:
-        lines.append("| " + " | ".join(cell.replace("|", "\\|") for cell in row) + " |")
+        lines.append("| " + " | ".join(render_cell(cell) for cell in row) + " |")
     return "\n".join(lines)
 
 
@@ -403,6 +408,10 @@ def _serialize_html(rows: list[list[str]], notes: list[str]) -> str:
 
 def _pick_mode(table_mode: TableMode, rows: list[list[str]]) -> tuple[str, Optional[str], list[str]]:
     simple, reasons = analyze_table_complexity(rows)
+    if table_mode in {TableMode.HTML, TableMode.HTML_ONLY}:
+        return "html", None, reasons
+    if table_mode == TableMode.MARKDOWN:
+        return "markdown", None, reasons
     if table_mode == TableMode.HTML_ONLY:
         return "html", None, reasons
     if table_mode == TableMode.GFM_ONLY:
@@ -413,6 +422,54 @@ def _pick_mode(table_mode: TableMode, rows: list[list[str]]) -> tuple[str, Optio
     if simple:
         return "gfm", None, reasons
     return "html", None, reasons
+
+
+def _fill_blank_headers(rows: list[list[str]]) -> list[list[str]]:
+    if not rows:
+        return rows
+    header = [cell if cell.strip() else f"Column {idx + 1}" for idx, cell in enumerate(rows[0])]
+    return [header] + [row[:] for row in rows[1:]]
+
+
+def _drop_empty_body_rows(rows: list[list[str]]) -> list[list[str]]:
+    if not rows:
+        return rows
+    header = rows[0][:]
+    body = [row[:] for row in rows[1:] if any(cell.strip() for cell in row)]
+    return [header] + body
+
+
+def _ensure_rectangular(rows: list[list[str]]) -> list[list[str]]:
+    if not rows:
+        return [["Column 1"], [""]]
+    width = max(len(row) for row in rows)
+    if width == 0:
+        return [["Column 1"], [""]]
+    rectangular = [row + [""] * (width - len(row)) for row in rows]
+    if len(rectangular) == 1:
+        rectangular.append([""] * width)
+    return rectangular
+
+
+def _prepare_forced_markdown_rows(rows: list[list[str]]) -> list[list[str]]:
+    prepared = [row[:] for row in rows]
+    prepared = _ensure_rectangular(prepared)
+    prepared = _drop_empty_body_rows(prepared)
+    prepared, _ = _compact_columns(prepared)
+    prepared = _ensure_rectangular(prepared)
+    prepared = _fill_blank_headers(prepared)
+    return prepared
+
+
+def _serialize_markdown_forced(rows: list[list[str]], notes: list[str]) -> str:
+    prepared = _prepare_forced_markdown_rows(rows)
+    rendered = _serialize_gfm(prepared)
+    if not notes:
+        return rendered
+    note_lines = [note for note in notes if note.strip()]
+    if not note_lines:
+        return rendered
+    return rendered + "\n\n" + "\n".join(note_lines)
 
 
 def _candidate_rank(
@@ -597,6 +654,15 @@ def extract_tables(
                                 details={"table_index": index, "reasons": reasons},
                             )
                         )
+                    elif mode == "markdown" and reasons:
+                        result.warnings.append(
+                            WarningEntry(
+                                code="TABLE_COMPLEXITY_MARKDOWN_COERCED",
+                                message="Table was treated as complex and coerced into Markdown output.",
+                                page=page_number,
+                                details={"table_index": index, "reasons": reasons},
+                            )
+                        )
                     if mode == "html":
                         result.fallbacks.append(
                             {
@@ -609,14 +675,21 @@ def extract_tables(
                             }
                         )
 
-                    rendered = _serialize_gfm(candidate.rows) if mode == "gfm" else _serialize_html(candidate.rows, candidate.notes)
-                    comment = f"<!-- table: page={page_number} index={index} mode={mode} -->"
+                    if mode == "html":
+                        rendered = _serialize_html(candidate.rows, candidate.notes)
+                    elif mode == "markdown":
+                        rendered = _serialize_markdown_forced(candidate.rows, candidate.notes)
+                    else:
+                        rendered = _serialize_gfm(candidate.rows)
+                    comment_mode = "markdown" if mode == "markdown" else mode
+                    comment = f"<!-- table: page={page_number} index={index} mode={comment_mode} -->"
                     x0, top, x1, bottom = candidate.bbox
+                    asset_mode = "gfm" if mode == "markdown" else mode
                     page_blocks.append(
                         TableBlock(
                             page=page_number,
                             index=index,
-                            mode=mode,
+                            mode=asset_mode,
                             markdown=f"{comment}\n{rendered}",
                             top=top,
                             bbox=(x0, top, x1, bottom),
@@ -626,7 +699,7 @@ def extract_tables(
                         TableAsset(
                             page=page_number,
                             index=index,
-                            mode=mode,
+                            mode=asset_mode,
                             bbox=[x0, top, x1, bottom],
                         )
                     )
@@ -644,15 +717,19 @@ def extract_tables(
                             "header_fill_ratio": candidate.metrics.header_fill_ratio,
                             "reasons": candidate.decision.reasons,
                             "unresolved": candidate.decision.unresolved,
-                            "mode": mode,
+                            "mode": asset_mode,
                         }
                     )
 
                     result.table_counts["table_total"] += 1
-                    if mode == "gfm":
+                    if asset_mode == "gfm":
                         result.table_counts["table_gfm_count"] += 1
                     else:
                         result.table_counts["table_html_count"] += 1
+                    if table_mode in {TableMode.HTML, TableMode.HTML_ONLY}:
+                        result.table_counts["table_html_forced_count"] += 1
+                    if table_mode == TableMode.MARKDOWN:
+                        result.table_counts["table_markdown_forced_count"] += 1
                     if candidate.metrics.columns_compacted > 0 or candidate.metrics.columns_merged > 0:
                         result.table_counts["table_recovered_count"] += 1
                     if candidate.decision.unresolved:

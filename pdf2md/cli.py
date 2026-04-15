@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--table-mode",
         choices=[m.value for m in TableMode],
         default=TableMode.AUTO.value,
+        help="Table output mode: auto, html, markdown. html-only/gfm-only are legacy compatibility modes.",
     )
     parser.add_argument("--force-ocr", action="store_true", default=False)
     marker_group = parser.add_mutually_exclusive_group()
