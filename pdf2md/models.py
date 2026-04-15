@@ -77,6 +77,45 @@ class PageResult(BaseModel):
     suppressed_line_count: int = 0
 
 
+class ReportSummary(BaseModel):
+    processed_pages: int = 0
+    warning_count: int = 0
+    failed_page_count: int = 0
+    partial_success: bool = False
+    ocr_confidence_by_page: dict[str, dict[str, float]] = Field(default_factory=dict)
+    excluded_image_count: int = 0
+    excluded_images: list[dict[str, Any]] = Field(default_factory=list)
+    total_deduplicated_blocks: int = 0
+    total_suppressed_lines: int = 0
+    deduplicated_blocks: list[dict[str, Any]] = Field(default_factory=list)
+    suppressed_lines: list[dict[str, Any]] = Field(default_factory=list)
+    table_quality: list[dict[str, Any]] = Field(default_factory=list)
+    table_fallback_count: int = 0
+    table_fallbacks: list[dict[str, Any]] = Field(default_factory=list)
+    table_mode_requested: Optional[str] = None
+    table_total: int = 0
+    table_html_count: int = 0
+    table_gfm_count: int = 0
+    table_recovered_count: int = 0
+    table_unresolved_count: int = 0
+    table_markdown_forced_count: int = 0
+    table_html_forced_count: int = 0
+    low_confidence_pages: list[int] = Field(default_factory=list)
+    page_status_counts: dict[str, int] = Field(
+        default_factory=lambda: {
+            "success": 0,
+            "partial_success": 0,
+            "failed": 0,
+        }
+    )
+    structure_marker_suppressed_count: int = 0
+    structure_marker_recovered_count: int = 0
+    structure_marker_recovered_exact_count: int = 0
+    structure_marker_recovered_context_count: int = 0
+    structure_marker_suppressed_no_candidate_count: int = 0
+    structure_marker_suppressed_ambiguous_count: int = 0
+
+
 class ImageAsset(BaseModel):
     page: int
     index: int
@@ -172,4 +211,43 @@ class Report(BaseModel):
     failed_pages: list[int] = Field(default_factory=list)
     warnings: list[WarningEntry] = Field(default_factory=list)
     page_results: list[PageResult] = Field(default_factory=list)
-    summary: dict[str, Any] = Field(default_factory=dict)
+    summary: ReportSummary = Field(default_factory=ReportSummary)
+
+
+class BatchDocumentFiles(BaseModel):
+    markdown: Optional[str] = None
+    manifest: Optional[str] = None
+    report: Optional[str] = None
+
+
+class BatchDocumentResult(BaseModel):
+    input_pdf: str
+    status: str
+    exit_code: int
+    output_dir: str
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    duration_ms: int = 0
+    warning_count: int = 0
+    table_count: int = 0
+    image_count: int = 0
+    used_ocr: bool = False
+    skipped: bool = False
+    files: BatchDocumentFiles = Field(default_factory=BatchDocumentFiles)
+
+
+class BatchReportSummary(BaseModel):
+    total_documents: int = 0
+    success_count: int = 0
+    partial_success_count: int = 0
+    failed_count: int = 0
+    skipped_count: int = 0
+
+
+class BatchReport(BaseModel):
+    schema_version: str = "1.0"
+    input_dir: str
+    output_dir: str
+    pdf_files: list[str] = Field(default_factory=list)
+    documents: list[BatchDocumentResult] = Field(default_factory=list)
+    summary: BatchReportSummary = Field(default_factory=BatchReportSummary)

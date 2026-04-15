@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 import pdfplumber
 
+from pdf2md.constants import TableModeEmission, TableReason, WarningCode
 from pdf2md.models import TableAsset, TableMode, WarningEntry
 
 TABLE_STRATEGIES: list[tuple[str, dict[str, Any] | None]] = [
@@ -328,37 +329,37 @@ def _quality_score(rows: list[list[str]], removed_rows: int, compacted: int, mer
 def analyze_table_complexity(rows: list[list[str]]) -> tuple[bool, list[str]]:
     reasons: set[str] = set()
     if not rows:
-        return False, ["AMBIGUOUS_GRID"]
+        return False, [TableReason.AMBIGUOUS_GRID]
     if len(rows) < 2:
-        reasons.add("AMBIGUOUS_GRID")
+        reasons.add(TableReason.AMBIGUOUS_GRID)
 
     width = len(rows[0]) if rows and rows[0] else 0
     if width < 2:
-        reasons.add("AMBIGUOUS_GRID")
+        reasons.add(TableReason.AMBIGUOUS_GRID)
     if width > 12:
-        reasons.add("SPARSE_LAYOUT")
+        reasons.add(TableReason.SPARSE_LAYOUT)
 
     if _header_fill_ratio(rows) < 0.4 and width >= 3:
-        reasons.add("HEADER_FRAGMENTED")
+        reasons.add(TableReason.HEADER_FRAGMENTED)
 
     density = _data_density(rows)
     if density < 0.3:
-        reasons.add("LOW_DATA_DENSITY")
+        reasons.add(TableReason.LOW_DATA_DENSITY)
 
     empty_ratio = _empty_ratio(rows)
     if empty_ratio > 0.55:
-        reasons.add("SPARSE_LAYOUT")
+        reasons.add(TableReason.SPARSE_LAYOUT)
     if empty_ratio > 0.75:
-        reasons.add("AMBIGUOUS_GRID")
+        reasons.add(TableReason.AMBIGUOUS_GRID)
 
     for row in rows:
         if len(row) != width:
-            reasons.add("AMBIGUOUS_GRID")
+            reasons.add(TableReason.AMBIGUOUS_GRID)
             break
         if any("\n" in cell for cell in row):
-            reasons.add("MULTILINE_CELL")
+            reasons.add(TableReason.MULTILINE_CELL)
         if any(len(cell.strip()) > 120 for cell in row):
-            reasons.add("AMBIGUOUS_GRID")
+            reasons.add(TableReason.AMBIGUOUS_GRID)
 
     return len(reasons) == 0, sorted(reasons)
 
@@ -409,19 +410,17 @@ def _serialize_html(rows: list[list[str]], notes: list[str]) -> str:
 def _pick_mode(table_mode: TableMode, rows: list[list[str]]) -> tuple[str, Optional[str], list[str]]:
     simple, reasons = analyze_table_complexity(rows)
     if table_mode in {TableMode.HTML, TableMode.HTML_ONLY}:
-        return "html", None, reasons
+        return TableModeEmission.HTML, None, reasons
     if table_mode == TableMode.MARKDOWN:
-        return "markdown", None, reasons
-    if table_mode == TableMode.HTML_ONLY:
-        return "html", None, reasons
+        return TableModeEmission.MARKDOWN, None, reasons
     if table_mode == TableMode.GFM_ONLY:
         if simple:
-            return "gfm", None, reasons
-        reason_text = ",".join(reasons) if reasons else "AMBIGUOUS_GRID"
-        return "html", f"Requested gfm-only but table was unsafe for GFM ({reason_text}); used HTML fallback.", reasons
+            return TableModeEmission.GFM, None, reasons
+        reason_text = ",".join(reasons) if reasons else TableReason.AMBIGUOUS_GRID
+        return TableModeEmission.HTML, f"Requested gfm-only but table was unsafe for GFM ({reason_text}); used HTML fallback.", reasons
     if simple:
-        return "gfm", None, reasons
-    return "html", None, reasons
+        return TableModeEmission.GFM, None, reasons
+    return TableModeEmission.HTML, None, reasons
 
 
 def _fill_blank_headers(rows: list[list[str]]) -> list[list[str]]:
@@ -539,6 +538,88 @@ def _process_rows(raw_rows: list[list[str]], strategy: str) -> tuple[list[list[s
     return rows, notes, metrics
 
 
+def _collect_candidates_for_page(page: pdfplumber.page.Page) -> list[TableExtractionCandidate]:
+    candidates_by_bbox: dict[tuple[float, float, float, float], TableExtractionCandidate] = {}
+    for strategy, table_settings in TABLE_STRATEGIES:
+        raw_candidates = page.find_tables() if table_settings is None else page.find_tables(table_settings=table_settings)
+        for table_obj in raw_candidates or []:
+            raw_rows = table_obj.extract() or []
+            rows, notes, metrics = _process_rows(raw_rows, strategy)
+            if not rows or not rows[0]:
+                continue
+            simple, reasons = analyze_table_complexity(rows)
+            candidate = TableExtractionCandidate(
+                strategy=strategy,
+                bbox=tuple(float(v) for v in table_obj.bbox),
+                rows=rows,
+                notes=notes,
+                quality_score=metrics.quality_score,
+                metrics=metrics,
+                decision=TableRecoveryDecision(unresolved=not simple, reasons=reasons),
+            )
+            bbox_key = tuple(round(v, 1) for v in candidate.bbox)
+            previous = candidates_by_bbox.get(bbox_key)
+            if previous is None or candidate.quality_score > previous.quality_score:
+                candidates_by_bbox[bbox_key] = candidate
+            elif previous is not None and candidate.quality_score == previous.quality_score:
+                prev_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == previous.strategy)
+                curr_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == candidate.strategy)
+                if curr_rank < prev_rank:
+                    candidates_by_bbox[bbox_key] = candidate
+    return list(candidates_by_bbox.values())
+
+
+def _prune_candidates(
+    page: pdfplumber.page.Page,
+    candidates: list[TableExtractionCandidate],
+) -> list[TableExtractionCandidate]:
+    ranked = list(candidates)
+    ranked.sort(
+        key=lambda item: (_candidate_rank(page, item.bbox, item.quality_score), _bbox_area(item.bbox)),
+        reverse=True,
+    )
+    deduped: list[TableExtractionCandidate] = []
+    for item in ranked:
+        if any(_is_contained(item.bbox, prev.bbox) for prev in deduped):
+            continue
+        deduped.append(item)
+        if len(deduped) >= 20:
+            break
+    deduped.sort(key=lambda item: item.bbox[1])
+    pruned: list[TableExtractionCandidate] = []
+    for item in deduped:
+        if any(_is_fragment_candidate(item, accepted) for accepted in pruned):
+            continue
+        pruned.append(item)
+    refined: list[TableExtractionCandidate] = []
+    for item in pruned:
+        width = len(item.rows[0]) if item.rows and item.rows[0] else 0
+        height = len(item.rows)
+        if width == 1 and height <= 2:
+            fragment_text = " ".join(cell.strip() for row in item.rows for cell in row if cell.strip()).lower()
+            has_better_neighbor = False
+            for other in pruned:
+                if other is item:
+                    continue
+                other_width = len(other.rows[0]) if other.rows and other.rows[0] else 0
+                if other_width <= 1:
+                    continue
+                same_page_band = abs(item.bbox[1] - other.bbox[1]) <= 90 or abs(item.bbox[3] - other.bbox[1]) <= 60
+                x_overlap = _bbox_intersection(item.bbox, other.bbox) > 0 or (
+                    min(item.bbox[2], other.bbox[2]) - max(item.bbox[0], other.bbox[0]) > 20
+                )
+                if not (same_page_band and x_overlap):
+                    continue
+                other_text = " ".join(cell.strip() for row in other.rows for cell in row if cell.strip()).lower()
+                if fragment_text and fragment_text in other_text:
+                    has_better_neighbor = True
+                    break
+            if has_better_neighbor:
+                continue
+        refined.append(item)
+    return refined
+
+
 def extract_tables(
     pdf_path: Path,
     selected_pages: list[int],
@@ -552,86 +633,8 @@ def extract_tables(
             for page_number in selected_pages:
                 page = pdf.pages[page_number - 1]
                 logger.debug("Extracting tables for page=%s", page_number)
-                candidates_by_bbox: dict[tuple[float, float, float, float], TableExtractionCandidate] = {}
-                for strategy, table_settings in TABLE_STRATEGIES:
-                    if table_settings is None:
-                        raw_candidates = page.find_tables() or []
-                    else:
-                        raw_candidates = page.find_tables(table_settings=table_settings) or []
-
-                    for table_obj in raw_candidates:
-                        raw_rows = table_obj.extract() or []
-                        rows, notes, metrics = _process_rows(raw_rows, strategy)
-                        if not rows or not rows[0]:
-                            continue
-                        reasons: list[str] = []
-                        simple, reasons = analyze_table_complexity(rows)
-                        candidate = TableExtractionCandidate(
-                            strategy=strategy,
-                            bbox=tuple(float(v) for v in table_obj.bbox),
-                            rows=rows,
-                            notes=notes,
-                            quality_score=metrics.quality_score,
-                            metrics=metrics,
-                            decision=TableRecoveryDecision(unresolved=not simple, reasons=reasons),
-                        )
-                        bbox_key = tuple(round(v, 1) for v in candidate.bbox)
-                        previous = candidates_by_bbox.get(bbox_key)
-                        if previous is None or candidate.quality_score > previous.quality_score:
-                            candidates_by_bbox[bbox_key] = candidate
-                        elif previous is not None and candidate.quality_score == previous.quality_score:
-                            # deterministic strategy precedence
-                            prev_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == previous.strategy)
-                            curr_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == candidate.strategy)
-                            if curr_rank < prev_rank:
-                                candidates_by_bbox[bbox_key] = candidate
-
-                ranked = list(candidates_by_bbox.values())
-                ranked.sort(
-                    key=lambda item: (_candidate_rank(page, item.bbox, item.quality_score), _bbox_area(item.bbox)),
-                    reverse=True,
-                )
-                deduped: list[TableExtractionCandidate] = []
-                for item in ranked:
-                    if any(_is_contained(item.bbox, prev.bbox) for prev in deduped):
-                        continue
-                    deduped.append(item)
-                    if len(deduped) >= 20:
-                        break
-                deduped.sort(key=lambda item: item.bbox[1])
-                pruned: list[TableExtractionCandidate] = []
-                for item in deduped:
-                    if any(_is_fragment_candidate(item, acc) for acc in pruned):
-                        continue
-                    pruned.append(item)
-                refined: list[TableExtractionCandidate] = []
-                for item in pruned:
-                    width = len(item.rows[0]) if item.rows and item.rows[0] else 0
-                    height = len(item.rows)
-                    if width == 1 and height <= 2:
-                        fragment_text = " ".join(cell.strip() for row in item.rows for cell in row if cell.strip()).lower()
-                        has_better_neighbor = False
-                        for other in pruned:
-                            if other is item:
-                                continue
-                            other_width = len(other.rows[0]) if other.rows and other.rows[0] else 0
-                            if other_width <= 1:
-                                continue
-                            same_page_band = abs(item.bbox[1] - other.bbox[1]) <= 90 or abs(item.bbox[3] - other.bbox[1]) <= 60
-                            x_overlap = _bbox_intersection(item.bbox, other.bbox) > 0 or (
-                                min(item.bbox[2], other.bbox[2]) - max(item.bbox[0], other.bbox[0]) > 20
-                            )
-                            if not (same_page_band and x_overlap):
-                                continue
-                            other_text = " ".join(cell.strip() for row in other.rows for cell in row if cell.strip()).lower()
-                            if fragment_text and fragment_text in other_text:
-                                has_better_neighbor = True
-                                break
-                        if has_better_neighbor:
-                            continue
-                    refined.append(item)
-                pruned = refined
-                deduped = pruned
+                candidates = _collect_candidates_for_page(page)
+                deduped = _prune_candidates(page, candidates)
 
                 page_blocks: list[TableBlock] = []
                 for index, candidate in enumerate(deduped, start=1):
@@ -639,31 +642,31 @@ def extract_tables(
                     if fallback_reason:
                         result.warnings.append(
                             WarningEntry(
-                                code="TABLE_GFM_UNSAFE_FALLBACK_HTML",
+                                code=WarningCode.TABLE_GFM_UNSAFE_FALLBACK_HTML,
                                 message=fallback_reason,
                                 page=page_number,
                                 details={"table_index": index, "reasons": reasons},
                             )
                         )
-                    elif mode == "html" and table_mode == TableMode.AUTO:
+                    elif mode == TableModeEmission.HTML and table_mode == TableMode.AUTO:
                         result.warnings.append(
                             WarningEntry(
-                                code="TABLE_COMPLEXITY_HTML_FALLBACK",
+                                code=WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK,
                                 message="Table was treated as complex and serialized as HTML fallback.",
                                 page=page_number,
                                 details={"table_index": index, "reasons": reasons},
                             )
                         )
-                    elif mode == "markdown" and reasons:
+                    elif mode == TableModeEmission.MARKDOWN and reasons:
                         result.warnings.append(
                             WarningEntry(
-                                code="TABLE_COMPLEXITY_MARKDOWN_COERCED",
+                                code=WarningCode.TABLE_COMPLEXITY_MARKDOWN_COERCED,
                                 message="Table was treated as complex and coerced into Markdown output.",
                                 page=page_number,
                                 details={"table_index": index, "reasons": reasons},
                             )
                         )
-                    if mode == "html":
+                    if mode == TableModeEmission.HTML:
                         result.fallbacks.append(
                             {
                                 "page": page_number,
@@ -675,16 +678,16 @@ def extract_tables(
                             }
                         )
 
-                    if mode == "html":
+                    if mode == TableModeEmission.HTML:
                         rendered = _serialize_html(candidate.rows, candidate.notes)
-                    elif mode == "markdown":
+                    elif mode == TableModeEmission.MARKDOWN:
                         rendered = _serialize_markdown_forced(candidate.rows, candidate.notes)
                     else:
                         rendered = _serialize_gfm(candidate.rows)
-                    comment_mode = "markdown" if mode == "markdown" else mode
+                    comment_mode = TableModeEmission.MARKDOWN if mode == TableModeEmission.MARKDOWN else mode
                     comment = f"<!-- table: page={page_number} index={index} mode={comment_mode} -->"
                     x0, top, x1, bottom = candidate.bbox
-                    asset_mode = "gfm" if mode == "markdown" else mode
+                    asset_mode = TableModeEmission.GFM if mode == TableModeEmission.MARKDOWN else mode
                     page_blocks.append(
                         TableBlock(
                             page=page_number,
@@ -722,7 +725,7 @@ def extract_tables(
                     )
 
                     result.table_counts["table_total"] += 1
-                    if asset_mode == "gfm":
+                    if asset_mode == TableModeEmission.GFM:
                         result.table_counts["table_gfm_count"] += 1
                     else:
                         result.table_counts["table_html_count"] += 1
@@ -740,7 +743,7 @@ def extract_tables(
     except Exception as exc:  # noqa: BLE001
         result.warnings.append(
             WarningEntry(
-                code="TABLE_EXTRACTION_FAILED",
+                code=WarningCode.TABLE_EXTRACTION_FAILED,
                 message=f"Failed to extract tables: {exc}",
             )
         )

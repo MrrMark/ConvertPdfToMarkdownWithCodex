@@ -2,8 +2,11 @@
 
 ## 문서 목적
 
-이 문서는 `PRD_pdf_to_markdown_converter.md`를 구현 가능한 작업 단위로 분해한 실행 계획서다.
-GPT Codex는 이 문서를 기준으로 작업을 **작게 쪼개고, 순서대로 구현하고, 각 단계마다 테스트를 통과**시켜야 한다.
+이 문서는 `PRD_pdf_to_markdown_converter.md`를 구현 가능한 작업 단위로 분해한 실행 계획서이자,
+현재 시점의 유지보수 백로그를 함께 관리하는 문서다.
+
+아래 `T00` 이후의 초기 작업 목록은 **historical implementation record** 로 유지한다.
+즉, “처음 무엇을 어떤 순서로 만들었는지”를 보존하는 목적이며, 현재 우선순위는 별도 유지보수 섹션을 따른다.
 
 본 프로젝트의 핵심 원칙은 아래 한 줄이다.
 
@@ -60,6 +63,47 @@ P0 안정화 후 구현:
 - PyMuPDF / Docling adapter
 - appendix / comment / json 이미지 설명 출력 모드
 - figure/table caption confidence 모델 고도화
+
+---
+
+## 1A. 현재 유지보수 백로그
+
+현재 우선순위는 신규 기능 확대보다 **구조화, 문서 정합성, 운영 재실행 편의성, 회귀 방지력 강화** 다.
+
+### M01. pipeline/report 집계 책임 분리
+
+- 변환 상태 판정
+- warning 기반 exit code 결정
+- page status 집계
+- `report.summary` 계산
+- structure marker 집계 카운트 계산
+
+### M02. 상수/사유 코드 고정
+
+- warning code 상수화
+- image exclusion reason 상수화
+- structure recovery reason/strategy 상수화
+- table fallback/coercion reason 상수화
+
+### M03. 운영 편의성 보강
+
+- 단일 모드 기본 출력 디렉터리 `<pdf_stem>_output/`
+- 배치 모드 `--skip-existing`
+- typed `batch_report.json` 확장
+- 산출물 구조 검증 helper 유지
+
+### M04. 문서 동기화
+
+- README를 현재 CLI 기준으로 유지
+- Windows 가이드와 명령 예시를 동일 정책으로 유지
+- 미사용 기술 선택이나 과거 범위 설명은 제거 또는 historical note로 축소
+
+### M05. 품질 회귀 안전망
+
+- spacing/serializer 계약 테스트
+- batch success/partial/failed/skipped 혼합 테스트
+- structure marker 오복구 방지 회귀 테스트
+- deterministic output 검증 범위에 `batch_report.json` 포함
 
 ---
 
@@ -595,4 +639,3 @@ Codex는 아래 순서를 기본으로 따른다.
 - 실패 시 전체 결과물을 버리지 말 것
 - deterministic output 을 깨는 랜덤 suffix/file name 을 쓰지 말 것
 - README 없이 구현만 남기지 말 것
-

@@ -3,14 +3,24 @@ from __future__ import annotations
 from pdf2md.utils.structure import is_structure_line
 
 
+def _ensure_blank_line(lines: list[str]) -> None:
+    if lines and lines[-1] != "":
+        lines.append("")
+
+
 def _append_line(lines: list[str], text: str) -> None:
     if is_structure_line(text):
-        if lines and lines[-1] != "":
-            lines.append("")
+        _ensure_blank_line(lines)
         lines.append(text)
-        lines.append("")
+        _ensure_blank_line(lines)
         return
     lines.append(text)
+
+
+def _append_block(lines: list[str], block_markdown: str) -> None:
+    _ensure_blank_line(lines)
+    lines.append(block_markdown)
+    _ensure_blank_line(lines)
 
 
 def serialize_markdown(
@@ -32,16 +42,14 @@ def serialize_markdown(
         block_idx = 0
         for line_idx, text_line in enumerate(text_lines):
             while block_idx < len(block_entries) and block_entries[block_idx][0] <= line_idx:
-                lines.append(block_entries[block_idx][1])
-                lines.append("")
+                _append_block(lines, block_entries[block_idx][1])
                 block_idx += 1
             _append_line(lines, text_line)
 
         while block_idx < len(block_entries):
-            lines.append(block_entries[block_idx][1])
-            lines.append("")
+            _append_block(lines, block_entries[block_idx][1])
             block_idx += 1
 
-        lines.append("")
+        _ensure_blank_line(lines)
 
     return "\n".join(lines).rstrip() + "\n"

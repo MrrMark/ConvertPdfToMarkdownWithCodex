@@ -84,6 +84,12 @@ pip --version
 권장 출력 예시:
 - `Python 3.11.x`
 
+버전 정책:
+
+- 최소 지원 버전: `Python 3.11`
+- 최신 안정화 검증은 별도 최신 `Python 3.14.x` 환경에서도 권장
+- 실무 검증은 `3.11`과 최신 안정화 버전을 각각 별도 가상환경으로 분리해 수행
+
 ---
 
 ## 4) 저장소 클론
@@ -159,13 +165,21 @@ python -m pdf2md --help
 예시 입력 파일: `sample.pdf`
 
 ```powershell
-python -m pdf2md .\sample.pdf -o .\output
+python -m pdf2md .\sample.pdf
 ```
 
+`-o`를 생략하면 입력 PDF와 같은 위치에 `sample_output\` 폴더가 생성됩니다.
+
 생성 파일:
-- `output\document.md`
-- `output\manifest.json`
-- `output\report.json`
+- `sample_output\document.md`
+- `sample_output\manifest.json`
+- `sample_output\report.json`
+
+출력 디렉터리를 직접 지정하려면:
+
+```powershell
+python -m pdf2md .\sample.pdf -o .\output
+```
 
 ### 7-1) 폴더 내 PDF 일괄 순차 변환
 
@@ -225,7 +239,15 @@ python -m pdf2md --input-dir .\pdfs
   - 문서별 상태
   - 문서별 출력 경로
   - 문서별 종료 코드
+  - 문서별 `started_at`, `finished_at`, `duration_ms`
+  - 문서별 `warning_count`, `table_count`, `image_count`, `used_ocr`, `skipped`
   - 전체 성공/실패 집계
+
+기존 핵심 산출물이 이미 있는 문서를 건너뛰려면:
+
+```powershell
+python -m pdf2md --input-dir .\pdfs --skip-existing
+```
 
 ---
 
@@ -313,6 +335,12 @@ python -m pdf2md .\sample.pdf -o .\output --debug
 python -m pdf2md --input-dir .\pdfs
 ```
 
+실행기 표기 정책:
+
+- 이 문서는 Windows 기준이라 `python -m pdf2md`를 기본으로 사용합니다.
+- README의 macOS/Linux 예시는 `python3 -m pdf2md`를 사용합니다.
+- 설치형 엔트리포인트가 잡혀 있으면 `pdf2md ...`로 실행할 수 있습니다.
+
 ---
 
 ## 9) OCR 사용 (Windows)
@@ -345,6 +373,32 @@ pytest -q -p no:cacheprovider
 
 ```powershell
 python -m pytest -q -p no:cacheprovider
+```
+
+### 10-1) Python 버전별 검증 권장 절차
+
+최소 지원 버전 `3.11`:
+
+```powershell
+py -3.11 -m venv .venv311
+.\.venv311\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .[dev]
+python -m pytest -q -p no:cacheprovider
+python -m pdf2md --help
+deactivate
+```
+
+최신 안정화 버전 `3.14`:
+
+```powershell
+py -3.14 -m venv .venv314
+.\.venv314\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .[dev]
+python -m pytest -q -p no:cacheprovider
+python -m pdf2md --help
+deactivate
 ```
 
 ---

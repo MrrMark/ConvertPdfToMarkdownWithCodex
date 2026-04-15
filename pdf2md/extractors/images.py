@@ -13,6 +13,13 @@ import pdfplumber
 from pypdf import PdfReader
 from PIL import Image, ImageFilter, ImageOps
 
+from pdf2md.constants import (
+    ImageClassification,
+    ImageExcludeReason,
+    StructureRecoveryReason,
+    StructureRecoveryStrategy,
+    WarningCode,
+)
 from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, WarningEntry
 from pdf2md.utils.structure import extract_leading_heading_index, is_caption_candidate
 
@@ -404,7 +411,7 @@ def _resolve_structure_marker_recovery(
             return StructureRecoveryDecision(
                 text=None,
                 confidence=None,
-                reason="STRUCTURE_MARKER_SUPPRESSED_AMBIGUOUS",
+                reason=StructureRecoveryReason.SUPPRESSED_AMBIGUOUS,
                 recovery_strategy=None,
                 context_validated=False,
                 parent_heading_index=parent_heading_index,
@@ -413,8 +420,8 @@ def _resolve_structure_marker_recovery(
         return StructureRecoveryDecision(
             text=best_exact.text,
             confidence=best_exact.confidence,
-            reason="STRUCTURE_MARKER_RECOVERED_EXACT",
-            recovery_strategy="ocr_exact",
+            reason=StructureRecoveryReason.RECOVERED_EXACT,
+            recovery_strategy=StructureRecoveryStrategy.OCR_EXACT,
             context_validated=False,
             parent_heading_index=parent_heading_index,
             source_candidates=source_candidates,
@@ -427,8 +434,8 @@ def _resolve_structure_marker_recovery(
         return StructureRecoveryDecision(
             text=expected_from_child,
             confidence=best_match.confidence,
-            reason="STRUCTURE_MARKER_RECOVERED_CONTEXT_VALIDATED",
-            recovery_strategy="child_heading_context",
+            reason=StructureRecoveryReason.RECOVERED_CONTEXT_VALIDATED,
+            recovery_strategy=StructureRecoveryStrategy.CHILD_HEADING_CONTEXT,
             context_validated=True,
             parent_heading_index=parent_heading_index,
             source_candidates=source_candidates,
@@ -467,7 +474,7 @@ def _resolve_structure_marker_recovery(
             return StructureRecoveryDecision(
                 text=None,
                 confidence=None,
-                reason="STRUCTURE_MARKER_SUPPRESSED_AMBIGUOUS",
+                reason=StructureRecoveryReason.SUPPRESSED_AMBIGUOUS,
                 recovery_strategy=None,
                 context_validated=False,
                 parent_heading_index=parent_heading_index,
@@ -479,8 +486,8 @@ def _resolve_structure_marker_recovery(
         return StructureRecoveryDecision(
             text=best_text,
             confidence=confidence,
-            reason="STRUCTURE_MARKER_RECOVERED_CONTEXT_VALIDATED",
-            recovery_strategy="parent_heading_context",
+            reason=StructureRecoveryReason.RECOVERED_CONTEXT_VALIDATED,
+            recovery_strategy=StructureRecoveryStrategy.PARENT_HEADING_CONTEXT,
             context_validated=True,
             parent_heading_index=parent_heading_index,
             source_candidates=source_candidates,
@@ -493,8 +500,8 @@ def _resolve_structure_marker_recovery(
         return StructureRecoveryDecision(
             text=expected_from_siblings,
             confidence=best_match.confidence,
-            reason="STRUCTURE_MARKER_RECOVERED_CONTEXT_VALIDATED",
-            recovery_strategy="sibling_sequence_context",
+            reason=StructureRecoveryReason.RECOVERED_CONTEXT_VALIDATED,
+            recovery_strategy=StructureRecoveryStrategy.SIBLING_SEQUENCE_CONTEXT,
             context_validated=True,
             parent_heading_index=parent_heading_index,
             source_candidates=source_candidates,
@@ -507,8 +514,8 @@ def _resolve_structure_marker_recovery(
         return StructureRecoveryDecision(
             text=expected_from_previous,
             confidence=best_match.confidence,
-            reason="STRUCTURE_MARKER_RECOVERED_CONTEXT_VALIDATED",
-            recovery_strategy="previous_sibling_context",
+            reason=StructureRecoveryReason.RECOVERED_CONTEXT_VALIDATED,
+            recovery_strategy=StructureRecoveryStrategy.PREVIOUS_SIBLING_CONTEXT,
             context_validated=True,
             parent_heading_index=parent_heading_index,
             source_candidates=source_candidates,
@@ -520,8 +527,8 @@ def _resolve_structure_marker_recovery(
         return StructureRecoveryDecision(
             text=best_exact.text,
             confidence=best_exact.confidence,
-            reason="STRUCTURE_MARKER_RECOVERED_EXACT",
-            recovery_strategy="ocr_exact",
+            reason=StructureRecoveryReason.RECOVERED_EXACT,
+            recovery_strategy=StructureRecoveryStrategy.OCR_EXACT,
             context_validated=False,
             parent_heading_index=parent_heading_index,
             source_candidates=source_candidates,
@@ -530,7 +537,7 @@ def _resolve_structure_marker_recovery(
     return StructureRecoveryDecision(
         text=None,
         confidence=None,
-        reason="STRUCTURE_MARKER_SUPPRESSED_NO_CANDIDATE",
+        reason=StructureRecoveryReason.SUPPRESSED_NO_CANDIDATE,
         recovery_strategy=None,
         context_validated=False,
         parent_heading_index=parent_heading_index,
@@ -548,7 +555,7 @@ def _append_structure_marker_result(
             page=marker.page,
             index=marker.index,
             reason=recovery.reason,
-            classification="STRUCTURE_MARKER",
+            classification=ImageClassification.STRUCTURE_MARKER,
             recovered_text=recovery.text,
             recovered_confidence=recovery.confidence,
             ocr_candidates=recovery.source_candidates,
@@ -622,25 +629,18 @@ def _is_decorative(
     small = (height is not None and height <= 10) or (width is not None and width <= 20)
     tiny = (height is not None and height <= 8) or (width is not None and width <= 16)
     if tiny and not caption_nearby:
-        return True, "TINY_DECORATIVE"
+        return True, ImageExcludeReason.TINY_DECORATIVE
     if small and hash_count >= 2 and not caption_nearby:
-        return True, "REPEATED_SMALL_DECORATIVE"
+        return True, ImageExcludeReason.REPEATED_SMALL_DECORATIVE
     return False, None
 
 
-def extract_images(
-    reader: PdfReader,
+def _load_page_image_context(
     pdf_path: Path,
     selected_pages: list[int],
     password: str | None,
-    output_dir: Path,
-    image_mode: ImageMode,
-    assets_dirname: str = "assets",
-) -> ImageExtractionResult:
-    result = ImageExtractionResult()
-    images_root = output_dir / assets_dirname / "images"
-    images_root.mkdir(parents=True, exist_ok=True)
-
+    result: ImageExtractionResult,
+) -> tuple[dict[int, list[dict]], dict[int, list[dict]]]:
     page_image_boxes: dict[int, list[dict]] = {}
     page_text_lines: dict[int, list[dict]] = {}
     try:
@@ -656,11 +656,18 @@ def extract_images(
     except Exception as exc:  # noqa: BLE001
         result.warnings.append(
             WarningEntry(
-                code="IMAGE_POSITION_MAPPING_FAILED",
+                code=WarningCode.IMAGE_POSITION_MAPPING_FAILED,
                 message=f"Failed to read image positions from pdfplumber: {exc}",
             )
         )
+    return page_image_boxes, page_text_lines
 
+
+def _collect_image_candidates(
+    reader: PdfReader,
+    selected_pages: list[int],
+    result: ImageExtractionResult,
+) -> list[dict]:
     hashed_candidates: list[dict] = []
     for page_number in selected_pages:
         page = reader.pages[page_number - 1]
@@ -670,7 +677,7 @@ def extract_images(
         except Exception as exc:  # noqa: BLE001
             result.warnings.append(
                 WarningEntry(
-                    code="IMAGE_EXTRACTION_FAILED",
+                    code=WarningCode.IMAGE_EXTRACTION_FAILED,
                     message=f"Failed to read image objects: {exc}",
                     page=page_number,
                 )
@@ -683,7 +690,7 @@ def extract_images(
             except Exception as exc:  # noqa: BLE001
                 result.warnings.append(
                     WarningEntry(
-                        code="IMAGE_EXTRACTION_FAILED",
+                        code=WarningCode.IMAGE_EXTRACTION_FAILED,
                         message=f"Failed to decode image bytes: {exc}",
                         page=page_number,
                         details={"image_index": index},
@@ -702,7 +709,151 @@ def extract_images(
                     "height": height,
                 }
             )
+    return hashed_candidates
 
+
+def _resolve_image_position(
+    *,
+    page_number: int,
+    index: int,
+    width: int | None,
+    height: int | None,
+    page_image_boxes: dict[int, list[dict]],
+) -> tuple[list[float] | None, float, float, int | None, int | None]:
+    bbox_payload = None
+    top = float(index) * 1000.0
+    bottom = top
+    mapped = page_image_boxes.get(page_number, [])
+    if len(mapped) >= index:
+        box = mapped[index - 1]
+        x0 = float(box.get("x0", 0.0))
+        y0 = float(box.get("top", 0.0))
+        x1 = float(box.get("x1", 0.0))
+        y1 = float(box.get("bottom", 0.0))
+        top = y0
+        bottom = y1
+        bbox_payload = [x0, y0, x1, y1]
+        if width is None and box.get("width") is not None:
+            width = int(float(box["width"]))
+        if height is None and box.get("height") is not None:
+            height = int(float(box["height"]))
+    return bbox_payload, top, bottom, width, height
+
+
+def _handle_structure_marker_candidate(
+    *,
+    page_number: int,
+    index: int,
+    top: float,
+    bbox_payload: list[float] | None,
+    width: int | None,
+    height: int | None,
+    sha256: str,
+    image_bytes: bytes,
+    page_text_lines: dict[int, list[dict]],
+    pending_structure_markers: dict[int, list[PendingStructureMarker]],
+) -> bool:
+    title_line = _find_structure_title(page_text_lines.get(page_number, []), bbox_payload)
+    if not _is_structure_marker_candidate(
+        bbox=bbox_payload,
+        width=width,
+        height=height,
+        title_line=title_line,
+    ):
+        return False
+    parent_heading_index = _find_parent_heading_index(page_text_lines.get(page_number, []), title_line)
+    child_heading_index = _find_child_heading_index(page_text_lines, page_number, title_line)
+    ocr_candidates = _collect_structure_marker_candidates(image_bytes)
+    pending_structure_markers.setdefault(page_number, []).append(
+        PendingStructureMarker(
+            page=page_number,
+            index=index,
+            top=top,
+            bbox=bbox_payload,
+            width=width,
+            height=height,
+            sha256=sha256,
+            title_text=str(title_line.get("text", "")).strip() if title_line is not None else "",
+            title_top=float(title_line.get("top", top)) if title_line is not None else top,
+            parent_heading_index=parent_heading_index,
+            child_heading_index=child_heading_index,
+            ocr_candidates=ocr_candidates,
+        )
+    )
+    return True
+
+
+def _append_figure_asset(
+    *,
+    result: ImageExtractionResult,
+    image_mode: ImageMode,
+    image_bytes: bytes,
+    page_number: int,
+    index: int,
+    extension: str,
+    rel_path: str,
+    disk_path: Path,
+    top: float,
+    bbox_payload: list[float] | None,
+    width: int | None,
+    height: int | None,
+    sha256: str,
+    caption_text: str | None,
+) -> None:
+    alt_text = f"Image page-{page_number:04d}-figure-{index:03d}"
+    if image_mode == ImageMode.REFERENCED:
+        disk_path.write_bytes(image_bytes)
+    markdown = _build_markdown(
+        mode=image_mode,
+        alt_text=alt_text,
+        rel_path=rel_path,
+        extension=extension,
+        data=image_bytes,
+        page=page_number,
+        index=index,
+    )
+    page_blocks = result.blocks_by_page.setdefault(page_number, [])
+    page_blocks.append(
+        ImageBlock(
+            page=page_number,
+            index=index,
+            markdown=markdown,
+            top=top,
+            anchor_line_index=0,
+            bbox=tuple(bbox_payload) if bbox_payload else None,
+        )
+    )
+    result.assets.append(
+        ImageAsset(
+            page=page_number,
+            index=index,
+            path=rel_path,
+            alt_text=alt_text,
+            caption_text=caption_text,
+            caption_source="nearby_caption" if caption_text else None,
+            bbox=bbox_payload,
+            width=width,
+            height=height,
+            sha256=sha256,
+        )
+    )
+
+
+def extract_images(
+    reader: PdfReader,
+    pdf_path: Path,
+    selected_pages: list[int],
+    password: str | None,
+    output_dir: Path,
+    image_mode: ImageMode,
+    assets_dirname: str = "assets",
+) -> ImageExtractionResult:
+    result = ImageExtractionResult()
+    images_root = output_dir / assets_dirname / "images"
+    images_root.mkdir(parents=True, exist_ok=True)
+
+    page_image_boxes, page_text_lines = _load_page_image_context(pdf_path, selected_pages, password, result)
+    hashed_candidates = _collect_image_candidates(reader, selected_pages, result)
     hash_counter = Counter(item["sha256"] for item in hashed_candidates)
     pending_structure_markers: dict[int, list[PendingStructureMarker]] = {}
 
@@ -720,52 +871,27 @@ def extract_images(
         rel_path = f"{assets_dirname}/images/{filename}"
         disk_path = images_root / filename
 
-        bbox_payload = None
-        top = float(index) * 1000.0
-        bottom = top
-        mapped = page_image_boxes.get(page_number, [])
-        if len(mapped) >= index:
-            box = mapped[index - 1]
-            x0 = float(box.get("x0", 0.0))
-            y0 = float(box.get("top", 0.0))
-            x1 = float(box.get("x1", 0.0))
-            y1 = float(box.get("bottom", 0.0))
-            top = y0
-            bottom = y1
-            bbox_payload = [x0, y0, x1, y1]
-            if width is None and box.get("width") is not None:
-                width = int(float(box["width"]))
-            if height is None and box.get("height") is not None:
-                height = int(float(box["height"]))
-
-        caption_nearby = _is_caption_nearby(page_text_lines.get(page_number, []), top, bottom)
-        caption_text = _extract_caption_text(page_text_lines.get(page_number, []), top, bottom) if caption_nearby else None
-        title_line = _find_structure_title(page_text_lines.get(page_number, []), bbox_payload)
-        if _is_structure_marker_candidate(
-            bbox=bbox_payload,
+        bbox_payload, top, bottom, width, height = _resolve_image_position(
+            page_number=page_number,
+            index=index,
             width=width,
             height=height,
-            title_line=title_line,
+            page_image_boxes=page_image_boxes,
+        )
+        caption_nearby = _is_caption_nearby(page_text_lines.get(page_number, []), top, bottom)
+        caption_text = _extract_caption_text(page_text_lines.get(page_number, []), top, bottom) if caption_nearby else None
+        if _handle_structure_marker_candidate(
+            page_number=page_number,
+            index=index,
+            top=top,
+            bbox_payload=bbox_payload,
+            width=width,
+            height=height,
+            sha256=sha256,
+            image_bytes=image_bytes,
+            page_text_lines=page_text_lines,
+            pending_structure_markers=pending_structure_markers,
         ):
-            parent_heading_index = _find_parent_heading_index(page_text_lines.get(page_number, []), title_line)
-            child_heading_index = _find_child_heading_index(page_text_lines, page_number, title_line)
-            ocr_candidates = _collect_structure_marker_candidates(image_bytes)
-            pending_structure_markers.setdefault(page_number, []).append(
-                PendingStructureMarker(
-                    page=page_number,
-                    index=index,
-                    top=top,
-                    bbox=bbox_payload,
-                    width=width,
-                    height=height,
-                    sha256=sha256,
-                    title_text=str(title_line.get("text", "")).strip() if title_line is not None else "",
-                    title_top=float(title_line.get("top", top)) if title_line is not None else top,
-                    parent_heading_index=parent_heading_index,
-                    child_heading_index=child_heading_index,
-                    ocr_candidates=ocr_candidates,
-                )
-            )
             continue
         is_decorative, reason = _is_decorative(
             width=width,
@@ -778,7 +904,7 @@ def extract_images(
                 ExcludedImageAsset(
                     page=page_number,
                     index=index,
-                    reason=reason or "DECORATIVE",
+                    reason=reason or ImageExcludeReason.DECORATIVE,
                     bbox=bbox_payload,
                     width=width,
                     height=height,
@@ -788,47 +914,26 @@ def extract_images(
             continue
 
         try:
-            alt_text = f"Image page-{page_number:04d}-figure-{index:03d}"
-            if image_mode == ImageMode.REFERENCED:
-                disk_path.write_bytes(image_bytes)
-            markdown = _build_markdown(
-                mode=image_mode,
-                alt_text=alt_text,
-                rel_path=rel_path,
-                extension=extension,
-                data=image_bytes,
-                page=page_number,
+            _append_figure_asset(
+                result=result,
+                image_mode=image_mode,
+                image_bytes=image_bytes,
+                page_number=page_number,
                 index=index,
-            )
-            page_blocks = result.blocks_by_page.setdefault(page_number, [])
-            page_blocks.append(
-                ImageBlock(
-                    page=page_number,
-                    index=index,
-                    markdown=markdown,
-                    top=top,
-                    anchor_line_index=0,
-                    bbox=tuple(bbox_payload) if bbox_payload else None,
-                )
-            )
-            result.assets.append(
-                ImageAsset(
-                    page=page_number,
-                    index=index,
-                    path=rel_path,
-                    alt_text=alt_text,
-                    caption_text=caption_text,
-                    caption_source="nearby_caption" if caption_text else None,
-                    bbox=bbox_payload,
-                    width=width,
-                    height=height,
-                    sha256=sha256,
-                )
+                extension=extension,
+                rel_path=rel_path,
+                disk_path=disk_path,
+                top=top,
+                bbox_payload=bbox_payload,
+                width=width,
+                height=height,
+                sha256=sha256,
+                caption_text=caption_text,
             )
         except Exception as exc:  # noqa: BLE001
             result.warnings.append(
                 WarningEntry(
-                    code="IMAGE_EXTRACTION_FAILED",
+                    code=WarningCode.IMAGE_EXTRACTION_FAILED,
                     message=f"Failed to process image object: {exc}",
                     page=page_number,
                     details={"image_index": index},

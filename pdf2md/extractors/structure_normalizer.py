@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from pdf2md.constants import TableDecisionReason
 from pdf2md.extractors.text import TextLine
 from pdf2md.models import DedupDecision, LineType, NormalizedLine, SuppressDecision
 from pdf2md.utils.structure import classify_structure_line
@@ -73,7 +74,7 @@ def _line_should_be_suppressed(
                 line_index=0,
                 block_type=region.block_type,
                 block_index=region.block_index,
-                reason="BLOCK_OVERLAP_SUPPRESSION",
+                reason=TableDecisionReason.BLOCK_OVERLAP_SUPPRESSION,
             )
     return None
 
@@ -128,7 +129,7 @@ def normalize_page_lines(
                         line_index=idx,
                         line_type=line_type,
                         text=normalized.text,
-                        reason="NEAR_DUPLICATE_CAPTION",
+                        reason=TableDecisionReason.NEAR_DUPLICATE_CAPTION,
                     )
                 )
                 continue

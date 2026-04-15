@@ -6,6 +6,7 @@ import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pdf2md.constants import WarningCode
 from pdf2md.models import WarningEntry
 
 try:
@@ -84,7 +85,7 @@ def run_ocr(
     if pytesseract is None or pdfium is None:
         result.warnings.append(
             WarningEntry(
-                code="OCR_RUNTIME_UNAVAILABLE",
+                code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
                 message="OCR dependencies are unavailable. Install pytesseract and pypdfium2.",
             )
         )
@@ -98,7 +99,7 @@ def run_ocr(
     try:
         document = pdfium.PdfDocument(str(pdf_path))
     except Exception as exc:  # noqa: BLE001
-        result.warnings.append(WarningEntry(code="OCR_FAILED", message=f"Failed to open PDF for OCR: {exc}"))
+        result.warnings.append(WarningEntry(code=WarningCode.OCR_FAILED, message=f"Failed to open PDF for OCR: {exc}"))
         return result
 
     for page_number in target_pages:
@@ -119,7 +120,7 @@ def run_ocr(
                 if metrics.mean < 50.0 or metrics.low_conf_token_ratio > 0.5:
                     result.warnings.append(
                         WarningEntry(
-                            code="OCR_CONFIDENCE_CRITICAL",
+                            code=WarningCode.OCR_CONFIDENCE_CRITICAL,
                             message=f"OCR confidence is critical (mean={metrics.mean}, low_ratio={metrics.low_conf_token_ratio}).",
                             page=page_number,
                             details={
@@ -132,7 +133,7 @@ def run_ocr(
                 elif metrics.mean < 75.0 or metrics.low_conf_token_ratio > 0.25:
                     result.warnings.append(
                         WarningEntry(
-                            code="OCR_CONFIDENCE_WARN",
+                            code=WarningCode.OCR_CONFIDENCE_WARN,
                             message=f"OCR confidence is degraded (mean={metrics.mean}, low_ratio={metrics.low_conf_token_ratio}).",
                             page=page_number,
                             details={
@@ -145,7 +146,7 @@ def run_ocr(
             else:
                 result.warnings.append(
                     WarningEntry(
-                        code="OCR_EMPTY_RESULT",
+                        code=WarningCode.OCR_EMPTY_RESULT,
                         message="OCR returned empty text.",
                         page=page_number,
                         details={
@@ -158,7 +159,7 @@ def run_ocr(
         except Exception as exc:  # noqa: BLE001
             result.warnings.append(
                 WarningEntry(
-                    code="OCR_FAILED",
+                    code=WarningCode.OCR_FAILED,
                     message=f"OCR failed on page {page_number}: {exc}",
                     page=page_number,
                 )
