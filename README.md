@@ -213,6 +213,8 @@ sudo apt-get install -y poppler-utils tesseract-ocr
 
 - Windows 전용 상세 문서: [docs/WINDOWS_A_TO_Z_GUIDE.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/WINDOWS_A_TO_Z_GUIDE.md)
 - 회사 보안 환경(온라인 설치 제한, `git clone` 제한) 대응 절차 포함
+- ZIP 배포본 기준 원클릭 환경 구성: `scripts\setup_windows_env.ps1`, `scripts\setup_windows_env.bat`
+- ZIP 배포본 기준 폴더 배치 변환: `scripts\run_batch_folder_windows.ps1`, `scripts\run_batch_folder_windows.bat`
 
 ---
 
@@ -331,6 +333,13 @@ deactivate
 
 ```bash
 ./scripts/validate_python_matrix.sh
+```
+
+Windows ZIP 배포본에서는 아래 스크립트로 동일한 목적의 환경 구성을 수행할 수 있습니다.
+
+```powershell
+.\scripts\setup_windows_env.bat
+.\scripts\run_batch_folder_windows.bat -InputDir .\pdfs
 ```
 
 ### 테이블 모드 권장 사용처

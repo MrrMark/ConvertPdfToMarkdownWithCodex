@@ -1,4 +1,4 @@
-# Windows A-Z 설치/실행 가이드 (Python 3.11 기준)
+# Windows A-Z 설치/실행 가이드 (Python 3.14 기준)
 
 이 문서는 **Windows 환경에서 `pdf2md`를 설치하고 실행하는 전체 절차**를 다룹니다.
 대상: 처음 세팅하는 사용자
@@ -11,7 +11,7 @@
 - Windows 10/11
 - PowerShell (권장)
 - Git
-- Python 3.11.x
+- Python 3.14.x
 
 선택(권장):
 - Tesseract OCR (OCR 기능 사용 시 필수)
@@ -70,9 +70,39 @@ Get-FileHash .\Git-Installer.exe -Algorithm SHA256
 
 ---
 
-## 3) Python 3.11 설치
+## 0) 원클릭 빠른 시작
 
-1. [Python 3.11 다운로드](https://www.python.org/downloads/windows/)
+ZIP 배포본을 압축 해제한 뒤, 아래 두 스크립트 중 하나로 바로 시작할 수 있습니다.
+
+환경만 먼저 준비:
+
+```powershell
+.\scripts\setup_windows_env.bat
+```
+
+폴더 내 PDF 일괄 순차 변환까지 바로 실행:
+
+```powershell
+.\scripts\run_batch_folder_windows.bat -InputDir .\pdfs
+```
+
+PowerShell 스크립트 본체:
+
+- `scripts\setup_windows_env.ps1`
+- `scripts\run_batch_folder_windows.ps1`
+
+기본 정책:
+
+- 최신 안정화 검증축 `Python 3.14`를 기본 사용
+- 기본 가상환경 경로는 `.venv314`
+- 배치 모드는 지정 폴더 바로 아래 PDF만 처리
+- 결과는 입력 폴더 내부 `output\` 아래에 생성
+
+---
+
+## 3) Python 3.14 설치
+
+1. [Python 3.14 다운로드](https://www.python.org/downloads/windows/)
 2. 설치 시 반드시 `Add python.exe to PATH` 체크
 3. 설치 확인
 
@@ -82,7 +112,7 @@ pip --version
 ```
 
 권장 출력 예시:
-- `Python 3.11.x`
+- `Python 3.14.x`
 
 버전 정책:
 
@@ -127,8 +157,8 @@ cd C:\Work\ConvertPdfToMarkdownWithCodex
 ## 5) 가상환경 생성/활성화
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+py -3.14 -m venv .venv314
+.\.venv314\Scripts\Activate.ps1
 ```
 
 PowerShell 실행 정책 오류가 나면(최초 1회):
@@ -140,7 +170,7 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 다시 활성화:
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
+.\.venv314\Scripts\Activate.ps1
 ```
 
 ---
@@ -428,7 +458,7 @@ deactivate
 - 아래 순서 재실행
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
+.\.venv314\Scripts\Activate.ps1
 pip install -e .[dev]
 ```
 
@@ -466,23 +496,92 @@ pip install -e .[dev]
 
 ---
 
-## 13) 업데이트 방법
+## 13) 원클릭 스크립트 상세
+
+### A. Windows 원클릭 환경 구성 스크립트
+
+배치 파일 진입점:
+
+```powershell
+.\scripts\setup_windows_env.bat
+```
+
+PowerShell 본체 직접 실행:
+
+```powershell
+.\scripts\setup_windows_env.ps1
+```
+
+이 스크립트가 하는 일:
+
+1. `py -3.14 --version` 확인
+2. 없으면 `winget`으로 Python 3.14 설치 시도
+3. `.venv314` 생성
+4. `.venv314\Scripts\python.exe -m pip install --upgrade pip`
+5. `.venv314\Scripts\python.exe -m pip install -e .[dev]`
+6. `.venv314\Scripts\python.exe -m pdf2md --help` 검증
+
+지원 옵션:
+
+```powershell
+.\scripts\setup_windows_env.ps1 -PythonVersion 3.14 -VenvDir .venv314
+.\scripts\setup_windows_env.ps1 -SkipWingetInstall
+```
+
+완료 후 표시되는 활성화 명령:
+
+- PowerShell: `.\.venv314\Scripts\Activate.ps1`
+- CMD: `.\.venv314\Scripts\activate.bat`
+
+### B. 폴더 내 PDF 일괄 순차 변환 원클릭 스크립트
+
+배치 파일 진입점:
+
+```powershell
+.\scripts\run_batch_folder_windows.bat -InputDir .\pdfs
+```
+
+PowerShell 본체 직접 실행:
+
+```powershell
+.\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs
+```
+
+이 스크립트가 하는 일:
+
+1. `.venv314\Scripts\python.exe` 확인
+2. 없으면 `scripts\setup_windows_env.ps1`를 먼저 실행
+3. 입력 폴더 바로 아래 PDF 존재 여부 확인
+4. `python -m pdf2md --input-dir .\pdfs` 실행
+5. 종료 코드와 출력 위치 요약
+
+예시 옵션:
+
+```powershell
+.\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs -SkipExisting
+.\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs -TableMode html -ImageMode referenced
+.\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs -Pages 1-3,5 -NoPageMarkers
+```
+
+---
+
+## 14) 업데이트 방법
 
 ```powershell
 git pull origin main
-.\.venv\Scripts\Activate.ps1
+.\.venv314\Scripts\Activate.ps1
 pip install -e .[dev]
 ```
 
 ---
 
-## 14) 권장 실행 예시 (복사해서 바로 실행)
+## 15) 권장 실행 예시 (복사해서 바로 실행)
 
 ```powershell
 git clone https://github.com/MrrMark/ConvertPdfToMarkdownWithCodex.git
 cd ConvertPdfToMarkdownWithCodex
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+py -3.14 -m venv .venv314
+.\.venv314\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -e .[dev]
 python -m pdf2md .\sample.pdf -o .\output --pages 1-3 --keep-page-markers --image-mode referenced --table-mode auto
@@ -490,17 +589,27 @@ python -m pdf2md .\sample.pdf -o .\output --pages 1-3 --keep-page-markers --imag
 
 ---
 
-## 15) `git clone` 없이 실행하는 실전 예시
+## 16) `git clone` 없이 실행하는 실전 예시
 
 ### A. 소스 ZIP만 있는 경우(인터넷 가능 환경)
 
 ```powershell
 cd C:\Work\ConvertPdfToMarkdownWithCodex
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -e .[dev]
-python -m pdf2md .\sample.pdf -o .\output
+.\scripts\setup_windows_env.bat
+.\scripts\run_batch_folder_windows.bat -InputDir .\pdfs
+```
+
+배치 결과 예시:
+
+- `pdfs\output\alpha\alpha.md`
+- `pdfs\output\alpha\alpha_manifest.json`
+- `pdfs\output\alpha\alpha_report.json`
+- `pdfs\output\batch_report.json`
+
+단일 PDF만 빠르게 실행하고 싶다면:
+
+```powershell
+.\.venv314\Scripts\python.exe -m pdf2md .\sample.pdf -o .\output
 ```
 
 ### B. 완전 오프라인 환경(의존성 wheel 반입)
@@ -513,8 +622,8 @@ python -m pdf2md .\sample.pdf -o .\output
 
 ```powershell
 cd C:\Work\ConvertPdfToMarkdownWithCodex
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+py -3.14 -m venv .venv314
+.\.venv314\Scripts\Activate.ps1
 pip install --no-index --find-links .\wheelhouse -e .
 python -m pdf2md .\sample.pdf -o .\output
 ```
