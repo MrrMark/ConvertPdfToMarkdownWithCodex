@@ -34,7 +34,10 @@ class OcrResult:
     warnings: list[WarningEntry] = field(default_factory=list)
     page_texts: dict[int, str] = field(default_factory=dict)
     ocr_pages: list[int] = field(default_factory=list)
+    attempted_pages: list[int] = field(default_factory=list)
+    reasons_by_page: dict[int, str] = field(default_factory=dict)
     used_ocr: bool = False
+    runtime_available: bool = False
     pdf_open_count: int = 0
     metrics_by_page: dict[int, OcrMetrics] = field(default_factory=dict)
 
@@ -74,14 +77,24 @@ def run_ocr(
     selected_pages: list[int],
     existing_page_texts: dict[int, str],
     force_ocr: bool,
+    ocr_lang: str = "eng",
 ) -> OcrResult:
     result = OcrResult()
     target_pages: list[int] = []
     for page in selected_pages:
-        if force_ocr or not existing_page_texts.get(page, "").strip():
+        existing_text = existing_page_texts.get(page, "").strip()
+        if force_ocr:
             target_pages.append(page)
+            result.reasons_by_page[page] = "force"
+        elif not existing_text:
+            target_pages.append(page)
+            result.reasons_by_page[page] = "empty_text_layer"
+        elif len(existing_text) < 3:
+            target_pages.append(page)
+            result.reasons_by_page[page] = "low_text_density"
     if not target_pages:
         return result
+    result.attempted_pages = target_pages
 
     if pytesseract is None or pdfium is None:
         result.warnings.append(
@@ -96,6 +109,16 @@ def run_ocr(
         homebrew_tesseract = Path("/opt/homebrew/bin/tesseract")
         if homebrew_tesseract.exists():
             pytesseract.pytesseract.tesseract_cmd = str(homebrew_tesseract)
+        else:
+            result.warnings.append(
+                WarningEntry(
+                    code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
+                    message="Tesseract executable is unavailable. Install tesseract or add it to PATH.",
+                    details={"ocr_lang": ocr_lang},
+                )
+            )
+            return result
+    result.runtime_available = True
 
     try:
         document = pdfium.PdfDocument(str(pdf_path))
@@ -105,13 +128,13 @@ def run_ocr(
         return result
 
     for page_number in target_pages:
+        page = None
         try:
             page = document.get_page(page_number - 1)
             bitmap = page.render(scale=2.0)
             pil_image = bitmap.to_pil()
-            text = (pytesseract.image_to_string(pil_image) or "").strip()
-            data = pytesseract.image_to_data(pil_image, output_type=pytesseract.Output.DICT)
-            page.close()
+            text = (pytesseract.image_to_string(pil_image, lang=ocr_lang) or "").strip()
+            data = pytesseract.image_to_data(pil_image, lang=ocr_lang, output_type=pytesseract.Output.DICT)
 
             metrics = _extract_confidence_metrics(data)
             if text:
@@ -166,5 +189,11 @@ def run_ocr(
                     page=page_number,
                 )
             )
+        finally:
+            if page is not None:
+                page.close()
 
+    close = getattr(document, "close", None)
+    if close is not None:
+        close()
     return result

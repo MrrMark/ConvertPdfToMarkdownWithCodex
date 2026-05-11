@@ -189,6 +189,17 @@ class _FakePdfWithPage:
         return None
 
 
+class _FakePdfWithPages:
+    def __init__(self, pages) -> None:  # noqa: ANN001
+        self.pages = pages
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):  # noqa: ANN001
+        return None
+
+
 def test_extract_tables_markdown_mode_never_uses_html(monkeypatch) -> None:
     rows = [["Bits", "Description"], ["63:0", "A" * 130]]
     monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
@@ -345,3 +356,24 @@ def test_extract_tables_records_stub_and_footnote_diagnostics(monkeypatch) -> No
     assert quality["stub_column_count"] == 1
     assert quality["footnote_row_count"] == 1
     assert result.rag_tables[0]["records"][0]["stub_cells"] == ["Read"]
+
+
+def test_extract_tables_marks_adjacent_same_header_tables_as_continuation(monkeypatch) -> None:
+    pages = [
+        _FakePage([["Field", "Value"], ["alpha", "1"]]),
+        _FakePage([["Field", "Value"], ["beta", "2"]]),
+    ]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdfWithPages(pages))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1, 2],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    assert result.assets[0].continuation_group == "table-continuation-001"
+    assert result.assets[0].continued_to_page == 2
+    assert result.assets[1].continued_from_page == 1
+    assert result.rag_tables[1]["continuation_group"] == "table-continuation-001"
+    assert result.rag_tables[1]["records"][0]["continuation_group"] == "table-continuation-001"

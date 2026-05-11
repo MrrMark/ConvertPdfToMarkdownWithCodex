@@ -49,6 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional RAG sidecar table output: none, markdown, jsonl, or both.",
     )
     parser.add_argument("--force-ocr", action="store_true", default=False)
+    parser.add_argument("--ocr-lang", default="eng", help="Tesseract language code for OCR, for example eng or kor+eng.")
     parser.add_argument(
         "--remove-header-footer",
         action="store_true",
@@ -60,6 +61,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Reuse the first extracted file for repeated image objects with the same sha256.",
+    )
+    parser.add_argument(
+        "--repair-hyphenation",
+        action="store_true",
+        default=False,
+        help="Opt-in repair for clear line-break hyphenation.",
+    )
+    parser.add_argument(
+        "--figure-crop-fallback",
+        action="store_true",
+        default=False,
+        help="Opt-in page crop fallback for captioned figures without embedded image objects.",
     )
     marker_group = parser.add_mutually_exclusive_group()
     marker_group.add_argument("--keep-page-markers", dest="keep_page_markers", action="store_true")
@@ -101,9 +114,12 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         table_mode=TableMode(args.table_mode),
         rag_table_output=RagTableOutputMode(args.rag_table_output),
         force_ocr=args.force_ocr,
+        ocr_lang=args.ocr_lang,
         keep_page_markers=args.keep_page_markers,
         remove_header_footer=args.remove_header_footer,
         dedupe_images=args.dedupe_images,
+        repair_hyphenation=args.repair_hyphenation,
+        figure_crop_fallback=args.figure_crop_fallback,
         debug=args.debug,
         verbose=args.verbose,
         skip_existing=args.skip_existing,
@@ -121,9 +137,12 @@ def _build_batch_config(args: argparse.Namespace, pdf_path: Path, output_dir: Pa
         table_mode=TableMode(args.table_mode),
         rag_table_output=RagTableOutputMode(args.rag_table_output),
         force_ocr=args.force_ocr,
+        ocr_lang=args.ocr_lang,
         keep_page_markers=args.keep_page_markers,
         remove_header_footer=args.remove_header_footer,
         dedupe_images=args.dedupe_images,
+        repair_hyphenation=args.repair_hyphenation,
+        figure_crop_fallback=args.figure_crop_fallback,
         debug=args.debug,
         verbose=args.verbose,
         skip_existing=args.skip_existing,

@@ -20,9 +20,12 @@ class Config(BaseModel):
     table_mode: TableMode = TableMode.AUTO
     rag_table_output: RagTableOutputMode = RagTableOutputMode.NONE
     force_ocr: bool = False
+    ocr_lang: str = "eng"
     keep_page_markers: bool = False
     remove_header_footer: bool = False
     dedupe_images: bool = False
+    repair_hyphenation: bool = False
+    figure_crop_fallback: bool = False
     debug: bool = False
     verbose: bool = False
     skip_existing: bool = False

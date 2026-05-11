@@ -14,6 +14,11 @@ import pdfplumber
 from pypdf import PdfReader
 from PIL import Image, ImageFilter, ImageOps
 
+try:
+    import pypdfium2 as pdfium
+except Exception:  # noqa: BLE001
+    pdfium = None
+
 from pdf2md.constants import (
     ImageClassification,
     ImageExcludeReason,
@@ -21,8 +26,8 @@ from pdf2md.constants import (
     StructureRecoveryStrategy,
     WarningCode,
 )
-from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, WarningEntry
-from pdf2md.utils.structure import extract_leading_heading_index, is_caption_candidate
+from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, LineType, WarningEntry
+from pdf2md.utils.structure import classify_structure_line, extract_leading_heading_index, is_caption_candidate
 
 logger = logging.getLogger(__name__)
 
@@ -816,6 +821,9 @@ def _append_figure_asset(
     sha256: str,
     caption_text: str | None,
     dedupe_of: str | None,
+    source: str = "embedded",
+    caption_confidence: float | None = None,
+    crop_reason: str | None = None,
 ) -> None:
     alt_text = f"Image page-{page_number:04d}-figure-{index:03d}"
     if image_mode == ImageMode.REFERENCED and dedupe_of is None:
@@ -853,8 +861,163 @@ def _append_figure_asset(
             height=height,
             sha256=sha256,
             dedupe_of=dedupe_of,
+            source=source,
+            caption_confidence=caption_confidence,
+            crop_reason=crop_reason,
         )
     )
+
+
+def _page_size(reader: PdfReader, page_number: int) -> tuple[float, float]:
+    page = reader.pages[page_number - 1]
+    width = float(page.mediabox.width)
+    height = float(page.mediabox.height)
+    return width, height
+
+
+def _figure_caption_lines(text_lines: list[dict]) -> list[dict]:
+    return [
+        line
+        for line in text_lines
+        if classify_structure_line(str(line.get("text", "")).strip()) is LineType.FIGURE_CAPTION
+    ]
+
+
+def _crop_bbox_near_caption(caption_line: dict, page_width: float, page_height: float) -> list[float]:
+    caption_top = float(caption_line.get("top", page_height * 0.75))
+    caption_bottom = float(caption_line.get("bottom", caption_top + 12.0))
+    margin_x = max(36.0, page_width * 0.08)
+    crop_height = min(220.0, page_height * 0.35)
+    if caption_top > page_height * 0.45:
+        bottom = max(caption_top - 8.0, 1.0)
+        top = max(0.0, bottom - crop_height)
+    else:
+        top = min(caption_bottom + 8.0, page_height - 1.0)
+        bottom = min(page_height, top + crop_height)
+    return [margin_x, top, page_width - margin_x, bottom]
+
+
+def _render_page_crop(
+    *,
+    pdf_path: Path,
+    password: str | None,
+    page_number: int,
+    bbox: list[float],
+) -> tuple[bytes, int, int]:
+    if pdfium is None:
+        raise RuntimeError("pypdfium2 is unavailable")
+    document = pdfium.PdfDocument(str(pdf_path), password=password)
+    try:
+        page = document.get_page(page_number - 1)
+        try:
+            bitmap = page.render(scale=2.0)
+            image = bitmap.to_pil()
+        finally:
+            page.close()
+    finally:
+        close = getattr(document, "close", None)
+        if close is not None:
+            close()
+
+    page_width = max(float(image.width) / 2.0, 1.0)
+    page_height = max(float(image.height) / 2.0, 1.0)
+    x0, top, x1, bottom = bbox
+    crop_box = (
+        max(0, int(x0 / page_width * image.width)),
+        max(0, int(top / page_height * image.height)),
+        min(image.width, int(x1 / page_width * image.width)),
+        min(image.height, int(bottom / page_height * image.height)),
+    )
+    cropped = image.crop(crop_box)
+    buffer = BytesIO()
+    cropped.save(buffer, format="PNG")
+    return buffer.getvalue(), cropped.width, cropped.height
+
+
+def _append_figure_crop_fallbacks(
+    *,
+    result: ImageExtractionResult,
+    reader: PdfReader,
+    pdf_path: Path,
+    password: str | None,
+    selected_pages: list[int],
+    output_dir: Path,
+    image_mode: ImageMode,
+    assets_dirname: str,
+    page_text_lines: dict[int, list[dict]],
+) -> None:
+    existing_pages = {asset.page for asset in result.assets}
+    images_root = output_dir / assets_dirname / "images"
+    for page_number in selected_pages:
+        if page_number in existing_pages:
+            continue
+        captions = _figure_caption_lines(page_text_lines.get(page_number, []))
+        if not captions:
+            continue
+        caption = captions[0]
+        caption_text = str(caption.get("text", "")).strip()
+        try:
+            page_width, page_height = _page_size(reader, page_number)
+            bbox_payload = _crop_bbox_near_caption(caption, page_width, page_height)
+            image_bytes, width, height = _render_page_crop(
+                pdf_path=pdf_path,
+                password=password,
+                page_number=page_number,
+                bbox=bbox_payload,
+            )
+        except Exception as exc:  # noqa: BLE001
+            result.warnings.append(
+                WarningEntry(
+                    code=WarningCode.IMAGE_EXTRACTION_FAILED,
+                    message=f"Figure crop fallback failed: {exc}",
+                    page=page_number,
+                    details={"caption_text": caption_text},
+                )
+            )
+            continue
+        index = 1
+        while any(asset.page == page_number and asset.index == index for asset in result.assets):
+            index += 1
+        filename = f"page-{page_number:04d}-figure-{index:03d}.png"
+        rel_path = f"{assets_dirname}/images/{filename}"
+        disk_path = images_root / filename
+        sha256 = hashlib.sha256(image_bytes).hexdigest()
+        _append_figure_asset(
+            result=result,
+            image_mode=image_mode,
+            image_bytes=image_bytes,
+            page_number=page_number,
+            index=index,
+            extension="png",
+            rel_path=rel_path,
+            disk_path=disk_path,
+            top=float(caption.get("top", bbox_payload[1])),
+            bbox_payload=bbox_payload,
+            width=width,
+            height=height,
+            sha256=sha256,
+            caption_text=caption_text,
+            dedupe_of=None,
+            source="page_crop",
+            caption_confidence=0.85,
+            crop_reason="captioned_figure_without_embedded_image",
+        )
+        result.debug_candidates_by_page.setdefault(page_number, []).append(
+            {
+                "page": page_number,
+                "image_index": index,
+                "sha256": sha256,
+                "width": width,
+                "height": height,
+                "bbox": bbox_payload,
+                "caption_text": caption_text,
+                "excluded": False,
+                "exclude_reason": None,
+                "dedupe_of": None,
+                "path": rel_path,
+                "source": "page_crop",
+            }
+        )
 
 
 def extract_images(
@@ -866,6 +1029,7 @@ def extract_images(
     image_mode: ImageMode,
     assets_dirname: str = "assets",
     dedupe_images: bool = False,
+    figure_crop_fallback: bool = False,
     pdf: Any = None,
     page_image_boxes: dict[int, list[dict]] | None = None,
     page_text_lines: dict[int, list[dict]] | None = None,
@@ -1002,5 +1166,18 @@ def extract_images(
     ]
     for marker, recovery in _resolve_structure_markers(all_pending_markers):
         _append_structure_marker_result(result, marker, recovery)
+
+    if figure_crop_fallback:
+        _append_figure_crop_fallbacks(
+            result=result,
+            reader=reader,
+            pdf_path=pdf_path,
+            password=password,
+            selected_pages=selected_pages,
+            output_dir=output_dir,
+            image_mode=image_mode,
+            assets_dirname=assets_dirname,
+            page_text_lines=page_text_lines,
+        )
 
     return result

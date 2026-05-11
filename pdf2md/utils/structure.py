@@ -10,6 +10,7 @@ LEADING_HEADING_INDEX_PATTERN = re.compile(r"^(\d+(?:\.\d+)*)\s+\S")
 FIGURE_CAPTION_PATTERN = re.compile(r"^(?:Figure|Fig\.?|그림|도표)\s+\d+\s*[:.]?", re.IGNORECASE)
 TABLE_CAPTION_PATTERN = re.compile(r"^(?:Table|표)\s+\d+\s*[:.]?", re.IGNORECASE)
 TOC_LEADER_PATTERN = re.compile(r"\.{5,}\s*\d+\s*$")
+LIST_ITEM_PATTERN = re.compile(r"^\s*(?:[-*]\s+\S|\d+[.)]\s+\S)")
 CAPTION_NEARBY_PATTERN = re.compile(r"\b(figure|fig\.?|chart|table|그림|도표|표)\b", re.IGNORECASE)
 CAPTION_LINE_PATTERN = re.compile(r"^(?:Figure|Fig\.?|Table|그림|도표|표)\s+\d+\s*[:.]?", re.IGNORECASE)
 
@@ -25,6 +26,8 @@ def classify_structure_line(text: str) -> LineType:
         return LineType.FIGURE_CAPTION
     if TABLE_CAPTION_PATTERN.match(normalized):
         return LineType.TABLE_CAPTION
+    if LIST_ITEM_PATTERN.match(normalized):
+        return LineType.LIST_ITEM
     return LineType.BODY_LINE
 
 

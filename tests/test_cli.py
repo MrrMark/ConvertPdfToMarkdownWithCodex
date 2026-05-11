@@ -205,6 +205,10 @@ def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
         "1",
         "--remove-header-footer",
         "--dedupe-images",
+        "--repair-hyphenation",
+        "--figure-crop-fallback",
+        "--ocr-lang",
+        "kor+eng",
         "--debug",
     ]
 
@@ -214,6 +218,9 @@ def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["options"]["remove_header_footer"] is True
     assert manifest["options"]["dedupe_images"] is True
+    assert manifest["options"]["repair_hyphenation"] is True
+    assert manifest["options"]["figure_crop_fallback"] is True
+    assert manifest["options"]["ocr_lang"] == "kor+eng"
     assert (output_dir / "debug" / "page-0001-raw-lines.json").exists()
 
 

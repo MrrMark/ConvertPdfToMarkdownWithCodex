@@ -195,6 +195,23 @@ def build_korean_text_pdf(path: Path) -> None:
     write_pdf(path, [PageSpec(texts=[PositionedText("한글 텍스트 원문", 72, 760)])])
 
 
+def build_structured_text_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("2.2 Structured Heading", 72, 760),
+                    PositionedText("- bullet item", 72, 720),
+                    PositionedText("1. ordered item", 72, 690),
+                    PositionedText("interoper-", 72, 640),
+                    PositionedText("ability", 72, 600),
+                ]
+            )
+        ],
+    )
+
+
 def build_password_pdf(path: Path, password: str = "secret") -> None:
     write_pdf(path, [PageSpec(texts=[PositionedText("Encrypted fixture", 72, 760)])], password=password)
 
