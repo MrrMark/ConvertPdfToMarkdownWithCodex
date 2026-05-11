@@ -75,6 +75,18 @@ def build_report(
     low_confidence_pages: list[int] | None = None,
     page_status_counts: dict[str, int] | None = None,
     structure_marker_counts: dict[str, int] | None = None,
+    stage_durations_ms: dict[str, int] | None = None,
+    pdf_open_count: int = 0,
+    pages_per_second: float | None = None,
+    rag_table_output: str = "none",
+    rag_table_record_count: int = 0,
+    rag_table_file_count: int = 0,
+    table_fallback_reason_counts: dict[str, int] | None = None,
+    table_low_quality_count: int = 0,
+    table_caption_linked_count: int = 0,
+    page_cache_hits: int = 0,
+    page_cache_misses: int = 0,
+    text_line_extract_count: int = 0,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
     excluded_images = excluded_images or []
@@ -86,6 +98,8 @@ def build_report(
     low_confidence_pages = low_confidence_pages or []
     page_status_counts = page_status_counts or {"success": 0, "partial_success": 0, "failed": 0}
     structure_marker_counts = structure_marker_counts or {}
+    stage_durations_ms = stage_durations_ms or {}
+    table_fallback_reason_counts = table_fallback_reason_counts or {}
 
     summary = ReportSummary(
         processed_pages=len(page_results),
@@ -132,6 +146,18 @@ def build_report(
         structure_marker_suppressed_ambiguous_count=int(
             structure_marker_counts.get(StructureRecoveryReason.SUPPRESSED_AMBIGUOUS, 0)
         ),
+        stage_durations_ms=stage_durations_ms,
+        pdf_open_count=pdf_open_count,
+        pages_per_second=pages_per_second,
+        rag_table_output=rag_table_output,
+        rag_table_record_count=rag_table_record_count,
+        rag_table_file_count=rag_table_file_count,
+        table_fallback_reason_counts=table_fallback_reason_counts,
+        table_low_quality_count=table_low_quality_count,
+        table_caption_linked_count=table_caption_linked_count,
+        page_cache_hits=page_cache_hits,
+        page_cache_misses=page_cache_misses,
+        text_line_extract_count=text_line_extract_count,
     )
 
     return Report(

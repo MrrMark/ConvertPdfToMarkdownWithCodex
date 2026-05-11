@@ -1,0 +1,25 @@
+{
+  "images": [],
+  "input_file": "header_footer.pdf",
+  "options": {
+    "debug": false,
+    "dedupe_images": false,
+    "force_ocr": false,
+    "image_mode": "referenced",
+    "keep_page_markers": true,
+    "pages": null,
+    "rag_table_output": "none",
+    "remove_header_footer": true,
+    "table_mode": "auto",
+    "version": "<version>"
+  },
+  "schema_version": "1.0",
+  "selected_pages": [
+    1,
+    2,
+    3
+  ],
+  "tables": [],
+  "total_pages": 3,
+  "warnings": []
+}

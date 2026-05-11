@@ -168,6 +168,30 @@ def test_cli_accepts_markdown_table_mode(sample_pdf: Path, tmp_path: Path) -> No
     assert manifest["options"]["table_mode"] == "markdown"
 
 
+def test_cli_accepts_rag_table_output_mode(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-out-rag-table-output"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--rag-table-output",
+        "markdown",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["rag_table_output"] == "markdown"
+    assert report["summary"]["rag_table_output"] == "markdown"
+    assert (output_dir / "rag_tables.md").exists()
+    assert not (output_dir / "tables_rag.jsonl").exists()
+
+
 def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
     output_dir = tmp_path / "cli-out-quality-options"
     cmd = [

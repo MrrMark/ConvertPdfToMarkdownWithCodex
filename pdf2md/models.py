@@ -35,6 +35,19 @@ class TableMode(str, Enum):
         return TableMode.AUTO.value
 
 
+class RagTableOutputMode(str, Enum):
+    NONE = "none"
+    MARKDOWN = "markdown"
+    JSONL = "jsonl"
+    BOTH = "both"
+
+    def writes_markdown(self) -> bool:
+        return self in {RagTableOutputMode.MARKDOWN, RagTableOutputMode.BOTH}
+
+    def writes_jsonl(self) -> bool:
+        return self in {RagTableOutputMode.JSONL, RagTableOutputMode.BOTH}
+
+
 class ConversionStatus(str, Enum):
     SUCCESS = "success"
     PARTIAL_SUCCESS = "partial_success"
@@ -117,6 +130,18 @@ class ReportSummary(BaseModel):
     structure_marker_recovered_context_count: int = 0
     structure_marker_suppressed_no_candidate_count: int = 0
     structure_marker_suppressed_ambiguous_count: int = 0
+    stage_durations_ms: dict[str, int] = Field(default_factory=dict)
+    pdf_open_count: int = 0
+    pages_per_second: Optional[float] = None
+    rag_table_output: str = "none"
+    rag_table_record_count: int = 0
+    rag_table_file_count: int = 0
+    table_fallback_reason_counts: dict[str, int] = Field(default_factory=dict)
+    table_low_quality_count: int = 0
+    table_caption_linked_count: int = 0
+    page_cache_hits: int = 0
+    page_cache_misses: int = 0
+    text_line_extract_count: int = 0
 
 
 class ImageAsset(BaseModel):
@@ -159,6 +184,10 @@ class TableAsset(BaseModel):
     bbox: Optional[list[float]] = None
     anchor_line_index: Optional[int] = None
     anchor_top: Optional[float] = None
+    quality_score: Optional[float] = None
+    fallback_reasons: list[str] = Field(default_factory=list)
+    caption_text: Optional[str] = None
+    caption_source: Optional[str] = None
 
 
 class NormalizedLine(BaseModel):

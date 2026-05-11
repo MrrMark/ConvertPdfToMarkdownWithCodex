@@ -14,18 +14,34 @@ from pdf2md.extractors.ocr import run_ocr
 from pdf2md.extractors.structure_normalizer import BlockRegion, normalize_page_lines
 from pdf2md.extractors.tables import extract_tables
 from pdf2md.extractors.text import PageLayoutMetadata, TextExtractionError, TextLine, extract_page_text_layout_result
-from pdf2md.models import ConversionStatus, ImageMode, Manifest, PageResult, PageStatus, Report, TableMode, WarningEntry
+from pdf2md.models import (
+    ConversionStatus,
+    ImageMode,
+    Manifest,
+    PageResult,
+    PageStatus,
+    RagTableOutputMode,
+    Report,
+    TableMode,
+    WarningEntry,
+)
 from pdf2md.reporting import build_report, count_structure_marker_reasons, determine_conversion_status, finalize_page_statuses
 from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown
+from pdf2md.serializers.rag_tables import (
+    flatten_rag_table_records,
+    serialize_rag_tables_jsonl,
+    serialize_rag_tables_markdown,
+)
 from pdf2md.serializers.report import serialize_report
 from pdf2md.utils.io import ensure_output_dirs, write_json, write_text
-from pdf2md.utils.pdf import PdfOpenError, open_pdf_reader
+from pdf2md.utils.pdf import PdfDocumentContext, PdfOpenError
 
 
 EXIT_SUCCESS = 0
 EXIT_FATAL = 1
 EXIT_PARTIAL = 2
+LOW_TABLE_QUALITY_THRESHOLD = 0.55
 logger = logging.getLogger(__name__)
 
 
@@ -148,12 +164,73 @@ def _write_debug_artifacts(
         )
 
 
+def _count_table_fallback_reasons(table_fallbacks: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for fallback in table_fallbacks:
+        for reason in fallback.get("reasons", []):
+            counts[str(reason)] = counts.get(str(reason), 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _count_low_quality_tables(table_quality: list[dict]) -> int:
+    count = 0
+    for item in table_quality:
+        try:
+            score = float(item.get("quality_score", 1.0))
+        except (TypeError, ValueError):
+            continue
+        if score < LOW_TABLE_QUALITY_THRESHOLD:
+            count += 1
+    return count
+
+
+def _count_caption_linked_tables(table_quality: list[dict]) -> int:
+    return sum(1 for item in table_quality if str(item.get("caption_text") or "").strip())
+
+
+def _write_rag_table_outputs(
+    *,
+    config: Config,
+    output_mode: RagTableOutputMode,
+    rag_tables: list[dict],
+) -> tuple[int, int]:
+    if output_mode is RagTableOutputMode.NONE:
+        return 0, 0
+
+    record_count = len(flatten_rag_table_records(rag_tables))
+    file_count = 0
+    if output_mode.writes_markdown():
+        write_text(
+            config.output_dir / config.rag_tables_markdown_filename,
+            serialize_rag_tables_markdown(rag_tables),
+        )
+        file_count += 1
+    if output_mode.writes_jsonl():
+        write_text(config.output_dir / config.rag_tables_jsonl_filename, serialize_rag_tables_jsonl(rag_tables))
+        file_count += 1
+    return record_count, file_count
+
+
 def run_conversion(config: Config) -> ConversionResult:
     """Run conversion and write markdown, manifest, and report outputs."""
     started_at = datetime.now(timezone.utc)
     logger.info("Starting conversion input=%s output_dir=%s", config.input_pdf, config.output_dir)
     image_mode = config.image_mode if isinstance(config.image_mode, ImageMode) else ImageMode(config.image_mode)
     table_mode = config.table_mode if isinstance(config.table_mode, TableMode) else TableMode(config.table_mode)
+    rag_table_output = (
+        config.rag_table_output
+        if isinstance(config.rag_table_output, RagTableOutputMode)
+        else RagTableOutputMode(config.rag_table_output)
+    )
+    stage_durations_ms: dict[str, int] = {}
+
+    def stage_start() -> datetime:
+        return datetime.now(timezone.utc)
+
+    def finish_stage(name: str, started: datetime) -> None:
+        elapsed_ms = max(int((datetime.now(timezone.utc) - started).total_seconds() * 1000), 0)
+        stage_durations_ms[name] = stage_durations_ms.get(name, 0) + elapsed_ms
+
     warnings: list[WarningEntry] = []
     page_results_map: dict[int, PageResult] = {}
     failed_pages: list[int] = []
@@ -165,11 +242,15 @@ def run_conversion(config: Config) -> ConversionResult:
         "images": False,
     }
 
+    output_setup_started = stage_start()
     ensure_output_dirs(config.output_dir, config.assets_dirname)
+    finish_stage("output_setup", output_setup_started)
 
+    pdf_open_started = stage_start()
     try:
-        reader = open_pdf_reader(config.input_pdf, config.password)
+        pdf_context = PdfDocumentContext.open(config.input_pdf, config.password)
     except PdfOpenError as exc:
+        finish_stage("pdf_open", pdf_open_started)
         logger.error("Failed to open PDF: %s", exc)
         finished_at = datetime.now(timezone.utc)
         warnings.append(WarningEntry(code=WarningCode.PDF_OPEN_FAILED, message=str(exc)))
@@ -181,6 +262,7 @@ def run_conversion(config: Config) -> ConversionResult:
             page_results=[],
             failed_pages=[],
             engine_usage=engine_usage,
+            stage_durations_ms=stage_durations_ms,
         )
         report_path = config.output_dir / config.report_filename
         write_json(report_path, serialize_report(report))
@@ -193,13 +275,18 @@ def run_conversion(config: Config) -> ConversionResult:
             status=ConversionStatus.FAILED,
             report=report,
         )
+    finish_stage("pdf_open", pdf_open_started)
 
-    total_pages = len(reader.pages)
+    reader = pdf_context.reader
+    total_pages = pdf_context.total_pages
     logger.info("Opened PDF total_pages=%s", total_pages)
 
+    page_selection_started = stage_start()
     try:
         selected_pages = config.selected_pages(total_pages)
     except ValueError as exc:
+        finish_stage("page_selection", page_selection_started)
+        pdf_context.close()
         logger.error("Invalid page range: %s", exc)
         finished_at = datetime.now(timezone.utc)
         warnings.append(WarningEntry(code=WarningCode.INVALID_PAGE_RANGE, message=str(exc)))
@@ -211,6 +298,8 @@ def run_conversion(config: Config) -> ConversionResult:
             page_results=[],
             failed_pages=[],
             engine_usage=engine_usage,
+            stage_durations_ms=stage_durations_ms,
+            pdf_open_count=pdf_context.pdf_open_count,
         )
         report_path = config.output_dir / config.report_filename
         write_json(report_path, serialize_report(report))
@@ -223,14 +312,25 @@ def run_conversion(config: Config) -> ConversionResult:
             status=ConversionStatus.FAILED,
             report=report,
         )
+    finish_stage("page_selection", page_selection_started)
 
     page_layout_lines: dict[int, list[TextLine]] = {}
     page_texts: dict[int, str] = {}
     raw_lines_by_page: dict[int, list[dict]] = {}
     text_metadata_by_page: dict[int, PageLayoutMetadata] = {}
+    shared_plumber_pdf = None
+    text_started = stage_start()
     try:
         logger.info("Extracting text for pages=%s", selected_pages)
-        text_layout = extract_page_text_layout_result(config.input_pdf, selected_pages, config.password)
+        shared_plumber_pdf = pdf_context.get_pdfplumber_pdf()
+        cached_text_lines_by_page = {page: pdf_context.get_text_lines(page) for page in selected_pages}
+        text_layout = extract_page_text_layout_result(
+            config.input_pdf,
+            selected_pages,
+            config.password,
+            pdf=shared_plumber_pdf,
+            text_lines_by_page=cached_text_lines_by_page,
+        )
         layout = text_layout.lines_by_page
         raw_lines_by_page = text_layout.raw_lines_by_page
         text_metadata_by_page = text_layout.metadata_by_page
@@ -246,7 +346,7 @@ def run_conversion(config: Config) -> ConversionResult:
                 reading_order_strategy=metadata.reading_order_strategy if metadata else "top",
                 column_count_estimate=metadata.column_count_estimate if metadata else 1,
             )
-    except TextExtractionError as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.exception("Text extraction failed")
         warnings.append(WarningEntry(code=WarningCode.TEXT_EXTRACTION_FAILED, message=str(exc)))
         for page in selected_pages:
@@ -254,9 +354,13 @@ def run_conversion(config: Config) -> ConversionResult:
             page_layout_lines[page] = []
             page_texts[page] = ""
             page_results_map[page] = PageResult(page=page, status=PageStatus.FAILED)
+    finally:
+        finish_stage("text_extraction", text_started)
 
+    ocr_started = stage_start()
     logger.info("Running OCR target_pages=%s force=%s", selected_pages, config.force_ocr)
     ocr_result = run_ocr(config.input_pdf, selected_pages, page_texts, config.force_ocr)
+    finish_stage("ocr", ocr_started)
     warnings.extend(ocr_result.warnings)
     engine_usage["ocr"] = ocr_result.used_ocr
     for page, text in ocr_result.page_texts.items():
@@ -287,6 +391,7 @@ def run_conversion(config: Config) -> ConversionResult:
     header_footer_suppressed_payload: list[dict] = []
     header_footer_suppressed_by_page: dict[int, int] = {}
     if config.remove_header_footer:
+        header_footer_started = stage_start()
         logger.info("Removing repeated headers/footers")
         header_footer_result = remove_repeated_header_footer(page_layout_lines, page_heights)
         page_layout_lines = header_footer_result.lines_by_page
@@ -295,10 +400,22 @@ def run_conversion(config: Config) -> ConversionResult:
         ]
         for decision in header_footer_result.suppressed_lines:
             header_footer_suppressed_by_page[decision.page] = header_footer_suppressed_by_page.get(decision.page, 0) + 1
+        finish_stage("header_footer", header_footer_started)
 
+    table_started = stage_start()
     logger.info("Extracting tables")
-    table_result = extract_tables(config.input_pdf, selected_pages, config.password, table_mode)
+    table_result = extract_tables(
+        config.input_pdf,
+        selected_pages,
+        config.password,
+        table_mode,
+        pdf=shared_plumber_pdf,
+        text_lines_by_page=raw_lines_by_page,
+    )
+    finish_stage("table_extraction", table_started)
+    image_started = stage_start()
     logger.info("Extracting images mode=%s", image_mode)
+    page_image_boxes = {page: pdf_context.get_image_boxes(page) for page in selected_pages}
     image_result = extract_images(
         reader=reader,
         pdf_path=config.input_pdf,
@@ -308,7 +425,11 @@ def run_conversion(config: Config) -> ConversionResult:
         image_mode=image_mode,
         assets_dirname=config.assets_dirname,
         dedupe_images=config.dedupe_images,
+        pdf=shared_plumber_pdf,
+        page_image_boxes=page_image_boxes,
+        page_text_lines=raw_lines_by_page,
     )
+    finish_stage("image_extraction", image_started)
     engine_usage["tables"] = len(table_result.assets) > 0
     engine_usage["images"] = len(image_result.assets) > 0
     warnings.extend(table_result.warnings)
@@ -344,6 +465,7 @@ def run_conversion(config: Config) -> ConversionResult:
     normalized_lines_debug_by_page: dict[int, list[dict]] = {}
     total_deduplicated_blocks = 0
     total_suppressed_lines = len(header_footer_suppressed_payload)
+    normalization_started = stage_start()
     for page in selected_pages:
         logger.debug("Normalizing page=%s", page)
         recovered_lines = _apply_structure_recoveries(
@@ -375,6 +497,7 @@ def run_conversion(config: Config) -> ConversionResult:
             [item.model_dump(mode="json") for item in normalization.deduplicated_blocks]
         )
         suppressed_lines_payload.extend([item.model_dump(mode="json") for item in normalization.suppressed_lines])
+    finish_stage("normalization", normalization_started)
 
     page_blocks_with_anchor: dict[int, list[tuple[int, float, str]]] = {}
     for page, blocks in table_result.blocks_by_page.items():
@@ -405,6 +528,7 @@ def run_conversion(config: Config) -> ConversionResult:
         entries.sort(key=lambda item: (item[0], item[1]))
         ordered_page_blocks[page] = [(anchor_idx, markdown) for anchor_idx, _, markdown in entries]
 
+    markdown_started = stage_start()
     markdown = serialize_markdown(
         page_text_lines=page_text_lines,
         keep_page_markers=config.keep_page_markers,
@@ -413,8 +537,18 @@ def run_conversion(config: Config) -> ConversionResult:
     markdown_path = config.output_dir / config.markdown_filename
     logger.info("Writing markdown path=%s", markdown_path)
     write_text(markdown_path, markdown)
+    finish_stage("markdown_serialization", markdown_started)
+
+    rag_started = stage_start()
+    rag_table_record_count, rag_table_file_count = _write_rag_table_outputs(
+        config=config,
+        output_mode=rag_table_output,
+        rag_tables=table_result.rag_tables,
+    )
+    finish_stage("rag_tables", rag_started)
 
     if config.debug:
+        debug_started = stage_start()
         logger.info("Writing debug artifacts")
         _write_debug_artifacts(
             config=config,
@@ -426,7 +560,9 @@ def run_conversion(config: Config) -> ConversionResult:
             table_candidates_by_page=table_result.debug_candidates_by_page,
             image_candidates_by_page=image_result.debug_candidates_by_page,
         )
+        finish_stage("debug_artifacts", debug_started)
 
+    manifest_started = stage_start()
     manifest = Manifest(
         input_file=config.input_pdf.name,
         total_pages=total_pages,
@@ -438,6 +574,7 @@ def run_conversion(config: Config) -> ConversionResult:
             "keep_page_markers": config.keep_page_markers,
             "remove_header_footer": config.remove_header_footer,
             "dedupe_images": config.dedupe_images,
+            "rag_table_output": rag_table_output.value,
             "debug": config.debug,
             "pages": config.pages,
             "version": config.version,
@@ -451,6 +588,7 @@ def run_conversion(config: Config) -> ConversionResult:
     manifest_path = config.output_dir / config.manifest_filename
     logger.info("Writing manifest path=%s", manifest_path)
     write_json(manifest_path, serialize_manifest(manifest))
+    finish_stage("manifest", manifest_started)
 
     finished_at = datetime.now(timezone.utc)
     page_results = [page_results_map[page] for page in sorted(page_results_map)]
@@ -469,6 +607,13 @@ def run_conversion(config: Config) -> ConversionResult:
             low_conf_pages.append(page_result.page)
 
     status, exit_code = determine_conversion_status(warnings, failed_pages)
+    reporting_started = stage_start()
+    elapsed_seconds = (finished_at - started_at).total_seconds()
+    pages_per_second = round(len(selected_pages) / elapsed_seconds, 4) if elapsed_seconds > 0 else None
+    table_fallback_reason_counts = _count_table_fallback_reasons(table_result.fallbacks)
+    table_low_quality_count = _count_low_quality_tables(table_result.table_quality)
+    table_caption_linked_count = _count_caption_linked_tables(table_result.table_quality)
+    finish_stage("reporting", reporting_started)
     report = build_report(
         started_at=started_at,
         finished_at=finished_at,
@@ -491,10 +636,23 @@ def run_conversion(config: Config) -> ConversionResult:
         low_confidence_pages=low_conf_pages,
         page_status_counts=page_status_counts,
         structure_marker_counts=structure_marker_counts,
+        stage_durations_ms=stage_durations_ms,
+        pdf_open_count=pdf_context.pdf_open_count + ocr_result.pdf_open_count,
+        pages_per_second=pages_per_second,
+        rag_table_output=rag_table_output.value,
+        rag_table_record_count=rag_table_record_count,
+        rag_table_file_count=rag_table_file_count,
+        table_fallback_reason_counts=table_fallback_reason_counts,
+        table_low_quality_count=table_low_quality_count,
+        table_caption_linked_count=table_caption_linked_count,
+        page_cache_hits=pdf_context.page_cache_hits,
+        page_cache_misses=pdf_context.page_cache_misses,
+        text_line_extract_count=pdf_context.text_line_extract_count,
     )
     report_path = config.output_dir / config.report_filename
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)
     write_json(report_path, serialize_report(report))
+    pdf_context.close()
 
     return ConversionResult(
         exit_code=exit_code,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import pdfplumber
 
@@ -136,48 +136,66 @@ def _raw_line_payload(line: dict) -> dict:
     }
 
 
+def _extract_page_text_layout_from_pdf(
+    pdf: Any,
+    selected_pages: list[int],
+    text_lines_by_page: dict[int, list[dict]] | None = None,
+) -> TextLayoutResult:
+    result = TextLayoutResult()
+    for page_number in selected_pages:
+        page = pdf.pages[page_number - 1]
+        raw_lines = (text_lines_by_page or {}).get(page_number)
+        if raw_lines is None:
+            raw_lines = page.extract_text_lines() or []
+        result.raw_lines_by_page[page_number] = [_raw_line_payload(line) for line in raw_lines]
+        normalized_lines: list[TextLine] = []
+        for line in raw_lines:
+            text = normalize_text(line.get("text", ""))
+            if not text:
+                continue
+            top = float(line.get("top", 0.0))
+            bottom = float(line.get("bottom", top))
+            x0 = float(line.get("x0", 0.0))
+            x1 = float(line.get("x1", x0))
+            normalized_lines.append(
+                TextLine(
+                    text=text,
+                    top=top,
+                    bottom=bottom,
+                    x0=x0,
+                    x1=x1,
+                )
+            )
+        ordered_lines, metadata = order_text_lines(
+            normalized_lines,
+            page_width=float(page.width),
+            page_height=float(page.height),
+        )
+        metadata.page = page_number
+        result.lines_by_page[page_number] = ordered_lines
+        result.metadata_by_page[page_number] = metadata
+    return result
+
+
 def extract_page_text_layout_result(
     pdf_path: Path,
     selected_pages: list[int],
     password: Optional[str] = None,
+    pdf: Any = None,
+    text_lines_by_page: dict[int, list[dict]] | None = None,
 ) -> TextLayoutResult:
     """Extract text lines, reading order metadata, and raw line debug payloads."""
-    result = TextLayoutResult()
     try:
-        with pdfplumber.open(str(pdf_path), password=password) as pdf:
-            for page_number in selected_pages:
-                page = pdf.pages[page_number - 1]
-                raw_lines = page.extract_text_lines() or []
-                result.raw_lines_by_page[page_number] = [_raw_line_payload(line) for line in raw_lines]
-                normalized_lines: list[TextLine] = []
-                for line in raw_lines:
-                    text = normalize_text(line.get("text", ""))
-                    if not text:
-                        continue
-                    top = float(line.get("top", 0.0))
-                    bottom = float(line.get("bottom", top))
-                    x0 = float(line.get("x0", 0.0))
-                    x1 = float(line.get("x1", x0))
-                    normalized_lines.append(
-                        TextLine(
-                            text=text,
-                            top=top,
-                            bottom=bottom,
-                            x0=x0,
-                            x1=x1,
-                        )
-                    )
-                ordered_lines, metadata = order_text_lines(
-                    normalized_lines,
-                    page_width=float(page.width),
-                    page_height=float(page.height),
-                )
-                metadata.page = page_number
-                result.lines_by_page[page_number] = ordered_lines
-                result.metadata_by_page[page_number] = metadata
+        if pdf is not None:
+            return _extract_page_text_layout_from_pdf(pdf, selected_pages, text_lines_by_page=text_lines_by_page)
+        with pdfplumber.open(str(pdf_path), password=password) as opened_pdf:
+            return _extract_page_text_layout_from_pdf(
+                opened_pdf,
+                selected_pages,
+                text_lines_by_page=text_lines_by_page,
+            )
     except Exception as exc:  # noqa: BLE001
         raise TextExtractionError(f"Failed to extract text layout: {exc}") from exc
-    return result
 
 
 def extract_page_text_layout(

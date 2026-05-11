@@ -262,3 +262,86 @@ def test_extract_tables_suppresses_redundant_text_fragment(monkeypatch) -> None:
     assert len(result.debug_candidates_by_page[1]) == 2
     suppressed = [item for item in result.debug_candidates_by_page[1] if not item["accepted"]]
     assert suppressed[0]["suppression_reason"] == "TEXT_FRAGMENT_SUPPRESSION"
+
+
+def test_extract_tables_keeps_html_fallback_and_builds_rag_payload(monkeypatch) -> None:
+    table = _FakeTable((10.0, 100.0, 230.0, 180.0), [["Bits", "Description"], ["63:0", "A" * 130]])
+
+    class _FakeCaptionPage(_FakePageWithTables):
+        def extract_text_lines(self):  # noqa: ANN201
+            return [
+                {
+                    "text": "Table 1: Register fields",
+                    "top": 70.0,
+                    "bottom": 84.0,
+                    "x0": 10.0,
+                    "x1": 180.0,
+                }
+            ]
+
+    page = _FakeCaptionPage([table])
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdfWithPage(page))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    assert "<table>" in result.blocks_by_page[1][0].markdown
+    assert result.assets[0].mode == "html"
+    assert result.assets[0].caption_text == "Table 1: Register fields"
+    assert result.rag_tables[0]["source_mode"] == "html"
+    assert result.rag_tables[0]["caption_text"] == "Table 1: Register fields"
+    assert result.rag_tables[0]["records"][0]["row_text"] == f"Bits = 63:0 | Description = {'A' * 130}"
+    assert result.rag_tables[0]["records"][0]["fallback_reasons"] == ["AMBIGUOUS_GRID", "LONG_CELL"]
+
+
+def test_extract_tables_flattens_multi_row_headers_for_rag(monkeypatch) -> None:
+    rows = [
+        ["", "Latency", "Latency"],
+        ["Command", "Min", "Max"],
+        ["Read", "1", "3"],
+    ]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    quality = result.table_quality[0]
+    assert result.assets[0].mode == "html"
+    assert "MULTI_ROW_HEADER" in quality["reasons"]
+    assert quality["header_depth"] == 2
+    assert quality["rag_header_strategy"] == "multi_row_flattened"
+    assert result.rag_tables[0]["headers"] == ["Command", "Latency / Min", "Latency / Max"]
+    assert result.rag_tables[0]["records"][0]["cells"]["Latency / Max"] == "3"
+
+
+def test_extract_tables_records_stub_and_footnote_diagnostics(monkeypatch) -> None:
+    rows = [
+        ["", "Min", "Max"],
+        ["Read", "1", "3"],
+        ["Write", "2", "4"],
+        ["Notes: values are cycles", "", ""],
+    ]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    quality = result.table_quality[0]
+    assert result.assets[0].mode == "html"
+    assert "FOOTNOTE_ROW" in quality["reasons"]
+    assert "STUB_COLUMN" in quality["reasons"]
+    assert quality["stub_column_count"] == 1
+    assert quality["footnote_row_count"] == 1
+    assert result.rag_tables[0]["records"][0]["stub_cells"] == ["Read"]

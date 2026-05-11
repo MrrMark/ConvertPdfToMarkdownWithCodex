@@ -207,6 +207,20 @@ python -m pdf2md .\sample.pdf -o .\output --table-mode html
 python -m pdf2md .\sample.pdf -o .\output --table-mode markdown
 ```
 
+RAG용 표 sidecar:
+
+```powershell
+python -m pdf2md .\sample.pdf -o .\output --table-mode auto --rag-table-output both
+python -m pdf2md .\sample.pdf -o .\output --rag-table-output markdown
+python -m pdf2md .\sample.pdf -o .\output --rag-table-output jsonl
+```
+
+- 기본값은 `none`입니다.
+- 복잡 표는 `document.md`에서 HTML fallback을 유지하고, RAG용 행 단위 데이터는 별도 파일로 생성합니다.
+- `rag_tables.md`: 행 단위 Markdown
+- `tables_rag.jsonl`: 행 단위 structured JSONL
+- 명확한 multi-row header는 `Parent / Child` 형태로 정리되고, row label 성격의 첫 번째 열은 `stub_cells`에 기록될 수 있습니다.
+
 이미지 모드:
 
 ```powershell
@@ -323,6 +337,7 @@ tesseract --version
 `manifest.json`에서 확인할 항목:
 
 - `schema_version`
+- `options.rag_table_output`
 - `images[].alt_text`
 - `images[].caption_text`, `caption_source`
 - 이미지 중복 제거 사용 시 `images[].dedupe_of`
@@ -343,12 +358,28 @@ tesseract --version
 - `summary.table_fallback_count`
 - `summary.table_fallbacks`
 - `summary.table_mode_requested`
+- `summary.stage_durations_ms`
+- `summary.pdf_open_count`
+- `summary.pages_per_second`
+- `summary.page_cache_hits`
+- `summary.page_cache_misses`
+- `summary.text_line_extract_count`
+- `summary.rag_table_output`
+- `summary.rag_table_record_count`
+- `summary.rag_table_file_count`
+- `summary.table_fallback_reason_counts`
+- `summary.table_low_quality_count`
+- `summary.table_caption_linked_count`
 - `summary.table_markdown_forced_count`
 - `summary.table_html_forced_count`
 - `summary.structure_marker_recovered_count`
 - `summary.structure_marker_recovered_exact_count`
 - `summary.structure_marker_recovered_context_count`
 - `summary.structure_marker_suppressed_count`
+
+표 품질을 볼 때는 `summary.table_quality[]`의 optional 진단 필드도 같이 확인하세요.
+주요 필드는 `header_depth`, `header_confidence`, `stub_column_count`,
+`footnote_row_count`, `merged_cell_suspected`, `rag_header_strategy`입니다.
 
 구조 인덱스가 중요한 기술 문서 운영 팁:
 
@@ -366,6 +397,18 @@ Debug 산출물 확인 위치:
 - `output\debug\page-0001-normalized-lines.json`
 - `output\debug\page-0001-table-candidates.json`
 - `output\debug\page-0001-image-candidates.json`
+
+로컬 corpus 평가와 benchmark:
+
+```powershell
+python scripts\run_corpus_eval.py --input-dir pdf --output-dir pdf\eval_output
+python scripts\benchmark_conversion.py --output-dir .\benchmark_output --page-counts 10,50,100
+```
+
+- 실제 PDF는 `pdf\` 같은 로컬 디렉터리에만 두고 repo에 커밋하지 않습니다.
+- `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count
+- `benchmark_report.json`: duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory
+- benchmark는 수동/릴리스 전 검증용이며 기본 테스트에 포함하지 않습니다.
 
 ---
 

@@ -6,5 +6,5 @@ __pycache__/
 .DS_Store
 
 # Local PDF evaluation inputs/outputs
-pdf/*.pdf
-pdf/output_*/
+pdf/
+benchmark_output/

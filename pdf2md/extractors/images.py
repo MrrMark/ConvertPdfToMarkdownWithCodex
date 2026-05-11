@@ -8,6 +8,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import pdfplumber
 from pypdf import PdfReader
@@ -641,19 +642,16 @@ def _load_page_image_context(
     selected_pages: list[int],
     password: str | None,
     result: ImageExtractionResult,
+    pdf: Any = None,
 ) -> tuple[dict[int, list[dict]], dict[int, list[dict]]]:
     page_image_boxes: dict[int, list[dict]] = {}
     page_text_lines: dict[int, list[dict]] = {}
     try:
-        with pdfplumber.open(str(pdf_path), password=password) as pdf:
-            for page_number in selected_pages:
-                page = pdf.pages[page_number - 1]
-                boxes = sorted(
-                    (page.images or []),
-                    key=lambda item: (float(item.get("top", 0.0)), float(item.get("x0", 0.0))),
-                )
-                page_image_boxes[page_number] = boxes
-                page_text_lines[page_number] = page.extract_text_lines() or []
+        opened_pdf = pdf
+        if opened_pdf is None:
+            with pdfplumber.open(str(pdf_path), password=password) as local_pdf:
+                return _load_page_image_context_from_pdf(local_pdf, selected_pages)
+        return _load_page_image_context_from_pdf(opened_pdf, selected_pages)
     except Exception as exc:  # noqa: BLE001
         result.warnings.append(
             WarningEntry(
@@ -661,6 +659,23 @@ def _load_page_image_context(
                 message=f"Failed to read image positions from pdfplumber: {exc}",
             )
         )
+    return page_image_boxes, page_text_lines
+
+
+def _load_page_image_context_from_pdf(
+    pdf: Any,
+    selected_pages: list[int],
+) -> tuple[dict[int, list[dict]], dict[int, list[dict]]]:
+    page_image_boxes: dict[int, list[dict]] = {}
+    page_text_lines: dict[int, list[dict]] = {}
+    for page_number in selected_pages:
+        page = pdf.pages[page_number - 1]
+        boxes = sorted(
+            (page.images or []),
+            key=lambda item: (float(item.get("top", 0.0)), float(item.get("x0", 0.0))),
+        )
+        page_image_boxes[page_number] = boxes
+        page_text_lines[page_number] = page.extract_text_lines() or []
     return page_image_boxes, page_text_lines
 
 
@@ -851,12 +866,16 @@ def extract_images(
     image_mode: ImageMode,
     assets_dirname: str = "assets",
     dedupe_images: bool = False,
+    pdf: Any = None,
+    page_image_boxes: dict[int, list[dict]] | None = None,
+    page_text_lines: dict[int, list[dict]] | None = None,
 ) -> ImageExtractionResult:
     result = ImageExtractionResult()
     images_root = output_dir / assets_dirname / "images"
     images_root.mkdir(parents=True, exist_ok=True)
 
-    page_image_boxes, page_text_lines = _load_page_image_context(pdf_path, selected_pages, password, result)
+    if page_image_boxes is None or page_text_lines is None:
+        page_image_boxes, page_text_lines = _load_page_image_context(pdf_path, selected_pages, password, result, pdf=pdf)
     hashed_candidates = _collect_image_candidates(reader, selected_pages, result)
     hash_counter = Counter(item["sha256"] for item in hashed_candidates)
     pending_structure_markers: dict[int, list[PendingStructureMarker]] = {}
