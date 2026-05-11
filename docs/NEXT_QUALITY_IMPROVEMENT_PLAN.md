@@ -165,3 +165,72 @@
 - `kor+eng` 같은 복합 language 값에서 누락된 언어팩을 식별한다.
 - 실제 변환 명령은 계속 partial success 정책을 유지한다.
 - 완료 후 테스트 통과 및 PR merge까지 끝나면 이 항목은 이 문서에서 제거한다.
+
+### Q06. Benchmark 성능 회귀 게이트
+
+현재 `scripts/benchmark_conversion.py`는 synthetic 10/50/100 page 변환 성능과 peak memory를 측정한다. 다음 단계에서는 이 결과를 릴리스 전 성능 회귀 게이트로 사용할 수 있도록 기준선 비교와 예산 초과 판정을 추가한다.
+
+#### 구현 명세
+
+- `scripts/benchmark_conversion.py`에 기준선 비교 옵션을 추가한다.
+  - `--baseline-report PATH`
+  - `--fail-on-regression`
+  - `--max-duration-regression FLOAT`
+  - `--max-memory-regression FLOAT`
+  - `--min-pages-per-second FLOAT`
+- 출력 `benchmark_report.json`에 regression summary를 추가한다.
+  - `baseline_report`
+  - `regressions`
+  - `passed_performance_gate`
+  - `thresholds`
+- 비교 대상은 page count별 결정적 집계값으로 제한한다.
+  - total duration
+  - pages/sec
+  - stage durations
+  - pdf_open_count
+  - text_line_extract_count
+  - peak memory
+- 성능 측정은 CI 기본 job에는 넣지 않고 수동/릴리스 전 게이트로 유지한다.
+
+#### Acceptance
+
+- 기준선이 없으면 현재처럼 benchmark report만 생성한다.
+- 기준선이 있으면 page count별 regression 여부를 deterministic하게 기록한다.
+- `--fail-on-regression` 사용 시 threshold 실패를 non-zero exit code로 반환한다.
+- README/Windows guide에 릴리스 전 성능 게이트 예시 명령이 반영된다.
+- 완료 후 테스트 통과 및 PR merge까지 끝나면 이 항목은 이 문서에서 제거한다.
+
+### Q07. Output Schema / 패키징 릴리스 계약
+
+현재 `manifest.json`, `report.json`, RAG sidecar는 Pydantic model과 golden test로 보호된다. 다음 단계에서는 외부 사용자가 안정적으로 통합할 수 있도록 출력 schema 계약과 배포 artifact 검증을 명시한다.
+
+#### 구현 명세
+
+- `docs/OUTPUT_SCHEMA.md`를 추가하거나 README schema 섹션을 분리한다.
+  - `document.md`
+  - `manifest.json`
+  - `report.json`
+  - `rag_tables.md`
+  - `tables_rag.jsonl`
+  - `debug/` artifact
+- 각 JSON 계열 산출물에 대해 field stability 정책을 명시한다.
+  - required field
+  - optional field
+  - backward-compatible additive field
+  - breaking change 처리 기준
+- schema contract test를 추가한다.
+  - known sample manifest/report가 현재 model에서 읽히는지 확인
+  - 새 optional field 추가가 기존 normalized golden을 깨지 않는지 확인
+- 패키징 smoke를 릴리스 전 검증에 추가한다.
+  - `python -m build`
+  - wheel 설치 후 `python -m pdf2md --help`
+  - console script `pdf2md --help`
+- 새 runtime dependency를 추가할 경우 README/Windows guide/CI matrix가 함께 갱신되도록 문서 규칙을 보강한다.
+
+#### Acceptance
+
+- 외부 RAG/indexing 파이프라인이 참조할 출력 field 계약이 문서화된다.
+- 기존 schema sample은 새 코드에서도 읽히고, additive field는 호환 변경으로 유지된다.
+- wheel 설치 smoke가 릴리스 전 절차에 포함된다.
+- README/Windows guide에서 schema 문서와 패키징 검증 절차를 찾을 수 있다.
+- 완료 후 테스트 통과 및 PR merge까지 끝나면 이 항목은 이 문서에서 제거한다.
