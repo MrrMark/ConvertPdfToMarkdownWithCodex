@@ -43,6 +43,7 @@ class ImageExtractionResult:
     excluded_assets: list[ExcludedImageAsset] = field(default_factory=list)
     blocks_by_page: dict[int, list[ImageBlock]] = field(default_factory=dict)
     structure_recoveries: list[dict] = field(default_factory=list)
+    debug_candidates_by_page: dict[int, list[dict]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -799,9 +800,10 @@ def _append_figure_asset(
     height: int | None,
     sha256: str,
     caption_text: str | None,
+    dedupe_of: str | None,
 ) -> None:
     alt_text = f"Image page-{page_number:04d}-figure-{index:03d}"
-    if image_mode == ImageMode.REFERENCED:
+    if image_mode == ImageMode.REFERENCED and dedupe_of is None:
         disk_path.write_bytes(image_bytes)
     markdown = _build_markdown(
         mode=image_mode,
@@ -835,6 +837,7 @@ def _append_figure_asset(
             width=width,
             height=height,
             sha256=sha256,
+            dedupe_of=dedupe_of,
         )
     )
 
@@ -847,6 +850,7 @@ def extract_images(
     output_dir: Path,
     image_mode: ImageMode,
     assets_dirname: str = "assets",
+    dedupe_images: bool = False,
 ) -> ImageExtractionResult:
     result = ImageExtractionResult()
     images_root = output_dir / assets_dirname / "images"
@@ -856,6 +860,7 @@ def extract_images(
     hashed_candidates = _collect_image_candidates(reader, selected_pages, result)
     hash_counter = Counter(item["sha256"] for item in hashed_candidates)
     pending_structure_markers: dict[int, list[PendingStructureMarker]] = {}
+    canonical_paths_by_hash: dict[str, str] = {}
 
     for candidate in hashed_candidates:
         page_number = int(candidate["page"])
@@ -880,6 +885,19 @@ def extract_images(
         )
         caption_nearby = _is_caption_nearby(page_text_lines.get(page_number, []), top, bottom)
         caption_text = _extract_caption_text(page_text_lines.get(page_number, []), top, bottom) if caption_nearby else None
+        debug_payload = {
+            "page": page_number,
+            "image_index": index,
+            "sha256": sha256,
+            "width": width,
+            "height": height,
+            "bbox": bbox_payload,
+            "caption_text": caption_text,
+            "excluded": False,
+            "exclude_reason": None,
+            "dedupe_of": None,
+            "path": rel_path,
+        }
         if _handle_structure_marker_candidate(
             page_number=page_number,
             index=index,
@@ -892,6 +910,9 @@ def extract_images(
             page_text_lines=page_text_lines,
             pending_structure_markers=pending_structure_markers,
         ):
+            debug_payload["excluded"] = True
+            debug_payload["exclude_reason"] = "STRUCTURE_MARKER_CANDIDATE"
+            result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
             continue
         is_decorative, reason = _is_decorative(
             width=width,
@@ -900,6 +921,9 @@ def extract_images(
             caption_nearby=caption_nearby,
         )
         if is_decorative:
+            debug_payload["excluded"] = True
+            debug_payload["exclude_reason"] = reason or ImageExcludeReason.DECORATIVE
+            result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
             result.excluded_assets.append(
                 ExcludedImageAsset(
                     page=page_number,
@@ -914,6 +938,16 @@ def extract_images(
             continue
 
         try:
+            dedupe_of: str | None = None
+            if dedupe_images and image_mode == ImageMode.REFERENCED and sha256 in canonical_paths_by_hash:
+                dedupe_of = canonical_paths_by_hash[sha256]
+                rel_path = dedupe_of
+                disk_path = output_dir / rel_path
+                debug_payload["dedupe_of"] = dedupe_of
+                debug_payload["path"] = rel_path
+            elif dedupe_images and image_mode == ImageMode.REFERENCED:
+                canonical_paths_by_hash[sha256] = rel_path
+
             _append_figure_asset(
                 result=result,
                 image_mode=image_mode,
@@ -929,7 +963,9 @@ def extract_images(
                 height=height,
                 sha256=sha256,
                 caption_text=caption_text,
+                dedupe_of=dedupe_of,
             )
+            result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
         except Exception as exc:  # noqa: BLE001
             result.warnings.append(
                 WarningEntry(

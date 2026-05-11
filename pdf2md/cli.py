@@ -32,6 +32,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Table output mode: auto, html, markdown. html-only/gfm-only are legacy compatibility modes.",
     )
     parser.add_argument("--force-ocr", action="store_true", default=False)
+    parser.add_argument(
+        "--remove-header-footer",
+        action="store_true",
+        default=False,
+        help="Conservatively suppress repeated page headers and footers.",
+    )
+    parser.add_argument(
+        "--dedupe-images",
+        action="store_true",
+        default=False,
+        help="Reuse the first extracted file for repeated image objects with the same sha256.",
+    )
     marker_group = parser.add_mutually_exclusive_group()
     marker_group.add_argument("--keep-page-markers", dest="keep_page_markers", action="store_true")
     marker_group.add_argument("--no-page-markers", dest="keep_page_markers", action="store_false")
@@ -72,6 +84,8 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         table_mode=TableMode(args.table_mode),
         force_ocr=args.force_ocr,
         keep_page_markers=args.keep_page_markers,
+        remove_header_footer=args.remove_header_footer,
+        dedupe_images=args.dedupe_images,
         debug=args.debug,
         verbose=args.verbose,
         skip_existing=args.skip_existing,
@@ -89,6 +103,8 @@ def _build_batch_config(args: argparse.Namespace, pdf_path: Path, output_dir: Pa
         table_mode=TableMode(args.table_mode),
         force_ocr=args.force_ocr,
         keep_page_markers=args.keep_page_markers,
+        remove_header_footer=args.remove_header_footer,
+        dedupe_images=args.dedupe_images,
         debug=args.debug,
         verbose=args.verbose,
         skip_existing=args.skip_existing,
