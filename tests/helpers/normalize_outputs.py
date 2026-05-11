@@ -9,13 +9,18 @@ def normalize_manifest(payload: dict[str, Any]) -> dict[str, Any]:
     options = normalized.get("options")
     if isinstance(options, dict):
         options["version"] = "<version>"
+    images = normalized.get("images", [])
+    if isinstance(images, list):
+        for image in images:
+            if isinstance(image, dict) and image.get("sha256"):
+                image["sha256"] = "<sha256>"
     return {
         "schema_version": normalized.get("schema_version"),
         "input_file": normalized.get("input_file"),
         "total_pages": normalized.get("total_pages"),
         "selected_pages": normalized.get("selected_pages"),
         "options": options,
-        "images": normalized.get("images", []),
+        "images": images,
         "tables": normalized.get("tables", []),
         "warnings": normalized.get("warnings", []),
     }
@@ -48,6 +53,10 @@ def normalize_report(payload: dict[str, Any]) -> dict[str, Any]:
         "page_cache_hits",
         "page_cache_misses",
         "text_line_extract_count",
+        "heading_count",
+        "list_item_count",
+        "code_block_count",
+        "hyphenation_repair_count",
         "pdf_open_count",
         "pages_per_second",
         "stage_durations_ms",

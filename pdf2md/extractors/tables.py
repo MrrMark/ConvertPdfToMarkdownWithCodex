@@ -108,9 +108,13 @@ class RagTablePayload:
     header_confidence: float
     stub_column_count: int
     rag_header_strategy: str
+    continuation_group: str | None = None
+    continued_from_page: int | None = None
+    continued_to_page: int | None = None
+    continuation_confidence: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "page": self.page,
             "table_index": self.table_index,
             "source_mode": self.source_mode,
@@ -125,6 +129,15 @@ class RagTablePayload:
             "stub_column_count": self.stub_column_count,
             "rag_header_strategy": self.rag_header_strategy,
         }
+        if self.continuation_group is not None:
+            payload["continuation_group"] = self.continuation_group
+        if self.continued_from_page is not None:
+            payload["continued_from_page"] = self.continued_from_page
+        if self.continued_to_page is not None:
+            payload["continued_to_page"] = self.continued_to_page
+        if self.continuation_confidence is not None:
+            payload["continuation_confidence"] = self.continuation_confidence
+        return payload
 
 
 @dataclass
@@ -1024,6 +1037,77 @@ def _build_rag_table_payload(
     ).as_dict()
 
 
+def _normalize_header_signature(headers: list[str]) -> tuple[str, ...]:
+    return tuple(_sanitize_cell(header).casefold() for header in headers if _sanitize_cell(header))
+
+
+def _annotate_table_continuations(result: TableExtractionResult) -> None:
+    """Link adjacent-page tables only when headers match with high confidence."""
+    rag_by_key = {
+        (int(table.get("page", 0)), int(table.get("table_index", 0))): table
+        for table in result.rag_tables
+    }
+    quality_by_key = {
+        (int(item.get("page", 0)), int(item.get("table_index", 0))): item
+        for item in result.table_quality
+    }
+    previous: tuple[TableAsset, dict[str, Any], tuple[str, ...]] | None = None
+    group_counter = 1
+    for asset in sorted(result.assets, key=lambda item: (item.page, item.index)):
+        rag_table = rag_by_key.get((asset.page, asset.index))
+        if rag_table is None:
+            previous = None
+            continue
+        signature = _normalize_header_signature([str(header) for header in rag_table.get("headers", [])])
+        if not signature:
+            previous = (asset, rag_table, signature)
+            continue
+        if previous is None:
+            previous = (asset, rag_table, signature)
+            continue
+
+        previous_asset, previous_rag, previous_signature = previous
+        current_caption = str(rag_table.get("caption_text") or "").strip()
+        same_headers = signature == previous_signature
+        adjacent_page = asset.page == previous_asset.page + 1
+        likely_continued = adjacent_page and same_headers and not current_caption
+        if not likely_continued:
+            previous = (asset, rag_table, signature)
+            continue
+
+        group = previous_asset.continuation_group or f"table-continuation-{group_counter:03d}"
+        if previous_asset.continuation_group is None:
+            group_counter += 1
+        confidence = 0.9
+        previous_asset.continuation_group = group
+        previous_asset.continued_to_page = asset.page
+        previous_asset.continuation_confidence = confidence
+        asset.continuation_group = group
+        asset.continued_from_page = previous_asset.page
+        asset.continuation_confidence = confidence
+        previous_rag["continuation_group"] = group
+        previous_rag["continued_to_page"] = asset.page
+        previous_rag["continuation_confidence"] = confidence
+        rag_table["continuation_group"] = group
+        rag_table["continued_from_page"] = previous_asset.page
+        rag_table["continuation_confidence"] = confidence
+        previous_quality = quality_by_key.get((previous_asset.page, previous_asset.index))
+        current_quality = quality_by_key.get((asset.page, asset.index))
+        if previous_quality is not None:
+            previous_quality["continuation_group"] = group
+            previous_quality["continued_to_page"] = asset.page
+            previous_quality["continuation_confidence"] = confidence
+        if current_quality is not None:
+            current_quality["continuation_group"] = group
+            current_quality["continued_from_page"] = previous_asset.page
+            current_quality["continuation_confidence"] = confidence
+        for record in previous_rag.get("records", []):
+            record["continuation_group"] = group
+        for record in rag_table.get("records", []):
+            record["continuation_group"] = group
+        previous = (asset, rag_table, signature)
+
+
 def extract_tables(
     pdf_path: Path,
     selected_pages: list[int],
@@ -1192,6 +1276,7 @@ def extract_tables(
 
                 if page_blocks:
                     result.blocks_by_page[page_number] = page_blocks
+            _annotate_table_continuations(result)
         finally:
             if close_after:
                 close = getattr(opened_pdf, "close", None)

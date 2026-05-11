@@ -12,6 +12,7 @@ from fixtures.pdf_builder import (
     build_repeated_image_pdf,
     build_simple_table_pdf,
     build_single_column_pdf,
+    build_structured_text_pdf,
     build_two_column_pdf,
 )
 
@@ -34,6 +35,7 @@ def test_deterministic_pdf_fixture_builder_covers_priority_corpus(tmp_path: Path
         "repeated_image.pdf": build_repeated_image_pdf,
         "image_only.pdf": build_image_only_pdf,
         "korean.pdf": build_korean_text_pdf,
+        "structured_text.pdf": build_structured_text_pdf,
         "password.pdf": build_password_pdf,
     }
 
@@ -52,6 +54,7 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         "simple_table": (build_simple_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
         "complex_table": (build_complex_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
         "repeated_image": (build_repeated_image_pdf, {"dedupe_images": True}),
+        "structured_text": (build_structured_text_pdf, {"repair_hyphenation": True}),
         "password": (lambda path: build_password_pdf(path, password="secret"), {"password": "secret"}),
     }
 

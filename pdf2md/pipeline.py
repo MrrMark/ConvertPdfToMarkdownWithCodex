@@ -27,7 +27,7 @@ from pdf2md.models import (
 )
 from pdf2md.reporting import build_report, count_structure_marker_reasons, determine_conversion_status, finalize_page_statuses
 from pdf2md.serializers.manifest import serialize_manifest
-from pdf2md.serializers.markdown import serialize_markdown
+from pdf2md.serializers.markdown import repair_hyphenated_lines, serialize_markdown_result
 from pdf2md.serializers.rag_tables import (
     flatten_rag_table_records,
     serialize_rag_tables_jsonl,
@@ -234,6 +234,10 @@ def run_conversion(config: Config) -> ConversionResult:
     warnings: list[WarningEntry] = []
     page_results_map: dict[int, PageResult] = {}
     failed_pages: list[int] = []
+    heading_count = 0
+    list_item_count = 0
+    code_block_count = 0
+    hyphenation_repair_count = 0
     engine_usage = {
         "pypdf": True,
         "pdfplumber": True,
@@ -343,6 +347,7 @@ def run_conversion(config: Config) -> ConversionResult:
                 page=page,
                 status=PageStatus.SUCCESS,
                 char_count=len(page_texts[page]),
+                text_layer_char_count=len(page_texts[page]),
                 reading_order_strategy=metadata.reading_order_strategy if metadata else "top",
                 column_count_estimate=metadata.column_count_estimate if metadata else 1,
             )
@@ -353,16 +358,21 @@ def run_conversion(config: Config) -> ConversionResult:
             failed_pages.append(page)
             page_layout_lines[page] = []
             page_texts[page] = ""
-            page_results_map[page] = PageResult(page=page, status=PageStatus.FAILED)
+            page_results_map[page] = PageResult(page=page, status=PageStatus.FAILED, text_layer_char_count=0)
     finally:
         finish_stage("text_extraction", text_started)
 
     ocr_started = stage_start()
     logger.info("Running OCR target_pages=%s force=%s", selected_pages, config.force_ocr)
-    ocr_result = run_ocr(config.input_pdf, selected_pages, page_texts, config.force_ocr)
+    ocr_result = run_ocr(config.input_pdf, selected_pages, page_texts, config.force_ocr, ocr_lang=config.ocr_lang)
     finish_stage("ocr", ocr_started)
     warnings.extend(ocr_result.warnings)
     engine_usage["ocr"] = ocr_result.used_ocr
+    for page in ocr_result.attempted_pages:
+        if page in page_results_map:
+            page_results_map[page].ocr_attempted = True
+            page_results_map[page].ocr_reason = ocr_result.reasons_by_page.get(page)
+            page_results_map[page].ocr_runtime_available = ocr_result.runtime_available
     for page, text in ocr_result.page_texts.items():
         lines = [line.rstrip() for line in text.splitlines() if line.strip()]
         page_layout_lines[page] = [
@@ -425,6 +435,7 @@ def run_conversion(config: Config) -> ConversionResult:
         image_mode=image_mode,
         assets_dirname=config.assets_dirname,
         dedupe_images=config.dedupe_images,
+        figure_crop_fallback=config.figure_crop_fallback,
         pdf=shared_plumber_pdf,
         page_image_boxes=page_image_boxes,
         page_text_lines=raw_lines_by_page,
@@ -497,6 +508,13 @@ def run_conversion(config: Config) -> ConversionResult:
             [item.model_dump(mode="json") for item in normalization.deduplicated_blocks]
         )
         suppressed_lines_payload.extend([item.model_dump(mode="json") for item in normalization.suppressed_lines])
+        if config.repair_hyphenation:
+            repair = repair_hyphenated_lines(page_text_lines[page])
+            page_text_lines[page] = repair.lines
+            hyphenation_repair_count += repair.repair_count
+            page_texts[page] = "\n".join(page_text_lines[page]).strip()
+            if page_result is not None:
+                page_result.char_count = len(page_texts[page])
     finish_stage("normalization", normalization_started)
 
     page_blocks_with_anchor: dict[int, list[tuple[int, float, str]]] = {}
@@ -529,11 +547,15 @@ def run_conversion(config: Config) -> ConversionResult:
         ordered_page_blocks[page] = [(anchor_idx, markdown) for anchor_idx, _, markdown in entries]
 
     markdown_started = stage_start()
-    markdown = serialize_markdown(
+    markdown_result = serialize_markdown_result(
         page_text_lines=page_text_lines,
         keep_page_markers=config.keep_page_markers,
         page_blocks_by_page=ordered_page_blocks,
     )
+    markdown = markdown_result.markdown
+    heading_count = markdown_result.heading_count
+    list_item_count = markdown_result.list_item_count
+    code_block_count = markdown_result.code_block_count
     markdown_path = config.output_dir / config.markdown_filename
     logger.info("Writing markdown path=%s", markdown_path)
     write_text(markdown_path, markdown)
@@ -571,9 +593,12 @@ def run_conversion(config: Config) -> ConversionResult:
             "image_mode": image_mode,
             "table_mode": table_mode.manifest_value(),
             "force_ocr": config.force_ocr,
+            "ocr_lang": config.ocr_lang,
             "keep_page_markers": config.keep_page_markers,
             "remove_header_footer": config.remove_header_footer,
             "dedupe_images": config.dedupe_images,
+            "repair_hyphenation": config.repair_hyphenation,
+            "figure_crop_fallback": config.figure_crop_fallback,
             "rag_table_output": rag_table_output.value,
             "debug": config.debug,
             "pages": config.pages,
@@ -648,6 +673,10 @@ def run_conversion(config: Config) -> ConversionResult:
         page_cache_hits=pdf_context.page_cache_hits,
         page_cache_misses=pdf_context.page_cache_misses,
         text_line_extract_count=pdf_context.text_line_extract_count,
+        heading_count=heading_count,
+        list_item_count=list_item_count,
+        code_block_count=code_block_count,
+        hyphenation_repair_count=hyphenation_repair_count,
     )
     report_path = config.output_dir / config.report_filename
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)

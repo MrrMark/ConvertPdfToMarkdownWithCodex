@@ -87,6 +87,10 @@ def build_report(
     page_cache_hits: int = 0,
     page_cache_misses: int = 0,
     text_line_extract_count: int = 0,
+    heading_count: int = 0,
+    list_item_count: int = 0,
+    code_block_count: int = 0,
+    hyphenation_repair_count: int = 0,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
     excluded_images = excluded_images or []
@@ -158,6 +162,10 @@ def build_report(
         page_cache_hits=page_cache_hits,
         page_cache_misses=page_cache_misses,
         text_line_extract_count=text_line_extract_count,
+        heading_count=heading_count,
+        list_item_count=list_item_count,
+        code_block_count=code_block_count,
+        hyphenation_repair_count=hyphenation_repair_count,
     )
 
     return Report(

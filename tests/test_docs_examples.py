@@ -22,6 +22,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "scripts/run_corpus_eval.py" in readme
     assert "scripts/benchmark_conversion.py" in readme
     assert "benchmark_report.json" in readme
+    assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "pdf/v10" not in readme
     assert "프로젝트 scaffold 생성" not in readme
     assert "metadata.py" not in readme
@@ -48,7 +49,22 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "scripts\\run_corpus_eval.py" in guide
     assert "scripts\\benchmark_conversion.py" in guide
     assert "benchmark_report.json" in guide
+    assert "docs\\NEXT_QUALITY_IMPROVEMENT_PLAN.md" in guide
     assert "- Git\n  - `git clone`, `git pull` 같은 저장소 동기화 흐름에서만 필요" in guide
+
+
+def test_ci_and_next_plan_contracts_are_present() -> None:
+    workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+    next_plan = Path("docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md").read_text(encoding="utf-8")
+
+    assert "python-version" in workflow
+    assert '"3.11"' in workflow
+    assert "python -m pytest" in workflow
+    assert "python -m pdf2md --help" in workflow
+    assert "앞으로 작업할 항목만" in next_plan
+    assert "작업이 완료되고 테스트 통과 및 PR merge까지 끝나면" in next_plan
+    assert "Q01. 실문서 Corpus 품질 게이트 고도화" in next_plan
+    assert "Q05. OCR Runtime/Language 사전 점검" in next_plan
 
 
 def test_windows_script_contracts_are_present() -> None:

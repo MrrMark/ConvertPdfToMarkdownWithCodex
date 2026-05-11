@@ -65,6 +65,7 @@ class LineType(str, Enum):
     FIGURE_CAPTION = "FIGURE_CAPTION"
     TABLE_CAPTION = "TABLE_CAPTION"
     TOC_LINE = "TOC_LINE"
+    LIST_ITEM = "LIST_ITEM"
     BODY_LINE = "BODY_LINE"
 
 
@@ -84,6 +85,10 @@ class PageResult(BaseModel):
     ocr_confidence_mean: Optional[float] = None
     ocr_confidence_median: Optional[float] = None
     low_conf_token_ratio: Optional[float] = None
+    text_layer_char_count: int = 0
+    ocr_attempted: bool = False
+    ocr_reason: Optional[str] = None
+    ocr_runtime_available: Optional[bool] = None
     line_merge_count: int = 0
     structure_line_count: int = 0
     dedupe_count: int = 0
@@ -142,6 +147,10 @@ class ReportSummary(BaseModel):
     page_cache_hits: int = 0
     page_cache_misses: int = 0
     text_line_extract_count: int = 0
+    heading_count: int = 0
+    list_item_count: int = 0
+    code_block_count: int = 0
+    hyphenation_repair_count: int = 0
 
 
 class ImageAsset(BaseModel):
@@ -158,6 +167,9 @@ class ImageAsset(BaseModel):
     dedupe_of: Optional[str] = None
     anchor_line_index: Optional[int] = None
     anchor_top: Optional[float] = None
+    source: str = "embedded"
+    caption_confidence: Optional[float] = None
+    crop_reason: Optional[str] = None
 
 
 class ExcludedImageAsset(BaseModel):
@@ -188,6 +200,10 @@ class TableAsset(BaseModel):
     fallback_reasons: list[str] = Field(default_factory=list)
     caption_text: Optional[str] = None
     caption_source: Optional[str] = None
+    continuation_group: Optional[str] = None
+    continued_from_page: Optional[int] = None
+    continued_to_page: Optional[int] = None
+    continuation_confidence: Optional[float] = None
 
 
 class NormalizedLine(BaseModel):

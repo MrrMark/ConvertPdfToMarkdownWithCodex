@@ -220,6 +220,7 @@ python -m pdf2md .\sample.pdf -o .\output --rag-table-output jsonl
 - `rag_tables.md`: 행 단위 Markdown
 - `tables_rag.jsonl`: 행 단위 structured JSONL
 - 명확한 multi-row header는 `Parent / Child` 형태로 정리되고, row label 성격의 첫 번째 열은 `stub_cells`에 기록될 수 있습니다.
+- adjacent page의 같은 header 표는 확실할 때만 `continuation_group`으로 연결됩니다.
 
 이미지 모드:
 
@@ -232,10 +233,14 @@ python -m pdf2md .\sample.pdf -o .\output --image-mode referenced
 ```powershell
 python -m pdf2md .\sample.pdf -o .\output --remove-header-footer
 python -m pdf2md .\sample.pdf -o .\output --dedupe-images
+python -m pdf2md .\sample.pdf -o .\output --repair-hyphenation
+python -m pdf2md .\sample.pdf -o .\output --figure-crop-fallback
 ```
 
 - `--remove-header-footer`: 여러 페이지의 상단/하단 margin에서 반복되는 header/footer 라인만 제거합니다.
 - `--dedupe-images`: 같은 `sha256` 이미지는 첫 번째 파일만 저장하고 이후 이미지는 같은 상대경로를 참조합니다.
+- `--repair-hyphenation`: 명확한 줄바꿈 하이픈만 opt-in으로 복구합니다.
+- `--figure-crop-fallback`: embedded image가 없고 확실한 figure caption이 있는 경우에만 crop fallback을 시도합니다.
 
 로그 보기:
 
@@ -330,6 +335,12 @@ tesseract --version
 
 정상 출력되면 OCR 기능 사용 가능
 
+OCR 언어 데이터가 설치되어 있으면 언어를 지정할 수 있습니다.
+
+```powershell
+python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
+```
+
 ---
 
 ## 9) 심화 운영 점검 포인트
@@ -338,8 +349,12 @@ tesseract --version
 
 - `schema_version`
 - `options.rag_table_output`
+- `options.ocr_lang`
+- `options.repair_hyphenation`
+- `options.figure_crop_fallback`
 - `images[].alt_text`
 - `images[].caption_text`, `caption_source`
+- figure crop fallback 사용 시 `images[].source`, `caption_confidence`, `crop_reason`
 - 이미지 중복 제거 사용 시 `images[].dedupe_of`
 - `excluded_images[].classification`
 - `excluded_images[].recovered_text`
@@ -353,6 +368,8 @@ tesseract --version
 - `page_results[].status`
 - `page_results[].reading_order_strategy`
 - `page_results[].column_count_estimate`
+- `page_results[].text_layer_char_count`
+- `page_results[].ocr_attempted`, `ocr_reason`, `ocr_runtime_available`
 - `page_results[].header_footer_suppressed_count`
 - `summary.page_status_counts`
 - `summary.table_fallback_count`
@@ -364,6 +381,10 @@ tesseract --version
 - `summary.page_cache_hits`
 - `summary.page_cache_misses`
 - `summary.text_line_extract_count`
+- `summary.heading_count`
+- `summary.list_item_count`
+- `summary.code_block_count`
+- `summary.hyphenation_repair_count`
 - `summary.rag_table_output`
 - `summary.rag_table_record_count`
 - `summary.rag_table_file_count`
@@ -409,6 +430,8 @@ python scripts\benchmark_conversion.py --output-dir .\benchmark_output --page-co
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count
 - `benchmark_report.json`: duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory
 - benchmark는 수동/릴리스 전 검증용이며 기본 테스트에 포함하지 않습니다.
+- GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
+- 향후 작업 backlog는 `docs\NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 새 작업만 남기고, 완료된 항목은 제거합니다.
 
 ---
 

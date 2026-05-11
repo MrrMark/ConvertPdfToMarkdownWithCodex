@@ -14,13 +14,17 @@
       "header_footer_suppressed_count": 0,
       "line_merge_count": 0,
       "low_conf_token_ratio": null,
+      "ocr_attempted": false,
       "ocr_confidence_mean": null,
       "ocr_confidence_median": null,
+      "ocr_reason": null,
+      "ocr_runtime_available": null,
       "page": 1,
       "reading_order_strategy": "top",
       "status": "success",
       "structure_line_count": 0,
       "suppressed_line_count": 0,
+      "text_layer_char_count": 17,
       "used_ocr": false,
       "warning_count": 0
     }
@@ -28,6 +32,10 @@
   "schema_version": "1.0",
   "status": "success",
   "summary": {
+    "code_block_count": 0,
+    "heading_count": 0,
+    "hyphenation_repair_count": 0,
+    "list_item_count": 0,
     "page_cache_hits": 1,
     "page_cache_misses": 1,
     "pages_per_second": null,

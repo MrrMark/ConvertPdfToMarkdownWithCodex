@@ -325,10 +325,23 @@ python3 -m pdf2md input.pdf -o output/ --no-page-markers
 ```bash
 python3 -m pdf2md input.pdf -o output/ --remove-header-footer
 python3 -m pdf2md input.pdf -o output/ --dedupe-images
+python3 -m pdf2md input.pdf -o output/ --repair-hyphenation
+python3 -m pdf2md input.pdf -o output/ --figure-crop-fallback
 ```
 
 - `--remove-header-footer`: 여러 페이지의 margin 영역에서 반복되는 header/footer 라인만 제거합니다.
 - `--dedupe-images`: 동일 `sha256` 이미지는 첫 파일만 저장하고 이후 asset은 같은 상대경로를 참조합니다.
+- `--repair-hyphenation`: 명확한 줄바꿈 하이픈만 opt-in으로 복구합니다.
+- `--figure-crop-fallback`: embedded image가 없고 확실한 figure caption이 있는 페이지에서만 crop fallback을 시도합니다.
+
+### OCR 언어 지정
+
+```bash
+python3 -m pdf2md input.pdf -o output/ --force-ocr --ocr-lang kor+eng
+```
+
+- 기본값은 `eng`입니다.
+- OCR runtime이 없거나 confidence가 낮으면 결과를 정답처럼 숨기지 않고 `report.json` warning과 page diagnostics에 남깁니다.
 
 ### 실행 로그 보기
 
@@ -459,8 +472,12 @@ pdfs/
 - 페이지 수 및 산출물 메타데이터
 - `schema_version`
 - `options.rag_table_output`
+- `options.ocr_lang`
+- `options.repair_hyphenation`
+- `options.figure_crop_fallback`
 - 이미지별 `alt_text`
 - 인접 캡션이 확실할 때만 `caption_text`, `caption_source`
+- figure crop fallback 사용 시 이미지별 `source`, `caption_confidence`, `crop_reason`
 - 이미지 중복 제거 사용 시 `dedupe_of`
 - 구조 마커 복구 메타데이터
   - `classification == "STRUCTURE_MARKER"`
@@ -479,6 +496,7 @@ pdfs/
 - `schema_version`
 - 페이지별 `status`
 - 페이지별 `reading_order_strategy`, `column_count_estimate`
+- 페이지별 `text_layer_char_count`, `ocr_attempted`, `ocr_reason`, `ocr_runtime_available`
 - 페이지별 `header_footer_suppressed_count`
 - `summary.page_status_counts`
 - `summary.table_mode_requested`
@@ -493,6 +511,10 @@ pdfs/
 - `summary.page_cache_hits`
 - `summary.page_cache_misses`
 - `summary.text_line_extract_count`
+- `summary.heading_count`
+- `summary.list_item_count`
+- `summary.code_block_count`
+- `summary.hyphenation_repair_count`
 - `summary.rag_table_output`
 - `summary.rag_table_record_count`
 - `summary.rag_table_file_count`
@@ -577,6 +599,7 @@ python3 -m pdf2md input.pdf -o output/ --table-mode auto --rag-table-output both
 - 캡션은 확실한 인접 table caption만 연결하고, 불확실하면 비워 둡니다.
 - multi-row header가 명확하면 `Parent / Child` 형태로 flatten하고, 첫 번째 열이 row label이면 `stub_cells`에 별도 기록합니다.
 - header 판단이 불확실하면 원문 header를 유지하고 `LOW_HEADER_CONFIDENCE`를 fallback reason에 남깁니다.
+- adjacent page의 header가 명확히 같은 표는 `continuation_group` metadata로만 연결하고, 확신이 낮으면 연결하지 않습니다.
 
 ### 구조 마커 복구 운영 포인트
 
@@ -597,6 +620,7 @@ python3 -m pdf2md input.pdf -o output/ --table-mode auto --rag-table-output both
 
 - OCR을 사용하려면 시스템에 Tesseract가 설치되어 있어야 합니다.
 - `OCR_RUNTIME_UNAVAILABLE` warning이 나오면 `tesseract --version`과 PATH를 먼저 확인하세요.
+- 한국어 OCR은 시스템 Tesseract에 해당 언어 데이터가 있어야 하며, 필요 시 `--ocr-lang kor+eng`처럼 지정합니다.
 
 ---
 
@@ -633,6 +657,8 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count
 - `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory
 - benchmark는 수동/릴리스 전 검증용이며 기본 CI 테스트에는 포함하지 않습니다.
+- GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
+- 향후 작업 backlog는 [docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md](docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md)에 새 작업만 남기고, 완료된 항목은 제거합니다.
 
 lint / format 도입 시 예시:
 
@@ -647,9 +673,7 @@ ruff format .
 
 ### 현재 안정화 이후 우선순위
 
-- 멀티컬럼/반복 header/footer/image dedupe/debug artifact 회귀 fixture 확대
-- RAG sidecar golden corpus를 실제 문서군으로 확대
-- 실제 문서군 기준 partial success, 표 품질 진단, page cache 성능 리포트 정교화
+- 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
 
 ### 이후 후보
 

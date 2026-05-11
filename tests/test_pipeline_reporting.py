@@ -9,6 +9,7 @@ from pdf2md.config import Config
 from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrResult
 from pdf2md.extractors.tables import TableExtractionResult
+from pdf2md.extractors.text import PageLayoutMetadata, TextLayoutResult, TextLine
 from pdf2md.models import ImageMode, TableAsset, TableMode, WarningEntry
 from pdf2md.pipeline import EXIT_PARTIAL, EXIT_SUCCESS, run_conversion
 
@@ -170,3 +171,64 @@ def test_pipeline_applies_structure_marker_recovery_without_inserting_image_bloc
     assert "2.2.1 Hello PDF Page 1" in document
     assert "![Image" not in document
     assert "structure_marker_recovered_count" in report["summary"]
+
+
+def test_pipeline_reports_markdown_structure_and_hyphenation_counts(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def fake_text_layout(*args, **kwargs) -> TextLayoutResult:  # noqa: ANN001
+        return TextLayoutResult(
+            lines_by_page={
+                1: [
+                    TextLine("2.2 Heading", 72.0, 84.0, 72.0, 180.0),
+                    TextLine("- bullet", 130.0, 142.0, 72.0, 140.0),
+                    TextLine("interoper-", 190.0, 202.0, 72.0, 150.0),
+                    TextLine("ability", 230.0, 242.0, 72.0, 130.0),
+                ]
+            },
+            metadata_by_page={1: PageLayoutMetadata(page=1, page_width=595.0, page_height=842.0, raw_line_count=4)},
+            raw_lines_by_page={1: []},
+        )
+
+    monkeypatch.setattr(pipeline_module, "extract_page_text_layout_result", fake_text_layout)
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "markdown-structure"
+    result = run_conversion(Config(input_pdf=sample_pdf, output_dir=output_dir, repair_hyphenation=True))
+
+    assert result.exit_code == EXIT_SUCCESS
+    document = (output_dir / "document.md").read_text(encoding="utf-8")
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert "## 2.2 Heading" in document
+    assert "interoperability" in document
+    assert report["summary"]["heading_count"] == 1
+    assert report["summary"]["list_item_count"] == 1
+    assert report["summary"]["hyphenation_repair_count"] == 1
+
+
+def test_pipeline_records_ocr_page_diagnostics(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
+    def fake_run_ocr(*args, **kwargs) -> OcrResult:  # noqa: ANN001
+        return OcrResult(
+            attempted_pages=[1],
+            reasons_by_page={1: "force"},
+            runtime_available=True,
+        )
+
+    monkeypatch.setattr(pipeline_module, "run_ocr", fake_run_ocr)
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+
+    output_dir = tmp_path / "ocr-diagnostics"
+    result = run_conversion(Config(input_pdf=sample_pdf, output_dir=output_dir, pages="1", force_ocr=True))
+
+    assert result.exit_code == EXIT_SUCCESS
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    page_result = report["page_results"][0]
+    assert page_result["text_layer_char_count"] > 0
+    assert page_result["ocr_attempted"] is True
+    assert page_result["ocr_reason"] == "force"
+    assert page_result["ocr_runtime_available"] is True
