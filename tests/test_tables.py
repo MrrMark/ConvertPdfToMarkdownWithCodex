@@ -156,9 +156,31 @@ class _FakePage:
         return [_FakeTable((10.0, 20.0, 100.0, 150.0), self._rows)]
 
 
+class _FakePageWithTables:
+    width = 595.0
+    height = 842.0
+
+    def __init__(self, tables: list[_FakeTable]) -> None:
+        self._tables = tables
+
+    def find_tables(self, table_settings=None):  # noqa: ANN001
+        return self._tables
+
+
 class _FakePdf:
     def __init__(self, rows: list[list[str]]) -> None:
         self.pages = [_FakePage(rows)]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):  # noqa: ANN001
+        return None
+
+
+class _FakePdfWithPage:
+    def __init__(self, page) -> None:  # noqa: ANN001
+        self.pages = [page]
 
     def __enter__(self):
         return self
@@ -221,3 +243,22 @@ def test_extract_tables_legacy_gfm_only_still_falls_back_to_html(monkeypatch) ->
     assert "<table>" in block
     assert result.assets[0].mode == "html"
     assert result.warnings[0].code == "TABLE_GFM_UNSAFE_FALLBACK_HTML"
+
+
+def test_extract_tables_suppresses_redundant_text_fragment(monkeypatch) -> None:
+    full = _FakeTable((10.0, 20.0, 230.0, 130.0), [["Field", "Value"], ["alpha", "beta"]])
+    fragment = _FakeTable((238.0, 42.0, 270.0, 60.0), [["alpha"]])
+    page = _FakePageWithTables([full, fragment])
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdfWithPage(page))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    assert len(result.assets) == 1
+    assert len(result.debug_candidates_by_page[1]) == 2
+    suppressed = [item for item in result.debug_candidates_by_page[1] if not item["accepted"]]
+    assert suppressed[0]["suppression_reason"] == "TEXT_FRAGMENT_SUPPRESSION"

@@ -54,3 +54,25 @@ def test_pipeline_uses_custom_output_filenames(sample_pdf: Path, tmp_path: Path)
     assert (output_dir / "sample_manifest.json").exists()
     assert (output_dir / "sample_report.json").exists()
     assert (output_dir / "sample_assets" / "images").exists()
+
+
+def test_pipeline_writes_debug_artifacts(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "debug-out"
+    config = Config(
+        input_pdf=sample_pdf,
+        output_dir=output_dir,
+        pages="1",
+        debug=True,
+    )
+
+    result = run_conversion(config)
+
+    assert result.exit_code == EXIT_SUCCESS
+    debug_dir = output_dir / "debug"
+    assert (debug_dir / "page-0001-raw-lines.json").exists()
+    assert (debug_dir / "page-0001-ordered-lines.json").exists()
+    assert (debug_dir / "page-0001-normalized-lines.json").exists()
+    assert (debug_dir / "page-0001-table-candidates.json").exists()
+    assert (debug_dir / "page-0001-image-candidates.json").exists()
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["debug"] is True

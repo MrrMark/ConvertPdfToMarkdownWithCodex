@@ -75,6 +75,9 @@ class PageResult(BaseModel):
     structure_line_count: int = 0
     dedupe_count: int = 0
     suppressed_line_count: int = 0
+    reading_order_strategy: str = "top"
+    column_count_estimate: int = 1
+    header_footer_suppressed_count: int = 0
 
 
 class ReportSummary(BaseModel):
@@ -127,6 +130,7 @@ class ImageAsset(BaseModel):
     width: Optional[int] = None
     height: Optional[int] = None
     sha256: Optional[str] = None
+    dedupe_of: Optional[str] = None
     anchor_line_index: Optional[int] = None
     anchor_top: Optional[float] = None
 
