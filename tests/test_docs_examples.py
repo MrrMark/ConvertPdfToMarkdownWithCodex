@@ -16,6 +16,12 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert ".\\scripts\\run_batch_folder_windows.bat -InputDir .\\pdfs" in readme
     assert '문서별 상태: `success`, `partial_success`, `failed`, `skipped`' in readme
     assert 'status == "skipped"' in readme
+    assert "summary.page_cache_hits" in readme
+    assert "summary.text_line_extract_count" in readme
+    assert "rag_header_strategy" in readme
+    assert "scripts/run_corpus_eval.py" in readme
+    assert "scripts/benchmark_conversion.py" in readme
+    assert "benchmark_report.json" in readme
     assert "pdf/v10" not in readme
     assert "프로젝트 scaffold 생성" not in readme
     assert "metadata.py" not in readme
@@ -36,6 +42,12 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "python -m pdf2md --input-dir .\\pdfs" in guide
     assert "ZIP 배포본 + 원클릭 스크립트 경로에서는 필수가 아님" in guide
     assert "status == \"skipped\"" in guide
+    assert "summary.page_cache_hits" in guide
+    assert "summary.text_line_extract_count" in guide
+    assert "rag_header_strategy" in guide
+    assert "scripts\\run_corpus_eval.py" in guide
+    assert "scripts\\benchmark_conversion.py" in guide
+    assert "benchmark_report.json" in guide
     assert "- Git\n  - `git clone`, `git pull` 같은 저장소 동기화 흐름에서만 필요" in guide
 
 

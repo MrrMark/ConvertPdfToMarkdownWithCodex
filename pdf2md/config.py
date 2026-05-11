@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pdf2md.models import ImageMode, TableMode
+from pdf2md.models import ImageMode, RagTableOutputMode, TableMode
 from pdf2md.utils.page_range import parse_page_range
 
 
@@ -18,6 +18,7 @@ class Config(BaseModel):
     password: Optional[str] = None
     image_mode: ImageMode = ImageMode.REFERENCED
     table_mode: TableMode = TableMode.AUTO
+    rag_table_output: RagTableOutputMode = RagTableOutputMode.NONE
     force_ocr: bool = False
     keep_page_markers: bool = False
     remove_header_footer: bool = False
@@ -29,6 +30,8 @@ class Config(BaseModel):
     markdown_filename: str = "document.md"
     manifest_filename: str = "manifest.json"
     report_filename: str = "report.json"
+    rag_tables_markdown_filename: str = "rag_tables.md"
+    rag_tables_jsonl_filename: str = "tables_rag.jsonl"
     assets_dirname: str = "assets"
 
     def selected_pages(self, total_pages: int) -> list[int]:

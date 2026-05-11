@@ -35,6 +35,7 @@ class OcrResult:
     page_texts: dict[int, str] = field(default_factory=dict)
     ocr_pages: list[int] = field(default_factory=list)
     used_ocr: bool = False
+    pdf_open_count: int = 0
     metrics_by_page: dict[int, OcrMetrics] = field(default_factory=dict)
 
 
@@ -98,6 +99,7 @@ def run_ocr(
 
     try:
         document = pdfium.PdfDocument(str(pdf_path))
+        result.pdf_open_count = 1
     except Exception as exc:  # noqa: BLE001
         result.warnings.append(WarningEntry(code=WarningCode.OCR_FAILED, message=f"Failed to open PDF for OCR: {exc}"))
         return result

@@ -1,0 +1,88 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from fixtures.pdf_builder import (
+    build_complex_table_pdf,
+    build_image_only_pdf,
+    build_korean_text_pdf,
+    build_password_pdf,
+    build_repeated_header_footer_pdf,
+    build_repeated_image_pdf,
+    build_simple_table_pdf,
+    build_single_column_pdf,
+    build_two_column_pdf,
+)
+
+from pdf2md.config import Config
+from pdf2md.models import RagTableOutputMode
+from pdf2md.pipeline import run_conversion
+from helpers.normalize_outputs import normalize_manifest, normalize_report
+
+
+GOLDEN_ROOT = Path("tests/golden/corpus")
+
+
+def test_deterministic_pdf_fixture_builder_covers_priority_corpus(tmp_path: Path) -> None:
+    builders = {
+        "single_column.pdf": build_single_column_pdf,
+        "two_column.pdf": build_two_column_pdf,
+        "header_footer.pdf": build_repeated_header_footer_pdf,
+        "simple_table.pdf": build_simple_table_pdf,
+        "complex_table.pdf": build_complex_table_pdf,
+        "repeated_image.pdf": build_repeated_image_pdf,
+        "image_only.pdf": build_image_only_pdf,
+        "korean.pdf": build_korean_text_pdf,
+        "password.pdf": build_password_pdf,
+    }
+
+    for filename, builder in builders.items():
+        path = tmp_path / filename
+        builder(path)
+        assert path.exists()
+        assert path.stat().st_size > 0
+
+
+def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
+    cases = {
+        "single_column": (build_single_column_pdf, {}),
+        "two_column": (build_two_column_pdf, {}),
+        "header_footer": (build_repeated_header_footer_pdf, {"remove_header_footer": True}),
+        "simple_table": (build_simple_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
+        "complex_table": (build_complex_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
+        "repeated_image": (build_repeated_image_pdf, {"dedupe_images": True}),
+        "password": (lambda path: build_password_pdf(path, password="secret"), {"password": "secret"}),
+    }
+
+    for case_name, (builder, options) in cases.items():
+        pdf_path = tmp_path / f"{case_name}.pdf"
+        output_dir = tmp_path / case_name
+        builder(pdf_path)
+        result = run_conversion(
+            Config(
+                input_pdf=pdf_path,
+                output_dir=output_dir,
+                keep_page_markers=True,
+                **options,
+            )
+        )
+
+        assert result.exit_code in {0, 2}
+        golden_dir = GOLDEN_ROOT / case_name
+        assert (output_dir / "document.md").read_text(encoding="utf-8") == (
+            golden_dir / "document.md"
+        ).read_text(encoding="utf-8")
+        assert normalize_manifest(json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))) == json.loads(
+            (golden_dir / "manifest.json").read_text(encoding="utf-8")
+        )
+        assert normalize_report(json.loads((output_dir / "report.json").read_text(encoding="utf-8"))) == json.loads(
+            (golden_dir / "report.json").read_text(encoding="utf-8")
+        )
+        for sidecar_name in ("rag_tables.md", "tables_rag.jsonl"):
+            golden_sidecar = golden_dir / sidecar_name
+            output_sidecar = output_dir / sidecar_name
+            if golden_sidecar.exists():
+                assert output_sidecar.read_text(encoding="utf-8") == golden_sidecar.read_text(encoding="utf-8")
+            else:
+                assert not output_sidecar.exists()

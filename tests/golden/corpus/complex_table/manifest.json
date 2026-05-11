@@ -1,0 +1,59 @@
+{
+  "images": [],
+  "input_file": "complex_table.pdf",
+  "options": {
+    "debug": false,
+    "dedupe_images": false,
+    "force_ocr": false,
+    "image_mode": "referenced",
+    "keep_page_markers": true,
+    "pages": null,
+    "rag_table_output": "both",
+    "remove_header_footer": false,
+    "table_mode": "auto",
+    "version": "<version>"
+  },
+  "schema_version": "1.0",
+  "selected_pages": [
+    1
+  ],
+  "tables": [
+    {
+      "anchor_line_index": 1,
+      "anchor_top": 112.0,
+      "bbox": [
+        72.0,
+        112.0,
+        372.0,
+        208.0
+      ],
+      "caption_source": "nearby_table_caption",
+      "caption_text": "Table 1: Complex fields",
+      "fallback_reasons": [
+        "MERGED_CELL_SUSPECTED",
+        "MULTI_ROW_HEADER",
+        "STUB_COLUMN"
+      ],
+      "index": 1,
+      "mode": "html",
+      "page": 1,
+      "quality_score": 0.9208
+    }
+  ],
+  "total_pages": 1,
+  "warnings": [
+    {
+      "code": "TABLE_COMPLEXITY_HTML_FALLBACK",
+      "details": {
+        "reasons": [
+          "MERGED_CELL_SUSPECTED",
+          "MULTI_ROW_HEADER",
+          "STUB_COLUMN"
+        ],
+        "table_index": 1
+      },
+      "message": "Table was treated as complex and serialized as HTML fallback.",
+      "page": 1
+    }
+  ]
+}

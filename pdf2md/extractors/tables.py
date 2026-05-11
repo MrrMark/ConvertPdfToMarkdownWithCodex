@@ -10,7 +10,8 @@ from typing import Any, Optional
 import pdfplumber
 
 from pdf2md.constants import TableDecisionReason, TableModeEmission, TableReason, WarningCode
-from pdf2md.models import TableAsset, TableMode, WarningEntry
+from pdf2md.models import LineType, TableAsset, TableMode, WarningEntry
+from pdf2md.utils.structure import classify_structure_line
 
 TABLE_STRATEGIES: list[tuple[str, dict[str, Any] | None]] = [
     ("default", None),
@@ -63,6 +64,67 @@ class TableExtractionCandidate:
     quality_score: float
     metrics: TableQualityMetrics
     decision: TableRecoveryDecision
+    diagnostics: "TableDiagnostics"
+
+
+@dataclass
+class TableRow:
+    index: int
+    cells: list[str]
+    role: str
+
+
+@dataclass
+class TableDiagnostics:
+    header_depth: int
+    header_confidence: float
+    stub_column_count: int
+    footnote_row_count: int
+    merged_cell_suspected: bool
+    rag_header_strategy: str
+    headers: list[str]
+    data_row_start_index: int
+    reasons: list[str] = field(default_factory=list)
+
+
+@dataclass
+class TableGrid:
+    rows: list[TableRow]
+    diagnostics: TableDiagnostics
+
+
+@dataclass
+class RagTablePayload:
+    page: int
+    table_index: int
+    source_mode: str
+    caption_text: str
+    headers: list[str]
+    bbox: list[float]
+    quality_score: float
+    fallback_reasons: list[str]
+    records: list[dict[str, Any]]
+    header_depth: int
+    header_confidence: float
+    stub_column_count: int
+    rag_header_strategy: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "page": self.page,
+            "table_index": self.table_index,
+            "source_mode": self.source_mode,
+            "caption_text": self.caption_text,
+            "headers": self.headers,
+            "bbox": self.bbox,
+            "quality_score": self.quality_score,
+            "fallback_reasons": self.fallback_reasons,
+            "records": self.records,
+            "header_depth": self.header_depth,
+            "header_confidence": self.header_confidence,
+            "stub_column_count": self.stub_column_count,
+            "rag_header_strategy": self.rag_header_strategy,
+        }
 
 
 @dataclass
@@ -73,6 +135,10 @@ class TableBlock:
     markdown: str
     top: float
     bbox: tuple[float, float, float, float]
+    rows: list[list[str]] = field(default_factory=list)
+    caption_text: str | None = None
+    quality_score: float = 0.0
+    fallback_reasons: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -82,6 +148,7 @@ class TableExtractionResult:
     blocks_by_page: dict[int, list[TableBlock]] = field(default_factory=dict)
     table_quality: list[dict[str, Any]] = field(default_factory=list)
     fallbacks: list[dict[str, Any]] = field(default_factory=list)
+    rag_tables: list[dict[str, Any]] = field(default_factory=list)
     debug_candidates_by_page: dict[int, list[dict[str, Any]]] = field(default_factory=dict)
     table_counts: dict[str, int] = field(
         default_factory=lambda: {
@@ -412,8 +479,16 @@ def _serialize_html(rows: list[list[str]], notes: list[str]) -> str:
     return "\n".join(lines)
 
 
-def _pick_mode(table_mode: TableMode, rows: list[list[str]]) -> tuple[str, Optional[str], list[str]]:
-    simple, reasons = analyze_table_complexity(rows)
+def _pick_mode(
+    table_mode: TableMode,
+    rows: list[list[str]],
+    complexity_reasons: list[str] | None = None,
+) -> tuple[str, Optional[str], list[str]]:
+    if complexity_reasons is None:
+        simple, reasons = analyze_table_complexity(rows)
+    else:
+        reasons = sorted(set(complexity_reasons))
+        simple = not reasons
     if table_mode in {TableMode.HTML, TableMode.HTML_ONLY}:
         return TableModeEmission.HTML, None, reasons
     if table_mode == TableMode.MARKDOWN:
@@ -543,6 +618,10 @@ def _candidate_debug_payload(candidate: TableExtractionCandidate, *, accepted: b
         "suppression_reason": reason,
         "reasons": candidate.decision.reasons,
         "unresolved": candidate.decision.unresolved,
+        "header_depth": candidate.diagnostics.header_depth,
+        "header_confidence": candidate.diagnostics.header_confidence,
+        "stub_column_count": candidate.diagnostics.stub_column_count,
+        "rag_header_strategy": candidate.diagnostics.rag_header_strategy,
     }
 
 
@@ -590,7 +669,9 @@ def _collect_candidates_for_page(page: pdfplumber.page.Page) -> list[TableExtrac
             rows, notes, metrics = _process_rows(raw_rows, strategy)
             if not rows or not rows[0]:
                 continue
+            table_grid = _build_table_grid(rows, notes, metrics)
             simple, reasons = analyze_table_complexity(rows)
+            reasons = sorted(set(reasons).union(table_grid.diagnostics.reasons))
             candidate = TableExtractionCandidate(
                 strategy=strategy,
                 bbox=tuple(float(v) for v in table_obj.bbox),
@@ -598,7 +679,8 @@ def _collect_candidates_for_page(page: pdfplumber.page.Page) -> list[TableExtrac
                 notes=notes,
                 quality_score=metrics.quality_score,
                 metrics=metrics,
-                decision=TableRecoveryDecision(unresolved=not simple, reasons=reasons),
+                decision=TableRecoveryDecision(unresolved=bool(reasons) or not simple, reasons=reasons),
+                diagnostics=table_grid.diagnostics,
             )
             bbox_key = tuple(round(v, 1) for v in candidate.bbox)
             previous = candidates_by_bbox.get(bbox_key)
@@ -683,18 +765,285 @@ def _prune_candidates(
     return pruned
 
 
+def _line_text(line: dict[str, Any]) -> str:
+    return _sanitize_cell(line.get("text", ""))
+
+
+def _line_bbox(line: dict[str, Any]) -> tuple[float, float, float, float]:
+    x0 = float(line.get("x0", 0.0))
+    top = float(line.get("top", 0.0))
+    x1 = float(line.get("x1", x0))
+    bottom = float(line.get("bottom", top))
+    return x0, top, x1, bottom
+
+
+def _horizontal_overlap_ratio(
+    line_bbox: tuple[float, float, float, float],
+    table_bbox: tuple[float, float, float, float],
+) -> float:
+    lx0, _, lx1, _ = line_bbox
+    tx0, _, tx1, _ = table_bbox
+    line_width = max(lx1 - lx0, 1.0)
+    overlap = max(0.0, min(lx1, tx1) - max(lx0, tx0))
+    return overlap / line_width
+
+
+def _find_table_caption(
+    page: pdfplumber.page.Page,
+    bbox: tuple[float, float, float, float],
+    text_lines: list[dict] | None = None,
+) -> str | None:
+    """Return a nearby explicit table caption only when the geometry is clear."""
+    if text_lines is None:
+        extract_text_lines = getattr(page, "extract_text_lines", None)
+        if extract_text_lines is None:
+            return None
+        try:
+            text_lines = extract_text_lines() or []
+        except Exception:  # noqa: BLE001
+            return None
+
+    _, table_top, _, table_bottom = bbox
+    candidates: list[tuple[float, str]] = []
+    for raw_line in text_lines:
+        text = _line_text(raw_line)
+        if not text or classify_structure_line(text) is not LineType.TABLE_CAPTION:
+            continue
+        line_bbox = _line_bbox(raw_line)
+        if _horizontal_overlap_ratio(line_bbox, bbox) < 0.25:
+            continue
+        _, line_top, _, line_bottom = line_bbox
+        above_distance = table_top - line_bottom
+        below_distance = line_top - table_bottom
+        if 0 <= above_distance <= 48:
+            candidates.append((above_distance, text))
+        elif 0 <= below_distance <= 24:
+            candidates.append((below_distance + 12, text))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0])
+    return candidates[0][1]
+
+
+def _unique_headers(header_row: list[str]) -> list[str]:
+    headers: list[str] = []
+    seen: dict[str, int] = {}
+    for idx, raw_header in enumerate(header_row, start=1):
+        base = raw_header.strip() or f"Column {idx}"
+        count = seen.get(base, 0) + 1
+        seen[base] = count
+        headers.append(base if count == 1 else f"{base} {count}")
+    return headers
+
+
+def _looks_like_multi_row_header(rows: list[list[str]]) -> bool:
+    if len(rows) < 3 or not rows[0] or not rows[1]:
+        return False
+    first = rows[0]
+    second = rows[1]
+    first_non_empty = sum(1 for cell in first if cell.strip())
+    second_non_empty = sum(1 for cell in second if cell.strip())
+    if second_non_empty < max(2, len(second) // 2):
+        return False
+    repeated_parent = any(first[idx].strip() and first[idx].strip() == first[idx + 1].strip() for idx in range(len(first) - 1))
+    blank_parent_with_child_count = sum(
+        1 for idx in range(min(len(first), len(second))) if not first[idx].strip() and second[idx].strip()
+    )
+    body_density = _data_density([second] + rows[2:])
+    return body_density >= 0.35 and (repeated_parent or blank_parent_with_child_count >= 2) and first_non_empty > 0
+
+
+def _flatten_multi_row_headers(rows: list[list[str]]) -> list[str]:
+    parent_row = rows[0]
+    child_row = rows[1]
+    headers: list[str] = []
+    last_parent = ""
+    width = max(len(parent_row), len(child_row))
+    for idx in range(width):
+        parent = parent_row[idx].strip() if idx < len(parent_row) else ""
+        child = child_row[idx].strip() if idx < len(child_row) else ""
+        if parent:
+            last_parent = parent
+        elif last_parent and child:
+            parent = last_parent
+        if parent and child and parent != child:
+            headers.append(f"{parent} / {child}")
+        else:
+            headers.append(child or parent or f"Column {idx + 1}")
+    return _unique_headers(headers)
+
+
+def _detect_stub_column_count(rows: list[list[str]], header_depth: int) -> int:
+    if len(rows) <= header_depth or not rows[0]:
+        return 0
+    data_rows = rows[header_depth:]
+    if not data_rows:
+        return 0
+    first_column_values = [row[0].strip() for row in data_rows if row and row[0].strip()]
+    if len(first_column_values) < max(1, int(len(data_rows) * 0.6)):
+        return 0
+    other_values = [
+        cell.strip()
+        for row in data_rows
+        for cell in row[1:]
+        if cell.strip()
+    ]
+    alpha_first = sum(1 for value in first_column_values if any(char.isalpha() for char in value))
+    numeric_other = sum(1 for value in other_values if any(char.isdigit() for char in value))
+    if alpha_first >= max(1, int(len(first_column_values) * 0.6)) and numeric_other >= max(1, int(len(other_values) * 0.4)):
+        return 1
+    header = rows[header_depth - 1][0].strip().lower() if header_depth > 0 and rows[header_depth - 1] else ""
+    if not header and numeric_other >= 1:
+        return 1
+    return 0
+
+
+def _header_confidence(rows: list[list[str]], header_depth: int) -> float:
+    if not rows:
+        return 0.0
+    if header_depth == 2:
+        return 0.85
+    fill_ratio = _header_fill_ratio(rows)
+    if fill_ratio >= 0.75:
+        return 0.85
+    if fill_ratio >= 0.5:
+        return 0.65
+    return 0.4
+
+
+def _merged_cell_suspected(rows: list[list[str]], header_depth: int) -> bool:
+    if not rows:
+        return False
+    width = len(rows[0])
+    if width < 3:
+        return False
+    header_blank = any(not cell.strip() for row in rows[: max(header_depth, 1)] for cell in row)
+    sparse_body_rows = 0
+    for row in rows[header_depth:]:
+        non_empty = sum(1 for cell in row if cell.strip())
+        if 0 < non_empty < max(2, width // 2):
+            sparse_body_rows += 1
+    return header_blank or sparse_body_rows >= 2
+
+
+def _build_table_grid(rows: list[list[str]], notes: list[str], metrics: TableQualityMetrics) -> TableGrid:
+    header_depth = 2 if _looks_like_multi_row_header(rows) else 1
+    confidence = _header_confidence(rows, header_depth)
+    headers = _flatten_multi_row_headers(rows) if header_depth == 2 else _unique_headers(rows[0] if rows else [])
+    rag_header_strategy = "multi_row_flattened" if header_depth == 2 else "single_row"
+    reasons: set[str] = set()
+    if header_depth == 2:
+        reasons.add(TableReason.MULTI_ROW_HEADER)
+    if notes:
+        reasons.add(TableReason.FOOTNOTE_ROW)
+    stub_count = _detect_stub_column_count(rows, header_depth)
+    if stub_count:
+        reasons.add(TableReason.STUB_COLUMN)
+    merged = _merged_cell_suspected(rows, header_depth)
+    if merged:
+        reasons.add(TableReason.MERGED_CELL_SUSPECTED)
+    if confidence < 0.5:
+        reasons.add(TableReason.LOW_HEADER_CONFIDENCE)
+        rag_header_strategy = "fallback_low_confidence"
+
+    diagnostics = TableDiagnostics(
+        header_depth=header_depth,
+        header_confidence=round(confidence, 4),
+        stub_column_count=stub_count,
+        footnote_row_count=len(notes),
+        merged_cell_suspected=merged,
+        rag_header_strategy=rag_header_strategy,
+        headers=headers,
+        data_row_start_index=header_depth,
+        reasons=sorted(reasons),
+    )
+    table_rows = [
+        TableRow(
+            index=idx,
+            cells=row,
+            role="header" if idx < header_depth else "body",
+        )
+        for idx, row in enumerate(rows)
+    ]
+    return TableGrid(rows=table_rows, diagnostics=diagnostics)
+
+
+def _build_rag_table_payload(
+    *,
+    page_number: int,
+    table_index: int,
+    source_mode: str,
+    candidate: TableExtractionCandidate,
+    caption_text: str | None,
+    fallback_reasons: list[str],
+) -> dict[str, Any]:
+    diagnostics = candidate.diagnostics
+    headers = diagnostics.headers
+    row_records: list[dict[str, Any]] = []
+    data_rows = candidate.rows[diagnostics.data_row_start_index :]
+    for row_index, row in enumerate(data_rows, start=1):
+        padded = row + [""] * max(0, len(headers) - len(row))
+        cells = {header: padded[idx] if idx < len(padded) else "" for idx, header in enumerate(headers)}
+        row_text = " | ".join(f"{header} = {cells[header]}" for header in headers)
+        stub_cells = padded[: diagnostics.stub_column_count] if diagnostics.stub_column_count else []
+        record = {
+            "page": page_number,
+            "table_index": table_index,
+            "source_mode": source_mode,
+            "caption_text": caption_text or "",
+            "headers": headers,
+            "row_index": row_index,
+            "cells": cells,
+            "row_text": row_text,
+            "bbox": [float(value) for value in candidate.bbox],
+            "quality_score": candidate.metrics.quality_score,
+            "fallback_reasons": fallback_reasons,
+            "header_depth": diagnostics.header_depth,
+            "header_confidence": diagnostics.header_confidence,
+            "rag_header_strategy": diagnostics.rag_header_strategy,
+        }
+        if stub_cells:
+            record["stub_cells"] = stub_cells
+        row_records.append(
+            record
+        )
+    return RagTablePayload(
+        page=page_number,
+        table_index=table_index,
+        source_mode=source_mode,
+        caption_text=caption_text or "",
+        headers=headers,
+        bbox=[float(value) for value in candidate.bbox],
+        quality_score=candidate.metrics.quality_score,
+        fallback_reasons=fallback_reasons,
+        records=row_records,
+        header_depth=diagnostics.header_depth,
+        header_confidence=diagnostics.header_confidence,
+        stub_column_count=diagnostics.stub_column_count,
+        rag_header_strategy=diagnostics.rag_header_strategy,
+    ).as_dict()
+
+
 def extract_tables(
     pdf_path: Path,
     selected_pages: list[int],
     password: Optional[str],
     table_mode: TableMode,
+    pdf: Any = None,
+    text_lines_by_page: dict[int, list[dict]] | None = None,
 ) -> TableExtractionResult:
     result = TableExtractionResult()
 
     try:
-        with pdfplumber.open(str(pdf_path), password=password) as pdf:
+        if pdf is not None:
+            opened_pdf = pdf
+            close_after = False
+        else:
+            opened_pdf = pdfplumber.open(str(pdf_path), password=password)
+            close_after = True
+        try:
             for page_number in selected_pages:
-                page = pdf.pages[page_number - 1]
+                page = opened_pdf.pages[page_number - 1]
                 logger.debug("Extracting tables for page=%s", page_number)
                 candidates = _collect_candidates_for_page(page)
                 deduped, debug_candidates = _prune_candidates_with_debug(page, candidates)
@@ -702,7 +1051,11 @@ def extract_tables(
 
                 page_blocks: list[TableBlock] = []
                 for index, candidate in enumerate(deduped, start=1):
-                    mode, fallback_reason, reasons = _pick_mode(table_mode, candidate.rows)
+                    mode, fallback_reason, reasons = _pick_mode(
+                        table_mode,
+                        candidate.rows,
+                        complexity_reasons=candidate.decision.reasons,
+                    )
                     if fallback_reason:
                         result.warnings.append(
                             WarningEntry(
@@ -730,6 +1083,7 @@ def extract_tables(
                                 details={"table_index": index, "reasons": reasons},
                             )
                         )
+
                     if mode == TableModeEmission.HTML:
                         result.fallbacks.append(
                             {
@@ -748,10 +1102,18 @@ def extract_tables(
                         rendered = _serialize_markdown_forced(candidate.rows, candidate.notes)
                     else:
                         rendered = _serialize_gfm(candidate.rows)
+
                     comment_mode = TableModeEmission.MARKDOWN if mode == TableModeEmission.MARKDOWN else mode
                     comment = f"<!-- table: page={page_number} index={index} mode={comment_mode} -->"
                     x0, top, x1, bottom = candidate.bbox
                     asset_mode = TableModeEmission.GFM if mode == TableModeEmission.MARKDOWN else mode
+                    caption_text = _find_table_caption(
+                        page,
+                        candidate.bbox,
+                        text_lines=(text_lines_by_page or {}).get(page_number),
+                    )
+                    fallback_reasons = reasons if asset_mode == TableModeEmission.HTML else []
+
                     page_blocks.append(
                         TableBlock(
                             page=page_number,
@@ -760,6 +1122,10 @@ def extract_tables(
                             markdown=f"{comment}\n{rendered}",
                             top=top,
                             bbox=(x0, top, x1, bottom),
+                            rows=candidate.rows,
+                            caption_text=caption_text,
+                            quality_score=candidate.metrics.quality_score,
+                            fallback_reasons=fallback_reasons,
                         )
                     )
                     result.assets.append(
@@ -768,6 +1134,20 @@ def extract_tables(
                             index=index,
                             mode=asset_mode,
                             bbox=[x0, top, x1, bottom],
+                            quality_score=candidate.metrics.quality_score,
+                            fallback_reasons=fallback_reasons,
+                            caption_text=caption_text,
+                            caption_source="nearby_table_caption" if caption_text else None,
+                        )
+                    )
+                    result.rag_tables.append(
+                        _build_rag_table_payload(
+                            page_number=page_number,
+                            table_index=index,
+                            source_mode=asset_mode,
+                            candidate=candidate,
+                            caption_text=caption_text,
+                            fallback_reasons=fallback_reasons,
                         )
                     )
                     result.table_quality.append(
@@ -785,6 +1165,14 @@ def extract_tables(
                             "reasons": candidate.decision.reasons,
                             "unresolved": candidate.decision.unresolved,
                             "mode": asset_mode,
+                            "caption_text": caption_text,
+                            "caption_source": "nearby_table_caption" if caption_text else None,
+                            "header_depth": candidate.diagnostics.header_depth,
+                            "header_confidence": candidate.diagnostics.header_confidence,
+                            "stub_column_count": candidate.diagnostics.stub_column_count,
+                            "footnote_row_count": candidate.diagnostics.footnote_row_count,
+                            "merged_cell_suspected": candidate.diagnostics.merged_cell_suspected,
+                            "rag_header_strategy": candidate.diagnostics.rag_header_strategy,
                         }
                     )
 
@@ -804,6 +1192,11 @@ def extract_tables(
 
                 if page_blocks:
                     result.blocks_by_page[page_number] = page_blocks
+        finally:
+            if close_after:
+                close = getattr(opened_pdf, "close", None)
+                if close is not None:
+                    close()
     except Exception as exc:  # noqa: BLE001
         result.warnings.append(
             WarningEntry(

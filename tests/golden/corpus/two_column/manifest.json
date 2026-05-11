@@ -1,0 +1,23 @@
+{
+  "images": [],
+  "input_file": "two_column.pdf",
+  "options": {
+    "debug": false,
+    "dedupe_images": false,
+    "force_ocr": false,
+    "image_mode": "referenced",
+    "keep_page_markers": true,
+    "pages": null,
+    "rag_table_output": "none",
+    "remove_header_footer": false,
+    "table_mode": "auto",
+    "version": "<version>"
+  },
+  "schema_version": "1.0",
+  "selected_pages": [
+    1
+  ],
+  "tables": [],
+  "total_pages": 1,
+  "warnings": []
+}

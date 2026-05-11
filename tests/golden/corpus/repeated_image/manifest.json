@@ -1,0 +1,65 @@
+{
+  "images": [
+    {
+      "alt_text": "Image page-0001-figure-001",
+      "anchor_line_index": 1,
+      "anchor_top": 104.0,
+      "bbox": [
+        430.0,
+        104.0,
+        478.0,
+        152.0
+      ],
+      "caption_source": null,
+      "caption_text": null,
+      "dedupe_of": null,
+      "height": 48,
+      "index": 1,
+      "page": 1,
+      "path": "assets/images/page-0001-figure-001.png",
+      "sha256": "dd7b2587cd489d7b4608b489bfc0e144c1df2c6e3b1028e0dc4601531524cefc",
+      "width": 48
+    },
+    {
+      "alt_text": "Image page-0002-figure-001",
+      "anchor_line_index": 1,
+      "anchor_top": 104.0,
+      "bbox": [
+        430.0,
+        104.0,
+        478.0,
+        152.0
+      ],
+      "caption_source": null,
+      "caption_text": null,
+      "dedupe_of": "assets/images/page-0001-figure-001.png",
+      "height": 48,
+      "index": 1,
+      "page": 2,
+      "path": "assets/images/page-0001-figure-001.png",
+      "sha256": "dd7b2587cd489d7b4608b489bfc0e144c1df2c6e3b1028e0dc4601531524cefc",
+      "width": 48
+    }
+  ],
+  "input_file": "repeated_image.pdf",
+  "options": {
+    "debug": false,
+    "dedupe_images": true,
+    "force_ocr": false,
+    "image_mode": "referenced",
+    "keep_page_markers": true,
+    "pages": null,
+    "rag_table_output": "none",
+    "remove_header_footer": false,
+    "table_mode": "auto",
+    "version": "<version>"
+  },
+  "schema_version": "1.0",
+  "selected_pages": [
+    1,
+    2
+  ],
+  "tables": [],
+  "total_pages": 2,
+  "warnings": []
+}

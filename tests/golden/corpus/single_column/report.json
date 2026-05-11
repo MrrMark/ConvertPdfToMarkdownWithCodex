@@ -1,0 +1,67 @@
+{
+  "engine_usage": {
+    "images": false,
+    "ocr": false,
+    "pdfplumber": true,
+    "pypdf": true,
+    "tables": false
+  },
+  "page_results": [
+    {
+      "char_count": 19,
+      "column_count_estimate": 1,
+      "dedupe_count": 0,
+      "header_footer_suppressed_count": 0,
+      "line_merge_count": 0,
+      "low_conf_token_ratio": null,
+      "ocr_confidence_mean": null,
+      "ocr_confidence_median": null,
+      "page": 1,
+      "reading_order_strategy": "top",
+      "status": "success",
+      "structure_line_count": 0,
+      "suppressed_line_count": 0,
+      "used_ocr": false,
+      "warning_count": 0
+    }
+  ],
+  "schema_version": "1.0",
+  "status": "success",
+  "summary": {
+    "page_cache_hits": 1,
+    "page_cache_misses": 1,
+    "pages_per_second": null,
+    "partial_success": false,
+    "pdf_open_count": 2,
+    "processed_pages": 1,
+    "rag_table_file_count": 0,
+    "rag_table_output": "none",
+    "rag_table_record_count": 0,
+    "stage_durations_ms": {
+      "image_extraction": 0,
+      "manifest": 0,
+      "markdown_serialization": 0,
+      "normalization": 0,
+      "ocr": 0,
+      "output_setup": 0,
+      "page_selection": 0,
+      "pdf_open": 0,
+      "rag_tables": 0,
+      "reporting": 0,
+      "table_extraction": 0,
+      "text_extraction": 0
+    },
+    "table_caption_linked_count": 0,
+    "table_fallback_count": 0,
+    "table_fallback_reason_counts": {},
+    "table_gfm_count": 0,
+    "table_html_count": 0,
+    "table_low_quality_count": 0,
+    "table_quality": [],
+    "table_total": 0,
+    "text_line_extract_count": 1,
+    "total_suppressed_lines": 0,
+    "warning_count": 0
+  },
+  "warnings": []
+}

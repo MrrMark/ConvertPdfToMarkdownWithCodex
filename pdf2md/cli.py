@@ -6,7 +6,18 @@ from pathlib import Path
 from typing import Optional
 
 from pdf2md.config import Config, default_output_dir_for_input
-from pdf2md.models import BatchDocumentFiles, BatchDocumentResult, BatchReport, BatchReportSummary, ConversionStatus, ImageMode, Manifest, Report, TableMode
+from pdf2md.models import (
+    BatchDocumentFiles,
+    BatchDocumentResult,
+    BatchReport,
+    BatchReportSummary,
+    ConversionStatus,
+    ImageMode,
+    Manifest,
+    RagTableOutputMode,
+    Report,
+    TableMode,
+)
 from pdf2md.pipeline import EXIT_FATAL, EXIT_PARTIAL, run_conversion
 from pdf2md.utils.io import write_json
 from pdf2md.utils.logging import configure_logging
@@ -30,6 +41,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[m.value for m in TableMode],
         default=TableMode.AUTO.value,
         help="Table output mode: auto, html, markdown. html-only/gfm-only are legacy compatibility modes.",
+    )
+    parser.add_argument(
+        "--rag-table-output",
+        choices=[m.value for m in RagTableOutputMode],
+        default=RagTableOutputMode.NONE.value,
+        help="Optional RAG sidecar table output: none, markdown, jsonl, or both.",
     )
     parser.add_argument("--force-ocr", action="store_true", default=False)
     parser.add_argument(
@@ -82,6 +99,7 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         password=args.password,
         image_mode=ImageMode(args.image_mode),
         table_mode=TableMode(args.table_mode),
+        rag_table_output=RagTableOutputMode(args.rag_table_output),
         force_ocr=args.force_ocr,
         keep_page_markers=args.keep_page_markers,
         remove_header_footer=args.remove_header_footer,
@@ -101,6 +119,7 @@ def _build_batch_config(args: argparse.Namespace, pdf_path: Path, output_dir: Pa
         password=args.password,
         image_mode=ImageMode(args.image_mode),
         table_mode=TableMode(args.table_mode),
+        rag_table_output=RagTableOutputMode(args.rag_table_output),
         force_ocr=args.force_ocr,
         keep_page_markers=args.keep_page_markers,
         remove_header_footer=args.remove_header_footer,
