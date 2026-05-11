@@ -213,12 +213,24 @@ python -m pdf2md .\sample.pdf -o .\output --table-mode markdown
 python -m pdf2md .\sample.pdf -o .\output --image-mode referenced
 ```
 
+보수적 품질 개선 옵션:
+
+```powershell
+python -m pdf2md .\sample.pdf -o .\output --remove-header-footer
+python -m pdf2md .\sample.pdf -o .\output --dedupe-images
+```
+
+- `--remove-header-footer`: 여러 페이지의 상단/하단 margin에서 반복되는 header/footer 라인만 제거합니다.
+- `--dedupe-images`: 같은 `sha256` 이미지는 첫 번째 파일만 저장하고 이후 이미지는 같은 상대경로를 참조합니다.
+
 로그 보기:
 
 ```powershell
 python -m pdf2md .\sample.pdf -o .\output --verbose
 python -m pdf2md .\sample.pdf -o .\output --debug
 ```
+
+`--debug` 사용 시 `output\debug\` 아래에 page별 raw lines, ordered lines, normalized lines, table candidates, image candidates JSON이 생성됩니다.
 
 ---
 
@@ -282,6 +294,12 @@ PowerShell 본체 직접 실행:
 .\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs -Pages 1-3,5 -NoPageMarkers
 ```
 
+품질 개선 옵션을 배치 모드에서 직접 쓰려면 CLI를 사용합니다.
+
+```powershell
+python -m pdf2md --input-dir .\pdfs --remove-header-footer --dedupe-images
+```
+
 ---
 
 ## 8) OCR 사용
@@ -307,6 +325,7 @@ tesseract --version
 - `schema_version`
 - `images[].alt_text`
 - `images[].caption_text`, `caption_source`
+- 이미지 중복 제거 사용 시 `images[].dedupe_of`
 - `excluded_images[].classification`
 - `excluded_images[].recovered_text`
 - `excluded_images[].ocr_candidates`
@@ -317,6 +336,9 @@ tesseract --version
 
 - `schema_version`
 - `page_results[].status`
+- `page_results[].reading_order_strategy`
+- `page_results[].column_count_estimate`
+- `page_results[].header_footer_suppressed_count`
 - `summary.page_status_counts`
 - `summary.table_fallback_count`
 - `summary.table_fallbacks`
@@ -336,6 +358,14 @@ tesseract --version
   - `document.md`
   - `manifest.json`
   - `report.json`
+
+Debug 산출물 확인 위치:
+
+- `output\debug\page-0001-raw-lines.json`
+- `output\debug\page-0001-ordered-lines.json`
+- `output\debug\page-0001-normalized-lines.json`
+- `output\debug\page-0001-table-candidates.json`
+- `output\debug\page-0001-image-candidates.json`
 
 ---
 

@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 import pdfplumber
 
-from pdf2md.constants import TableModeEmission, TableReason, WarningCode
+from pdf2md.constants import TableDecisionReason, TableModeEmission, TableReason, WarningCode
 from pdf2md.models import TableAsset, TableMode, WarningEntry
 
 TABLE_STRATEGIES: list[tuple[str, dict[str, Any] | None]] = [
@@ -82,6 +82,7 @@ class TableExtractionResult:
     blocks_by_page: dict[int, list[TableBlock]] = field(default_factory=dict)
     table_quality: list[dict[str, Any]] = field(default_factory=list)
     fallbacks: list[dict[str, Any]] = field(default_factory=list)
+    debug_candidates_by_page: dict[int, list[dict[str, Any]]] = field(default_factory=dict)
     table_counts: dict[str, int] = field(
         default_factory=lambda: {
             "table_total": 0,
@@ -332,12 +333,15 @@ def analyze_table_complexity(rows: list[list[str]]) -> tuple[bool, list[str]]:
         return False, [TableReason.AMBIGUOUS_GRID]
     if len(rows) < 2:
         reasons.add(TableReason.AMBIGUOUS_GRID)
+        reasons.add(TableReason.TOO_FEW_ROWS)
 
     width = len(rows[0]) if rows and rows[0] else 0
     if width < 2:
         reasons.add(TableReason.AMBIGUOUS_GRID)
+        reasons.add(TableReason.TOO_FEW_COLUMNS)
     if width > 12:
         reasons.add(TableReason.SPARSE_LAYOUT)
+        reasons.add(TableReason.OVERWIDE_TABLE)
 
     if _header_fill_ratio(rows) < 0.4 and width >= 3:
         reasons.add(TableReason.HEADER_FRAGMENTED)
@@ -360,6 +364,7 @@ def analyze_table_complexity(rows: list[list[str]]) -> tuple[bool, list[str]]:
             reasons.add(TableReason.MULTILINE_CELL)
         if any(len(cell.strip()) > 120 for cell in row):
             reasons.add(TableReason.AMBIGUOUS_GRID)
+            reasons.add(TableReason.LONG_CELL)
 
     return len(reasons) == 0, sorted(reasons)
 
@@ -503,6 +508,44 @@ def _is_fragment_candidate(
     return cand_w <= 1 or (cand_w <= 2 and cand_h <= 3 and acc_w >= 3)
 
 
+def _candidate_text_signature(candidate: TableExtractionCandidate) -> str:
+    return " ".join(cell.strip().lower() for row in candidate.rows for cell in row if cell.strip())
+
+
+def _is_redundant_text_fragment(
+    candidate: TableExtractionCandidate,
+    accepted: TableExtractionCandidate,
+) -> bool:
+    candidate_text = _candidate_text_signature(candidate)
+    accepted_text = _candidate_text_signature(accepted)
+    if len(candidate_text) < 5 or candidate_text not in accepted_text:
+        return False
+    candidate_area = _bbox_area(candidate.bbox)
+    accepted_area = _bbox_area(accepted.bbox)
+    if accepted_area <= 0 or candidate_area / accepted_area > 0.35:
+        return False
+    vertical_overlap = max(0.0, min(candidate.bbox[3], accepted.bbox[3]) - max(candidate.bbox[1], accepted.bbox[1]))
+    candidate_height = max(1.0, candidate.bbox[3] - candidate.bbox[1])
+    same_band = vertical_overlap / candidate_height >= 0.35
+    horizontal_gap = max(accepted.bbox[0] - candidate.bbox[2], candidate.bbox[0] - accepted.bbox[2], 0.0)
+    return same_band and horizontal_gap <= 36.0 and candidate.quality_score <= accepted.quality_score
+
+
+def _candidate_debug_payload(candidate: TableExtractionCandidate, *, accepted: bool, reason: str | None = None) -> dict[str, Any]:
+    width = len(candidate.rows[0]) if candidate.rows and candidate.rows[0] else 0
+    return {
+        "bbox": list(candidate.bbox),
+        "selected_strategy": candidate.metrics.selected_strategy,
+        "quality_score": candidate.metrics.quality_score,
+        "row_count": len(candidate.rows),
+        "column_count": width,
+        "accepted": accepted,
+        "suppression_reason": reason,
+        "reasons": candidate.decision.reasons,
+        "unresolved": candidate.decision.unresolved,
+    }
+
+
 def _process_rows(raw_rows: list[list[str]], strategy: str) -> tuple[list[list[str]], list[str], TableQualityMetrics]:
     rows = _normalize_rows(raw_rows)
     if not rows:
@@ -569,10 +612,13 @@ def _collect_candidates_for_page(page: pdfplumber.page.Page) -> list[TableExtrac
     return list(candidates_by_bbox.values())
 
 
-def _prune_candidates(
+def _prune_candidates_with_debug(
     page: pdfplumber.page.Page,
     candidates: list[TableExtractionCandidate],
-) -> list[TableExtractionCandidate]:
+) -> tuple[list[TableExtractionCandidate], list[dict[str, Any]]]:
+    debug_by_id: dict[int, dict[str, Any]] = {
+        id(candidate): _candidate_debug_payload(candidate, accepted=False) for candidate in candidates
+    }
     ranked = list(candidates)
     ranked.sort(
         key=lambda item: (_candidate_rank(page, item.bbox, item.quality_score), _bbox_area(item.bbox)),
@@ -581,6 +627,7 @@ def _prune_candidates(
     deduped: list[TableExtractionCandidate] = []
     for item in ranked:
         if any(_is_contained(item.bbox, prev.bbox) for prev in deduped):
+            debug_by_id[id(item)]["suppression_reason"] = "contained_bbox"
             continue
         deduped.append(item)
         if len(deduped) >= 20:
@@ -589,6 +636,10 @@ def _prune_candidates(
     pruned: list[TableExtractionCandidate] = []
     for item in deduped:
         if any(_is_fragment_candidate(item, accepted) for accepted in pruned):
+            debug_by_id[id(item)]["suppression_reason"] = "narrow_fragment"
+            continue
+        if any(_is_redundant_text_fragment(item, accepted) for accepted in pruned):
+            debug_by_id[id(item)]["suppression_reason"] = TableDecisionReason.TEXT_FRAGMENT_SUPPRESSION
             continue
         pruned.append(item)
     refined: list[TableExtractionCandidate] = []
@@ -615,9 +666,21 @@ def _prune_candidates(
                     has_better_neighbor = True
                     break
             if has_better_neighbor:
+                debug_by_id[id(item)]["suppression_reason"] = "neighbor_text_fragment"
                 continue
         refined.append(item)
-    return refined
+    for item in refined:
+        debug_by_id[id(item)]["accepted"] = True
+    debug = [debug_by_id[id(candidate)] for candidate in candidates]
+    return refined, debug
+
+
+def _prune_candidates(
+    page: pdfplumber.page.Page,
+    candidates: list[TableExtractionCandidate],
+) -> list[TableExtractionCandidate]:
+    pruned, _ = _prune_candidates_with_debug(page, candidates)
+    return pruned
 
 
 def extract_tables(
@@ -634,7 +697,8 @@ def extract_tables(
                 page = pdf.pages[page_number - 1]
                 logger.debug("Extracting tables for page=%s", page_number)
                 candidates = _collect_candidates_for_page(page)
-                deduped = _prune_candidates(page, candidates)
+                deduped, debug_candidates = _prune_candidates_with_debug(page, candidates)
+                result.debug_candidates_by_page[page_number] = debug_candidates
 
                 page_blocks: list[TableBlock] = []
                 for index, candidate in enumerate(deduped, start=1):

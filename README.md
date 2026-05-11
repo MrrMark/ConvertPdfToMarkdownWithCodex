@@ -305,12 +305,25 @@ python3 -m pdf2md input.pdf -o output/ --keep-page-markers
 python3 -m pdf2md input.pdf -o output/ --no-page-markers
 ```
 
+### 보수적 품질 개선 옵션
+
+```bash
+python3 -m pdf2md input.pdf -o output/ --remove-header-footer
+python3 -m pdf2md input.pdf -o output/ --dedupe-images
+```
+
+- `--remove-header-footer`: 여러 페이지의 margin 영역에서 반복되는 header/footer 라인만 제거합니다.
+- `--dedupe-images`: 동일 `sha256` 이미지는 첫 파일만 저장하고 이후 asset은 같은 상대경로를 참조합니다.
+
 ### 실행 로그 보기
 
 ```bash
 pdf2md input.pdf -o output/ --verbose
 pdf2md input.pdf -o output/ --debug
 ```
+
+`--debug`를 사용하면 일반 산출물과 별도로 `debug/` 디렉터리에 page별 intermediate JSON이 생성됩니다.
+예: raw lines, ordered lines, normalized lines, table candidates, image candidates.
 
 ### 기존 배치 산출물이 있으면 건너뛰기
 
@@ -383,6 +396,12 @@ output/
     images/
       page-0001-figure-001.png
       page-0002-figure-002.png
+  debug/                 # --debug 사용 시에만 생성
+    page-0001-raw-lines.json
+    page-0001-ordered-lines.json
+    page-0001-normalized-lines.json
+    page-0001-table-candidates.json
+    page-0001-image-candidates.json
   manifest.json
   report.json
 ```
@@ -424,6 +443,7 @@ pdfs/
 - `schema_version`
 - 이미지별 `alt_text`
 - 인접 캡션이 확실할 때만 `caption_text`, `caption_source`
+- 이미지 중복 제거 사용 시 `dedupe_of`
 - 구조 마커 복구 메타데이터
   - `classification == "STRUCTURE_MARKER"`
   - `recovered_text`
@@ -440,6 +460,8 @@ pdfs/
 - 페이지별 처리 결과 요약
 - `schema_version`
 - 페이지별 `status`
+- 페이지별 `reading_order_strategy`, `column_count_estimate`
+- 페이지별 `header_footer_suppressed_count`
 - `summary.page_status_counts`
 - `summary.table_mode_requested`
 - `summary.table_quality`
@@ -451,6 +473,12 @@ pdfs/
 - `summary.structure_marker_recovered_exact_count`
 - `summary.structure_marker_recovered_context_count`
 - `summary.structure_marker_suppressed_count`
+
+### `debug/`
+
+- `--debug` 사용 시에만 생성됩니다.
+- page별 raw/ordered/normalized text line과 table/image 후보 정보를 JSON으로 저장합니다.
+- 변환 결과에는 영향을 주지 않는 진단용 산출물이며, 일반 운영에서는 생략해도 됩니다.
 
 ### `batch_report.json`
 
@@ -556,11 +584,9 @@ ruff format .
 
 ### 현재 안정화 이후 우선순위
 
-- 복잡 표 HTML fallback 고도화
-- 멀티컬럼 reading order 개선
-- header/footer 제거 옵션
-- image dedupe
-- debug artifact 개선
+- 멀티컬럼/반복 header/footer/image dedupe/debug artifact 회귀 fixture 확대
+- 복잡 표 HTML fallback 평가 fixture 확대
+- 실제 문서군 기준 partial success 원인 리포트 정교화
 
 ### 이후 후보
 

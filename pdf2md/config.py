@@ -20,6 +20,8 @@ class Config(BaseModel):
     table_mode: TableMode = TableMode.AUTO
     force_ocr: bool = False
     keep_page_markers: bool = False
+    remove_header_footer: bool = False
+    dedupe_images: bool = False
     debug: bool = False
     verbose: bool = False
     skip_existing: bool = False

@@ -39,6 +39,10 @@ def _fake_reader(image: _FakeImage) -> SimpleNamespace:
     return SimpleNamespace(pages=[SimpleNamespace(images=[image])])
 
 
+def _fake_reader_pages(images_by_page: list[list[_FakeImage]]) -> SimpleNamespace:
+    return SimpleNamespace(pages=[SimpleNamespace(images=images) for images in images_by_page])
+
+
 def test_extract_images_does_not_write_files_for_embedded_or_placeholder(
     monkeypatch,
     sample_pdf: Path,
@@ -92,6 +96,45 @@ def test_extract_images_writes_referenced_file(monkeypatch, sample_pdf: Path, tm
     files = list((output_dir / "assets" / "images").glob("*"))
     assert len(files) == 1
     assert result.assets[0].alt_text == "Image page-0001-figure-001"
+
+
+def test_extract_images_dedupes_referenced_files_by_sha(monkeypatch, sample_pdf: Path, tmp_path: Path) -> None:
+    pages = [
+        _FakePdfPlumberPage(
+            images=[{"top": 100.0, "bottom": 180.0, "x0": 50.0, "x1": 170.0, "width": 120, "height": 80}],
+            text_lines=[],
+        ),
+        _FakePdfPlumberPage(
+            images=[{"top": 120.0, "bottom": 200.0, "x0": 60.0, "x1": 180.0, "width": 120, "height": 80}],
+            text_lines=[],
+        ),
+    ]
+    monkeypatch.setattr(
+        "pdf2md.extractors.images.pdfplumber.open",
+        lambda *args, **kwargs: _FakePdfPlumberDocument(pages),
+    )
+
+    output_dir = tmp_path / "dedupe"
+    result = extract_images(
+        reader=_fake_reader_pages(
+            [
+                [_FakeImage(b"same-image", name="first.png")],
+                [_FakeImage(b"same-image", name="second.png")],
+            ]
+        ),
+        pdf_path=sample_pdf,
+        selected_pages=[1, 2],
+        password=None,
+        output_dir=output_dir,
+        image_mode=ImageMode.REFERENCED,
+        dedupe_images=True,
+    )
+
+    files = list((output_dir / "assets" / "images").glob("*"))
+    assert len(files) == 1
+    assert len(result.assets) == 2
+    assert result.assets[1].path == result.assets[0].path
+    assert result.assets[1].dedupe_of == result.assets[0].path
 
 
 def test_caption_candidate_requires_caption_line_prefix() -> None:

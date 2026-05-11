@@ -8,11 +8,12 @@ from typing import Optional
 
 from pdf2md.config import Config
 from pdf2md.constants import WarningCode
+from pdf2md.extractors.header_footer import remove_repeated_header_footer
 from pdf2md.extractors.images import extract_images
 from pdf2md.extractors.ocr import run_ocr
 from pdf2md.extractors.structure_normalizer import BlockRegion, normalize_page_lines
 from pdf2md.extractors.tables import extract_tables
-from pdf2md.extractors.text import TextExtractionError, TextLine, extract_page_text_layout
+from pdf2md.extractors.text import PageLayoutMetadata, TextExtractionError, TextLine, extract_page_text_layout_result
 from pdf2md.models import ConversionStatus, ImageMode, Manifest, PageResult, PageStatus, Report, TableMode, WarningEntry
 from pdf2md.reporting import build_report, count_structure_marker_reasons, determine_conversion_status, finalize_page_statuses
 from pdf2md.serializers.manifest import serialize_manifest
@@ -79,6 +80,72 @@ def _apply_structure_recoveries(
             continue
         line.text = f"{recovered_text} {line.text}".strip()
     return updated
+
+
+def _text_line_payload(line: TextLine) -> dict:
+    return {
+        "text": line.text,
+        "top": line.top,
+        "bottom": line.bottom,
+        "x0": line.x0,
+        "x1": line.x1,
+    }
+
+
+def _write_debug_artifacts(
+    *,
+    config: Config,
+    selected_pages: list[int],
+    raw_lines_by_page: dict[int, list[dict]],
+    ordered_lines_by_page: dict[int, list[TextLine]],
+    normalized_lines_by_page: dict[int, list[dict]],
+    text_metadata_by_page: dict[int, PageLayoutMetadata],
+    table_candidates_by_page: dict[int, list[dict]],
+    image_candidates_by_page: dict[int, list[dict]],
+) -> None:
+    debug_root = config.output_dir / "debug"
+    debug_root.mkdir(parents=True, exist_ok=True)
+    for page in selected_pages:
+        prefix = f"page-{page:04d}"
+        metadata = text_metadata_by_page.get(page)
+        write_json(
+            debug_root / f"{prefix}-raw-lines.json",
+            {
+                "page": page,
+                "metadata": metadata.model_dump(mode="json") if hasattr(metadata, "model_dump") else (
+                    metadata.__dict__ if metadata else {}
+                ),
+                "lines": raw_lines_by_page.get(page, []),
+            },
+        )
+        write_json(
+            debug_root / f"{prefix}-ordered-lines.json",
+            {
+                "page": page,
+                "lines": [_text_line_payload(line) for line in ordered_lines_by_page.get(page, [])],
+            },
+        )
+        write_json(
+            debug_root / f"{prefix}-normalized-lines.json",
+            {
+                "page": page,
+                "lines": normalized_lines_by_page.get(page, []),
+            },
+        )
+        write_json(
+            debug_root / f"{prefix}-table-candidates.json",
+            {
+                "page": page,
+                "candidates": table_candidates_by_page.get(page, []),
+            },
+        )
+        write_json(
+            debug_root / f"{prefix}-image-candidates.json",
+            {
+                "page": page,
+                "candidates": image_candidates_by_page.get(page, []),
+            },
+        )
 
 
 def run_conversion(config: Config) -> ConversionResult:
@@ -159,17 +226,25 @@ def run_conversion(config: Config) -> ConversionResult:
 
     page_layout_lines: dict[int, list[TextLine]] = {}
     page_texts: dict[int, str] = {}
+    raw_lines_by_page: dict[int, list[dict]] = {}
+    text_metadata_by_page: dict[int, PageLayoutMetadata] = {}
     try:
         logger.info("Extracting text for pages=%s", selected_pages)
-        layout = extract_page_text_layout(config.input_pdf, selected_pages, config.password)
+        text_layout = extract_page_text_layout_result(config.input_pdf, selected_pages, config.password)
+        layout = text_layout.lines_by_page
+        raw_lines_by_page = text_layout.raw_lines_by_page
+        text_metadata_by_page = text_layout.metadata_by_page
         for page in selected_pages:
             lines = layout.get(page, [])
             page_layout_lines[page] = lines
             page_texts[page] = "\n".join(item.text for item in lines).strip()
+            metadata = text_metadata_by_page.get(page)
             page_results_map[page] = PageResult(
                 page=page,
                 status=PageStatus.SUCCESS,
                 char_count=len(page_texts[page]),
+                reading_order_strategy=metadata.reading_order_strategy if metadata else "top",
+                column_count_estimate=metadata.column_count_estimate if metadata else 1,
             )
     except TextExtractionError as exc:
         logger.exception("Text extraction failed")
@@ -201,10 +276,25 @@ def run_conversion(config: Config) -> ConversionResult:
             metrics = ocr_result.metrics_by_page.get(page)
             page_results_map[page].used_ocr = True
             page_results_map[page].char_count = len(page_texts[page])
+            page_results_map[page].reading_order_strategy = "ocr_line_order"
+            page_results_map[page].column_count_estimate = 1
             if metrics:
                 page_results_map[page].ocr_confidence_mean = metrics.mean
                 page_results_map[page].ocr_confidence_median = metrics.median
                 page_results_map[page].low_conf_token_ratio = metrics.low_conf_token_ratio
+
+    page_heights = {page: metadata.page_height for page, metadata in text_metadata_by_page.items()}
+    header_footer_suppressed_payload: list[dict] = []
+    header_footer_suppressed_by_page: dict[int, int] = {}
+    if config.remove_header_footer:
+        logger.info("Removing repeated headers/footers")
+        header_footer_result = remove_repeated_header_footer(page_layout_lines, page_heights)
+        page_layout_lines = header_footer_result.lines_by_page
+        header_footer_suppressed_payload = [
+            item.model_dump(mode="json") for item in header_footer_result.suppressed_lines
+        ]
+        for decision in header_footer_result.suppressed_lines:
+            header_footer_suppressed_by_page[decision.page] = header_footer_suppressed_by_page.get(decision.page, 0) + 1
 
     logger.info("Extracting tables")
     table_result = extract_tables(config.input_pdf, selected_pages, config.password, table_mode)
@@ -217,6 +307,7 @@ def run_conversion(config: Config) -> ConversionResult:
         output_dir=config.output_dir,
         image_mode=image_mode,
         assets_dirname=config.assets_dirname,
+        dedupe_images=config.dedupe_images,
     )
     engine_usage["tables"] = len(table_result.assets) > 0
     engine_usage["images"] = len(image_result.assets) > 0
@@ -249,9 +340,10 @@ def run_conversion(config: Config) -> ConversionResult:
     page_text_lines: dict[int, list[str]] = {}
     page_line_tops: dict[int, list[float]] = {}
     deduplicated_blocks_payload: list[dict] = []
-    suppressed_lines_payload: list[dict] = []
+    suppressed_lines_payload: list[dict] = list(header_footer_suppressed_payload)
+    normalized_lines_debug_by_page: dict[int, list[dict]] = {}
     total_deduplicated_blocks = 0
-    total_suppressed_lines = 0
+    total_suppressed_lines = len(header_footer_suppressed_payload)
     for page in selected_pages:
         logger.debug("Normalizing page=%s", page)
         recovered_lines = _apply_structure_recoveries(
@@ -267,13 +359,16 @@ def run_conversion(config: Config) -> ConversionResult:
         page_text_lines[page] = [line.text for line in normalization.lines]
         page_line_tops[page] = [line.top for line in normalization.lines]
         page_texts[page] = "\n".join(page_text_lines[page]).strip()
+        normalized_lines_debug_by_page[page] = [line.model_dump(mode="json") for line in normalization.lines]
         page_result = page_results_map.get(page)
         if page_result is not None:
+            header_footer_count = header_footer_suppressed_by_page.get(page, 0)
             page_result.char_count = len(page_texts[page])
             page_result.line_merge_count = normalization.line_merge_count
             page_result.structure_line_count = normalization.structure_line_count
             page_result.dedupe_count = normalization.dedupe_count
-            page_result.suppressed_line_count = normalization.suppressed_line_count
+            page_result.header_footer_suppressed_count = header_footer_count
+            page_result.suppressed_line_count = normalization.suppressed_line_count + header_footer_count
         total_deduplicated_blocks += normalization.dedupe_count
         total_suppressed_lines += normalization.suppressed_line_count
         deduplicated_blocks_payload.extend(
@@ -319,6 +414,19 @@ def run_conversion(config: Config) -> ConversionResult:
     logger.info("Writing markdown path=%s", markdown_path)
     write_text(markdown_path, markdown)
 
+    if config.debug:
+        logger.info("Writing debug artifacts")
+        _write_debug_artifacts(
+            config=config,
+            selected_pages=selected_pages,
+            raw_lines_by_page=raw_lines_by_page,
+            ordered_lines_by_page=page_layout_lines,
+            normalized_lines_by_page=normalized_lines_debug_by_page,
+            text_metadata_by_page=text_metadata_by_page,
+            table_candidates_by_page=table_result.debug_candidates_by_page,
+            image_candidates_by_page=image_result.debug_candidates_by_page,
+        )
+
     manifest = Manifest(
         input_file=config.input_pdf.name,
         total_pages=total_pages,
@@ -328,6 +436,9 @@ def run_conversion(config: Config) -> ConversionResult:
             "table_mode": table_mode.manifest_value(),
             "force_ocr": config.force_ocr,
             "keep_page_markers": config.keep_page_markers,
+            "remove_header_footer": config.remove_header_footer,
+            "dedupe_images": config.dedupe_images,
+            "debug": config.debug,
             "pages": config.pages,
             "version": config.version,
         },

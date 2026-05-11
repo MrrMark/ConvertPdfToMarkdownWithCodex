@@ -168,6 +168,31 @@ def test_cli_accepts_markdown_table_mode(sample_pdf: Path, tmp_path: Path) -> No
     assert manifest["options"]["table_mode"] == "markdown"
 
 
+def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-out-quality-options"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--pages",
+        "1",
+        "--remove-header-footer",
+        "--dedupe-images",
+        "--debug",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["remove_header_footer"] is True
+    assert manifest["options"]["dedupe_images"] is True
+    assert (output_dir / "debug" / "page-0001-raw-lines.json").exists()
+
+
 def test_cli_batch_mode_generates_per_pdf_outputs(
     sample_pdf: Path,
     encrypted_pdf: Path,
