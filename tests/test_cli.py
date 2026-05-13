@@ -36,6 +36,9 @@ def test_cli_runs_and_writes_outputs(sample_pdf: Path, tmp_path: Path) -> None:
     assert (output_dir / "technical_tables_rag.jsonl").exists()
     assert (output_dir / "retrieval_chunks_rag.jsonl").exists()
     assert (output_dir / "figures_rag.jsonl").exists()
+    first_chunk = json.loads((output_dir / "retrieval_chunks_rag.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert first_chunk["schema_version"] == "1.0"
+    assert len(first_chunk["source_sha256"]) == 64
 
 
 def test_cli_uses_default_output_dir_when_output_dir_is_omitted(sample_pdf: Path) -> None:

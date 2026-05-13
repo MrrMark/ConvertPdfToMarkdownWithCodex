@@ -37,15 +37,18 @@ GOLDEN_ROOT = Path("tests/golden/corpus")
 
 
 def _normalize_jsonl_sidecar(content: str, sidecar_name: str) -> str:
-    if sidecar_name != "figures_rag.jsonl" or not content.strip():
+    if sidecar_name not in {"figures_rag.jsonl", "retrieval_chunks_rag.jsonl"} or not content.strip():
         return content
     records = []
     for line in content.splitlines():
         if not line.strip():
             continue
         record = json.loads(line)
-        if record.get("sha256"):
+        if sidecar_name == "figures_rag.jsonl" and record.get("sha256"):
             record["sha256"] = "<sha256>"
+        if sidecar_name == "retrieval_chunks_rag.jsonl":
+            record.pop("schema_version", None)
+            record.pop("source_sha256", None)
         records.append(record)
     return "\n".join(json.dumps(record, ensure_ascii=False) for record in records) + ("\n" if records else "")
 

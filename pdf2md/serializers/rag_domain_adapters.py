@@ -39,12 +39,15 @@ OCP_HEADER_TOKENS = {
 }
 TCG_HEADER_TOKENS = {
     "authority",
+    "bits",
     "bytes",
     "description",
     "field",
     "method",
     "object",
     "protocolid",
+    "securitydescription",
+    "securityfield",
     "uid",
     "value",
 }
@@ -93,15 +96,28 @@ def _unit_from_row(
     field = _cell_value(cells, "Field", "Parameter")
     bits = _cell_value(cells, "Bits")
     value = _cell_value(cells, "Value")
-    description = _cell_value(cells, "Description")
+    description = _cell_value(cells, "Description", "Requirement Description", "Security Description")
     requirement_id = _cell_value(cells, "Requirement ID", "Req ID", "ID", "Requirement")
     capability = _cell_value(cells, "Capability", "Register", "Register Name")
-    method = _cell_value(cells, "Method", "Method ID", "Object", "Authority", "UID")
+    method = _cell_value(cells, "Method", "Method ID")
+    security_object = _cell_value(cells, "Object", "Object ID")
+    authority = _cell_value(cells, "Authority")
+    uid = _cell_value(cells, "UID", "Protocol ID", "ProtocolID")
+    security_field = _cell_value(cells, "Security Field", "Field", "Parameter")
 
     if domain_adapter in {DomainAdapterMode.OCP, DomainAdapterMode.CUSTOMER_REQUIREMENTS} and requirement_id:
         return "requirement", requirement_id, requirement_id, description, [f"{prefix}_requirement_id_row"]
-    if domain_adapter is DomainAdapterMode.TCG and method:
-        return "security_method", method, value or opcode, description, [f"{prefix}_security_method_or_object_row"]
+    if domain_adapter is DomainAdapterMode.TCG:
+        if method:
+            return "security_method", method, value or uid or opcode, description, [f"{prefix}_security_method_row"]
+        if security_object:
+            return "security_object", security_object, uid or value or opcode, description, [f"{prefix}_security_object_row"]
+        if authority:
+            return "security_authority", authority, uid or value or opcode, description, [f"{prefix}_security_authority_row"]
+        if uid and description:
+            return "security_object", uid, uid, description, [f"{prefix}_security_uid_row"]
+        if security_field and description:
+            return "security_field", security_field, bits or value or uid, description, [f"{prefix}_security_field_row"]
     if domain_adapter is DomainAdapterMode.PCIE and (capability or field):
         return "register_field", capability or field or "", bits or value, description, [f"{prefix}_register_or_capability_row"]
 
@@ -170,9 +186,21 @@ def _unit_from_technical_record(
             return "requirement", req_id, req_id, description, ["ocp_requirement_id_row"]
 
     if domain_adapter is DomainAdapterMode.TCG:
-        method = _cell_value(raw_cells, "Method", "Method ID", "Object", "Authority", "Field") or field
+        method = _cell_value(raw_cells, "Method", "Method ID")
+        security_object = _cell_value(raw_cells, "Object", "Object ID")
+        authority = _cell_value(raw_cells, "Authority")
+        uid = _cell_value(raw_cells, "UID", "Protocol ID", "ProtocolID")
+        security_field = _cell_value(raw_cells, "Security Field", "Field", "Parameter") or field
         if method:
-            return "security_method", method, value or None, description, ["tcg_security_method_or_object_row"]
+            return "security_method", method, uid or value or None, description, ["tcg_security_method_row"]
+        if security_object:
+            return "security_object", security_object, uid or value or None, description, ["tcg_security_object_row"]
+        if authority:
+            return "security_authority", authority, uid or value or None, description, ["tcg_security_authority_row"]
+        if uid and description:
+            return "security_object", uid, uid, description, ["tcg_security_uid_row"]
+        if unit_type in {"bitfield", "register_field", "technical_parameter", "security_method"} and security_field:
+            return "security_field", security_field, uid or value or None, description, ["tcg_security_field_row"]
 
     if domain_adapter is DomainAdapterMode.CUSTOMER_REQUIREMENTS:
         req_id = requirement_ref or _cell_value(raw_cells, "Requirement ID", "Req ID", "ID", "Requirement")

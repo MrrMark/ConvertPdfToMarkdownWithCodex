@@ -300,7 +300,7 @@ Required per JSONL record:
 
 Policy:
 
-- `unit_type` is conservative and may include `command_opcode`, `opcode`, `log_page`, `feature_identifier`, `register_field`, `bitfield`, `enum_value`, `requirement_row`, `security_method`, or `technical_parameter`.
+- `unit_type` is conservative and may include `command_opcode`, `opcode`, `log_page`, `feature_identifier`, `register_field`, `bitfield`, `enum_value`, `requirement_row`, `security_method`, `security_object`, `security_authority`, `security_field`, or `technical_parameter`.
 - Original `raw_cells` and `text` remain the source of truth. Normalized fields are populated only when header/cell evidence is clear.
 
 ## retrieval_chunks_rag.jsonl
@@ -310,9 +310,11 @@ Default JSONL output for vector DB ingest candidates. It is derived from text bl
 Required per JSONL record:
 
 - `chunk_id`
+- `schema_version`
 - `chunk_index`
 - `chunk_type`
 - `text`
+- `source_sha256`
 - `source_refs`
 - `page_range`
 - `bbox`
@@ -333,6 +335,7 @@ Policy:
 
 - `text` remains extracted source text or deterministic row text, not a summary or paraphrase.
 - `source_refs` must be sufficient to trace a chunk back to the originating block, table row, requirement, requirement trace, technical table unit, or domain unit.
+- `source_sha256` is the lowercase SHA-256 of the input PDF and is copied into each chunk for downstream index identity checks.
 - Chunk boundary fields are deterministic diagnostics for long technical specs; they do not summarize or rewrite source text.
 
 ## figures_rag.jsonl
@@ -394,6 +397,7 @@ Policy:
 
 - Default adapter is `none`, so this file is only written when a domain adapter is explicitly selected.
 - Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, and `customer-requirements`.
+- TCG domain units may use `security_method`, `security_object`, `security_authority`, or `security_field`; TCG is expected to map to SSD `HIL/TCG` without a CustomerRequirement fallback.
 - Adapter profiles consume the typed technical table sidecar where possible and keep domain heuristics out of the default conversion path.
 
 ## corpus_manifest.json

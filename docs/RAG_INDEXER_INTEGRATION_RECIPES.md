@@ -37,6 +37,8 @@ Vector DB에는 보통 `retrieval_chunks_rag.jsonl`만 넣고, 나머지 sidecar
 | `retrieval_priority` | `retrieval_priority` | re-ranking hint |
 | `token_estimate` | `token_estimate` | chunk budget diagnostics |
 | `source_dedupe_key` | `source_dedupe_key` | duplicate guard |
+| `schema_version` | `schema_version` | chunk contract version |
+| `source_sha256` | `source_sha256` | 원본 PDF identity / corpus diff guard |
 
 ## OpenAI Vector Store / Generic Embedding Pipeline
 
@@ -63,6 +65,44 @@ Vector DB에는 보통 `retrieval_chunks_rag.jsonl`만 넣고, 나머지 sidecar
 - `source_refs`는 citation 화면이나 test script generator에서 원문 위치로 되돌아가기 위해 보존한다.
 - metadata 크기 제한이 있는 indexer에서는 `source_refs` 전체를 별도 object store에 저장하고 `source_dedupe_key`나 `chunk_id`만 metadata에 둔다.
 - confidential safe mode 산출물을 공유할 때는 path, filename, customer-specific identifier가 노출되지 않았는지 확인한다.
+
+## SSD 검증 에이전트 연동 계약
+
+SSD 검증 에이전트의 Secure RAG adapter는 `retrieval_chunks_rag.jsonl`을 기본 입력으로 삼고, 나머지 sidecar는 citation expansion, impact review, UI drilldown에 보존한다. `document.md` 단독 업로드는 fallback이며 권장 경로가 아니다.
+
+Profile mapping:
+
+| domain_adapter | SSD domain | SSD spec_type |
+| --- | --- | --- |
+| `nvme` | `HIL` | `NVMe` |
+| `pcie` | `HIL` | `PCIe` |
+| `ocp` | `HIL` | `OCP` |
+| `tcg` | `HIL` | `TCG` |
+
+`TCG`는 first-class `spec_type`으로 취급한다. `CustomerRequirement + feature_name=TCG` fallback은 사용하지 않는다.
+
+RagChunk/RagCitation mapping:
+
+| SSD field | pdf2md field |
+| --- | --- |
+| `RagChunk.chunk_id` | `chunk_id` |
+| `RagChunk.text` | `text` |
+| `RagCitation.document_id` | Secure RAG document id |
+| `RagCitation.chunk_id` | `chunk_id` |
+| `RagCitation.page_number` | `page_range[0]` |
+| `RagCitation.section_title` | `section_path` |
+| `RagCitation.heading_path` | `section_path` |
+| `RagChunk.metadata` | `chunk_type`, `source_refs`, `semantic_types`, `normative_strength`, `retrieval_priority`, `source_dedupe_key`, `schema_version`, `source_sha256` |
+
+Local validation:
+
+```bash
+python scripts/validate_ssd_rag_contract.py --output-dir output/nvme --ssd-agent-domain HIL --ssd-agent-spec-type NVMe --domain-adapter nvme
+python scripts/validate_ssd_rag_contract.py --output-dir output/tcg --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
+python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error
+```
+
+운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json` 또는 sanitized summary만 공유한다.
 
 ## Azure AI Search
 

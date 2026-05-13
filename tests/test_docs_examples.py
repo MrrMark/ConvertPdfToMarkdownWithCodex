@@ -34,6 +34,12 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "scripts/benchmark_conversion.py" in readme
     assert "scripts/check_ocr_runtime.py --ocr-lang kor+eng" in readme
     assert "scripts/run_release_gates.py" in readme
+    assert "scripts/run_ssd_corpus_profile.py" in readme
+    assert "scripts/validate_ssd_rag_contract.py" in readme
+    assert "rag_requirements.py" in readme
+    assert "rag_technical_tables.py" in readme
+    assert "requirement_change_impact_report.json" in readme
+    assert "--ssd-agent-spec-type TCG" in readme
     assert "release_gate_report.json" in readme
     assert "--baseline-report pdf/baseline/corpus_eval_report.json" in readme
     assert "--max-duration-regression 0.2" in readme
@@ -81,6 +87,10 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "scripts\\benchmark_conversion.py" in guide
     assert "scripts\\check_ocr_runtime.py --ocr-lang kor+eng" in guide
     assert "scripts\\run_release_gates.py" in guide
+    assert "scripts\\run_ssd_corpus_profile.py" in guide
+    assert "scripts\\validate_ssd_rag_contract.py" in guide
+    assert "requirement_change_impact_report.json" in guide
+    assert "--ssd-agent-spec-type TCG" in guide
     assert "release_gate_report.json" in guide
     assert "--baseline-report pdf\\baseline\\corpus_eval_report.json" in guide
     assert "--max-duration-regression 0.2" in guide
@@ -97,6 +107,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
     next_plan = Path("docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md").read_text(encoding="utf-8")
     output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
+    quality_scorecard = Path("docs/QUALITY_SCORECARD.md").read_text(encoding="utf-8")
 
     assert "python-version" in workflow
     assert '"3.11"' in workflow
@@ -130,14 +141,19 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "requirements_rag.jsonl" in output_schema
     assert "cross_refs_rag.jsonl" in output_schema
     assert "retrieval_chunks_rag.jsonl" in output_schema
+    assert "source_sha256" in output_schema
     assert "figures_rag.jsonl" in output_schema
     assert "domain_units_rag.jsonl" in output_schema
     assert "requirement_traceability_rag.jsonl" in output_schema
     assert "technical_tables_rag.jsonl" in output_schema
     assert "corpus_manifest.json" in output_schema
     assert "corpus_diff_report.json" in output_schema
+    assert "requirement_change_impact_report.json" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema
+    assert "94/100" in quality_scorecard
+    assert "Q31. Local Corpus Profile Runner" in quality_scorecard
+    assert "Q35. Rendered Diagram Fixture Suite" in quality_scorecard
 
 
 def test_windows_script_contracts_are_present() -> None:

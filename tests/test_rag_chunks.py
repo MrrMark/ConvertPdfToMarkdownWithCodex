@@ -64,6 +64,7 @@ def test_retrieval_chunks_include_text_semantic_requirement_and_table_provenance
         semantic_units=[requirement, definition],
         requirements=[requirement],
         rag_tables=rag_tables,
+        source_sha256="a" * 64,
     )
 
     assert [chunk["chunk_type"] for chunk in chunks] == [
@@ -73,6 +74,8 @@ def test_retrieval_chunks_include_text_semantic_requirement_and_table_provenance
         "table_row",
     ]
     assert chunks[0]["chunk_id"] == "chunk-000001"
+    assert chunks[0]["schema_version"] == "1.0"
+    assert chunks[0]["source_sha256"] == "a" * 64
     assert chunks[1]["retrieval_priority"] == 100
     assert chunks[1]["source_refs"][-1]["source_type"] == "requirement"
     assert chunks[2]["semantic_types"] == ["definition"]
