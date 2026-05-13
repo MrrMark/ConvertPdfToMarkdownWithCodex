@@ -1,0 +1,155 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from scripts import benchmark_conversion
+from scripts import check_ocr_runtime
+from scripts import run_corpus_eval
+
+
+def test_corpus_quality_gate_records_baseline_and_threshold_regressions(tmp_path: Path) -> None:
+    payload = {
+        "summary": {
+            "total_documents": 4,
+            "success_count": 2,
+            "partial_success_count": 2,
+            "failed_count": 0,
+            "skipped_count": 0,
+            "table_fallback_reason_counts": {"complex_table": 2},
+            "total_suppressed_lines": 5,
+            "table_low_quality_count": 2,
+            "table_total": 4,
+            "pages_per_second_min": 1.1,
+            "pages_per_second_mean": 2.0,
+            "pdf_open_count": 8,
+            "text_line_extract_count": 20,
+        }
+    }
+    baseline = {
+        "summary": {
+            "success_count": 3,
+            "partial_success_count": 1,
+            "failed_count": 0,
+            "skipped_count": 0,
+            "table_fallback_reason_counts": {"complex_table": 1},
+            "total_suppressed_lines": 4,
+            "table_low_quality_count": 1,
+            "pages_per_second_min": 1.5,
+            "pages_per_second_mean": 2.2,
+            "pdf_open_count": 6,
+            "text_line_extract_count": 18,
+        }
+    }
+
+    result = run_corpus_eval.apply_quality_gate(
+        payload,
+        baseline_report=baseline,
+        baseline_report_path=tmp_path / "baseline.json",
+        max_partial_rate=0.25,
+        max_low_quality_table_rate=0.25,
+        min_pages_per_second=1.2,
+    )
+
+    metrics = {item["metric"] for item in result["regressions"]}
+    assert result["passed_quality_gate"] is False
+    assert result["baseline_report"].endswith("baseline.json")
+    assert result["summary"]["partial_success_rate"] == 0.5
+    assert result["summary"]["low_quality_table_rate"] == 0.5
+    assert "summary.success_count" in metrics
+    assert "summary.table_fallback_reason_counts.complex_table" in metrics
+    assert "summary.partial_success_rate" in metrics
+    assert "summary.pages_per_second_min" in metrics
+
+
+def test_corpus_quality_gate_passes_without_baseline_or_threshold_failures() -> None:
+    payload = {
+        "summary": {
+            "total_documents": 1,
+            "success_count": 1,
+            "partial_success_count": 0,
+            "table_low_quality_count": 0,
+            "table_total": 0,
+            "pages_per_second_min": 3.0,
+        }
+    }
+
+    result = run_corpus_eval.apply_quality_gate(payload, min_pages_per_second=2.0)
+
+    assert result["passed_quality_gate"] is True
+    assert result["baseline_report"] is None
+    assert result["regressions"] == []
+
+
+def test_benchmark_performance_gate_records_page_count_regressions(tmp_path: Path) -> None:
+    payload = {
+        "runs": [
+            {
+                "page_count": 10,
+                "elapsed_ms": 1300,
+                "total_duration_ms": 1300,
+                "peak_memory_bytes": 1500,
+                "stage_durations_ms": {"text": 500},
+                "pages_per_second": 7.5,
+                "pdf_open_count": 3,
+                "text_line_extract_count": 25,
+            }
+        ]
+    }
+    baseline = {
+        "runs": [
+            {
+                "page_count": 10,
+                "total_duration_ms": 1000,
+                "peak_memory_bytes": 1000,
+                "stage_durations_ms": {"text": 300},
+                "pages_per_second": 10.0,
+                "pdf_open_count": 2,
+                "text_line_extract_count": 20,
+            }
+        ]
+    }
+
+    result = benchmark_conversion.apply_performance_gate(
+        payload,
+        baseline_report=baseline,
+        baseline_report_path=tmp_path / "benchmark_report.json",
+        max_duration_regression=0.2,
+        max_memory_regression=0.2,
+        min_pages_per_second=8.0,
+    )
+
+    metrics = {item["metric"] for item in result["regressions"]}
+    assert result["passed_performance_gate"] is False
+    assert result["baseline_report"].endswith("benchmark_report.json")
+    assert "total_duration_ms" in metrics
+    assert "peak_memory_bytes" in metrics
+    assert "stage_durations_ms.text" in metrics
+    assert "pages_per_second" in metrics
+    assert "pdf_open_count" in metrics
+    assert "text_line_extract_count" in metrics
+
+
+def test_ocr_runtime_check_reports_missing_tesseract(monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(check_ocr_runtime, "_discover_tesseract", lambda: None)
+    monkeypatch.setattr(check_ocr_runtime, "_module_available", lambda module_name: module_name == "pytesseract")
+
+    report = check_ocr_runtime.check_ocr_runtime("kor+eng")
+    text = check_ocr_runtime.format_text_report(report)
+
+    assert report["ready"] is False
+    assert report["checks"]["tesseract_executable"]["ok"] is False
+    assert report["checks"]["pypdfium2_import"]["ok"] is False
+    assert report["checks"]["language_data"]["missing"] == ["kor", "eng"]
+    assert "Tesseract executable: MISSING" in text
+
+
+def test_ocr_runtime_check_identifies_missing_composite_language(monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(check_ocr_runtime, "_discover_tesseract", lambda: "/usr/bin/tesseract")
+    monkeypatch.setattr(check_ocr_runtime, "_module_available", lambda module_name: True)
+    monkeypatch.setattr(check_ocr_runtime, "_list_tesseract_languages", lambda executable: (["eng"], None))
+
+    report = check_ocr_runtime.check_ocr_runtime("kor+eng")
+
+    assert report["ready"] is False
+    assert report["checks"]["language_data"]["requested"] == ["kor", "eng"]
+    assert report["checks"]["language_data"]["missing"] == ["kor"]

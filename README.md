@@ -337,10 +337,12 @@ python3 -m pdf2md input.pdf -o output/ --figure-crop-fallback
 ### OCR 언어 지정
 
 ```bash
+python3 scripts/check_ocr_runtime.py --ocr-lang kor+eng
 python3 -m pdf2md input.pdf -o output/ --force-ocr --ocr-lang kor+eng
 ```
 
 - 기본값은 `eng`입니다.
+- 변환 전에 `scripts/check_ocr_runtime.py`로 Tesseract 실행 파일, Python OCR 패키지, `kor+eng` 언어팩 설치 여부를 점검할 수 있습니다.
 - OCR runtime이 없거나 confidence가 낮으면 결과를 정답처럼 숨기지 않고 `report.json` warning과 page diagnostics에 남깁니다.
 
 ### 실행 로그 보기
@@ -526,6 +528,8 @@ pdfs/
 - `summary.structure_marker_recovered_context_count`
 - `summary.structure_marker_suppressed_count`
 
+출력 schema 안정성 정책과 RAG sidecar field 계약은 [docs/OUTPUT_SCHEMA.md](docs/OUTPUT_SCHEMA.md)에 별도로 정리합니다.
+
 `summary.table_quality[]`에는 표별 품질 진단이 기록됩니다. 복잡 표에서는
 `header_depth`, `header_confidence`, `stub_column_count`, `footnote_row_count`,
 `merged_cell_suspected`, `rag_header_strategy` 같은 optional 필드를 통해
@@ -651,12 +655,15 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 
 ```bash
 ./.venv311/bin/python scripts/run_corpus_eval.py --input-dir pdf --output-dir pdf/eval_output
+./.venv311/bin/python scripts/run_corpus_eval.py --input-dir pdf --output-dir pdf/eval_output --baseline-report pdf/baseline/corpus_eval_report.json --max-partial-rate 0.1 --max-low-quality-table-rate 0.05 --min-pages-per-second 1.0 --fail-on-regression
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100
+./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100 --baseline-report /tmp/pdf2md-baseline/benchmark_report.json --max-duration-regression 0.2 --max-memory-regression 0.2 --min-pages-per-second 1.0 --fail-on-regression
 ```
 
-- `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count
-- `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory
+- `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
+- `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
 - benchmark는 수동/릴리스 전 검증용이며 기본 CI 테스트에는 포함하지 않습니다.
+- 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
 - 향후 작업 backlog는 [docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md](docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md)에 새 작업만 남기고, 완료된 항목은 제거합니다.
 
