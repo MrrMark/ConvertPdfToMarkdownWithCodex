@@ -78,6 +78,8 @@
     "table_quality": [
       {
         "all_empty_rows_removed": 0,
+        "caption_distance": 27.516,
+        "caption_position": "above",
         "caption_source": "nearby_table_caption",
         "caption_text": "Table 1: Complex fields",
         "columns_compacted": 0,

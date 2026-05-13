@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import logging
 import math
+from difflib import SequenceMatcher
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -87,6 +88,22 @@ class TableDiagnostics:
     reasons: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class TableCaptionMatch:
+    text: str
+    distance: float
+    position: str
+
+
+@dataclass(frozen=True)
+class ContinuationDecision:
+    accepted: bool
+    confidence: float
+    reasons: list[str]
+    rejected_reasons: list[str]
+    features: dict[str, Any]
+
+
 @dataclass
 class TableGrid:
     rows: list[TableRow]
@@ -108,10 +125,15 @@ class RagTablePayload:
     header_confidence: float
     stub_column_count: int
     rag_header_strategy: str
+    caption_distance: float | None = None
+    caption_position: str | None = None
     continuation_group: str | None = None
     continued_from_page: int | None = None
     continued_to_page: int | None = None
     continuation_confidence: float | None = None
+    continuation_reasons: list[str] = field(default_factory=list)
+    continuation_rejected_reasons: list[str] = field(default_factory=list)
+    continuation_features: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         payload = {
@@ -137,6 +159,16 @@ class RagTablePayload:
             payload["continued_to_page"] = self.continued_to_page
         if self.continuation_confidence is not None:
             payload["continuation_confidence"] = self.continuation_confidence
+        if self.caption_distance is not None:
+            payload["caption_distance"] = self.caption_distance
+        if self.caption_position is not None:
+            payload["caption_position"] = self.caption_position
+        if self.continuation_reasons:
+            payload["continuation_reasons"] = self.continuation_reasons
+        if self.continuation_rejected_reasons:
+            payload["continuation_rejected_reasons"] = self.continuation_rejected_reasons
+        if self.continuation_features:
+            payload["continuation_features"] = self.continuation_features
         return payload
 
 
@@ -801,11 +833,11 @@ def _horizontal_overlap_ratio(
     return overlap / line_width
 
 
-def _find_table_caption(
+def _find_table_caption_match(
     page: pdfplumber.page.Page,
     bbox: tuple[float, float, float, float],
     text_lines: list[dict] | None = None,
-) -> str | None:
+) -> TableCaptionMatch | None:
     """Return a nearby explicit table caption only when the geometry is clear."""
     if text_lines is None:
         extract_text_lines = getattr(page, "extract_text_lines", None)
@@ -817,7 +849,7 @@ def _find_table_caption(
             return None
 
     _, table_top, _, table_bottom = bbox
-    candidates: list[tuple[float, str]] = []
+    candidates: list[tuple[float, str, str]] = []
     for raw_line in text_lines:
         text = _line_text(raw_line)
         if not text or classify_structure_line(text) is not LineType.TABLE_CAPTION:
@@ -829,13 +861,23 @@ def _find_table_caption(
         above_distance = table_top - line_bottom
         below_distance = line_top - table_bottom
         if 0 <= above_distance <= 48:
-            candidates.append((above_distance, text))
+            candidates.append((above_distance, text, "above"))
         elif 0 <= below_distance <= 24:
-            candidates.append((below_distance + 12, text))
+            candidates.append((below_distance + 12, text, "below"))
     if not candidates:
         return None
     candidates.sort(key=lambda item: item[0])
-    return candidates[0][1]
+    distance, text, position = candidates[0]
+    return TableCaptionMatch(text=text, distance=round(distance, 4), position=position)
+
+
+def _find_table_caption(
+    page: pdfplumber.page.Page,
+    bbox: tuple[float, float, float, float],
+    text_lines: list[dict] | None = None,
+) -> str | None:
+    match = _find_table_caption_match(page, bbox, text_lines=text_lines)
+    return match.text if match is not None else None
 
 
 def _unique_headers(header_row: list[str]) -> list[str]:
@@ -989,6 +1031,8 @@ def _build_rag_table_payload(
     candidate: TableExtractionCandidate,
     caption_text: str | None,
     fallback_reasons: list[str],
+    caption_distance: float | None = None,
+    caption_position: str | None = None,
 ) -> dict[str, Any]:
     diagnostics = candidate.diagnostics
     headers = diagnostics.headers
@@ -1015,6 +1059,10 @@ def _build_rag_table_payload(
             "header_confidence": diagnostics.header_confidence,
             "rag_header_strategy": diagnostics.rag_header_strategy,
         }
+        if caption_distance is not None:
+            record["caption_distance"] = caption_distance
+        if caption_position is not None:
+            record["caption_position"] = caption_position
         if stub_cells:
             record["stub_cells"] = stub_cells
         row_records.append(
@@ -1034,6 +1082,8 @@ def _build_rag_table_payload(
         header_confidence=diagnostics.header_confidence,
         stub_column_count=diagnostics.stub_column_count,
         rag_header_strategy=diagnostics.rag_header_strategy,
+        caption_distance=caption_distance,
+        caption_position=caption_position,
     ).as_dict()
 
 
@@ -1041,8 +1091,150 @@ def _normalize_header_signature(headers: list[str]) -> tuple[str, ...]:
     return tuple(_sanitize_cell(header).casefold() for header in headers if _sanitize_cell(header))
 
 
+def _signature_similarity(previous: tuple[str, ...], current: tuple[str, ...]) -> float:
+    if not previous or not current:
+        return 0.0
+    if previous == current:
+        return 1.0
+    width = max(len(previous), len(current))
+    positional_matches = sum(1 for left, right in zip(previous, current) if left == right) / width
+    previous_set = set(previous)
+    current_set = set(current)
+    overlap = len(previous_set & current_set) / max(len(previous_set | current_set), 1)
+    sequence = SequenceMatcher(None, " | ".join(previous), " | ".join(current)).ratio()
+    return round(max(positional_matches, overlap, sequence), 4)
+
+
+def _bbox_alignment_similarity(previous_bbox: list[float] | None, current_bbox: list[float] | None) -> float:
+    if not previous_bbox or not current_bbox or len(previous_bbox) < 4 or len(current_bbox) < 4:
+        return 0.0
+    prev_x0, _, prev_x1, _ = (float(value) for value in previous_bbox[:4])
+    curr_x0, _, curr_x1, _ = (float(value) for value in current_bbox[:4])
+    prev_width = max(prev_x1 - prev_x0, 1.0)
+    curr_width = max(curr_x1 - curr_x0, 1.0)
+    scale = max(prev_width, curr_width, 1.0)
+    left_delta = abs(prev_x0 - curr_x0) / scale
+    right_delta = abs(prev_x1 - curr_x1) / scale
+    width_delta = abs(prev_width - curr_width) / scale
+    return round(max(0.0, 1.0 - ((left_delta + right_delta + width_delta) / 3.0)), 4)
+
+
+def _body_text_signature(rag_table: dict[str, Any]) -> str:
+    row_texts = [
+        _sanitize_cell(str(record.get("row_text", ""))).casefold()
+        for record in rag_table.get("records", [])
+        if _sanitize_cell(str(record.get("row_text", "")))
+    ]
+    return "\n".join(row_texts)
+
+
+def _repeated_template_penalty(previous_rag: dict[str, Any], current_rag: dict[str, Any]) -> float:
+    previous_text = _body_text_signature(previous_rag)
+    current_text = _body_text_signature(current_rag)
+    if not previous_text or not current_text:
+        return 0.0
+    previous_rows = set(previous_text.splitlines())
+    current_rows = set(current_text.splitlines())
+    row_overlap = len(previous_rows & current_rows) / max(min(len(previous_rows), len(current_rows)), 1)
+    body_similarity = SequenceMatcher(None, previous_text, current_text).ratio()
+    if row_overlap >= 0.8 or body_similarity >= 0.9:
+        return 0.45
+    if row_overlap >= 0.5 or body_similarity >= 0.82:
+        return 0.25
+    return 0.0
+
+
+def _continuation_decision(
+    *,
+    previous_asset: TableAsset,
+    previous_rag: dict[str, Any],
+    previous_signature: tuple[str, ...],
+    asset: TableAsset,
+    rag_table: dict[str, Any],
+    signature: tuple[str, ...],
+) -> ContinuationDecision:
+    page_gap = asset.page - previous_asset.page
+    header_similarity = _signature_similarity(previous_signature, signature)
+    bbox_alignment_similarity = _bbox_alignment_similarity(previous_asset.bbox, asset.bbox)
+    current_caption_text = str(rag_table.get("caption_text") or "").strip()
+    current_caption_distance = rag_table.get("caption_distance")
+    repeated_template_penalty = _repeated_template_penalty(previous_rag, rag_table)
+    adjacency_score = 1.0 if page_gap == 1 else 0.0
+    confidence = round(
+        max(
+            0.0,
+            min(
+                1.0,
+                (0.45 * header_similarity)
+                + (0.35 * bbox_alignment_similarity)
+                + (0.20 * adjacency_score)
+                - repeated_template_penalty,
+            ),
+        ),
+        4,
+    )
+    features: dict[str, Any] = {
+        "page_gap": page_gap,
+        "header_similarity": header_similarity,
+        "bbox_alignment_similarity": bbox_alignment_similarity,
+        "current_caption_distance": current_caption_distance,
+        "repeated_template_penalty": repeated_template_penalty,
+    }
+    rejected_reasons: list[str] = []
+    if page_gap != 1:
+        rejected_reasons.append("non_adjacent_page")
+    if header_similarity < 0.95:
+        rejected_reasons.append("header_similarity_below_threshold")
+    if bbox_alignment_similarity < 0.8:
+        rejected_reasons.append("bbox_alignment_below_threshold")
+    if current_caption_text:
+        rejected_reasons.append("current_caption_present")
+    if repeated_template_penalty >= 0.35:
+        rejected_reasons.append("repeated_template_penalty")
+    if confidence < 0.82:
+        rejected_reasons.append("continuation_confidence_below_threshold")
+
+    reasons = [
+        "adjacent_page",
+        "header_similarity_high",
+        "bbox_alignment_high",
+        "no_current_caption",
+        "repeated_template_penalty_clear",
+    ]
+    return ContinuationDecision(
+        accepted=not rejected_reasons,
+        confidence=confidence,
+        reasons=reasons if not rejected_reasons else [],
+        rejected_reasons=rejected_reasons,
+        features=features,
+    )
+
+
+def _store_continuation_diagnostics(
+    *,
+    asset: TableAsset,
+    rag_table: dict[str, Any],
+    quality: dict[str, Any] | None,
+    decision: ContinuationDecision,
+) -> None:
+    if decision.reasons:
+        asset.continuation_reasons = decision.reasons
+        rag_table["continuation_reasons"] = decision.reasons
+        if quality is not None:
+            quality["continuation_reasons"] = decision.reasons
+    if decision.rejected_reasons:
+        asset.continuation_rejected_reasons = decision.rejected_reasons
+        rag_table["continuation_rejected_reasons"] = decision.rejected_reasons
+        if quality is not None:
+            quality["continuation_rejected_reasons"] = decision.rejected_reasons
+    asset.continuation_features = decision.features
+    rag_table["continuation_features"] = decision.features
+    if quality is not None:
+        quality["continuation_features"] = decision.features
+
+
 def _annotate_table_continuations(result: TableExtractionResult) -> None:
-    """Link adjacent-page tables only when headers match with high confidence."""
+    """Link adjacent-page tables only when continuation evidence is high confidence."""
     rag_by_key = {
         (int(table.get("page", 0)), int(table.get("table_index", 0))): table
         for table in result.rag_tables
@@ -1067,18 +1259,29 @@ def _annotate_table_continuations(result: TableExtractionResult) -> None:
             continue
 
         previous_asset, previous_rag, previous_signature = previous
-        current_caption = str(rag_table.get("caption_text") or "").strip()
-        same_headers = signature == previous_signature
-        adjacent_page = asset.page == previous_asset.page + 1
-        likely_continued = adjacent_page and same_headers and not current_caption
-        if not likely_continued:
+        decision = _continuation_decision(
+            previous_asset=previous_asset,
+            previous_rag=previous_rag,
+            previous_signature=previous_signature,
+            asset=asset,
+            rag_table=rag_table,
+            signature=signature,
+        )
+        current_quality = quality_by_key.get((asset.page, asset.index))
+        if not decision.accepted:
+            _store_continuation_diagnostics(
+                asset=asset,
+                rag_table=rag_table,
+                quality=current_quality,
+                decision=decision,
+            )
             previous = (asset, rag_table, signature)
             continue
 
         group = previous_asset.continuation_group or f"table-continuation-{group_counter:03d}"
         if previous_asset.continuation_group is None:
             group_counter += 1
-        confidence = 0.9
+        confidence = decision.confidence
         previous_asset.continuation_group = group
         previous_asset.continued_to_page = asset.page
         previous_asset.continuation_confidence = confidence
@@ -1092,7 +1295,18 @@ def _annotate_table_continuations(result: TableExtractionResult) -> None:
         rag_table["continued_from_page"] = previous_asset.page
         rag_table["continuation_confidence"] = confidence
         previous_quality = quality_by_key.get((previous_asset.page, previous_asset.index))
-        current_quality = quality_by_key.get((asset.page, asset.index))
+        _store_continuation_diagnostics(
+            asset=previous_asset,
+            rag_table=previous_rag,
+            quality=previous_quality,
+            decision=decision,
+        )
+        _store_continuation_diagnostics(
+            asset=asset,
+            rag_table=rag_table,
+            quality=current_quality,
+            decision=decision,
+        )
         if previous_quality is not None:
             previous_quality["continuation_group"] = group
             previous_quality["continued_to_page"] = asset.page
@@ -1103,8 +1317,16 @@ def _annotate_table_continuations(result: TableExtractionResult) -> None:
             current_quality["continuation_confidence"] = confidence
         for record in previous_rag.get("records", []):
             record["continuation_group"] = group
+            record["continued_to_page"] = asset.page
+            record["continuation_confidence"] = confidence
+            record["continuation_reasons"] = decision.reasons
+            record["continuation_features"] = decision.features
         for record in rag_table.get("records", []):
             record["continuation_group"] = group
+            record["continued_from_page"] = previous_asset.page
+            record["continuation_confidence"] = confidence
+            record["continuation_reasons"] = decision.reasons
+            record["continuation_features"] = decision.features
         previous = (asset, rag_table, signature)
 
 
@@ -1191,11 +1413,14 @@ def extract_tables(
                     comment = f"<!-- table: page={page_number} index={index} mode={comment_mode} -->"
                     x0, top, x1, bottom = candidate.bbox
                     asset_mode = TableModeEmission.GFM if mode == TableModeEmission.MARKDOWN else mode
-                    caption_text = _find_table_caption(
+                    caption_match = _find_table_caption_match(
                         page,
                         candidate.bbox,
                         text_lines=(text_lines_by_page or {}).get(page_number),
                     )
+                    caption_text = caption_match.text if caption_match is not None else None
+                    caption_distance = caption_match.distance if caption_match is not None else None
+                    caption_position = caption_match.position if caption_match is not None else None
                     fallback_reasons = reasons if asset_mode == TableModeEmission.HTML else []
 
                     page_blocks.append(
@@ -1232,6 +1457,8 @@ def extract_tables(
                             candidate=candidate,
                             caption_text=caption_text,
                             fallback_reasons=fallback_reasons,
+                            caption_distance=caption_distance,
+                            caption_position=caption_position,
                         )
                     )
                     result.table_quality.append(
@@ -1250,6 +1477,8 @@ def extract_tables(
                             "unresolved": candidate.decision.unresolved,
                             "mode": asset_mode,
                             "caption_text": caption_text,
+                            "caption_distance": caption_distance,
+                            "caption_position": caption_position,
                             "caption_source": "nearby_table_caption" if caption_text else None,
                             "header_depth": candidate.diagnostics.header_depth,
                             "header_confidence": candidate.diagnostics.header_confidence,

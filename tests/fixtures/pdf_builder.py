@@ -195,6 +195,31 @@ def build_complex_table_pdf(path: Path) -> None:
     )
 
 
+def build_continued_table_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[PositionedText("Table 1: Device fields", 72, 760)],
+                tables=[TableSpec([["Field", "Value"], ["alpha", "1"]], 72, 730, [120, 120])],
+            ),
+            PageSpec(
+                tables=[TableSpec([["Field", "Value"], ["beta", "2"]], 72, 730, [120, 120])],
+            ),
+        ],
+    )
+
+
+def build_repeated_template_table_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(tables=[TableSpec([["Field", "Value"], ["Total", "100"]], 72, 730, [120, 120])]),
+            PageSpec(tables=[TableSpec([["Field", "Value"], ["Total", "100"]], 72, 730, [120, 120])]),
+        ],
+    )
+
+
 def build_repeated_image_pdf(path: Path) -> None:
     write_pdf(
         path,

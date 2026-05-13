@@ -175,6 +175,8 @@ class ImageAsset(BaseModel):
     source: str = "embedded"
     caption_confidence: Optional[float] = None
     crop_reason: Optional[str] = None
+    crop_content_ratio: Optional[float] = None
+    crop_rejected_reason: Optional[str] = None
 
 
 class ExcludedImageAsset(BaseModel):
@@ -209,6 +211,9 @@ class TableAsset(BaseModel):
     continued_from_page: Optional[int] = None
     continued_to_page: Optional[int] = None
     continuation_confidence: Optional[float] = None
+    continuation_reasons: list[str] = Field(default_factory=list)
+    continuation_rejected_reasons: list[str] = Field(default_factory=list)
+    continuation_features: dict[str, Any] = Field(default_factory=dict)
 
 
 class NormalizedLine(BaseModel):

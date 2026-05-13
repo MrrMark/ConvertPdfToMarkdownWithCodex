@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
+
+from PIL import Image, ImageDraw
 
 from pdf2md.extractors.images import StructureOcrCandidate, _resolve_structure_marker_recovery, extract_images
 from pdf2md.models import ImageMode
@@ -46,6 +49,17 @@ def _fake_reader_pages(images_by_page: list[list[_FakeImage]]) -> SimpleNamespac
 def _fake_reader_without_images() -> SimpleNamespace:
     mediabox = SimpleNamespace(width=595, height=842)
     return SimpleNamespace(pages=[SimpleNamespace(images=[], mediabox=mediabox)])
+
+
+def _png_bytes(*, blank: bool = False) -> bytes:
+    image = Image.new("RGB", (160, 100), "white")
+    if not blank:
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((24, 20, 136, 80), outline="black", width=3)
+        draw.line((30, 72, 130, 28), fill="black", width=2)
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def test_extract_images_does_not_write_files_for_embedded_or_placeholder(
@@ -106,7 +120,7 @@ def test_extract_images_writes_referenced_file(monkeypatch, sample_pdf: Path, tm
 def test_extract_images_can_create_captioned_page_crop_fallback(monkeypatch, sample_pdf: Path, tmp_path: Path) -> None:
     monkeypatch.setattr(
         "pdf2md.extractors.images._render_page_crop",
-        lambda **kwargs: (b"crop-bytes", 160, 100),
+        lambda **kwargs: (_png_bytes(), 160, 100),
     )
 
     output_dir = tmp_path / "crop-fallback"
@@ -136,7 +150,50 @@ def test_extract_images_can_create_captioned_page_crop_fallback(monkeypatch, sam
     assert result.assets[0].source == "page_crop"
     assert result.assets[0].caption_confidence == 0.85
     assert result.assets[0].crop_reason == "captioned_figure_without_embedded_image"
+    assert result.assets[0].crop_content_ratio is not None
+    assert result.assets[0].crop_content_ratio > 0.002
     assert (output_dir / result.assets[0].path).exists()
+    debug = result.debug_candidates_by_page[1][0]
+    assert debug["crop_rejected_reason"] is None
+    assert debug["crop_content_bbox"] is not None
+
+
+def test_extract_images_rejects_blank_figure_crop_fallback(monkeypatch, sample_pdf: Path, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "pdf2md.extractors.images._render_page_crop",
+        lambda **kwargs: (_png_bytes(blank=True), 160, 100),
+    )
+
+    output_dir = tmp_path / "blank-crop"
+    result = extract_images(
+        reader=_fake_reader_without_images(),
+        pdf_path=sample_pdf,
+        selected_pages=[1],
+        password=None,
+        output_dir=output_dir,
+        image_mode=ImageMode.REFERENCED,
+        page_image_boxes={1: []},
+        page_text_lines={
+            1: [
+                {
+                    "top": 300.0,
+                    "bottom": 314.0,
+                    "x0": 72.0,
+                    "x1": 220.0,
+                    "text": "Figure 1: Caption without drawing",
+                }
+            ]
+        },
+        figure_crop_fallback=True,
+    )
+
+    assert result.assets == []
+    assert list((output_dir / "assets" / "images").glob("*")) == []
+    assert result.warnings[0].code == "IMAGE_CROP_REJECTED"
+    assert result.warnings[0].details["crop_rejected_reason"] == "near_blank_crop"
+    debug = result.debug_candidates_by_page[1][0]
+    assert debug["excluded"] is True
+    assert debug["crop_rejected_reason"] == "near_blank_crop"
 
 
 def test_extract_images_crop_fallback_requires_clear_caption(sample_pdf: Path, tmp_path: Path) -> None:

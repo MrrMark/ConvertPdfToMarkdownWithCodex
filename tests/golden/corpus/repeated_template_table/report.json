@@ -1,0 +1,193 @@
+{
+  "engine_usage": {
+    "images": false,
+    "ocr": false,
+    "pdfplumber": true,
+    "pypdf": true,
+    "tables": true
+  },
+  "page_results": [
+    {
+      "char_count": 0,
+      "column_count_estimate": 1,
+      "dedupe_count": 0,
+      "header_footer_suppressed_count": 0,
+      "line_merge_count": 0,
+      "low_conf_token_ratio": null,
+      "ocr_attempted": false,
+      "ocr_confidence_mean": null,
+      "ocr_confidence_median": null,
+      "ocr_reason": null,
+      "ocr_runtime_available": null,
+      "page": 1,
+      "reading_order_strategy": "top",
+      "status": "partial_success",
+      "structure_line_count": 0,
+      "suppressed_line_count": 2,
+      "text_layer_char_count": 21,
+      "used_ocr": false,
+      "warning_count": 1
+    },
+    {
+      "char_count": 0,
+      "column_count_estimate": 1,
+      "dedupe_count": 0,
+      "header_footer_suppressed_count": 0,
+      "line_merge_count": 0,
+      "low_conf_token_ratio": null,
+      "ocr_attempted": false,
+      "ocr_confidence_mean": null,
+      "ocr_confidence_median": null,
+      "ocr_reason": null,
+      "ocr_runtime_available": null,
+      "page": 2,
+      "reading_order_strategy": "top",
+      "status": "partial_success",
+      "structure_line_count": 0,
+      "suppressed_line_count": 2,
+      "text_layer_char_count": 21,
+      "used_ocr": false,
+      "warning_count": 1
+    }
+  ],
+  "schema_version": "1.0",
+  "status": "partial_success",
+  "summary": {
+    "code_block_count": 0,
+    "font_heading_candidate_count": 0,
+    "footnote_candidate_count": 0,
+    "heading_count": 0,
+    "hyphenation_repair_count": 0,
+    "list_item_count": 0,
+    "page_cache_hits": 2,
+    "page_cache_misses": 2,
+    "pages_per_second": null,
+    "partial_success": true,
+    "pdf_open_count": 2,
+    "processed_pages": 2,
+    "rag_table_file_count": 2,
+    "rag_table_output": "both",
+    "rag_table_record_count": 2,
+    "rag_text_block_file_count": 1,
+    "rag_text_block_record_count": 0,
+    "stage_durations_ms": {
+      "image_extraction": 0,
+      "manifest": 0,
+      "markdown_serialization": 0,
+      "normalization": 0,
+      "ocr": 0,
+      "output_setup": 0,
+      "page_selection": 0,
+      "pdf_open": 0,
+      "rag_tables": 0,
+      "rag_text_blocks": 0,
+      "reporting": 0,
+      "table_extraction": 0,
+      "text_extraction": 0
+    },
+    "structure_low_confidence_count": 0,
+    "table_caption_linked_count": 0,
+    "table_fallback_count": 2,
+    "table_fallback_reason_counts": {
+      "STUB_COLUMN": 2
+    },
+    "table_gfm_count": 0,
+    "table_html_count": 2,
+    "table_low_quality_count": 0,
+    "table_quality": [
+      {
+        "all_empty_rows_removed": 0,
+        "caption_distance": null,
+        "caption_position": null,
+        "caption_source": null,
+        "caption_text": null,
+        "columns_compacted": 0,
+        "columns_merged": 0,
+        "data_density": 1.0,
+        "empty_cell_ratio": 0.0,
+        "footnote_row_count": 0,
+        "header_confidence": 0.85,
+        "header_depth": 1,
+        "header_fill_ratio": 1.0,
+        "merged_cell_suspected": false,
+        "mode": "html",
+        "page": 1,
+        "quality_score": 1.0,
+        "rag_header_strategy": "single_row",
+        "reasons": [
+          "STUB_COLUMN"
+        ],
+        "selected_strategy": "default",
+        "stub_column_count": 1,
+        "table_index": 1,
+        "unresolved": true
+      },
+      {
+        "all_empty_rows_removed": 0,
+        "caption_distance": null,
+        "caption_position": null,
+        "caption_source": null,
+        "caption_text": null,
+        "columns_compacted": 0,
+        "columns_merged": 0,
+        "continuation_features": {
+          "bbox_alignment_similarity": 1.0,
+          "current_caption_distance": null,
+          "header_similarity": 1.0,
+          "page_gap": 1,
+          "repeated_template_penalty": 0.45
+        },
+        "continuation_rejected_reasons": [
+          "repeated_template_penalty",
+          "continuation_confidence_below_threshold"
+        ],
+        "data_density": 1.0,
+        "empty_cell_ratio": 0.0,
+        "footnote_row_count": 0,
+        "header_confidence": 0.85,
+        "header_depth": 1,
+        "header_fill_ratio": 1.0,
+        "merged_cell_suspected": false,
+        "mode": "html",
+        "page": 2,
+        "quality_score": 1.0,
+        "rag_header_strategy": "single_row",
+        "reasons": [
+          "STUB_COLUMN"
+        ],
+        "selected_strategy": "default",
+        "stub_column_count": 1,
+        "table_index": 1,
+        "unresolved": true
+      }
+    ],
+    "table_total": 2,
+    "text_line_extract_count": 2,
+    "total_suppressed_lines": 4,
+    "warning_count": 2
+  },
+  "warnings": [
+    {
+      "code": "TABLE_COMPLEXITY_HTML_FALLBACK",
+      "details": {
+        "reasons": [
+          "STUB_COLUMN"
+        ],
+        "table_index": 1
+      },
+      "message": "Table was treated as complex and serialized as HTML fallback.",
+      "page": 1
+    },
+    {
+      "code": "TABLE_COMPLEXITY_HTML_FALLBACK",
+      "details": {
+        "reasons": [
+          "STUB_COLUMN"
+        ],
+        "table_index": 1
+      },
+      "message": "Table was treated as complex and serialized as HTML fallback.",
+      "page": 2
+    }
+  ]
+}

@@ -24,9 +24,13 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "scripts/run_corpus_eval.py" in readme
     assert "scripts/benchmark_conversion.py" in readme
     assert "scripts/check_ocr_runtime.py --ocr-lang kor+eng" in readme
+    assert "scripts/run_release_gates.py" in readme
+    assert "release_gate_report.json" in readme
     assert "--baseline-report pdf/baseline/corpus_eval_report.json" in readme
     assert "--max-duration-regression 0.2" in readme
     assert "docs/OUTPUT_SCHEMA.md" in readme
+    assert "docs/schema/manifest.schema.json" in readme
+    assert "scripts/export_output_schema.py --check" in readme
     assert "python -m build" in readme
     assert "benchmark_report.json" in readme
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
@@ -58,9 +62,13 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "scripts\\run_corpus_eval.py" in guide
     assert "scripts\\benchmark_conversion.py" in guide
     assert "scripts\\check_ocr_runtime.py --ocr-lang kor+eng" in guide
+    assert "scripts\\run_release_gates.py" in guide
+    assert "release_gate_report.json" in guide
     assert "--baseline-report pdf\\baseline\\corpus_eval_report.json" in guide
     assert "--max-duration-regression 0.2" in guide
     assert "docs\\OUTPUT_SCHEMA.md" in guide
+    assert "docs\\schema\\manifest.schema.json" in guide
+    assert "scripts\\export_output_schema.py --check" in guide
     assert "python -m build" in guide
     assert "benchmark_report.json" in guide
     assert "docs\\NEXT_QUALITY_IMPROVEMENT_PLAN.md" in guide
@@ -80,12 +88,15 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "작업이 완료되고 테스트 통과 및 PR merge까지 끝나면" in next_plan
     assert "구현 완료, 테스트 통과, PR merge까지 끝난 항목은" in next_plan
     assert "Q02. Font/Geometry 기반 텍스트 블록 구조화" not in next_plan
-    assert "Q03. Figure Crop Fallback 시각 검증 및 보정" in next_plan
-    assert "Q08. Release Gate Runner 통합" in next_plan
-    assert "Q09. Machine-readable Output Schema Export" in next_plan
+    assert "Q03. Figure Crop Fallback 시각 검증 및 보정" not in next_plan
+    assert "Q04. Multi-page Table Continuation 보정" not in next_plan
+    assert "Q08. Release Gate Runner 통합" not in next_plan
+    assert "Q09. Machine-readable Output Schema Export" not in next_plan
+    assert "현재 남은 작업 없음." in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "schema_version" in output_schema
+    assert "docs/schema/manifest.schema.json" in output_schema
     assert "text_blocks_rag.jsonl" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema

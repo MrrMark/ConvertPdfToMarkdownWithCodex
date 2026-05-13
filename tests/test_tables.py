@@ -375,5 +375,90 @@ def test_extract_tables_marks_adjacent_same_header_tables_as_continuation(monkey
     assert result.assets[0].continuation_group == "table-continuation-001"
     assert result.assets[0].continued_to_page == 2
     assert result.assets[1].continued_from_page == 1
+    assert result.assets[1].continuation_confidence == 1.0
+    assert result.assets[1].continuation_reasons == [
+        "adjacent_page",
+        "header_similarity_high",
+        "bbox_alignment_high",
+        "no_current_caption",
+        "repeated_template_penalty_clear",
+    ]
+    assert result.table_quality[1]["continuation_features"]["header_similarity"] == 1.0
     assert result.rag_tables[1]["continuation_group"] == "table-continuation-001"
+    assert result.rag_tables[1]["continuation_confidence"] == 1.0
     assert result.rag_tables[1]["records"][0]["continuation_group"] == "table-continuation-001"
+    assert result.rag_tables[1]["records"][0]["continuation_confidence"] == 1.0
+
+
+def test_extract_tables_rejects_same_header_table_with_new_caption(monkeypatch) -> None:
+    class _CaptionedPage(_FakePage):
+        def extract_text_lines(self):  # noqa: ANN201
+            return [
+                {
+                    "text": "Table 2: Independent fields",
+                    "top": 0.0,
+                    "bottom": 10.0,
+                    "x0": 10.0,
+                    "x1": 180.0,
+                }
+            ]
+
+    pages = [
+        _FakePage([["Field", "Value"], ["alpha", "1"]]),
+        _CaptionedPage([["Field", "Value"], ["beta", "2"]]),
+    ]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdfWithPages(pages))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1, 2],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    assert result.assets[1].continuation_group is None
+    assert "current_caption_present" in result.assets[1].continuation_rejected_reasons
+    assert result.table_quality[1]["caption_distance"] == 10.0
+    assert result.rag_tables[1]["continuation_features"]["current_caption_distance"] == 10.0
+
+
+def test_extract_tables_rejects_repeated_template_continuation(monkeypatch) -> None:
+    pages = [
+        _FakePage([["Field", "Value"], ["Total", "100"]]),
+        _FakePage([["Field", "Value"], ["Total", "100"]]),
+    ]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdfWithPages(pages))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1, 2],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    assert result.assets[1].continuation_group is None
+    assert "repeated_template_penalty" in result.assets[1].continuation_rejected_reasons
+    assert result.table_quality[1]["continuation_features"]["repeated_template_penalty"] == 0.45
+    assert result.rag_tables[1]["continuation_rejected_reasons"] == [
+        "repeated_template_penalty",
+        "continuation_confidence_below_threshold",
+    ]
+
+
+def test_extract_tables_rejects_misaligned_same_header_table(monkeypatch) -> None:
+    pages = [
+        _FakePageWithTables([_FakeTable((10.0, 20.0, 100.0, 150.0), [["Field", "Value"], ["alpha", "1"]])]),
+        _FakePageWithTables([_FakeTable((220.0, 20.0, 310.0, 150.0), [["Field", "Value"], ["beta", "2"]])]),
+    ]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdfWithPages(pages))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1, 2],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    assert result.assets[1].continuation_group is None
+    assert "bbox_alignment_below_threshold" in result.assets[1].continuation_rejected_reasons
+    assert result.table_quality[1]["continuation_features"]["bbox_alignment_similarity"] < 0.8
