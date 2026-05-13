@@ -17,6 +17,7 @@
 - `docs/schema/manifest.schema.json`
 - `docs/schema/report.schema.json`
 - `docs/schema/batch_report.schema.json`
+- `docs/schema/corpus_manifest.schema.json`
 
 Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 
@@ -57,6 +58,7 @@ Stable nested fields:
 
 - `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_text_blocks_output`, `options.semantic_layer_output`, `options.ocr_lang`
 - `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
+- `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
 - `images[].page`, `index`, `path`, `source`, `bbox`, `sha256`
 - `images[].alt_text`, `caption_text`, `caption_source`, `dedupe_of`
 - `images[].caption_confidence`, `crop_reason`, `crop_content_ratio`, `crop_rejected_reason`
@@ -95,6 +97,9 @@ Stable summary fields:
 - `requirement_record_count`, `requirement_file_count`
 - `cross_ref_record_count`, `cross_ref_file_count`
 - `semantic_low_confidence_count`, `unresolved_cross_ref_count`, `normative_requirement_count`
+- `retrieval_chunk_record_count`, `retrieval_chunk_file_count`
+- `figure_rag_record_count`, `figure_rag_file_count`
+- `domain_unit_record_count`, `domain_unit_file_count`
 - `font_heading_candidate_count`, `footnote_candidate_count`, `structure_low_confidence_count`
 
 ## text_blocks_rag.jsonl
@@ -223,6 +228,112 @@ Policy:
 
 - `target_type` is one of `section`, `table`, `figure`, `appendix`, `unknown`.
 - Unresolved references are preserved with `resolved: false` for downstream diagnostics.
+
+## retrieval_chunks_rag.jsonl
+
+Default JSONL output for vector DB ingest candidates. It is derived from text blocks, semantic units, requirements, table rows, and opt-in domain units.
+
+Required per JSONL record:
+
+- `chunk_id`
+- `chunk_index`
+- `chunk_type`
+- `text`
+- `source_refs`
+- `page_range`
+- `bbox`
+- `heading_path`
+- `semantic_types`
+- `normative_strength`
+- `retrieval_priority`
+- `char_count`
+- `token_estimate`
+
+Policy:
+
+- `text` remains extracted source text or deterministic row text, not a summary or paraphrase.
+- `source_refs` must be sufficient to trace a chunk back to the originating block, table row, requirement, or domain unit.
+
+## figures_rag.jsonl
+
+Default JSONL output for figure/diagram provenance.
+
+Required per JSONL record:
+
+- `figure_id`
+- `page`
+- `figure_index`
+- `record_type`
+- `status`
+- `path`
+- `bbox`
+- `caption_text`
+- `caption_source`
+- `caption_confidence`
+- `heading_path`
+- `ocr_candidates`
+- `source_refs`
+- `classification_confidence`
+- `classification_reasons`
+
+Policy:
+
+- The sidecar records extracted image assets and excluded image candidates.
+- No generated visual description is added by default.
+
+## domain_units_rag.jsonl
+
+Optional JSONL output controlled by `--domain-adapter`.
+
+Required per JSONL record:
+
+- `domain_unit_id`
+- `domain_unit_index`
+- `domain`
+- `unit_type`
+- `name`
+- `value`
+- `description`
+- `text`
+- `source_refs`
+- `page_range`
+- `bbox`
+- `heading_path`
+- `classification_confidence`
+- `classification_reasons`
+
+Policy:
+
+- Default adapter is `none`, so this file is only written when a domain adapter is explicitly selected.
+- `--domain-adapter nvme` currently extracts conservative command/opcode/register field/enum value records from table rows with clear headers.
+
+## corpus_manifest.json
+
+Batch-mode JSON output for multi-PDF RAG corpus ingest.
+
+Required:
+
+- `schema_version`
+- `purpose`
+- `input_dir`
+- `output_dir`
+- `documents`
+
+Required per `documents[]` record:
+
+- `doc_id`
+- `input_pdf`
+- `source_sha256`
+- `output_dir`
+- `status`
+- `selected_pages`
+- `skipped`
+- `files`
+
+Policy:
+
+- `purpose` is `rag_corpus_ingest`.
+- `files` contains core outputs and any generated RAG sidecars for that document.
 
 ## debug/
 

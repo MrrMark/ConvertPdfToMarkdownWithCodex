@@ -1,0 +1,235 @@
+{
+  "$defs": {
+    "BatchDocumentFiles": {
+      "properties": {
+        "cross_refs_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cross Refs Rag"
+        },
+        "domain_units_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Domain Units Rag"
+        },
+        "figures_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figures Rag"
+        },
+        "manifest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manifest"
+        },
+        "markdown": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Markdown"
+        },
+        "rag_tables_markdown": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rag Tables Markdown"
+        },
+        "report": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Report"
+        },
+        "requirements_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requirements Rag"
+        },
+        "retrieval_chunks_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrieval Chunks Rag"
+        },
+        "semantic_units_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Semantic Units Rag"
+        },
+        "tables_rag_jsonl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tables Rag Jsonl"
+        },
+        "text_blocks_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text Blocks Rag"
+        }
+      },
+      "title": "BatchDocumentFiles",
+      "type": "object"
+    },
+    "CorpusDocument": {
+      "properties": {
+        "doc_id": {
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "files": {
+          "$ref": "#/$defs/BatchDocumentFiles"
+        },
+        "input_pdf": {
+          "title": "Input Pdf",
+          "type": "string"
+        },
+        "output_dir": {
+          "title": "Output Dir",
+          "type": "string"
+        },
+        "selected_pages": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Selected Pages",
+          "type": "array"
+        },
+        "skipped": {
+          "default": false,
+          "title": "Skipped",
+          "type": "boolean"
+        },
+        "source_sha256": {
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "doc_id",
+        "input_pdf",
+        "source_sha256",
+        "output_dir",
+        "status"
+      ],
+      "title": "CorpusDocument",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "documents": {
+      "items": {
+        "$ref": "#/$defs/CorpusDocument"
+      },
+      "title": "Documents",
+      "type": "array"
+    },
+    "input_dir": {
+      "title": "Input Dir",
+      "type": "string"
+    },
+    "output_dir": {
+      "title": "Output Dir",
+      "type": "string"
+    },
+    "purpose": {
+      "default": "rag_corpus_ingest",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "input_dir",
+    "output_dir"
+  ],
+  "title": "CorpusManifest",
+  "type": "object"
+}

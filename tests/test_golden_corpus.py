@@ -36,6 +36,20 @@ from helpers.normalize_outputs import normalize_manifest, normalize_report
 GOLDEN_ROOT = Path("tests/golden/corpus")
 
 
+def _normalize_jsonl_sidecar(content: str, sidecar_name: str) -> str:
+    if sidecar_name != "figures_rag.jsonl" or not content.strip():
+        return content
+    records = []
+    for line in content.splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if record.get("sha256"):
+            record["sha256"] = "<sha256>"
+        records.append(record)
+    return "\n".join(json.dumps(record, ensure_ascii=False) for record in records) + ("\n" if records else "")
+
+
 def test_deterministic_pdf_fixture_builder_covers_priority_corpus(tmp_path: Path) -> None:
     builders = {
         "single_column.pdf": build_single_column_pdf,
@@ -128,10 +142,14 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
             "semantic_units_rag.jsonl",
             "requirements_rag.jsonl",
             "cross_refs_rag.jsonl",
+            "retrieval_chunks_rag.jsonl",
+            "figures_rag.jsonl",
         ):
             golden_sidecar = golden_dir / sidecar_name
             output_sidecar = output_dir / sidecar_name
             if golden_sidecar.exists():
-                assert output_sidecar.read_text(encoding="utf-8") == golden_sidecar.read_text(encoding="utf-8")
+                assert _normalize_jsonl_sidecar(output_sidecar.read_text(encoding="utf-8"), sidecar_name) == (
+                    _normalize_jsonl_sidecar(golden_sidecar.read_text(encoding="utf-8"), sidecar_name)
+                )
             else:
                 assert not output_sidecar.exists()

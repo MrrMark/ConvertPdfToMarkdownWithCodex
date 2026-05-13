@@ -22,28 +22,34 @@
 
 ## 남은 작업
 
-### Q11. RAG Retrieval Chunk Pack
+현재 backlog는 모두 **RAG 운영 목적**의 개선 작업이다. PDF 변환 산출물을 AI Agent/Copilot의 스펙 분석, 요구사항 추적, 테스트 스크립트 구현에 더 안정적으로 쓰기 위한 항목만 남긴다.
 
-- `retrieval_chunks_rag.jsonl`을 추가해 vector DB에 바로 넣기 좋은 chunk 단위를 생성한다.
-- chunk는 `text_blocks_rag`, `semantic_units`, `requirements`, `tables_rag` provenance를 포함한다.
-- Q10 semantic layer가 안정화된 뒤 진행한다.
+### Q16. RAG Chunk Boundary Quality
 
-### Q12. RAG Evaluation Harness
+- `retrieval_chunks_rag.jsonl`의 chunk 길이, section boundary, heading carry-over, 중복 provenance를 정량 진단한다.
+- chunk text는 원문 기반을 유지하고 요약/재서술은 도입하지 않는다.
+- 긴 section과 짧은 requirement chunk가 검색 품질을 해치지 않도록 deterministic packing rule을 개선한다.
 
-- 스펙 질의 golden set, expected source ids, hit@k, MRR, citation coverage, chunk length 분포를 검증한다.
-- 초기 버전은 외부 embedding 없이 deterministic local retrieval 평가부터 시작한다.
+### Q17. RAG Evaluation Golden Set
 
-### Q13. Multi-PDF Corpus Manifest
+- `scripts/run_rag_eval.py`에 사용할 스펙 질의 golden set과 expected source id fixture를 추가한다.
+- hit@k, MRR, citation coverage, chunk length 분포를 release gate 후보로 승격한다.
+- 초기 평가는 deterministic local retrieval로 유지하고 embedding/외부 서비스는 opt-in 후속으로 둔다.
 
-- 여러 PDF 스펙을 함께 운영하기 위한 `doc_id`, source hash, schema version, output file map, selected pages manifest를 추가한다.
-- stable id와 incremental ingest/diff 운영의 기반으로 사용한다.
+### Q18. Incremental Corpus Ingest Diff
 
-### Q14. Figure/Diagram RAG Sidecar
+- `corpus_manifest.json`의 `doc_id`, `source_sha256`, output file map을 기준으로 changed/unchanged/removed 문서를 판정한다.
+- 대량 PDF 스펙 운영에서 재변환과 vector DB re-index 대상을 최소화하는 diff report를 추가한다.
+- 기존 batch 변환 결정성은 유지한다.
 
-- 이미지/도표 캡션, OCR 후보, figure bbox, nearby heading을 `figures_rag.jsonl`로 분리한다.
-- 기본 설명 생성은 하지 않고 추출 가능한 원문/캡션 중심으로 유지한다.
+### Q19. RAG Cross-Reference Resolution Expansion
 
-### Q15. Domain Adapter
+- `cross_refs_rag.jsonl`의 target을 `figures_rag.jsonl`, `tables_rag.jsonl`, `semantic_units_rag.jsonl` record id와 더 적극적으로 연결한다.
+- unresolved reference는 계속 보존하되, resolved coverage를 report summary에 추가한다.
+- 잘못된 resolved보다 unresolved 보존을 우선한다.
 
-- NVMe 같은 기술 스펙에서 command, opcode, register field, enum/value table을 더 잘 뽑는 opt-in adapter를 추가한다.
-- 기본 변환 로직에는 특정 도메인 heuristic을 과하게 넣지 않는다.
+### Q20. Domain Adapter Coverage Expansion
+
+- `--domain-adapter nvme`의 command set, opcode, register field, enum/value table fixture를 늘린다.
+- adapter별 schema 예시와 golden을 추가해 도메인 heuristic 회귀를 막는다.
+- 기본 변환 로직에는 특정 도메인 heuristic을 추가하지 않고 opt-in adapter 안에 격리한다.

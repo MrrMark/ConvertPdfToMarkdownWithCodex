@@ -169,6 +169,8 @@ python -m pdf2md .\sample.pdf
 - `sample_output\semantic_units_rag.jsonl`
 - `sample_output\requirements_rag.jsonl`
 - `sample_output\cross_refs_rag.jsonl`
+- `sample_output\retrieval_chunks_rag.jsonl`
+- `sample_output\figures_rag.jsonl`
 - `sample_output\manifest.json`
 - `sample_output\report.json`
 
@@ -225,6 +227,16 @@ python -m pdf2md .\sample.pdf -o .\output --rag-table-output jsonl
 - `tables_rag.jsonl`: 행 단위 structured JSONL
 - 명확한 multi-row header는 `Parent / Child` 형태로 정리되고, row label 성격의 첫 번째 열은 `stub_cells`에 기록될 수 있습니다.
 - adjacent page의 같은 header 표는 확실할 때만 `continuation_group`으로 연결됩니다.
+- 텍스트/semantic/retrieval chunk/figure sidecar는 RAG 운영용으로 기본 생성됩니다.
+
+RAG용 도메인 adapter:
+
+```powershell
+python -m pdf2md .\sample.pdf -o .\output --domain-adapter nvme --rag-table-output jsonl
+```
+
+- 기본값은 `none`입니다.
+- `nvme` adapter는 명확한 표 header가 있는 command/opcode/register field/enum value만 `domain_units_rag.jsonl`로 생성합니다.
 
 이미지 모드:
 
@@ -274,6 +286,7 @@ python -m pdf2md --input-dir .\pdfs
 - `pdfs\output\alpha\alpha_report.json`
 - `pdfs\output\alpha\alpha_assets\images\...`
 - `pdfs\output\batch_report.json`
+- `pdfs\output\corpus_manifest.json`
 
 배치 모드 주의사항:
 
@@ -294,6 +307,7 @@ python -m pdf2md --input-dir .\pdfs --skip-existing
 - 문서별 출력 경로
 - 문서별 종료 코드
 - 문서별 `warning_count`, `table_count`, `image_count`, `used_ocr`, `skipped`
+- `corpus_manifest.json`의 문서별 `doc_id`, `source_sha256`, `selected_pages`, RAG sidecar file map
 
 `--skip-existing`를 사용하면 다시 처리하지 않은 문서는 `status == "skipped"` 와 `skipped == true`로 기록됩니다.
 
@@ -360,6 +374,10 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - `options.semantic_units_jsonl_filename`
 - `options.requirements_jsonl_filename`
 - `options.cross_refs_jsonl_filename`
+- `options.retrieval_chunks_jsonl_filename`
+- `options.figures_rag_jsonl_filename`
+- `options.domain_adapter`
+- `options.domain_units_jsonl_filename`
 - `options.ocr_lang`
 - `options.repair_hyphenation`
 - `options.figure_crop_fallback`
@@ -407,12 +425,18 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - `summary.semantic_low_confidence_count`
 - `summary.unresolved_cross_ref_count`
 - `summary.normative_requirement_count`
+- `summary.retrieval_chunk_record_count`
+- `summary.retrieval_chunk_file_count`
+- `summary.figure_rag_record_count`
+- `summary.figure_rag_file_count`
+- `summary.domain_unit_record_count`
+- `summary.domain_unit_file_count`
 - `summary.font_heading_candidate_count`
 - `summary.footnote_candidate_count`
 - `summary.structure_low_confidence_count`
 
 출력 schema 안정성 정책과 RAG sidecar field 계약은 `docs\OUTPUT_SCHEMA.md`에서 확인합니다.
-Machine-readable schema는 `docs\schema\manifest.schema.json`, `docs\schema\report.schema.json`, `docs\schema\batch_report.schema.json`에 있으며 `python scripts\export_output_schema.py --check`로 검증합니다.
+Machine-readable schema는 `docs\schema\manifest.schema.json`, `docs\schema\report.schema.json`, `docs\schema\batch_report.schema.json`, `docs\schema\corpus_manifest.schema.json`에 있으며 `python scripts\export_output_schema.py --check`로 검증합니다.
 - `summary.rag_table_output`
 - `summary.rag_table_record_count`
 - `summary.rag_table_file_count`
@@ -440,6 +464,8 @@ Machine-readable schema는 `docs\schema\manifest.schema.json`, `docs\schema\repo
   - `semantic_units_rag.jsonl`
   - `requirements_rag.jsonl`
   - `cross_refs_rag.jsonl`
+  - `retrieval_chunks_rag.jsonl`
+  - `figures_rag.jsonl`
   - `manifest.json`
   - `report.json`
 
@@ -458,12 +484,14 @@ python scripts\run_corpus_eval.py --input-dir pdf --output-dir pdf\eval_output
 python scripts\run_corpus_eval.py --input-dir pdf --output-dir pdf\eval_output --baseline-report pdf\baseline\corpus_eval_report.json --max-partial-rate 0.1 --max-low-quality-table-rate 0.05 --min-pages-per-second 1.0 --fail-on-regression
 python scripts\benchmark_conversion.py --output-dir .\benchmark_output --page-counts 10,50,100
 python scripts\benchmark_conversion.py --output-dir .\benchmark_output --page-counts 10,50,100 --baseline-report .\benchmark_baseline\benchmark_report.json --max-duration-regression 0.2 --max-memory-regression 0.2 --min-pages-per-second 1.0 --fail-on-regression
+python scripts\run_rag_eval.py --output-dir .\output --eval-set .\rag_eval_queries.json --top-k 5
 python scripts\run_release_gates.py --output-dir .\release_gate_output --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf\baseline\corpus_eval_report.json --benchmark-baseline-report .\benchmark_baseline\benchmark_report.json
 ```
 
 - 실제 PDF는 `pdf\` 같은 로컬 디렉터리에만 두고 repo에 커밋하지 않습니다.
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
+- `rag_eval_report.json`: hit@k, MRR, citation coverage, query별 retrieved chunk/source id
 - `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, schema check, packaging smoke command/status summary
 - benchmark는 수동/릴리스 전 검증용이며 기본 테스트에 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
@@ -600,6 +628,7 @@ cd C:\Work\ConvertPdfToMarkdownWithCodex
 - `pdfs\output\alpha\alpha_manifest.json`
 - `pdfs\output\alpha\alpha_report.json`
 - `pdfs\output\batch_report.json`
+- `pdfs\output\corpus_manifest.json`
 
 단일 PDF만 빠르게 실행하고 싶다면:
 

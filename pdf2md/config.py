@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pdf2md.models import ImageMode, RagTableOutputMode, TableMode
+from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
 from pdf2md.utils.page_range import parse_page_range
 
 
@@ -19,6 +19,7 @@ class Config(BaseModel):
     image_mode: ImageMode = ImageMode.REFERENCED
     table_mode: TableMode = TableMode.AUTO
     rag_table_output: RagTableOutputMode = RagTableOutputMode.NONE
+    domain_adapter: DomainAdapterMode = DomainAdapterMode.NONE
     force_ocr: bool = False
     ocr_lang: str = "eng"
     keep_page_markers: bool = False
@@ -39,6 +40,9 @@ class Config(BaseModel):
     semantic_units_jsonl_filename: str = "semantic_units_rag.jsonl"
     requirements_jsonl_filename: str = "requirements_rag.jsonl"
     cross_refs_jsonl_filename: str = "cross_refs_rag.jsonl"
+    retrieval_chunks_jsonl_filename: str = "retrieval_chunks_rag.jsonl"
+    figures_rag_jsonl_filename: str = "figures_rag.jsonl"
+    domain_units_jsonl_filename: str = "domain_units_rag.jsonl"
     assets_dirname: str = "assets"
 
     def selected_pages(self, total_pages: int) -> list[int]:

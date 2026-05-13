@@ -16,6 +16,7 @@ from pdf2md.extractors.tables import extract_tables
 from pdf2md.extractors.text import PageLayoutMetadata, TextExtractionError, TextLine, extract_page_text_layout_result
 from pdf2md.models import (
     ConversionStatus,
+    DomainAdapterMode,
     ImageMode,
     Manifest,
     NormalizedLine,
@@ -29,6 +30,9 @@ from pdf2md.models import (
 from pdf2md.reporting import build_report, count_structure_marker_reasons, determine_conversion_status, finalize_page_statuses
 from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown_blocks_result
+from pdf2md.serializers.rag_chunks import build_retrieval_chunks, serialize_retrieval_chunks_jsonl
+from pdf2md.serializers.rag_domain_adapters import build_domain_units, serialize_domain_units_jsonl
+from pdf2md.serializers.rag_figures import build_figure_records, serialize_figures_jsonl
 from pdf2md.serializers.rag_tables import (
     flatten_rag_table_records,
     normalize_rag_table_payload,
@@ -293,6 +297,21 @@ def _write_semantic_layer_outputs(
     return len(semantic_units), 1, len(requirements), 1, len(cross_refs), 1
 
 
+def _write_retrieval_chunk_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(config.output_dir / config.retrieval_chunks_jsonl_filename, serialize_retrieval_chunks_jsonl(records))
+    return len(records), 1
+
+
+def _write_figure_rag_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(config.output_dir / config.figures_rag_jsonl_filename, serialize_figures_jsonl(records))
+    return len(records), 1
+
+
+def _write_domain_unit_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(config.output_dir / config.domain_units_jsonl_filename, serialize_domain_units_jsonl(records))
+    return len(records), 1
+
+
 def run_conversion(config: Config) -> ConversionResult:
     """Run conversion and write markdown, manifest, and report outputs."""
     started_at = datetime.now(timezone.utc)
@@ -303,6 +322,11 @@ def run_conversion(config: Config) -> ConversionResult:
         config.rag_table_output
         if isinstance(config.rag_table_output, RagTableOutputMode)
         else RagTableOutputMode(config.rag_table_output)
+    )
+    domain_adapter = (
+        config.domain_adapter
+        if isinstance(config.domain_adapter, DomainAdapterMode)
+        else DomainAdapterMode(config.domain_adapter)
     )
     stage_durations_ms: dict[str, int] = {}
 
@@ -334,6 +358,12 @@ def run_conversion(config: Config) -> ConversionResult:
     semantic_low_confidence_count = 0
     unresolved_cross_ref_count = 0
     normative_requirement_count = 0
+    retrieval_chunk_record_count = 0
+    retrieval_chunk_file_count = 0
+    figure_rag_record_count = 0
+    figure_rag_file_count = 0
+    domain_unit_record_count = 0
+    domain_unit_file_count = 0
     engine_usage = {
         "pypdf": True,
         "pdfplumber": True,
@@ -653,6 +683,15 @@ def run_conversion(config: Config) -> ConversionResult:
     structure_low_confidence_count = text_block_result.structure_low_confidence_count
     finish_stage("rag_text_blocks", rag_text_started)
 
+    figure_rag_started = stage_start()
+    figure_records = build_figure_records(
+        images=image_result.assets,
+        excluded_images=image_result.excluded_assets,
+        text_block_records=text_block_result.records,
+    )
+    figure_rag_record_count, figure_rag_file_count = _write_figure_rag_output(config, figure_records)
+    finish_stage("rag_figures", figure_rag_started)
+
     semantic_started = stage_start()
     semantic_result = build_semantic_layer(
         text_block_records=text_block_result.records,
@@ -675,6 +714,30 @@ def run_conversion(config: Config) -> ConversionResult:
     unresolved_cross_ref_count = semantic_result.unresolved_cross_ref_count
     normative_requirement_count = semantic_result.normative_requirement_count
     finish_stage("rag_semantics", semantic_started)
+
+    domain_units: list[dict] = []
+    if domain_adapter is not DomainAdapterMode.NONE:
+        domain_started = stage_start()
+        domain_units = build_domain_units(
+            domain_adapter=domain_adapter,
+            rag_tables=table_result.rag_tables,
+        )
+        domain_unit_record_count, domain_unit_file_count = _write_domain_unit_output(config, domain_units)
+        finish_stage("rag_domain_adapter", domain_started)
+
+    retrieval_started = stage_start()
+    retrieval_chunks = build_retrieval_chunks(
+        text_block_records=text_block_result.records,
+        semantic_units=semantic_result.semantic_units,
+        requirements=semantic_result.requirements,
+        rag_tables=table_result.rag_tables,
+        domain_units=domain_units,
+    )
+    retrieval_chunk_record_count, retrieval_chunk_file_count = _write_retrieval_chunk_output(
+        config,
+        retrieval_chunks,
+    )
+    finish_stage("rag_retrieval_chunks", retrieval_started)
 
     markdown_started = stage_start()
     markdown_result = serialize_markdown_blocks_result(
@@ -733,12 +796,18 @@ def run_conversion(config: Config) -> ConversionResult:
             "repair_hyphenation": config.repair_hyphenation,
             "figure_crop_fallback": config.figure_crop_fallback,
             "rag_table_output": rag_table_output.value,
+            "domain_adapter": domain_adapter.value,
             "rag_text_blocks_output": "jsonl",
             "rag_text_blocks_jsonl_filename": config.rag_text_blocks_jsonl_filename,
             "semantic_layer_output": "jsonl",
             "semantic_units_jsonl_filename": config.semantic_units_jsonl_filename,
             "requirements_jsonl_filename": config.requirements_jsonl_filename,
             "cross_refs_jsonl_filename": config.cross_refs_jsonl_filename,
+            "retrieval_chunks_output": "jsonl",
+            "retrieval_chunks_jsonl_filename": config.retrieval_chunks_jsonl_filename,
+            "figures_rag_output": "jsonl",
+            "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
+            "domain_units_jsonl_filename": config.domain_units_jsonl_filename,
             "debug": config.debug,
             "pages": config.pages,
             "version": config.version,
@@ -830,6 +899,12 @@ def run_conversion(config: Config) -> ConversionResult:
         semantic_low_confidence_count=semantic_low_confidence_count,
         unresolved_cross_ref_count=unresolved_cross_ref_count,
         normative_requirement_count=normative_requirement_count,
+        retrieval_chunk_record_count=retrieval_chunk_record_count,
+        retrieval_chunk_file_count=retrieval_chunk_file_count,
+        figure_rag_record_count=figure_rag_record_count,
+        figure_rag_file_count=figure_rag_file_count,
+        domain_unit_record_count=domain_unit_record_count,
+        domain_unit_file_count=domain_unit_file_count,
     )
     report_path = config.output_dir / config.report_filename
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)
