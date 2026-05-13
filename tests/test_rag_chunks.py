@@ -5,6 +5,7 @@ import json
 from pdf2md.serializers.rag_chunks import (
     build_retrieval_chunk_diagnostics,
     build_retrieval_chunks,
+    optimize_retrieval_chunks,
     serialize_retrieval_chunks_jsonl,
 )
 
@@ -134,3 +135,41 @@ def test_retrieval_chunk_diagnostics_report_length_and_duplicate_sources() -> No
         "retrieval_chunk_over_target_count": 1,
         "retrieval_chunk_duplicate_source_ref_count": 1,
     }
+
+
+def test_retrieval_chunk_optimizer_splits_over_budget_chunks_and_reindexes() -> None:
+    records = [
+        {
+            "chunk_id": "chunk-000001",
+            "chunk_index": 1,
+            "chunk_type": "requirement",
+            "text": "The device shall preserve data. " * 10,
+            "source_refs": [{"source_type": "requirement", "source_id": "req-1", "page": 1}],
+            "source_dedupe_key": "req-1",
+            "chunk_boundary_reasons": ["requirement_boundary"],
+            "char_count": 320,
+            "token_estimate": 80,
+        },
+        {
+            "chunk_id": "chunk-000002",
+            "chunk_index": 2,
+            "chunk_type": "text_block",
+            "text": "Short chunk.",
+            "source_refs": [{"source_type": "text_block", "source_id": "block-1", "page": 1}],
+            "source_dedupe_key": "block-1",
+            "char_count": 12,
+            "token_estimate": 3,
+        },
+    ]
+
+    optimized = optimize_retrieval_chunks(records, max_tokens=16)
+
+    assert len(optimized) > 2
+    assert [record["chunk_id"] for record in optimized] == [
+        f"chunk-{index:06d}" for index in range(1, len(optimized) + 1)
+    ]
+    split_parts = [record for record in optimized if record.get("parent_chunk_id") == "chunk-000001"]
+    assert len(split_parts) == split_parts[0]["chunk_part_count"]
+    assert all(record["token_estimate"] <= 16 for record in split_parts)
+    assert all("token_budget_split" in record["chunk_boundary_reasons"] for record in split_parts)
+    assert optimized[-1]["text"] == "Short chunk."

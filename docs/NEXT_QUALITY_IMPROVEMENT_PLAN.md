@@ -24,24 +24,6 @@
 
 현재 backlog는 모두 **RAG 운영 목적**의 개선 작업이다. PDF 변환 산출물을 AI Agent/Copilot의 스펙 분석, 요구사항 추적, 테스트 스크립트 구현에 더 안정적으로 쓰기 위한 항목만 남긴다.
 
-### P0 / Q31. Local Corpus Profile Runner
-
-- 로컬 전용 profile JSON을 받아 여러 output directory와 eval set을 한 번에 평가하는 corpus-level RAG calibration runner를 추가한다.
-- document별 `rag_eval_report.json`을 aggregate해 domain별 hit/MRR/coverage/token/duration 분포를 기록한다.
-- 실제 공개 스펙/고객 원문은 계속 커밋하지 않고 synthetic/sanitized profile만 repo에 둔다.
-
-### P0 / Q32. Requirement Impact Review Pack
-
-- `requirement_change_impact_report.json`을 AI Agent/리뷰어가 바로 쓰기 쉬운 Markdown/JSON summary pack으로 변환한다.
-- changed requirement와 관련 table/technical/domain unit source_refs를 lookup해 test script 수정 후보 범위를 provenance 중심으로 묶는다.
-- 영향도 설명 생성은 하지 않고 원문 diff, source id, page/bbox, changed field만 제공한다.
-
-### P1 / Q33. Technical Cross-Reference Resolver Hardening
-
-- NVMe opcode/log page/feature, PCIe register/capability, TCG method/object 참조를 `cross_refs_rag.jsonl`에서 더 안정적으로 resolved 처리한다.
-- unresolved technical ref의 원인 분류와 source_refs를 진단 필드로 남긴다.
-- 합성 fixture와 golden으로 resolver 회귀를 막고, 애매한 참조는 resolved로 승격하지 않는다.
-
 ### P1 / Q34. Offline Index Contract Validator
 
 - OpenAI/Azure AI Search/LangChain/LlamaIndex mapping recipe가 요구하는 필드와 타입을 로컬에서 검증하는 validator script를 추가한다.
@@ -53,3 +35,9 @@
 - state machine, sequence diagram, register layout synthetic PDF를 렌더링 기반 fixture로 추가한다.
 - `figures_rag.jsonl`의 `diagram_label_diagnostics`와 bbox/caption/heading provenance를 golden으로 고정한다.
 - OCR runtime이 없을 때와 있을 때의 기대 diagnostics를 분리해 CI 안정성을 유지한다.
+
+### P2 / Q36. Page-Level Parallel Extractor
+
+- 문서 단위 증분 캐시 이후, page extraction/read-order/table 후보 생성을 page worker 단위로 병렬화할 수 있는 executor를 추가한다.
+- 출력 순서, warning/report ordering, asset naming은 기존 deterministic contract를 유지한다.
+- 기본값은 single-worker로 두고, `--page-workers` opt-in에서 benchmark gate로 속도 향상과 결과 동일성을 함께 검증한다.

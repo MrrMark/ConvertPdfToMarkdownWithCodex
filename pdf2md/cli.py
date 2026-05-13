@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -44,6 +45,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Previous corpus_manifest.json for incremental RAG ingest diff in batch mode.",
+    )
+    parser.add_argument(
+        "--reuse-unchanged",
+        action="store_true",
+        default=False,
+        help="Reuse previous batch outputs for unchanged PDFs when --previous-corpus-manifest is provided.",
     )
     parser.add_argument("--pages", default=None, help="Page ranges (example: 1-3,5)")
     parser.add_argument("--password", default=None, help="Password for encrypted PDF")
@@ -128,6 +135,10 @@ def _detect_duplicate_stems(pdf_paths: list[Path]) -> list[str]:
         if len(names) > 1:
             duplicates.append(", ".join(sorted(names)))
     return sorted(duplicates)
+
+
+def _batch_doc_id(pdf_path: Path, index: int, *, confidential_safe_mode: bool) -> str:
+    return f"doc-{index:04d}" if confidential_safe_mode else pdf_path.stem
 
 
 def _build_single_config(args: argparse.Namespace) -> Config:
@@ -337,7 +348,7 @@ def _build_corpus_manifest(
                 selected_pages = []
         corpus_documents.append(
             CorpusDocument(
-                doc_id=f"doc-{idx:04d}" if confidential_safe_mode else pdf_path.stem,
+                doc_id=_batch_doc_id(pdf_path, idx, confidential_safe_mode=confidential_safe_mode),
                 input_pdf="redacted.pdf" if confidential_safe_mode else str(pdf_path),
                 source_sha256=_file_sha256(pdf_path) if pdf_path.exists() else "",
                 output_dir=document.output_dir if not confidential_safe_mode else f"doc-{idx:04d}",
@@ -472,6 +483,67 @@ def _resolve_requirement_traceability_path(
         if candidate.exists() and candidate.is_file():
             return candidate
     return None
+
+
+def _resolve_previous_output_dir(
+    *,
+    manifest_path: Path,
+    manifest: CorpusManifest,
+    document: CorpusDocument,
+) -> Path | None:
+    candidates: list[Path] = []
+    raw = Path(document.output_dir)
+    if raw.is_absolute():
+        candidates.append(raw)
+    else:
+        candidates.append(manifest_path.parent / raw)
+        output_root = Path(manifest.output_dir)
+        if output_root.is_absolute():
+            candidates.append(output_root / document.doc_id)
+        else:
+            candidates.append(manifest_path.parent / output_root / document.doc_id)
+    if document.files.manifest:
+        candidates.extend(
+            candidate.parent
+            for candidate in _path_candidates(
+                document.files.manifest,
+                manifest_path=manifest_path,
+                manifest=manifest,
+                document=document,
+            )
+        )
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.exists() and candidate.is_dir():
+            return candidate
+    return None
+
+
+def _output_dir_is_empty_or_missing(path: Path) -> bool:
+    return not path.exists() or not any(path.iterdir())
+
+
+def _reuse_previous_output(
+    *,
+    source_dir: Path,
+    target_dir: Path,
+) -> bool:
+    if source_dir.resolve() == target_dir.resolve():
+        return True
+    if not _output_dir_is_empty_or_missing(target_dir):
+        return False
+    shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
+    return True
+
+
+def _previous_output_has_expected_core(source_dir: Path, config: Config) -> bool:
+    return all(
+        (source_dir / filename).exists()
+        for filename in (config.markdown_filename, config.manifest_filename, config.report_filename)
+    )
 
 
 def _source_id_fallback(record: dict) -> str | None:
@@ -698,14 +770,37 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
     failed_count = 0
     skipped_count = 0
     final_exit_code = 0
+    previous_manifest: CorpusManifest | None = None
+    previous_by_id: dict[str, CorpusDocument] = {}
+    if args.reuse_unchanged and args.previous_corpus_manifest is not None:
+        previous_manifest = _load_json_model(args.previous_corpus_manifest, CorpusManifest)
+        previous_by_id = {document.doc_id: document for document in previous_manifest.documents}
 
-    for pdf_path in pdf_paths:
+    for index, pdf_path in enumerate(pdf_paths, start=1):
         document_output_dir = batch_output_root / pdf_path.stem
         config = _build_batch_config(args, pdf_path, document_output_dir)
         if args.skip_existing and _batch_config_has_existing_outputs(config):
             documents.append(_build_skipped_batch_document(pdf_path, config))
             skipped_count += 1
             continue
+        if previous_manifest is not None:
+            doc_id = _batch_doc_id(pdf_path, index, confidential_safe_mode=args.confidential_safe_mode)
+            previous_doc = previous_by_id.get(doc_id)
+            if previous_doc is not None and previous_doc.source_sha256 == _file_sha256(pdf_path):
+                previous_output_dir = _resolve_previous_output_dir(
+                    manifest_path=args.previous_corpus_manifest,
+                    manifest=previous_manifest,
+                    document=previous_doc,
+                )
+                if (
+                    previous_output_dir is not None
+                    and _previous_output_has_expected_core(previous_output_dir, config)
+                    and _reuse_previous_output(source_dir=previous_output_dir, target_dir=document_output_dir)
+                    and _batch_config_has_existing_outputs(config)
+                ):
+                    documents.append(_build_skipped_batch_document(pdf_path, config))
+                    skipped_count += 1
+                    continue
         result = run_conversion(config)
         if result.status == ConversionStatus.FAILED:
             failed_count += 1
@@ -770,6 +865,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error("Provide an input PDF path or --input-dir.")
     if args.previous_corpus_manifest is not None and not args.input_dir:
         parser.error("--previous-corpus-manifest is only supported with --input-dir batch mode.")
+    if args.reuse_unchanged and args.previous_corpus_manifest is None:
+        parser.error("--reuse-unchanged requires --previous-corpus-manifest.")
 
     if args.input_dir:
         if args.output_dir is not None:
