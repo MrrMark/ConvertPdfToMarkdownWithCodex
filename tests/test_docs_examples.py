@@ -116,8 +116,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q16. Domain-Specific Technical Spec Adapter Framework" not in next_plan
     assert "Q22. Confidential Corpus Safe Mode" not in next_plan
     assert "Q25. Domain Adapter Coverage Expansion" not in next_plan
-    assert "Q26. Real Technical Corpus Calibration Gate" in next_plan
-    assert "Q30. Diagram OCR And Label Recovery Calibration" in next_plan
+    assert "Q26. Real Technical Corpus Calibration Gate" not in next_plan
+    assert "Q30. Diagram OCR And Label Recovery Calibration" not in next_plan
+    assert "Q31. Local Corpus Profile Runner" in next_plan
+    assert "Q35. Rendered Diagram Fixture Suite" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
