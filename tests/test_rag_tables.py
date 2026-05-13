@@ -54,6 +54,8 @@ def test_rag_table_serializers_preserve_row_text() -> None:
     assert "Caption: Table 1: Example" in markdown
     assert "Row 1: Field = alpha | Value = beta" in markdown
     record = json.loads(jsonl)
+    assert record["table_id"] == "page-0001-table-0001"
+    assert record["table_row_id"] == "page-0001-table-0001-row-0001"
     assert record["cells"] == {"Field": "alpha", "Value": "beta"}
     assert record["fallback_reasons"] == ["AMBIGUOUS_GRID"]
 
@@ -146,6 +148,12 @@ def test_pipeline_writes_selected_rag_sidecar_outputs(
     assert report["summary"]["table_fallback_reason_counts"] == {"AMBIGUOUS_GRID": 1}
     assert report["summary"]["table_low_quality_count"] == 1
     assert report["summary"]["table_caption_linked_count"] == 1
+    assert report["summary"]["semantic_unit_file_count"] == 1
+    assert report["summary"]["requirement_file_count"] == 1
+    assert report["summary"]["cross_ref_file_count"] == 1
+    assert (output_dir / "semantic_units_rag.jsonl").exists()
+    assert (output_dir / "requirements_rag.jsonl").exists()
+    assert (output_dir / "cross_refs_rag.jsonl").exists()
 
 
 def test_pipeline_does_not_write_rag_sidecars_by_default(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:

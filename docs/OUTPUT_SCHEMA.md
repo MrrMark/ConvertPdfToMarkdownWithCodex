@@ -55,7 +55,8 @@ Required:
 
 Stable nested fields:
 
-- `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_text_blocks_output`, `options.ocr_lang`
+- `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_text_blocks_output`, `options.semantic_layer_output`, `options.ocr_lang`
+- `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
 - `images[].page`, `index`, `path`, `source`, `bbox`, `sha256`
 - `images[].alt_text`, `caption_text`, `caption_source`, `dedupe_of`
 - `images[].caption_confidence`, `crop_reason`, `crop_content_ratio`, `crop_rejected_reason`
@@ -90,6 +91,10 @@ Stable summary fields:
 - `heading_count`, `list_item_count`, `code_block_count`, `hyphenation_repair_count`
 - `rag_table_output`, `rag_table_record_count`, `rag_table_file_count`
 - `rag_text_block_record_count`, `rag_text_block_file_count`
+- `semantic_unit_record_count`, `semantic_unit_file_count`
+- `requirement_record_count`, `requirement_file_count`
+- `cross_ref_record_count`, `cross_ref_file_count`
+- `semantic_low_confidence_count`, `unresolved_cross_ref_count`, `normative_requirement_count`
 - `font_heading_candidate_count`, `footnote_candidate_count`, `structure_low_confidence_count`
 
 ## text_blocks_rag.jsonl
@@ -132,6 +137,8 @@ Optional output controlled by `--rag-table-output jsonl|both`.
 
 Required per JSONL record:
 
+- `table_id`
+- `table_row_id`
 - `page`
 - `table_index`
 - `source_mode`
@@ -154,6 +161,68 @@ Optional continuation fields:
 - `continuation_confidence`
 - `continuation_reasons`
 - `continuation_features`
+
+## semantic_units_rag.jsonl
+
+Default JSONL output for spec-level RAG semantics derived from `text_blocks_rag.jsonl` and table row sidecars.
+
+Required per JSONL record:
+
+- `semantic_id`
+- `semantic_index`
+- `semantic_type`
+- `text`
+- `source_refs`
+- `page_range`
+- `bbox`
+- `heading_path`
+- `parent_section_id`
+- `canonical_key`
+- `normative_strength`
+- `classification_confidence`
+- `classification_reasons`
+
+Policy:
+
+- `semantic_type` is one of `section`, `requirement`, `definition`, `parameter`, `procedure_step`, `note`, `warning`, `reference`.
+- `text` is extracted source text, not a summary or paraphrase.
+- `normative_strength` is one of `required`, `prohibited`, `recommended`, `optional`, `informative`, `unknown`.
+- Low-confidence normative or definition candidates are not promoted to semantic records.
+
+## requirements_rag.jsonl
+
+Default JSONL output containing the `semantic_type == "requirement"` subset of `semantic_units_rag.jsonl`.
+
+Required per JSONL record:
+
+- Same field contract as `semantic_units_rag.jsonl`
+
+Policy:
+
+- Only clear normative keywords such as `shall`, `shall not`, `should`, `may`, `required`, `prohibited`, `mandatory`, and `optional` are emitted.
+- `will` is treated as informative and is not promoted to a requirement.
+
+## cross_refs_rag.jsonl
+
+Default JSONL output for section/table/figure/appendix reference provenance.
+
+Required per JSONL record:
+
+- `ref_id`
+- `source_refs`
+- `source_text`
+- `target_type`
+- `target_label`
+- `target_ref`
+- `resolved`
+- `heading_path`
+- `classification_confidence`
+- `classification_reasons`
+
+Policy:
+
+- `target_type` is one of `section`, `table`, `figure`, `appendix`, `unknown`.
+- Unresolved references are preserved with `resolved: false` for downstream diagnostics.
 
 ## debug/
 

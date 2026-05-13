@@ -314,6 +314,75 @@ def build_bottom_footnote_pdf(path: Path) -> None:
     )
 
 
+def build_semantic_requirements_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("1 Requirements", 72, 780, 14),
+                    PositionedText("The controller shall return SUCCESS.", 72, 742, 10),
+                    PositionedText("The host shall not modify reserved bits.", 72, 724, 10),
+                    PositionedText("Software should retry the command.", 72, 706, 10),
+                    PositionedText("The command may complete asynchronously.", 72, 688, 10),
+                    PositionedText("The controller will report status.", 72, 670, 10),
+                ]
+            )
+        ],
+    )
+
+
+def build_semantic_definitions_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("2 Terms", 72, 780, 14),
+                    PositionedText("Controller: The device component that processes commands.", 72, 742, 10),
+                    PositionedText("Namespace means a formatted collection of logical blocks.", 72, 724, 10),
+                ]
+            )
+        ],
+    )
+
+
+def build_semantic_cross_refs_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("1.1 Overview", 72, 780, 14),
+                    PositionedText("See Section 2.1 and Table 1 for details.", 72, 742, 10),
+                    PositionedText("2.1 Details", 72, 690, 14),
+                    PositionedText("Table 1: Fields", 72, 650, 10),
+                ],
+                tables=[TableSpec([["Field", "Description"], ["Status", "Current status"]], 72, 620, [120, 160])],
+            )
+        ],
+    )
+
+
+def build_semantic_table_parameters_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[PositionedText("Table 1: Register fields", 72, 760)],
+                tables=[
+                    TableSpec(
+                        [["Field", "Bits", "Description"], ["Status", "3:0", "Current status"]],
+                        72,
+                        730,
+                        [100, 80, 160],
+                    )
+                ],
+            )
+        ],
+    )
+
+
 def build_password_pdf(path: Path, password: str = "secret") -> None:
     write_pdf(path, [PageSpec(texts=[PositionedText("Encrypted fixture", 72, 760)])], password=password)
 

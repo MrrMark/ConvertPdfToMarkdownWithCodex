@@ -156,6 +156,15 @@ class ReportSummary(BaseModel):
     structure_low_confidence_count: int = 0
     rag_text_block_record_count: int = 0
     rag_text_block_file_count: int = 0
+    semantic_unit_record_count: int = 0
+    semantic_unit_file_count: int = 0
+    requirement_record_count: int = 0
+    requirement_file_count: int = 0
+    cross_ref_record_count: int = 0
+    cross_ref_file_count: int = 0
+    semantic_low_confidence_count: int = 0
+    unresolved_cross_ref_count: int = 0
+    normative_requirement_count: int = 0
 
 
 class ImageAsset(BaseModel):

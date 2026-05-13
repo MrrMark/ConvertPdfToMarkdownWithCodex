@@ -19,7 +19,12 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "summary.page_cache_hits" in readme
     assert "summary.text_line_extract_count" in readme
     assert "text_blocks_rag.jsonl" in readme
+    assert "semantic_units_rag.jsonl" in readme
+    assert "requirements_rag.jsonl" in readme
+    assert "cross_refs_rag.jsonl" in readme
     assert "summary.rag_text_block_record_count" in readme
+    assert "summary.semantic_unit_record_count" in readme
+    assert "summary.normative_requirement_count" in readme
     assert "rag_header_strategy" in readme
     assert "scripts/run_corpus_eval.py" in readme
     assert "scripts/benchmark_conversion.py" in readme
@@ -57,7 +62,12 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "summary.page_cache_hits" in guide
     assert "summary.text_line_extract_count" in guide
     assert "text_blocks_rag.jsonl" in guide
+    assert "semantic_units_rag.jsonl" in guide
+    assert "requirements_rag.jsonl" in guide
+    assert "cross_refs_rag.jsonl" in guide
     assert "summary.rag_text_block_record_count" in guide
+    assert "summary.semantic_unit_record_count" in guide
+    assert "summary.normative_requirement_count" in guide
     assert "rag_header_strategy" in guide
     assert "scripts\\run_corpus_eval.py" in guide
     assert "scripts\\benchmark_conversion.py" in guide
@@ -92,12 +102,18 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q04. Multi-page Table Continuation 보정" not in next_plan
     assert "Q08. Release Gate Runner 통합" not in next_plan
     assert "Q09. Machine-readable Output Schema Export" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
+    assert "Q10. RAG 운영용 스펙 Semantic Layer" not in next_plan
+    assert "Q11. RAG Retrieval Chunk Pack" in next_plan
+    assert "Q15. Domain Adapter" in next_plan
+    assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "schema_version" in output_schema
     assert "docs/schema/manifest.schema.json" in output_schema
     assert "text_blocks_rag.jsonl" in output_schema
+    assert "semantic_units_rag.jsonl" in output_schema
+    assert "requirements_rag.jsonl" in output_schema
+    assert "cross_refs_rag.jsonl" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema
 

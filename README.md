@@ -58,7 +58,7 @@ PDF 문서를 **신뢰성 있게 Markdown으로 변환**하기 위한 CLI/라이
 - `pdfplumber` 중심으로 텍스트를 추출합니다.
 - 공백 정리는 최소화하되 의미 손실은 피합니다.
 - OCR 결과도 의미를 바꾸는 후처리를 하지 않습니다.
-- RAG 등록을 기본 운영 경로로 보고 `text_blocks_rag.jsonl`을 기본 생성합니다.
+- RAG 등록을 기본 운영 경로로 보고 `text_blocks_rag.jsonl`과 semantic sidecar 3종을 기본 생성합니다.
 
 ### 테이블
 
@@ -312,7 +312,8 @@ python3 -m pdf2md input.pdf -o output/ --rag-table-output jsonl
 
 - 기본값은 `none`입니다.
 - `document.md`는 기존 정책을 유지합니다: 단순 표는 GFM, 복잡 표는 HTML fallback.
-- `rag_tables.md`는 행 단위 Markdown, `tables_rag.jsonl`은 행 단위 structured JSONL입니다.
+- `rag_tables.md`는 행 단위 Markdown, `tables_rag.jsonl`은 stable `table_id`/`table_row_id`를 포함한 행 단위 structured JSONL입니다.
+- 텍스트와 스펙 semantic sidecar는 별도 옵션 없이 항상 생성됩니다.
 
 ### 페이지 마커 제어
 
@@ -424,6 +425,9 @@ Windows ZIP 배포본에서는 아래 스크립트로 동일한 목적의 환경
 output/
   document.md
   text_blocks_rag.jsonl # 기본 생성되는 텍스트 블록 RAG sidecar
+  semantic_units_rag.jsonl # 기본 생성되는 스펙 semantic unit sidecar
+  requirements_rag.jsonl   # 기본 생성되는 요구사항 filtered sidecar
+  cross_refs_rag.jsonl     # 기본 생성되는 section/table/figure 참조 sidecar
   rag_tables.md          # --rag-table-output markdown|both 사용 시
   tables_rag.jsonl       # --rag-table-output jsonl|both 사용 시
   assets/
@@ -478,6 +482,10 @@ pdfs/
 - `options.rag_table_output`
 - `options.rag_text_blocks_output`
 - `options.rag_text_blocks_jsonl_filename`
+- `options.semantic_layer_output`
+- `options.semantic_units_jsonl_filename`
+- `options.requirements_jsonl_filename`
+- `options.cross_refs_jsonl_filename`
 - `options.ocr_lang`
 - `options.repair_hyphenation`
 - `options.figure_crop_fallback`
@@ -526,6 +534,15 @@ pdfs/
 - `summary.rag_table_file_count`
 - `summary.rag_text_block_record_count`
 - `summary.rag_text_block_file_count`
+- `summary.semantic_unit_record_count`
+- `summary.semantic_unit_file_count`
+- `summary.requirement_record_count`
+- `summary.requirement_file_count`
+- `summary.cross_ref_record_count`
+- `summary.cross_ref_file_count`
+- `summary.semantic_low_confidence_count`
+- `summary.unresolved_cross_ref_count`
+- `summary.normative_requirement_count`
 - `summary.font_heading_candidate_count`
 - `summary.footnote_candidate_count`
 - `summary.structure_low_confidence_count`
@@ -610,9 +627,13 @@ python3 -m pdf2md input.pdf -o output/ --table-mode auto --rag-table-output both
 
 - `document.md`: 사람이 검토할 정본입니다. 복잡 표는 HTML fallback으로 보존합니다.
 - `text_blocks_rag.jsonl`: 본문 heading/paragraph/list/code/footnote/caption 블록을 page/bbox/heading_path와 함께 기록하는 기본 RAG sidecar입니다.
+- `semantic_units_rag.jsonl`: section/requirement/definition/parameter/procedure_step/note/warning/reference를 원문과 provenance 중심으로 기록합니다.
+- `requirements_rag.jsonl`: `semantic_units_rag.jsonl` 중 명확한 normative keyword가 있는 requirement만 별도 제공하는 filtered view입니다.
+- `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix 참조와 resolved/unresolved 상태를 기록합니다.
 - `rag_tables.md`: 검색 chunk에 넣기 쉬운 행 단위 Markdown입니다.
-- `tables_rag.jsonl`: `page`, `table_index`, `headers`, `cells`, `row_text`, `bbox`, `quality_score`, `fallback_reasons`를 가진 행 단위 JSONL입니다.
+- `tables_rag.jsonl`: `table_id`, `table_row_id`, `page`, `table_index`, `headers`, `cells`, `row_text`, `bbox`, `quality_score`, `fallback_reasons`를 가진 행 단위 JSONL입니다.
 - 텍스트 블록 sidecar는 본문을 요약하거나 재서술하지 않고, 추출된 원문 블록과 provenance만 기록합니다.
+- semantic sidecar도 요약/재서술/설명 생성을 하지 않고, 명확한 스펙 신호만 보수적으로 분류합니다.
 - sidecar는 셀 텍스트를 요약하거나 해석하지 않고, 추출된 셀을 행 단위로 재배열만 합니다.
 - 캡션은 확실한 인접 table caption만 연결하고, 불확실하면 비워 둡니다.
 - multi-row header가 명확하면 `Parent / Child` 형태로 flatten하고, 첫 번째 열이 row label이면 `stub_cells`에 별도 기록합니다.

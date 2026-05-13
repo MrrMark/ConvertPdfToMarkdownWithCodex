@@ -165,6 +165,10 @@ python -m pdf2md .\sample.pdf
 생성 파일:
 
 - `sample_output\document.md`
+- `sample_output\text_blocks_rag.jsonl`
+- `sample_output\semantic_units_rag.jsonl`
+- `sample_output\requirements_rag.jsonl`
+- `sample_output\cross_refs_rag.jsonl`
 - `sample_output\manifest.json`
 - `sample_output\report.json`
 
@@ -352,6 +356,10 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - `options.rag_table_output`
 - `options.rag_text_blocks_output`
 - `options.rag_text_blocks_jsonl_filename`
+- `options.semantic_layer_output`
+- `options.semantic_units_jsonl_filename`
+- `options.requirements_jsonl_filename`
+- `options.cross_refs_jsonl_filename`
 - `options.ocr_lang`
 - `options.repair_hyphenation`
 - `options.figure_crop_fallback`
@@ -390,6 +398,15 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - `summary.hyphenation_repair_count`
 - `summary.rag_text_block_record_count`
 - `summary.rag_text_block_file_count`
+- `summary.semantic_unit_record_count`
+- `summary.semantic_unit_file_count`
+- `summary.requirement_record_count`
+- `summary.requirement_file_count`
+- `summary.cross_ref_record_count`
+- `summary.cross_ref_file_count`
+- `summary.semantic_low_confidence_count`
+- `summary.unresolved_cross_ref_count`
+- `summary.normative_requirement_count`
 - `summary.font_heading_candidate_count`
 - `summary.footnote_candidate_count`
 - `summary.structure_low_confidence_count`
@@ -420,6 +437,9 @@ Machine-readable schema는 `docs\schema\manifest.schema.json`, `docs\schema\repo
 - 확인 위치:
   - `document.md`
   - `text_blocks_rag.jsonl`
+  - `semantic_units_rag.jsonl`
+  - `requirements_rag.jsonl`
+  - `cross_refs_rag.jsonl`
   - `manifest.json`
   - `report.json`
 

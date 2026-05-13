@@ -2,6 +2,7 @@
   "images": [],
   "input_file": "bottom_footnote.pdf",
   "options": {
+    "cross_refs_jsonl_filename": "cross_refs_rag.jsonl",
     "debug": false,
     "dedupe_images": false,
     "figure_crop_fallback": false,
@@ -15,6 +16,9 @@
     "rag_text_blocks_output": "jsonl",
     "remove_header_footer": false,
     "repair_hyphenation": false,
+    "requirements_jsonl_filename": "requirements_rag.jsonl",
+    "semantic_layer_output": "jsonl",
+    "semantic_units_jsonl_filename": "semantic_units_rag.jsonl",
     "table_mode": "auto",
     "version": "<version>"
   },
