@@ -152,6 +152,10 @@ class _CrossRefRecorder:
         heading_path: list[str],
         confidence: float,
         reasons: list[str],
+        target_key: str | None = None,
+        normalized_target_key: str | None = None,
+        candidate_count: int = 0,
+        unresolved_reason: str | None = None,
     ) -> dict[str, Any]:
         self._page_counts[page] = self._page_counts.get(page, 0) + 1
         record = {
@@ -160,8 +164,12 @@ class _CrossRefRecorder:
             "source_text": source_text,
             "target_type": target_type,
             "target_label": target_label,
+            "target_key": target_key,
+            "normalized_target_key": normalized_target_key,
+            "candidate_count": candidate_count,
             "target_ref": target_ref,
             "resolved": resolved,
+            "unresolved_reason": None if resolved else unresolved_reason,
             "heading_path": heading_path,
             "classification_confidence": round(confidence, 2),
             "classification_reasons": sorted(dict.fromkeys(reasons)),
@@ -382,6 +390,76 @@ def _target_key_from_label(target_label: str) -> str:
     return target_label
 
 
+def _strip_target_prefixes(value: str) -> str:
+    text = value.strip(" .,;:")
+    for prefix in (
+        "Log Identifier ",
+        "Log Page ",
+        "LID ",
+        "Feature Identifier ",
+        "FID ",
+        "Requirement ",
+        "Req ",
+        "Opcode ",
+        "Command Opcode ",
+        "Register ",
+        "Capability ",
+    ):
+        if text.lower().startswith(prefix.lower()):
+            return text[len(prefix) :].strip(" .,;:")
+    return text
+
+
+def _normalize_ref_key(value: str) -> str:
+    text = _strip_target_prefixes(value)
+    hex_match = re.fullmatch(r"(?:0x(?P<prefix_hex>[0-9a-fA-F]+)|(?P<suffix_hex>[0-9a-fA-F]+)h|(?P<alpha_hex>[0-9a-fA-F]*[a-fA-F][0-9a-fA-F]*))", text.strip())
+    if hex_match is not None:
+        value = hex_match.group("prefix_hex") or hex_match.group("suffix_hex") or hex_match.group("alpha_hex") or ""
+        return f"hex:{int(value, 16):x}"
+    return re.sub(r"[^a-z0-9]+", "", text.lower())
+
+
+def _normalized_ref_variants(value: str) -> set[str]:
+    text = _strip_target_prefixes(value)
+    variants = {_normalize_ref_key(text)}
+    trimmed = re.sub(r"\b(?:register|capability|field)\b", " ", text, flags=re.IGNORECASE).strip()
+    if trimmed:
+        variants.add(_normalize_ref_key(trimmed))
+    compact = re.sub(r"\s+", " ", text).strip()
+    if compact:
+        variants.add(_normalize_ref_key(compact))
+    return {variant for variant in variants if variant}
+
+
+def _lookup_reference_target(
+    targets: dict[str, dict[str, str]],
+    target_type: str,
+    target_key: str,
+) -> tuple[str | None, str, int, str | None]:
+    type_targets = targets.get(target_type, {})
+    normalized_key = _normalize_ref_key(target_key)
+    if target_key in type_targets:
+        candidate_refs = {
+            ref for label, ref in type_targets.items() if normalized_key in _normalized_ref_variants(label)
+        }
+        return type_targets[target_key], normalized_key, max(len(candidate_refs), 1), None
+
+    lookup_variants = _normalized_ref_variants(target_key)
+    candidate_refs = sorted(
+        {
+            ref
+            for label, ref in type_targets.items()
+            if lookup_variants & _normalized_ref_variants(label)
+        }
+    )
+    if len(candidate_refs) == 1:
+        return candidate_refs[0], normalized_key, 1, None
+    if len(candidate_refs) > 1:
+        return None, normalized_key, len(candidate_refs), "ambiguous_target"
+    reason = "missing_target_type" if not type_targets else "missing_target_label"
+    return None, normalized_key, 0, reason
+
+
 def _known_parameter_headers(headers: list[Any]) -> bool:
     normalized = {str(header).strip().lower() for header in headers if str(header).strip()}
     return bool(normalized & PARAMETER_HEADER_TOKENS)
@@ -561,7 +639,11 @@ def build_semantic_layer(
         for match in REFERENCE_PATTERN.finditer(text):
             target_type = _target_type_for_kind(match.group("kind"))
             target_label_value = match.group("label")
-            target_ref = targets.get(target_type, {}).get(target_label_value)
+            target_ref, normalized_target_key, candidate_count, unresolved_reason = _lookup_reference_target(
+                targets,
+                target_type,
+                target_label_value,
+            )
             resolved = target_ref is not None
             target_label = f"{match.group('kind')} {target_label_value}"
             source_text = _reference_source_text(text, match.start(), match.end())
@@ -576,6 +658,10 @@ def build_semantic_layer(
                 heading_path=heading_path,
                 confidence=0.85 if resolved else 0.65,
                 reasons=["reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
+                target_key=target_label_value,
+                normalized_target_key=normalized_target_key,
+                candidate_count=candidate_count,
+                unresolved_reason=unresolved_reason,
             )
             result.unresolved_cross_ref_count += int(not resolved)
             semantic_recorder.add(
@@ -595,7 +681,11 @@ def build_semantic_layer(
 
         for match, target_type, target_label in _extra_reference_matches(text):
             target_key = _target_key_from_label(target_label)
-            target_ref = targets.get(target_type, {}).get(target_key)
+            target_ref, normalized_target_key, candidate_count, unresolved_reason = _lookup_reference_target(
+                targets,
+                target_type,
+                target_key,
+            )
             resolved = target_ref is not None
             source_text = _reference_source_text(text, match.start(), match.end())
             cross_ref_recorder.add(
@@ -609,6 +699,10 @@ def build_semantic_layer(
                 heading_path=heading_path,
                 confidence=0.82 if resolved else 0.62,
                 reasons=["technical_reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
+                target_key=target_key,
+                normalized_target_key=normalized_target_key,
+                candidate_count=candidate_count,
+                unresolved_reason=unresolved_reason,
             )
             result.unresolved_cross_ref_count += int(not resolved)
 
@@ -640,7 +734,11 @@ def build_semantic_layer(
         for match in REFERENCE_PATTERN.finditer(row_text):
             target_type = _target_type_for_kind(match.group("kind"))
             target_label_value = match.group("label")
-            target_ref = targets.get(target_type, {}).get(target_label_value)
+            target_ref, normalized_target_key, candidate_count, unresolved_reason = _lookup_reference_target(
+                targets,
+                target_type,
+                target_label_value,
+            )
             resolved = target_ref is not None
             target_label = f"{match.group('kind')} {target_label_value}"
             source_text = _reference_source_text(row_text, match.start(), match.end())
@@ -655,12 +753,20 @@ def build_semantic_layer(
                 heading_path=[],
                 confidence=0.85 if resolved else 0.65,
                 reasons=["reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
+                target_key=target_label_value,
+                normalized_target_key=normalized_target_key,
+                candidate_count=candidate_count,
+                unresolved_reason=unresolved_reason,
             )
             result.unresolved_cross_ref_count += int(not resolved)
 
         for match, target_type, target_label in _extra_reference_matches(row_text):
             target_key = _target_key_from_label(target_label)
-            target_ref = targets.get(target_type, {}).get(target_key)
+            target_ref, normalized_target_key, candidate_count, unresolved_reason = _lookup_reference_target(
+                targets,
+                target_type,
+                target_key,
+            )
             resolved = target_ref is not None
             source_text = _reference_source_text(row_text, match.start(), match.end())
             cross_ref_recorder.add(
@@ -674,6 +780,10 @@ def build_semantic_layer(
                 heading_path=[],
                 confidence=0.82 if resolved else 0.62,
                 reasons=["technical_reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
+                target_key=target_key,
+                normalized_target_key=normalized_target_key,
+                candidate_count=candidate_count,
+                unresolved_reason=unresolved_reason,
             )
             result.unresolved_cross_ref_count += int(not resolved)
 

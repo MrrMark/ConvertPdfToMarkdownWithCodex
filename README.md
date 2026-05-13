@@ -412,6 +412,15 @@ python3 -m pdf2md --input-dir ./pdfs_v2 --previous-corpus-manifest ./pdfs_v1/out
 - `requirement_change_impact_report.json`: `requirement_traceability_rag.jsonl` 기준 requirement 단위 `added`, `changed`, `removed`와 원문 `source_refs`를 기록합니다.
 - 문장 요약/재서술 없이 diff provenance만 제공하므로 AI Agent의 영향 분석 입력으로 쓰기 좋습니다.
 
+동일한 PDF SHA-256이 이전 corpus에 있고 현재 출력 디렉터리가 비어 있으면 이전 산출물을 재사용할 수 있습니다.
+
+```bash
+python3 -m pdf2md --input-dir ./pdfs_v2 --previous-corpus-manifest ./pdfs_v1/output/corpus_manifest.json --reuse-unchanged
+python3 scripts/build_requirement_impact_review_pack.py --impact-report ./pdfs_v2/output/requirement_change_impact_report.json
+```
+
+`--reuse-unchanged`로 재사용된 문서는 `batch_report.json`과 `corpus_manifest.json`에서 `status == "skipped"`, `skipped == true`로 기록됩니다. Review pack script는 `requirement_impact_review_pack.json`과 `requirement_impact_review_pack.md`를 생성합니다.
+
 ### 실행기 표기 정책
 
 - 이 README의 기본 예시는 macOS/Linux 기준으로 `python3 -m pdf2md`를 사용합니다.
@@ -729,10 +738,10 @@ python3 -m pdf2md input.pdf -o output/ --table-mode auto --rag-table-output both
 - `text_blocks_rag.jsonl`: 본문 heading/paragraph/list/code/footnote/caption 블록을 page/bbox/heading_path와 함께 기록하는 기본 RAG sidecar입니다.
 - `semantic_units_rag.jsonl`: section/requirement/definition/parameter/procedure_step/note/warning/reference를 원문과 provenance 중심으로 기록합니다.
 - `requirements_rag.jsonl`: `semantic_units_rag.jsonl` 중 명확한 normative keyword가 있는 requirement만 별도 제공하는 filtered view입니다.
-- `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix와 requirement/log page/feature/opcode/register 참조의 resolved/unresolved 상태를 기록합니다.
+- `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix와 requirement/log page/feature/opcode/register 참조의 resolved/unresolved 상태를 기록하며, technical ref는 normalized key, candidate count, unresolved reason을 함께 남깁니다.
 - `requirement_traceability_rag.jsonl`: Requirement ID, condition, dependency, exception, testability hint를 원문 기반으로 기록합니다.
 - `technical_tables_rag.jsonl`: register, bitfield, command/opcode, log page, feature identifier, enum/value table row를 typed sidecar로 기록합니다.
-- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록하며, 각 chunk에 `schema_version`과 원본 PDF `source_sha256`를 포함합니다.
+- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록하며, 각 chunk에 `schema_version`과 원본 PDF `source_sha256`를 포함합니다. 긴 chunk는 token budget 기준으로 deterministic split되고 `parent_chunk_id`, `chunk_part_index`, `chunk_part_count`가 보존됩니다.
 - `figures_rag.jsonl`: 이미지/도표 bbox, caption, OCR 후보, nearby heading, figure kind를 별도 기록합니다.
 - `rag_tables.md`: 검색 chunk에 넣기 쉬운 행 단위 Markdown입니다.
 - `tables_rag.jsonl`: `table_id`, `table_row_id`, `page`, `table_index`, `headers`, `cells`, `row_text`, `bbox`, `quality_score`, `fallback_reasons`를 가진 행 단위 JSONL입니다.
@@ -766,7 +775,7 @@ python3 scripts/validate_ssd_rag_contract.py --output-dir output/tcg --ssd-agent
 python3 scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error
 ```
 
-Profile mapping은 `nvme -> HIL/NVMe`, `pcie -> HIL/PCIe`, `ocp -> HIL/OCP`, `tcg -> HIL/TCG`를 기준으로 합니다. TCG는 `CustomerRequirement` fallback 없이 first-class `spec_type=TCG`로 검증합니다. `tables_rag.jsonl`은 운영 profile에서 `--rag-table-output jsonl|both`로 생성하고, `domain_units_rag.jsonl`은 profile별 `--domain-adapter`를 필수로 지정해 생성합니다.
+Profile mapping은 `nvme -> HIL/NVMe`, `pcie -> HIL/PCIe`, `ocp -> HIL/OCP`, `tcg -> HIL/TCG`를 기준으로 합니다. TCG는 `CustomerRequirement` fallback 없이 first-class `spec_type=TCG`로 검증합니다. `tables_rag.jsonl`은 운영 profile에서 `--rag-table-output jsonl|both`로 생성하고, `domain_units_rag.jsonl`은 profile별 `--domain-adapter`를 필수로 지정해 생성합니다. Profile 문서에 `eval_set`, `rag_thresholds`, `top_k`를 넣으면 document별 `rag_eval_report.json`과 domain/spec별 aggregate metric도 `ssd_corpus_profile_report.json`에 기록됩니다.
 
 ### 구조 마커 복구 운영 포인트
 

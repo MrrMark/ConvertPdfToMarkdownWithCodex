@@ -163,6 +163,7 @@ def test_cross_refs_are_resolved_when_targets_exist_and_kept_when_unresolved() -
         ("Table 1", True),
         ("Figure 9", False),
     ]
+    assert result.cross_refs[-1]["unresolved_reason"] == "missing_target_type"
     assert result.unresolved_cross_ref_count == 1
     reference_units = [record for record in result.semantic_units if record["semantic_type"] == "reference"]
     assert len(reference_units) == 3
@@ -208,6 +209,46 @@ def test_technical_cross_refs_include_requirement_and_log_identifier_targets() -
         ("requirement", "Requirement GLP-ACC-1", True),
         ("log_page", "Log Identifier C0h", True),
     ]
+
+
+def test_technical_cross_refs_resolve_hex_format_variants_and_explain_unresolved() -> None:
+    rag_tables = normalize_rag_table_payload(
+        [
+            {
+                "page": 1,
+                "table_index": 1,
+                "headers": ["Feature Identifier", "Description"],
+                "records": [
+                    {
+                        "page": 1,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Feature Identifier", "Description"],
+                        "cells": {"Feature Identifier": "0x0C", "Description": "Autonomous Power State Transition"},
+                        "row_text": "Feature Identifier = 0x0C | Description = Autonomous Power State Transition",
+                    }
+                ],
+            }
+        ]
+    )
+
+    result = build_semantic_layer(
+        text_block_records=[
+            _text_block("See FID 0Ch for APST behavior and Opcode 0x99 for vendor behavior.")
+        ],
+        rag_tables=rag_tables,
+    )
+
+    resolved_feature, unresolved_opcode = result.cross_refs
+    assert resolved_feature["target_type"] == "feature"
+    assert resolved_feature["resolved"] is True
+    assert resolved_feature["target_ref"] == "page-0001-table-0001-row-0001"
+    assert resolved_feature["normalized_target_key"] == "hex:c"
+    assert resolved_feature["candidate_count"] == 1
+    assert unresolved_opcode["target_type"] == "opcode"
+    assert unresolved_opcode["resolved"] is False
+    assert unresolved_opcode["normalized_target_key"] == "hex:99"
+    assert unresolved_opcode["unresolved_reason"] == "missing_target_type"
 
 
 def test_semantic_jsonl_is_deterministic() -> None:

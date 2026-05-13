@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pdf2md import cli
 from pdf2md.models import CorpusManifest
+from scripts.build_requirement_impact_review_pack import build_review_pack, main as review_pack_main, render_markdown
 
 
 def _write_jsonl(path: Path, records: list[dict]) -> None:
@@ -107,3 +108,55 @@ def test_requirement_change_impact_report_tracks_added_changed_removed_and_sourc
     assert by_requirement["REQ-1"].current_source_refs[0]["source_id"] == "current-req-1"
     assert by_requirement["REQ-2"].status == "removed"
     assert by_requirement["REQ-3"].status == "added"
+
+
+def test_requirement_impact_review_pack_builds_json_and_markdown(tmp_path: Path) -> None:
+    impact_report = {
+        "schema_version": "1.0",
+        "purpose": "rag_requirement_change_impact",
+        "previous_manifest": "previous/corpus_manifest.json",
+        "current_manifest": "current/corpus_manifest.json",
+        "summary": {"changed_count": 1, "removed_count": 0, "added_count": 1, "unchanged_count": 3},
+        "entries": [
+            {
+                "doc_id": "spec",
+                "requirement_key": "REQ-1",
+                "requirement_id": "REQ-1",
+                "status": "changed",
+                "changed_fields": ["texts", "source_refs"],
+                "previous_trace_ids": ["req-trace-000001"],
+                "current_trace_ids": ["req-trace-000001"],
+                "previous_texts": ["REQ-1 shall return GOOD."],
+                "current_texts": ["REQ-1 shall return BETTER."],
+                "previous_source_refs": [{"source_id": "prev-req-1", "page": 1}],
+                "current_source_refs": [{"source_id": "current-req-1", "page": 2}],
+            },
+            {
+                "doc_id": "spec",
+                "requirement_key": "REQ-2",
+                "requirement_id": "REQ-2",
+                "status": "added",
+                "changed_fields": ["texts", "source_refs"],
+                "previous_texts": [],
+                "current_texts": ["REQ-2 shall be added."],
+                "previous_source_refs": [],
+                "current_source_refs": [{"source_id": "current-req-2", "page": 3}],
+            },
+        ],
+    }
+
+    pack = build_review_pack(impact_report, source_report="requirement_change_impact_report.json")
+    markdown = render_markdown(pack)
+
+    assert pack["summary"]["total_review_items"] == 2
+    assert pack["summary"]["status_counts"] == {"added": 1, "changed": 1, "removed": 0}
+    assert pack["review_items"][0]["recommendation"] == "review_test_logic_and_expected_results"
+    assert pack["review_items"][0]["current_pages"] == [2]
+    assert "REQ-1 shall return BETTER." in markdown
+
+    impact_path = tmp_path / "requirement_change_impact_report.json"
+    impact_path.write_text(json.dumps(impact_report), encoding="utf-8")
+    output_dir = tmp_path / "pack"
+    assert review_pack_main(["--impact-report", str(impact_path), "--output-dir", str(output_dir)]) == 0
+    assert (output_dir / "requirement_impact_review_pack.json").exists()
+    assert (output_dir / "requirement_impact_review_pack.md").exists()

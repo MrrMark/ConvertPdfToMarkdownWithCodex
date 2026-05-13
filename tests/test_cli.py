@@ -530,6 +530,53 @@ def test_cli_batch_mode_writes_incremental_corpus_diff(sample_pdf: Path, tmp_pat
     assert impact["purpose"] == "rag_requirement_change_impact"
 
 
+def test_cli_batch_mode_reuses_unchanged_previous_outputs(sample_pdf: Path, tmp_path: Path) -> None:
+    previous_input_dir = tmp_path / "previous-batch"
+    current_input_dir = tmp_path / "current-batch"
+    previous_input_dir.mkdir()
+    current_input_dir.mkdir()
+    (previous_input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+    (current_input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+
+    first_run = subprocess.run(
+        [sys.executable, "-m", "pdf2md", "--input-dir", str(previous_input_dir), "--pages", "1"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert first_run.returncode == 0
+    previous_manifest = previous_input_dir / "output" / "corpus_manifest.json"
+
+    second_run = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pdf2md",
+            "--input-dir",
+            str(current_input_dir),
+            "--pages",
+            "1",
+            "--previous-corpus-manifest",
+            str(previous_manifest),
+            "--reuse-unchanged",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert second_run.returncode == 0
+    output_root = current_input_dir / "output"
+    assert (output_root / "alpha" / "alpha.md").exists()
+    batch_report = json.loads((output_root / "batch_report.json").read_text(encoding="utf-8"))
+    assert batch_report["summary"]["skipped_count"] == 1
+    assert batch_report["documents"][0]["status"] == "skipped"
+    diff = json.loads((output_root / "corpus_diff_report.json").read_text(encoding="utf-8"))
+    assert diff["summary"]["unchanged_count"] == 1
+    corpus_manifest = json.loads((output_root / "corpus_manifest.json").read_text(encoding="utf-8"))
+    assert corpus_manifest["documents"][0]["skipped"] is True
+
+
 def test_cli_batch_mode_rejects_output_dir(sample_pdf: Path, tmp_path: Path) -> None:
     input_dir = tmp_path / "batch-input"
     input_dir.mkdir()

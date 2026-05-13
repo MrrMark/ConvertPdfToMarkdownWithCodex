@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from pdf2md.serializers.rag_tables import flatten_rag_table_records, normalize_rag_table_payload
+
+
+RAG_CHUNK_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
 
 
 def _page_of(record: dict[str, Any]) -> int:
@@ -45,6 +49,68 @@ def _source_ref(source_type: str, source_id: str | None, record: dict[str, Any])
 
 def _token_estimate(text: str) -> int:
     return max((len(text) + 3) // 4, 1) if text else 0
+
+
+def _split_text_to_token_budget(text: str, max_tokens: int) -> list[str]:
+    stripped = text.strip()
+    if not stripped or _token_estimate(stripped) <= max_tokens:
+        return [stripped] if stripped else []
+    char_budget = max(max_tokens * 4, 1)
+    parts: list[str] = []
+    start = 0
+    while start < len(stripped):
+        end = min(start + char_budget, len(stripped))
+        if end < len(stripped):
+            window = stripped[start:end]
+            boundary = -1
+            for match in RAG_CHUNK_SENTENCE_BOUNDARY.finditer(window):
+                boundary = match.end()
+            if boundary < char_budget // 2:
+                boundary = max(window.rfind("\n"), window.rfind(" "))
+            if boundary >= char_budget // 2:
+                end = start + boundary
+        part = stripped[start:end].strip()
+        if part:
+            parts.append(part)
+        start = end
+        while start < len(stripped) and stripped[start].isspace():
+            start += 1
+    return parts
+
+
+def optimize_retrieval_chunks(records: list[dict[str, Any]], *, max_tokens: int = 512) -> list[dict[str, Any]]:
+    """Split over-budget RAG chunks deterministically while preserving provenance."""
+    if max_tokens <= 0:
+        return records
+
+    optimized: list[dict[str, Any]] = []
+    for record in records:
+        text = str(record.get("text") or "")
+        parts = _split_text_to_token_budget(text, max_tokens)
+        if len(parts) <= 1:
+            optimized.append(dict(record))
+            continue
+        parent_chunk_id = str(record.get("chunk_id") or f"chunk-{len(optimized) + 1:06d}")
+        original_dedupe_key = str(record.get("source_dedupe_key") or parent_chunk_id)
+        for part_index, part in enumerate(parts, start=1):
+            split_record = dict(record)
+            split_record["text"] = part
+            split_record["char_count"] = len(part)
+            split_record["token_estimate"] = _token_estimate(part)
+            split_record["parent_chunk_id"] = parent_chunk_id
+            split_record["chunk_part_index"] = part_index
+            split_record["chunk_part_count"] = len(parts)
+            split_record["source_dedupe_key"] = f"{original_dedupe_key}|part-{part_index:03d}"
+            split_record["chunk_boundary_policy"] = "source_record_token_budget"
+            split_record["chunk_boundary_reasons"] = sorted(
+                dict.fromkeys(list(record.get("chunk_boundary_reasons") or []) + ["token_budget_split"])
+            )
+            optimized.append(split_record)
+
+    for index, record in enumerate(optimized, start=1):
+        record["chunk_id"] = f"chunk-{index:06d}"
+        record["chunk_index"] = index
+    return optimized
 
 
 def _make_chunk(
@@ -116,6 +182,7 @@ def build_retrieval_chunks(
     technical_table_records: list[dict[str, Any]] | None = None,
     schema_version: str = "1.0",
     source_sha256: str = "",
+    max_tokens: int = 512,
 ) -> list[dict[str, Any]]:
     """Build deterministic ready-to-index chunks for RAG operations."""
     chunks: list[dict[str, Any]] = []
@@ -292,7 +359,7 @@ def build_retrieval_chunks(
             chunk_group_id=f"table-{record.get('table_id') or 'unknown'}",
         )
 
-    return chunks
+    return optimize_retrieval_chunks(chunks, max_tokens=max_tokens)
 
 
 def build_retrieval_chunk_diagnostics(records: list[dict[str, Any]], *, target_tokens: int = 512) -> dict[str, Any]:

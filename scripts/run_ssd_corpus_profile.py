@@ -9,8 +9,24 @@ from typing import Any
 
 try:
     from scripts.validate_ssd_rag_contract import DOMAIN_ADAPTER_TO_SPEC_TYPE, validate_ssd_rag_contract
+    from scripts.run_rag_eval import (
+        _load_eval_set,
+        _profile_thresholds,
+        _read_jsonl,
+        apply_calibration_gate,
+        collect_output_diagnostics,
+        evaluate_queries,
+    )
 except ModuleNotFoundError:  # pragma: no cover - allows `python scripts/run_ssd_corpus_profile.py`
     from validate_ssd_rag_contract import DOMAIN_ADAPTER_TO_SPEC_TYPE, validate_ssd_rag_contract
+    from run_rag_eval import (
+        _load_eval_set,
+        _profile_thresholds,
+        _read_jsonl,
+        apply_calibration_gate,
+        collect_output_diagnostics,
+        evaluate_queries,
+    )
 
 
 REPORT_FILENAME = "ssd_corpus_profile_report.json"
@@ -98,6 +114,77 @@ def _budget_failures(item: dict[str, Any], contract_report: dict[str, Any]) -> l
     return failures
 
 
+def _numeric_metrics(report: dict[str, Any] | None) -> dict[str, float]:
+    if report is None:
+        return {}
+    metrics = report.get("metrics")
+    if not isinstance(metrics, dict):
+        return {}
+    return {str(key): float(value) for key, value in metrics.items() if isinstance(value, (int, float))}
+
+
+def _rag_thresholds(item: dict[str, Any]) -> tuple[str | None, dict[str, float]]:
+    profile_path = item.get("calibration_profile")
+    profile_name, thresholds = _profile_thresholds(Path(profile_path) if profile_path else None)
+    inline_thresholds = item.get("rag_thresholds") or item.get("thresholds") or {}
+    if inline_thresholds and not isinstance(inline_thresholds, dict):
+        raise ValueError("rag_thresholds/thresholds must be an object when provided.")
+    thresholds.update(
+        {str(key): float(value) for key, value in inline_thresholds.items() if isinstance(value, (int, float))}
+    )
+    return str(item.get("profile_name") or profile_name) if item.get("profile_name") or profile_name else None, thresholds
+
+
+def _run_rag_eval_for_document(item: dict[str, Any]) -> dict[str, Any] | None:
+    eval_set = item.get("eval_set")
+    if not eval_set:
+        return None
+    output_dir = Path(item["output_dir"])
+    chunks = _read_jsonl(output_dir / "retrieval_chunks_rag.jsonl")
+    queries = _load_eval_set(Path(eval_set))
+    report = evaluate_queries(chunks=chunks, queries=queries, top_k=int(item.get("top_k") or 5))
+    report["metrics"].update(collect_output_diagnostics(output_dir))
+    calibration_profile, thresholds = _rag_thresholds(item)
+    if thresholds:
+        report = apply_calibration_gate(
+            report,
+            calibration_profile=calibration_profile,
+            thresholds=thresholds,
+        )
+    report_path = output_dir / "rag_eval_report.json"
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return report
+
+
+def _aggregate_metric_groups(results: list[dict[str, Any]], field: str) -> dict[str, dict[str, Any]]:
+    groups: dict[str, dict[str, list[float] | int]] = {}
+    for item in results:
+        metrics = _numeric_metrics(item.get("rag_eval_report"))
+        if not metrics:
+            continue
+        group_key = str(item.get(field) or "unknown")
+        group = groups.setdefault(group_key, {"document_count": 0})
+        group["document_count"] = int(group["document_count"]) + 1
+        for metric, value in metrics.items():
+            values = group.setdefault(metric, [])
+            if isinstance(values, list):
+                values.append(value)
+
+    aggregate: dict[str, dict[str, Any]] = {}
+    for group_key, raw_group in sorted(groups.items()):
+        group_payload: dict[str, Any] = {"document_count": int(raw_group.get("document_count") or 0)}
+        for metric, values in sorted(raw_group.items()):
+            if metric == "document_count" or not isinstance(values, list) or not values:
+                continue
+            group_payload[metric] = {
+                "average": round(sum(values) / len(values), 4),
+                "min": round(min(values), 4),
+                "max": round(max(values), 4),
+            }
+        aggregate[group_key] = group_payload
+    return aggregate
+
+
 def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
     """Run local SSD corpus conversion and contract validation from a JSON profile."""
     profile = _load_profile(profile_path)
@@ -115,6 +202,7 @@ def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
         ssd_agent_spec_type = _expected_spec_type(item)
         conversion_exit_code: int | None = None
         contract_report: dict[str, Any] | None = None
+        rag_eval_report: dict[str, Any] | None = None
         budget_failures: list[dict[str, Any]] = []
         if not dry_run:
             completed = subprocess.run(command, check=False)
@@ -135,6 +223,7 @@ def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
                     encoding="utf-8",
                 )
                 budget_failures = _budget_failures(item, contract_report)
+                rag_eval_report = _run_rag_eval_for_document(item)
         results.append(
             {
                 "name": name,
@@ -148,6 +237,11 @@ def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
                 "conversion_exit_code": conversion_exit_code,
                 "contract_passed": None if contract_report is None else bool(contract_report.get("passed")),
                 "contract_summary": None if contract_report is None else contract_report.get("summary"),
+                "rag_eval_passed": None
+                if rag_eval_report is None
+                else bool(rag_eval_report.get("passed_calibration_gate", True)),
+                "rag_eval_metrics": _numeric_metrics(rag_eval_report),
+                "rag_eval_report": rag_eval_report,
                 "budget_failures": budget_failures,
             }
         )
@@ -156,8 +250,10 @@ def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
         for item in results
         if (item["conversion_exit_code"] not in {None, 0, 2})
         or item["contract_passed"] is False
+        or item["rag_eval_passed"] is False
         or item["budget_failures"]
     ]
+    rag_evaluated = [item for item in results if item.get("rag_eval_report") is not None]
     return {
         "schema_version": "1.0",
         "purpose": "ssd_local_corpus_profile",
@@ -168,7 +264,11 @@ def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
         "summary": {
             "document_count": len(results),
             "failed_count": len(failed),
+            "rag_eval_document_count": len(rag_evaluated),
+            "rag_eval_failed_count": sum(1 for item in rag_evaluated if item.get("rag_eval_passed") is False),
         },
+        "rag_metrics_by_domain": _aggregate_metric_groups(results, "domain_adapter"),
+        "rag_metrics_by_spec_type": _aggregate_metric_groups(results, "ssd_agent_spec_type"),
         "documents": results,
     }
 
