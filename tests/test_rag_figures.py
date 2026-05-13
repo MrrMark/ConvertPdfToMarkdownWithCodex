@@ -61,3 +61,37 @@ def test_figure_records_include_available_and_excluded_image_provenance() -> Non
 
     jsonl = serialize_figures_jsonl(records)
     assert json.loads(jsonl.splitlines()[0])["figure_id"] == "page-0001-figure-0001"
+
+
+def test_diagram_ocr_labels_require_confidence_for_promotion() -> None:
+    high_confidence = ExcludedImageAsset(
+        page=1,
+        index=1,
+        reason="diagram_crop_candidate",
+        classification="large_image",
+        recovered_text="Sequence diagram MSG1",
+        recovered_confidence=0.91,
+        ocr_candidates=[{"text": "Sequence diagram MSG1", "confidence": 0.91}],
+        bbox=[72.0, 90.0, 300.0, 180.0],
+    )
+    low_confidence = ExcludedImageAsset(
+        page=1,
+        index=2,
+        reason="diagram_crop_candidate",
+        classification="large_image",
+        recovered_text="State machine IDLE",
+        recovered_confidence=0.42,
+        ocr_candidates=[{"text": "State machine IDLE", "confidence": 0.42}],
+        bbox=[72.0, 200.0, 300.0, 280.0],
+    )
+
+    records = build_figure_records(images=[], excluded_images=[high_confidence, low_confidence], text_block_records=[])
+
+    assert records[0]["figure_kind"] == "sequence_diagram"
+    assert "MSG1" in records[0]["detected_labels"]
+    assert records[0]["diagram_label_diagnostics"]["promoted_ocr_candidate_count"] == 1
+    assert records[1]["figure_kind"] == "image"
+    assert records[1]["diagram_candidate"] is False
+    assert "IDLE" not in records[1]["detected_labels"]
+    assert records[1]["diagram_label_diagnostics"]["rejected_ocr_candidate_count"] == 1
+    assert records[1]["diagram_label_diagnostics"]["rejected_ocr_candidates"][0]["reason"] == "low_confidence"

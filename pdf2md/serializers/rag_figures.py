@@ -7,6 +7,10 @@ from typing import Any
 from pdf2md.models import ExcludedImageAsset, ImageAsset
 
 
+OCR_LABEL_CONFIDENCE_THRESHOLD = 0.65
+LABEL_PATTERN = re.compile(r"\b(?:[A-Z]{2,}[A-Z0-9_-]*-\d+|[A-Z]{2,}[0-9]+|[A-Z][A-Za-z]+)\b")
+
+
 def _bbox(value: Any) -> list[float] | None:
     return value if isinstance(value, list) else None
 
@@ -83,12 +87,104 @@ def _figure_text(*values: Any) -> str:
                     text = str(item.get("text") or "").strip()
                     if text:
                         parts.append(text)
+                elif isinstance(item, str) and item.strip():
+                    parts.append(item.strip())
     return " ".join(parts)
+
+
+def _labels_from_text(text: str) -> list[str]:
+    return sorted(dict.fromkeys(LABEL_PATTERN.findall(text)))
+
+
+def _confidence(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return round(float(value), 4)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ocr_candidate_text(candidate: Any) -> str:
+    if isinstance(candidate, dict):
+        return str(candidate.get("text") or "").strip()
+    return ""
+
+
+def _ocr_candidate_confidence(candidate: Any) -> float | None:
+    if not isinstance(candidate, dict):
+        return None
+    return _confidence(candidate.get("confidence"))
+
+
+def _diagram_label_diagnostics(
+    *,
+    caption_labels: list[str],
+    ocr_candidates: list[dict[str, Any]],
+    recovered_text: str | None = None,
+    recovered_confidence: float | None = None,
+) -> tuple[list[str], dict[str, Any]]:
+    promoted_labels = list(caption_labels)
+    rejected: list[dict[str, Any]] = []
+    promoted_ocr_candidates: list[dict[str, Any]] = []
+    all_candidates: list[dict[str, Any]] = []
+    seen_candidates: set[tuple[str, float | None]] = set()
+
+    def append_candidate(candidate: dict[str, Any]) -> None:
+        key = (_ocr_candidate_text(candidate), _ocr_candidate_confidence(candidate))
+        if key in seen_candidates:
+            return
+        seen_candidates.add(key)
+        all_candidates.append(candidate)
+
+    for candidate in ocr_candidates:
+        append_candidate(candidate)
+    if recovered_text:
+        append_candidate({"text": recovered_text, "confidence": recovered_confidence, "source": "recovered_text"})
+
+    for candidate in all_candidates:
+        text = _ocr_candidate_text(candidate)
+        labels = _labels_from_text(text)
+        confidence = _ocr_candidate_confidence(candidate)
+        if not labels:
+            rejected.append(
+                {
+                    "text": text,
+                    "confidence": confidence,
+                    "reason": "no_label_pattern",
+                }
+            )
+            continue
+        if confidence is None or confidence < OCR_LABEL_CONFIDENCE_THRESHOLD:
+            rejected.append(
+                {
+                    "text": text,
+                    "confidence": confidence,
+                    "labels": labels,
+                    "reason": "low_confidence",
+                }
+            )
+            continue
+        promoted_ocr_candidates.append({"text": text, "confidence": confidence, "labels": labels})
+        for label in labels:
+            if label not in promoted_labels:
+                promoted_labels.append(label)
+
+    diagnostics = {
+        "label_confidence_threshold": OCR_LABEL_CONFIDENCE_THRESHOLD,
+        "caption_or_heading_label_count": len(caption_labels),
+        "ocr_candidate_count": len(all_candidates),
+        "promoted_ocr_candidate_count": len(promoted_ocr_candidates),
+        "rejected_ocr_candidate_count": len(rejected),
+        "promoted_ocr_candidates": promoted_ocr_candidates,
+        "rejected_ocr_candidates": rejected,
+    }
+    return sorted(dict.fromkeys(promoted_labels)), diagnostics
 
 
 def _figure_kind(text: str) -> tuple[str, list[str], list[str]]:
     lowered = text.lower()
-    labels = sorted(dict.fromkeys(re.findall(r"\b(?:[A-Z]{2,}[A-Z0-9_-]*-\d+|[A-Z]{2,}[0-9]+|[A-Z][A-Za-z]+)\b", text)))
+    labels = _labels_from_text(text)
     if any(token in lowered for token in ("state machine", "state diagram", "state transition")):
         return "state_machine", labels, ["state_machine_text"]
     if any(token in lowered for token in ("sequence diagram", "message sequence", "timing diagram")):
@@ -114,7 +210,8 @@ def _figure_record(
         text_block_records=text_block_records,
     )
     kind, labels, kind_reasons = _figure_kind(_figure_text(asset.caption_text, asset.alt_text, heading_path))
-    return {
+    labels, label_diagnostics = _diagram_label_diagnostics(caption_labels=labels, ocr_candidates=[])
+    record = {
         "figure_id": figure_id,
         "page": asset.page,
         "figure_index": figure_index,
@@ -152,6 +249,9 @@ def _figure_record(
         "classification_confidence": round(float(asset.caption_confidence or 0.75), 2),
         "classification_reasons": sorted(dict.fromkeys(["image_asset"] + kind_reasons)),
     }
+    if kind != "image":
+        record["diagram_label_diagnostics"] = label_diagnostics
+    return record
 
 
 def _excluded_figure_record(
@@ -170,10 +270,21 @@ def _excluded_figure_record(
     reasons = ["excluded_image_asset", str(asset.reason)]
     if asset.recovered_text:
         reasons.append("recovered_text")
-    kind, labels, kind_reasons = _figure_kind(
-        _figure_text(asset.recovered_text, asset.ocr_candidates, heading_path, asset.parent_heading_index)
+    recovered_confidence = _confidence(asset.recovered_confidence)
+    candidate_labels, label_diagnostics = _diagram_label_diagnostics(
+        caption_labels=[],
+        ocr_candidates=asset.ocr_candidates,
+        recovered_text=asset.recovered_text,
+        recovered_confidence=recovered_confidence,
     )
-    return {
+    promoted_ocr_text = [
+        str(candidate.get("text") or "")
+        for candidate in label_diagnostics["promoted_ocr_candidates"]
+        if isinstance(candidate, dict)
+    ]
+    kind, labels, kind_reasons = _figure_kind(_figure_text(*promoted_ocr_text, heading_path, asset.parent_heading_index))
+    labels = sorted(dict.fromkeys(labels + candidate_labels))
+    record = {
         "figure_id": figure_id,
         "page": asset.page,
         "figure_index": figure_index,
@@ -210,6 +321,9 @@ def _excluded_figure_record(
         "classification_confidence": round(float(asset.recovered_confidence or 0.5), 2),
         "classification_reasons": sorted(dict.fromkeys(reasons + kind_reasons)),
     }
+    if asset.ocr_candidates or asset.recovered_text or kind != "image":
+        record["diagram_label_diagnostics"] = label_diagnostics
+    return record
 
 
 def build_figure_records(

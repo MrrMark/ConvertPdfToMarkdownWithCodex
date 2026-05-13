@@ -1,0 +1,20 @@
+{
+  "profile_name": "synthetic-technical-spec-rag",
+  "purpose": "local_rag_calibration_thresholds",
+  "corpus_policy": {
+    "commit_real_public_specs": false,
+    "commit_customer_confidential_sources": false,
+    "use_synthetic_or_sanitized_fixtures": true
+  },
+  "thresholds": {
+    "min_hit_at_k": 0.9,
+    "min_mrr": 0.75,
+    "min_citation_coverage": 0.9,
+    "min_requirement_coverage": 0.9,
+    "min_table_field_coverage": 0.85,
+    "min_cross_ref_resolved_coverage": 0.8,
+    "max_chunk_token_p95": 512,
+    "max_chunk_token_max": 768,
+    "max_conversion_duration_ms": 10000
+  }
+}

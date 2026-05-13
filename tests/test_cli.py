@@ -523,6 +523,8 @@ def test_cli_batch_mode_writes_incremental_corpus_diff(sample_pdf: Path, tmp_pat
     assert diff["summary"]["changed_count"] == 1
     assert diff["summary"]["removed_count"] == 1
     assert [entry["status"] for entry in diff["entries"]] == ["changed", "removed"]
+    impact = json.loads((input_dir / "output" / "requirement_change_impact_report.json").read_text(encoding="utf-8"))
+    assert impact["purpose"] == "rag_requirement_change_impact"
 
 
 def test_cli_batch_mode_rejects_output_dir(sample_pdf: Path, tmp_path: Path) -> None:

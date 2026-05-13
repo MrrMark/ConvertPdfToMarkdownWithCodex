@@ -13,6 +13,8 @@ from pdf2md.utils.io import write_json
 
 
 DEFAULT_GATES = ("ocr", "corpus", "benchmark", "schema", "packaging")
+OPTIONAL_GATES = ("rag",)
+KNOWN_GATES = DEFAULT_GATES + OPTIONAL_GATES
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,20 @@ class ReleaseGateConfig:
     max_duration_regression: float = 0.2
     max_memory_regression: float = 0.2
     benchmark_min_pages_per_second: float | None = None
+    rag_output_dir: Path | None = None
+    rag_eval_set: Path | None = None
+    rag_top_k: int = 5
+    rag_calibration_profile: Path | None = None
+    rag_profile_name: str | None = None
+    rag_min_hit_at_k: float | None = None
+    rag_min_mrr: float | None = None
+    rag_min_citation_coverage: float | None = None
+    rag_min_requirement_coverage: float | None = None
+    rag_min_table_field_coverage: float | None = None
+    rag_min_cross_ref_resolved_coverage: float | None = None
+    rag_max_chunk_token_p95: float | None = None
+    rag_max_chunk_token_max: float | None = None
+    rag_max_conversion_duration_ms: float | None = None
 
 
 def _split_gates(raw_gates: str) -> list[str]:
@@ -39,7 +55,7 @@ def _split_gates(raw_gates: str) -> list[str]:
         gate = raw_gate.strip()
         if not gate or gate in seen:
             continue
-        if gate not in DEFAULT_GATES:
+        if gate not in KNOWN_GATES:
             raise ValueError(f"Unknown release gate: {gate}")
         gates.append(gate)
         seen.add(gate)
@@ -152,6 +168,52 @@ def _benchmark_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     return [_run_command(gate="benchmark", command=command, report_path=report_path)]
 
 
+def _append_optional_arg(command: list[str], flag: str, value: object | None) -> None:
+    if value is not None:
+        command.extend([flag, str(value)])
+
+
+def _rag_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    report_path = config.output_dir / "rag_eval_report.json"
+    if config.rag_output_dir is None or config.rag_eval_set is None:
+        return [
+            {
+                "gate": "rag",
+                "command": [],
+                "exit_code": 2,
+                "status": "failed",
+                "report_path": str(report_path),
+                "stdout_tail": "",
+                "stderr_tail": "--rag-output-dir and --rag-eval-set are required when --gates includes rag.",
+            }
+        ]
+    command = [
+        sys.executable,
+        "scripts/run_rag_eval.py",
+        "--output-dir",
+        str(config.rag_output_dir),
+        "--eval-set",
+        str(config.rag_eval_set),
+        "--top-k",
+        str(config.rag_top_k),
+        "--report-path",
+        str(report_path),
+        "--fail-on-threshold",
+    ]
+    _append_optional_arg(command, "--calibration-profile", config.rag_calibration_profile)
+    _append_optional_arg(command, "--profile-name", config.rag_profile_name)
+    _append_optional_arg(command, "--min-hit-at-k", config.rag_min_hit_at_k)
+    _append_optional_arg(command, "--min-mrr", config.rag_min_mrr)
+    _append_optional_arg(command, "--min-citation-coverage", config.rag_min_citation_coverage)
+    _append_optional_arg(command, "--min-requirement-coverage", config.rag_min_requirement_coverage)
+    _append_optional_arg(command, "--min-table-field-coverage", config.rag_min_table_field_coverage)
+    _append_optional_arg(command, "--min-cross-ref-resolved-coverage", config.rag_min_cross_ref_resolved_coverage)
+    _append_optional_arg(command, "--max-chunk-token-p95", config.rag_max_chunk_token_p95)
+    _append_optional_arg(command, "--max-chunk-token-max", config.rag_max_chunk_token_max)
+    _append_optional_arg(command, "--max-conversion-duration-ms", config.rag_max_conversion_duration_ms)
+    return [_run_command(gate="rag", command=command, report_path=report_path)]
+
+
 def _schema_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     return [
         _run_command(
@@ -198,6 +260,8 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
             records.extend(_corpus_gate(config))
         elif gate == "benchmark":
             records.extend(_benchmark_gate(config))
+        elif gate == "rag":
+            records.extend(_rag_gate(config))
         elif gate == "schema":
             records.extend(_schema_gate(config))
         elif gate == "packaging":
@@ -225,7 +289,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--gates",
         default=",".join(DEFAULT_GATES),
-        help="Comma-separated gates: ocr,corpus,benchmark,schema,packaging.",
+        help="Comma-separated gates: ocr,corpus,benchmark,schema,packaging,rag.",
     )
     parser.add_argument("--ocr-lang", default="eng")
     parser.add_argument("--corpus-input-dir", type=Path, default=Path("pdf"))
@@ -238,6 +302,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-duration-regression", type=float, default=0.2)
     parser.add_argument("--max-memory-regression", type=float, default=0.2)
     parser.add_argument("--benchmark-min-pages-per-second", type=float)
+    parser.add_argument("--rag-output-dir", type=Path)
+    parser.add_argument("--rag-eval-set", type=Path)
+    parser.add_argument("--rag-top-k", type=int, default=5)
+    parser.add_argument("--rag-calibration-profile", type=Path)
+    parser.add_argument("--rag-profile-name")
+    parser.add_argument("--rag-min-hit-at-k", type=float)
+    parser.add_argument("--rag-min-mrr", type=float)
+    parser.add_argument("--rag-min-citation-coverage", type=float)
+    parser.add_argument("--rag-min-requirement-coverage", type=float)
+    parser.add_argument("--rag-min-table-field-coverage", type=float)
+    parser.add_argument("--rag-min-cross-ref-resolved-coverage", type=float)
+    parser.add_argument("--rag-max-chunk-token-p95", type=float)
+    parser.add_argument("--rag-max-chunk-token-max", type=float)
+    parser.add_argument("--rag-max-conversion-duration-ms", type=float)
     return parser
 
 
@@ -263,6 +341,20 @@ def main(argv: list[str] | None = None) -> int:
             max_duration_regression=args.max_duration_regression,
             max_memory_regression=args.max_memory_regression,
             benchmark_min_pages_per_second=args.benchmark_min_pages_per_second,
+            rag_output_dir=args.rag_output_dir,
+            rag_eval_set=args.rag_eval_set,
+            rag_top_k=args.rag_top_k,
+            rag_calibration_profile=args.rag_calibration_profile,
+            rag_profile_name=args.rag_profile_name,
+            rag_min_hit_at_k=args.rag_min_hit_at_k,
+            rag_min_mrr=args.rag_min_mrr,
+            rag_min_citation_coverage=args.rag_min_citation_coverage,
+            rag_min_requirement_coverage=args.rag_min_requirement_coverage,
+            rag_min_table_field_coverage=args.rag_min_table_field_coverage,
+            rag_min_cross_ref_resolved_coverage=args.rag_min_cross_ref_resolved_coverage,
+            rag_max_chunk_token_p95=args.rag_max_chunk_token_p95,
+            rag_max_chunk_token_max=args.rag_max_chunk_token_max,
+            rag_max_conversion_duration_ms=args.rag_max_conversion_duration_ms,
         )
     )
     print(f"Wrote {args.output_dir / 'release_gate_report.json'}")

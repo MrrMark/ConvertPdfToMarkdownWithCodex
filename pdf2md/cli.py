@@ -22,6 +22,9 @@ from pdf2md.models import (
     ImageMode,
     Manifest,
     RagTableOutputMode,
+    RequirementChangeImpactEntry,
+    RequirementChangeImpactReport,
+    RequirementChangeImpactSummary,
     Report,
     TableMode,
 )
@@ -414,6 +417,267 @@ def _build_corpus_diff_report(
     )
 
 
+def _read_jsonl_records(path: Path) -> list[dict]:
+    records: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            records.append(json.loads(line))
+    return records
+
+
+def _path_candidates(
+    path_text: str,
+    *,
+    manifest_path: Path,
+    manifest: CorpusManifest,
+    document: CorpusDocument,
+) -> list[Path]:
+    raw = Path(path_text)
+    if raw.is_absolute():
+        return [raw]
+
+    candidates = [raw, manifest_path.parent / raw]
+    output_root = Path(manifest.output_dir)
+    document_output = Path(document.output_dir)
+    if output_root.is_absolute():
+        candidates.extend([output_root / raw, output_root / document.doc_id / raw.name])
+    else:
+        candidates.extend(
+            [
+                manifest_path.parent / output_root / raw,
+                manifest_path.parent / output_root / document.doc_id / raw.name,
+            ]
+        )
+    if document_output.is_absolute():
+        candidates.append(document_output / raw.name)
+    else:
+        candidates.append(manifest_path.parent / document_output / raw.name)
+    return candidates
+
+
+def _resolve_requirement_traceability_path(
+    *,
+    manifest_path: Path,
+    manifest: CorpusManifest,
+    document: CorpusDocument,
+) -> Path | None:
+    path_text = document.files.requirement_traceability_rag
+    if not path_text:
+        return None
+    seen: set[Path] = set()
+    for candidate in _path_candidates(path_text, manifest_path=manifest_path, manifest=manifest, document=document):
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return None
+
+
+def _source_id_fallback(record: dict) -> str | None:
+    for ref in record.get("source_refs") or []:
+        if isinstance(ref, dict) and ref.get("source_id"):
+            return str(ref["source_id"])
+    return None
+
+
+def _requirement_key(record: dict) -> tuple[str, str | None]:
+    requirement_id = str(record.get("requirement_id") or "").strip() or None
+    if requirement_id:
+        return requirement_id, requirement_id
+    fallback = _source_id_fallback(record) or str(record.get("trace_id") or "").strip()
+    return f"unidentified:{fallback or 'unknown'}", None
+
+
+def _stable_json_key(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _append_unique(target: list, value: object) -> None:
+    if value is None or value == "":
+        return
+    key = _stable_json_key(value)
+    if all(_stable_json_key(existing) != key for existing in target):
+        target.append(value)
+
+
+def _aggregate_requirement_records(records: list[dict]) -> dict[str, dict]:
+    grouped: dict[str, dict] = {}
+    sorted_records = sorted(records, key=lambda item: int(item.get("trace_index") or 0))
+    for record in sorted_records:
+        key, requirement_id = _requirement_key(record)
+        aggregate = grouped.setdefault(
+            key,
+            {
+                "requirement_key": key,
+                "requirement_id": requirement_id,
+                "trace_ids": [],
+                "texts": [],
+                "source_refs": [],
+                "normative_strengths": [],
+                "testability_hints": [],
+            },
+        )
+        if aggregate["requirement_id"] is None and requirement_id is not None:
+            aggregate["requirement_id"] = requirement_id
+        _append_unique(aggregate["trace_ids"], str(record.get("trace_id") or ""))
+        _append_unique(aggregate["texts"], str(record.get("text") or ""))
+        for ref in record.get("source_refs") or []:
+            if isinstance(ref, dict):
+                _append_unique(aggregate["source_refs"], ref)
+        _append_unique(aggregate["normative_strengths"], str(record.get("normative_strength") or ""))
+        _append_unique(aggregate["testability_hints"], str(record.get("testability_hint") or ""))
+    for aggregate in grouped.values():
+        aggregate["source_refs"] = sorted(aggregate["source_refs"], key=_stable_json_key)
+    return grouped
+
+
+def _changed_requirement_fields(previous: dict, current: dict) -> list[str]:
+    changed_fields: list[str] = []
+    for field in ("texts", "source_refs", "normative_strengths", "testability_hints"):
+        if previous.get(field) != current.get(field):
+            changed_fields.append(field)
+    return changed_fields
+
+
+def _requirement_change_entry(
+    *,
+    doc_id: str,
+    status: str,
+    requirement_key: str,
+    previous: dict | None,
+    current: dict | None,
+    changed_fields: list[str],
+) -> RequirementChangeImpactEntry:
+    previous = previous or {}
+    current = current or {}
+    return RequirementChangeImpactEntry(
+        doc_id=doc_id,
+        requirement_key=requirement_key,
+        requirement_id=current.get("requirement_id") or previous.get("requirement_id"),
+        status=status,
+        changed_fields=changed_fields,
+        previous_trace_ids=list(previous.get("trace_ids") or []),
+        current_trace_ids=list(current.get("trace_ids") or []),
+        previous_texts=list(previous.get("texts") or []),
+        current_texts=list(current.get("texts") or []),
+        previous_source_refs=list(previous.get("source_refs") or []),
+        current_source_refs=list(current.get("source_refs") or []),
+        previous_normative_strengths=list(previous.get("normative_strengths") or []),
+        current_normative_strengths=list(current.get("normative_strengths") or []),
+        previous_testability_hints=list(previous.get("testability_hints") or []),
+        current_testability_hints=list(current.get("testability_hints") or []),
+    )
+
+
+def _load_requirement_trace_records(
+    *,
+    manifest_path: Path,
+    manifest: CorpusManifest,
+    document: CorpusDocument | None,
+) -> list[dict]:
+    if document is None:
+        return []
+    path = _resolve_requirement_traceability_path(
+        manifest_path=manifest_path,
+        manifest=manifest,
+        document=document,
+    )
+    if path is None:
+        return []
+    return _read_jsonl_records(path)
+
+
+def _build_requirement_change_impact_report(
+    *,
+    previous_manifest_path: Path,
+    current_manifest_path: Path,
+    current_manifest: CorpusManifest,
+) -> RequirementChangeImpactReport:
+    previous_manifest = _load_json_model(previous_manifest_path, CorpusManifest)
+    previous_by_id = {document.doc_id: document for document in previous_manifest.documents}
+    current_by_id = {document.doc_id: document for document in current_manifest.documents}
+    entries: list[RequirementChangeImpactEntry] = []
+    changed_count = 0
+    removed_count = 0
+    added_count = 0
+    unchanged_count = 0
+
+    for doc_id in sorted(set(previous_by_id) | set(current_by_id)):
+        previous_records = _aggregate_requirement_records(
+            _load_requirement_trace_records(
+                manifest_path=previous_manifest_path,
+                manifest=previous_manifest,
+                document=previous_by_id.get(doc_id),
+            )
+        )
+        current_records = _aggregate_requirement_records(
+            _load_requirement_trace_records(
+                manifest_path=current_manifest_path,
+                manifest=current_manifest,
+                document=current_by_id.get(doc_id),
+            )
+        )
+        for requirement_key in sorted(set(previous_records) | set(current_records)):
+            previous = previous_records.get(requirement_key)
+            current = current_records.get(requirement_key)
+            if previous is None:
+                added_count += 1
+                entries.append(
+                    _requirement_change_entry(
+                        doc_id=doc_id,
+                        status="added",
+                        requirement_key=requirement_key,
+                        previous=None,
+                        current=current,
+                        changed_fields=["texts", "source_refs"],
+                    )
+                )
+                continue
+            if current is None:
+                removed_count += 1
+                entries.append(
+                    _requirement_change_entry(
+                        doc_id=doc_id,
+                        status="removed",
+                        requirement_key=requirement_key,
+                        previous=previous,
+                        current=None,
+                        changed_fields=["texts", "source_refs"],
+                    )
+                )
+                continue
+            changed_fields = _changed_requirement_fields(previous, current)
+            if changed_fields:
+                changed_count += 1
+                entries.append(
+                    _requirement_change_entry(
+                        doc_id=doc_id,
+                        status="changed",
+                        requirement_key=requirement_key,
+                        previous=previous,
+                        current=current,
+                        changed_fields=changed_fields,
+                    )
+                )
+            else:
+                unchanged_count += 1
+
+    return RequirementChangeImpactReport(
+        previous_manifest=str(previous_manifest_path),
+        current_manifest=str(current_manifest_path),
+        entries=entries,
+        summary=RequirementChangeImpactSummary(
+            changed_count=changed_count,
+            removed_count=removed_count,
+            added_count=added_count,
+            unchanged_count=unchanged_count,
+            documents_compared=len(set(previous_by_id) | set(current_by_id)),
+            documents_with_requirement_changes=len({entry.doc_id for entry in entries}),
+        ),
+    )
+
+
 def _run_batch_conversion(args: argparse.Namespace) -> int:
     input_dir = Path(args.input_dir)
     if not input_dir.exists() or not input_dir.is_dir():
@@ -483,6 +747,15 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
             current_manifest=corpus_manifest,
         )
         write_json(batch_output_root / "corpus_diff_report.json", diff_report.model_dump(mode="json"))
+        requirement_impact_report = _build_requirement_change_impact_report(
+            previous_manifest_path=args.previous_corpus_manifest,
+            current_manifest_path=current_manifest_path,
+            current_manifest=corpus_manifest,
+        )
+        write_json(
+            batch_output_root / "requirement_change_impact_report.json",
+            requirement_impact_report.model_dump(mode="json"),
+        )
     return final_exit_code
 
 

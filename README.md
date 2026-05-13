@@ -613,7 +613,7 @@ pdfs/
 - `summary.structure_marker_suppressed_count`
 
 출력 schema 안정성 정책과 RAG sidecar field 계약은 [docs/OUTPUT_SCHEMA.md](docs/OUTPUT_SCHEMA.md)에 별도로 정리합니다.
-Machine-readable schema는 `docs/schema/manifest.schema.json`, `docs/schema/report.schema.json`, `docs/schema/batch_report.schema.json`, `docs/schema/corpus_manifest.schema.json`, `docs/schema/corpus_diff_report.schema.json`에 있으며 `python scripts/export_output_schema.py --check`로 검증합니다.
+Machine-readable schema는 `docs/schema/manifest.schema.json`, `docs/schema/report.schema.json`, `docs/schema/batch_report.schema.json`, `docs/schema/corpus_manifest.schema.json`, `docs/schema/corpus_diff_report.schema.json`, `docs/schema/requirement_change_impact_report.schema.json`에 있으며 `python scripts/export_output_schema.py --check`로 검증합니다.
 
 `summary.table_quality[]`에는 표별 품질 진단이 기록됩니다. 복잡 표에서는
 `header_depth`, `header_confidence`, `stub_column_count`, `footnote_row_count`,
@@ -650,6 +650,12 @@ multi-page table continuation 후보는 `continuation_reasons`,
 - `--input-dir`와 `--previous-corpus-manifest`를 함께 사용할 때 생성됩니다.
 - 이전/현재 `corpus_manifest.json`의 `doc_id`와 `source_sha256`을 비교해 `added`, `changed`, `unchanged`, `removed`를 기록합니다.
 - 대량 스펙 corpus 운영에서 재변환과 vector DB re-index 대상을 줄이는 기준으로 사용합니다.
+
+### `requirement_change_impact_report.json`
+
+- `--input-dir`와 `--previous-corpus-manifest`를 함께 사용할 때 `corpus_diff_report.json`과 같이 생성됩니다.
+- 이전/현재 `requirement_traceability_rag.jsonl`을 비교해 requirement 단위 `added`, `changed`, `removed`와 원문 `source_refs`를 기록합니다.
+- 문장 요약이나 영향 추론을 하지 않고, AI Agent가 후속 impact analysis/test script 수정 범위를 찾을 수 있는 provenance만 제공합니다.
 
 ### 종료 코드와 리포트 해석
 
@@ -716,15 +722,17 @@ python3 -m pdf2md input.pdf -o output/ --table-mode auto --rag-table-output both
 - header 판단이 불확실하면 원문 header를 유지하고 `LOW_HEADER_CONFIDENCE`를 fallback reason에 남깁니다.
 - adjacent page의 header가 명확히 같은 표는 `continuation_group` metadata로만 연결하고, 확신이 낮으면 연결하지 않습니다.
 
-RAG 검색 품질을 로컬 deterministic 방식으로 점검하려면 `retrieval_chunks_rag.jsonl`이 있는 출력 폴더와 질의 fixture를 지정합니다.
+RAG 검색 품질을 로컬 deterministic 방식으로 점검하려면 `retrieval_chunks_rag.jsonl`이 있는 출력 폴더와 질의 fixture를 지정합니다. Indexer별 field mapping과 운영 checklist는 [docs/RAG_INDEXER_INTEGRATION_RECIPES.md](docs/RAG_INDEXER_INTEGRATION_RECIPES.md)에 정리되어 있습니다.
 
 ```bash
 ./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --top-k 5
+./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --top-k 5 --min-requirement-coverage 0.9 --min-table-field-coverage 0.85 --min-cross-ref-resolved-coverage 0.8 --max-chunk-token-p95 512 --max-conversion-duration-ms 10000 --fail-on-threshold
+./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --calibration-profile docs/rag_calibration_profile.example.json --fail-on-threshold
 ```
 
-Eval fixture에는 `expected_source_ids` 외에 `expected_requirement_source_ids`, `expected_table_field_source_ids`를 넣을 수 있으며 report에는 hit@k, MRR, citation coverage, requirement coverage, table-field coverage, chunk token 분포가 기록됩니다.
+Eval fixture에는 `expected_source_ids` 외에 `expected_requirement_source_ids`, `expected_table_field_source_ids`를 넣을 수 있으며 report에는 hit@k, MRR, citation coverage, requirement coverage, table-field coverage, cross-reference resolved coverage, chunk token 분포, conversion duration이 기록됩니다.
 
-`rag_eval_report.json`에는 hit@k, MRR, citation coverage, query별 retrieved chunk/source id가 기록됩니다.
+`rag_eval_report.json`에는 hit@k, MRR, citation coverage, query별 retrieved chunk/source id, threshold 통과/실패 정보가 기록됩니다.
 
 ### 구조 마커 복구 운영 포인트
 
@@ -780,11 +788,13 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100 --baseline-report /tmp/pdf2md-baseline/benchmark_report.json --max-duration-regression 0.2 --max-memory-regression 0.2 --min-pages-per-second 1.0 --fail-on-regression
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gates --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf/baseline/corpus_eval_report.json --benchmark-baseline-report /tmp/pdf2md-baseline/benchmark_report.json
+./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-rag --gates rag --rag-output-dir output --rag-eval-set rag_eval_queries.json --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
 ```
 
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
-- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, schema check, packaging smoke command/status summary
+- `rag_eval_report.json`: hit@k, MRR, citation coverage, requirement/table-field/cross-ref coverage, chunk token 분포, threshold summary
+- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, schema check, packaging smoke command/status summary
 - benchmark는 수동/릴리스 전 검증용이며 기본 CI 테스트에는 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.

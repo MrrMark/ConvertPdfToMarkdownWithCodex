@@ -165,3 +165,150 @@ def test_domain_adapter_profiles_extract_pcie_ocp_tcg_and_customer_units() -> No
     assert ocp[0]["unit_type"] == "requirement"
     assert tcg[0]["unit_type"] == "security_method"
     assert customer[0]["classification_reasons"] == ["customer_requirement_id_row"]
+
+
+def test_domain_adapter_deep_fixtures_cover_storage_pcie_ocp_tcg_and_customer_shapes() -> None:
+    nvme_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "headers": ["Log Identifier", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Log Identifier", "Description"],
+                    "cells": {"Log Identifier": "0x02", "Description": "SMART / Health Information"},
+                    "row_text": "Log Identifier = 0x02 | Description = SMART / Health Information",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 2,
+            "headers": ["Feature Identifier", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 2,
+                    "row_index": 1,
+                    "headers": ["Feature Identifier", "Description"],
+                    "cells": {"Feature Identifier": "0x0C", "Description": "Autonomous Power State Transition"},
+                    "row_text": "Feature Identifier = 0x0C | Description = Autonomous Power State Transition",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 3,
+            "headers": ["Status", "Value", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 3,
+                    "row_index": 1,
+                    "headers": ["Status", "Value", "Description"],
+                    "cells": {"Status": "Success", "Value": "0h", "Description": "Command completed successfully"},
+                    "row_text": "Status = Success | Value = 0h | Description = Command completed successfully",
+                }
+            ],
+        },
+    ]
+    pcie_tables = [
+        {
+            "page": 2,
+            "table_index": 1,
+            "headers": ["Capability", "Offset", "Field", "Description"],
+            "records": [
+                {
+                    "page": 2,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Capability", "Offset", "Field", "Description"],
+                    "cells": {
+                        "Capability": "Advanced Error Reporting",
+                        "Offset": "0x100",
+                        "Field": "Uncorrectable Error Status",
+                        "Description": "ECN-defined error status bits",
+                    },
+                    "row_text": (
+                        "Capability = Advanced Error Reporting | Offset = 0x100 | "
+                        "Field = Uncorrectable Error Status | Description = ECN-defined error status bits"
+                    ),
+                }
+            ],
+        }
+    ]
+    ocp_tables = [
+        {
+            "page": 3,
+            "table_index": 1,
+            "headers": ["Requirement ID", "SSD", "Requirement Description"],
+            "records": [
+                {
+                    "page": 3,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Requirement ID", "SSD", "Requirement Description"],
+                    "cells": {
+                        "Requirement ID": "SLIFE-12",
+                        "SSD": "Required",
+                        "Requirement Description": "The device shall report spare life.",
+                    },
+                    "row_text": (
+                        "Requirement ID = SLIFE-12 | SSD = Required | "
+                        "Requirement Description = The device shall report spare life."
+                    ),
+                }
+            ],
+        }
+    ]
+    tcg_tables = [
+        {
+            "page": 4,
+            "table_index": 1,
+            "headers": ["Object", "UID", "Description"],
+            "records": [
+                {
+                    "page": 4,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Object", "UID", "Description"],
+                    "cells": {"Object": "LockingSP", "UID": "0002h", "Description": "Locking security provider object"},
+                    "row_text": "Object = LockingSP | UID = 0002h | Description = Locking security provider object",
+                }
+            ],
+        }
+    ]
+    customer_tables = [
+        {
+            "page": 5,
+            "table_index": 1,
+            "headers": ["Req ID", "Requirement Description"],
+            "records": [
+                {
+                    "page": 5,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Req ID", "Requirement Description"],
+                    "cells": {"Req ID": "CUST-101", "Requirement Description": "The product must preserve telemetry."},
+                    "row_text": "Req ID = CUST-101 | Requirement Description = The product must preserve telemetry.",
+                }
+            ],
+        }
+    ]
+
+    nvme = build_domain_units(domain_adapter=DomainAdapterMode.NVME, rag_tables=nvme_tables)
+    pcie = build_domain_units(domain_adapter=DomainAdapterMode.PCIE, rag_tables=pcie_tables)
+    ocp = build_domain_units(domain_adapter=DomainAdapterMode.OCP, rag_tables=ocp_tables)
+    tcg = build_domain_units(domain_adapter=DomainAdapterMode.TCG, rag_tables=tcg_tables)
+    customer = build_domain_units(domain_adapter=DomainAdapterMode.CUSTOMER_REQUIREMENTS, rag_tables=customer_tables)
+
+    assert [record["unit_type"] for record in nvme] == ["log_page", "feature", "enum_value"]
+    assert nvme[0]["value"] == "0x02"
+    assert pcie[0]["unit_type"] == "register_field"
+    assert pcie[0]["name"] == "Advanced Error Reporting"
+    assert ocp[0]["name"] == "SLIFE-12"
+    assert tcg[0]["unit_type"] == "security_method"
+    assert customer[0]["classification_reasons"] == ["customer_requirement_id_row"]
