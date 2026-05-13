@@ -162,6 +162,16 @@
           "title": "Code Block Count",
           "type": "integer"
         },
+        "cross_ref_file_count": {
+          "default": 0,
+          "title": "Cross Ref File Count",
+          "type": "integer"
+        },
+        "cross_ref_record_count": {
+          "default": 0,
+          "title": "Cross Ref Record Count",
+          "type": "integer"
+        },
         "deduplicated_blocks": {
           "items": {
             "additionalProperties": true,
@@ -219,6 +229,11 @@
           },
           "title": "Low Confidence Pages",
           "type": "array"
+        },
+        "normative_requirement_count": {
+          "default": 0,
+          "title": "Normative Requirement Count",
+          "type": "integer"
         },
         "ocr_confidence_by_page": {
           "additionalProperties": {
@@ -297,6 +312,31 @@
         "rag_text_block_record_count": {
           "default": 0,
           "title": "Rag Text Block Record Count",
+          "type": "integer"
+        },
+        "requirement_file_count": {
+          "default": 0,
+          "title": "Requirement File Count",
+          "type": "integer"
+        },
+        "requirement_record_count": {
+          "default": 0,
+          "title": "Requirement Record Count",
+          "type": "integer"
+        },
+        "semantic_low_confidence_count": {
+          "default": 0,
+          "title": "Semantic Low Confidence Count",
+          "type": "integer"
+        },
+        "semantic_unit_file_count": {
+          "default": 0,
+          "title": "Semantic Unit File Count",
+          "type": "integer"
+        },
+        "semantic_unit_record_count": {
+          "default": 0,
+          "title": "Semantic Unit Record Count",
           "type": "integer"
         },
         "stage_durations_ms": {
@@ -447,6 +487,11 @@
         "total_suppressed_lines": {
           "default": 0,
           "title": "Total Suppressed Lines",
+          "type": "integer"
+        },
+        "unresolved_cross_ref_count": {
+          "default": 0,
+          "title": "Unresolved Cross Ref Count",
           "type": "integer"
         },
         "warning_count": {

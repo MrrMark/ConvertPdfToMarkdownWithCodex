@@ -36,6 +36,9 @@ class Config(BaseModel):
     rag_tables_markdown_filename: str = "rag_tables.md"
     rag_tables_jsonl_filename: str = "tables_rag.jsonl"
     rag_text_blocks_jsonl_filename: str = "text_blocks_rag.jsonl"
+    semantic_units_jsonl_filename: str = "semantic_units_rag.jsonl"
+    requirements_jsonl_filename: str = "requirements_rag.jsonl"
+    cross_refs_jsonl_filename: str = "cross_refs_rag.jsonl"
     assets_dirname: str = "assets"
 
     def selected_pages(self, total_pages: int) -> list[int]:

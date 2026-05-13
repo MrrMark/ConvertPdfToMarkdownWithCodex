@@ -31,8 +31,15 @@ from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown_blocks_result
 from pdf2md.serializers.rag_tables import (
     flatten_rag_table_records,
+    normalize_rag_table_payload,
     serialize_rag_tables_jsonl,
     serialize_rag_tables_markdown,
+)
+from pdf2md.serializers.rag_semantics import (
+    build_semantic_layer,
+    serialize_cross_refs_jsonl,
+    serialize_requirements_jsonl,
+    serialize_semantic_units_jsonl,
 )
 from pdf2md.serializers.rag_text_blocks import build_text_blocks, serialize_text_blocks_jsonl
 from pdf2md.serializers.report import serialize_report
@@ -273,6 +280,19 @@ def _write_rag_text_block_output(config: Config, records: list[dict]) -> tuple[i
     return len(records), 1
 
 
+def _write_semantic_layer_outputs(
+    config: Config,
+    *,
+    semantic_units: list[dict],
+    requirements: list[dict],
+    cross_refs: list[dict],
+) -> tuple[int, int, int, int, int, int]:
+    write_text(config.output_dir / config.semantic_units_jsonl_filename, serialize_semantic_units_jsonl(semantic_units))
+    write_text(config.output_dir / config.requirements_jsonl_filename, serialize_requirements_jsonl(requirements))
+    write_text(config.output_dir / config.cross_refs_jsonl_filename, serialize_cross_refs_jsonl(cross_refs))
+    return len(semantic_units), 1, len(requirements), 1, len(cross_refs), 1
+
+
 def run_conversion(config: Config) -> ConversionResult:
     """Run conversion and write markdown, manifest, and report outputs."""
     started_at = datetime.now(timezone.utc)
@@ -305,6 +325,15 @@ def run_conversion(config: Config) -> ConversionResult:
     structure_low_confidence_count = 0
     rag_text_block_record_count = 0
     rag_text_block_file_count = 0
+    semantic_unit_record_count = 0
+    semantic_unit_file_count = 0
+    requirement_record_count = 0
+    requirement_file_count = 0
+    cross_ref_record_count = 0
+    cross_ref_file_count = 0
+    semantic_low_confidence_count = 0
+    unresolved_cross_ref_count = 0
+    normative_requirement_count = 0
     engine_usage = {
         "pypdf": True,
         "pdfplumber": True,
@@ -490,6 +519,7 @@ def run_conversion(config: Config) -> ConversionResult:
         text_lines_by_page=raw_lines_by_page,
     )
     finish_stage("table_extraction", table_started)
+    table_result.rag_tables = normalize_rag_table_payload(table_result.rag_tables)
     image_started = stage_start()
     logger.info("Extracting images mode=%s", image_mode)
     page_image_boxes = {page: pdf_context.get_image_boxes(page) for page in selected_pages}
@@ -623,6 +653,29 @@ def run_conversion(config: Config) -> ConversionResult:
     structure_low_confidence_count = text_block_result.structure_low_confidence_count
     finish_stage("rag_text_blocks", rag_text_started)
 
+    semantic_started = stage_start()
+    semantic_result = build_semantic_layer(
+        text_block_records=text_block_result.records,
+        rag_tables=table_result.rag_tables,
+    )
+    (
+        semantic_unit_record_count,
+        semantic_unit_file_count,
+        requirement_record_count,
+        requirement_file_count,
+        cross_ref_record_count,
+        cross_ref_file_count,
+    ) = _write_semantic_layer_outputs(
+        config,
+        semantic_units=semantic_result.semantic_units,
+        requirements=semantic_result.requirements,
+        cross_refs=semantic_result.cross_refs,
+    )
+    semantic_low_confidence_count = semantic_result.semantic_low_confidence_count
+    unresolved_cross_ref_count = semantic_result.unresolved_cross_ref_count
+    normative_requirement_count = semantic_result.normative_requirement_count
+    finish_stage("rag_semantics", semantic_started)
+
     markdown_started = stage_start()
     markdown_result = serialize_markdown_blocks_result(
         page_text_blocks={
@@ -682,6 +735,10 @@ def run_conversion(config: Config) -> ConversionResult:
             "rag_table_output": rag_table_output.value,
             "rag_text_blocks_output": "jsonl",
             "rag_text_blocks_jsonl_filename": config.rag_text_blocks_jsonl_filename,
+            "semantic_layer_output": "jsonl",
+            "semantic_units_jsonl_filename": config.semantic_units_jsonl_filename,
+            "requirements_jsonl_filename": config.requirements_jsonl_filename,
+            "cross_refs_jsonl_filename": config.cross_refs_jsonl_filename,
             "debug": config.debug,
             "pages": config.pages,
             "version": config.version,
@@ -764,6 +821,15 @@ def run_conversion(config: Config) -> ConversionResult:
         structure_low_confidence_count=structure_low_confidence_count,
         rag_text_block_record_count=rag_text_block_record_count,
         rag_text_block_file_count=rag_text_block_file_count,
+        semantic_unit_record_count=semantic_unit_record_count,
+        semantic_unit_file_count=semantic_unit_file_count,
+        requirement_record_count=requirement_record_count,
+        requirement_file_count=requirement_file_count,
+        cross_ref_record_count=cross_ref_record_count,
+        cross_ref_file_count=cross_ref_file_count,
+        semantic_low_confidence_count=semantic_low_confidence_count,
+        unresolved_cross_ref_count=unresolved_cross_ref_count,
+        normative_requirement_count=normative_requirement_count,
     )
     report_path = config.output_dir / config.report_filename
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)

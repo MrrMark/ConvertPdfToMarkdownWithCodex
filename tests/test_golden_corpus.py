@@ -18,6 +18,10 @@ from fixtures.pdf_builder import (
     build_repeated_image_pdf,
     build_simple_table_pdf,
     build_single_column_pdf,
+    build_semantic_cross_refs_pdf,
+    build_semantic_definitions_pdf,
+    build_semantic_requirements_pdf,
+    build_semantic_table_parameters_pdf,
     build_structured_text_pdf,
     build_two_column_pdf,
     build_uppercase_body_pdf,
@@ -50,6 +54,10 @@ def test_deterministic_pdf_fixture_builder_covers_priority_corpus(tmp_path: Path
         "grouped_list.pdf": build_grouped_list_pdf,
         "code_block.pdf": build_code_block_pdf,
         "bottom_footnote.pdf": build_bottom_footnote_pdf,
+        "semantic_requirements.pdf": build_semantic_requirements_pdf,
+        "semantic_definitions.pdf": build_semantic_definitions_pdf,
+        "semantic_cross_refs.pdf": build_semantic_cross_refs_pdf,
+        "semantic_table_parameters.pdf": build_semantic_table_parameters_pdf,
         "password.pdf": build_password_pdf,
     }
 
@@ -79,6 +87,13 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         "grouped_list": (build_grouped_list_pdf, {}),
         "code_block": (build_code_block_pdf, {}),
         "bottom_footnote": (build_bottom_footnote_pdf, {}),
+        "semantic_requirements": (build_semantic_requirements_pdf, {}),
+        "semantic_definitions": (build_semantic_definitions_pdf, {}),
+        "semantic_cross_refs": (build_semantic_cross_refs_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
+        "semantic_table_parameters": (
+            build_semantic_table_parameters_pdf,
+            {"rag_table_output": RagTableOutputMode.BOTH},
+        ),
         "password": (lambda path: build_password_pdf(path, password="secret"), {"password": "secret"}),
     }
 
@@ -106,7 +121,14 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         assert normalize_report(json.loads((output_dir / "report.json").read_text(encoding="utf-8"))) == json.loads(
             (golden_dir / "report.json").read_text(encoding="utf-8")
         )
-        for sidecar_name in ("rag_tables.md", "tables_rag.jsonl", "text_blocks_rag.jsonl"):
+        for sidecar_name in (
+            "rag_tables.md",
+            "tables_rag.jsonl",
+            "text_blocks_rag.jsonl",
+            "semantic_units_rag.jsonl",
+            "requirements_rag.jsonl",
+            "cross_refs_rag.jsonl",
+        ):
             golden_sidecar = golden_dir / sidecar_name
             output_sidecar = output_dir / sidecar_name
             if golden_sidecar.exists():

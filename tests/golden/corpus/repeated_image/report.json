@@ -54,11 +54,14 @@
   "status": "success",
   "summary": {
     "code_block_count": 0,
+    "cross_ref_file_count": 1,
+    "cross_ref_record_count": 0,
     "font_heading_candidate_count": 0,
     "footnote_candidate_count": 0,
     "heading_count": 0,
     "hyphenation_repair_count": 0,
     "list_item_count": 0,
+    "normative_requirement_count": 0,
     "page_cache_hits": 2,
     "page_cache_misses": 2,
     "pages_per_second": null,
@@ -70,6 +73,11 @@
     "rag_table_record_count": 0,
     "rag_text_block_file_count": 1,
     "rag_text_block_record_count": 2,
+    "requirement_file_count": 1,
+    "requirement_record_count": 0,
+    "semantic_low_confidence_count": 0,
+    "semantic_unit_file_count": 1,
+    "semantic_unit_record_count": 0,
     "stage_durations_ms": {
       "image_extraction": 0,
       "manifest": 0,
@@ -79,6 +87,7 @@
       "output_setup": 0,
       "page_selection": 0,
       "pdf_open": 0,
+      "rag_semantics": 0,
       "rag_tables": 0,
       "rag_text_blocks": 0,
       "reporting": 0,
@@ -96,6 +105,7 @@
     "table_total": 0,
     "text_line_extract_count": 2,
     "total_suppressed_lines": 0,
+    "unresolved_cross_ref_count": 0,
     "warning_count": 0
   },
   "warnings": []

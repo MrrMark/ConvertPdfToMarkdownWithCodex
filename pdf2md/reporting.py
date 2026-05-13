@@ -96,6 +96,15 @@ def build_report(
     structure_low_confidence_count: int = 0,
     rag_text_block_record_count: int = 0,
     rag_text_block_file_count: int = 0,
+    semantic_unit_record_count: int = 0,
+    semantic_unit_file_count: int = 0,
+    requirement_record_count: int = 0,
+    requirement_file_count: int = 0,
+    cross_ref_record_count: int = 0,
+    cross_ref_file_count: int = 0,
+    semantic_low_confidence_count: int = 0,
+    unresolved_cross_ref_count: int = 0,
+    normative_requirement_count: int = 0,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
     excluded_images = excluded_images or []
@@ -176,6 +185,15 @@ def build_report(
         structure_low_confidence_count=structure_low_confidence_count,
         rag_text_block_record_count=rag_text_block_record_count,
         rag_text_block_file_count=rag_text_block_file_count,
+        semantic_unit_record_count=semantic_unit_record_count,
+        semantic_unit_file_count=semantic_unit_file_count,
+        requirement_record_count=requirement_record_count,
+        requirement_file_count=requirement_file_count,
+        cross_ref_record_count=cross_ref_record_count,
+        cross_ref_file_count=cross_ref_file_count,
+        semantic_low_confidence_count=semantic_low_confidence_count,
+        unresolved_cross_ref_count=unresolved_cross_ref_count,
+        normative_requirement_count=normative_requirement_count,
     )
 
     return Report(
