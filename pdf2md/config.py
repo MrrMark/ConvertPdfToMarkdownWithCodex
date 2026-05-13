@@ -20,6 +20,7 @@ class Config(BaseModel):
     table_mode: TableMode = TableMode.AUTO
     rag_table_output: RagTableOutputMode = RagTableOutputMode.NONE
     domain_adapter: DomainAdapterMode = DomainAdapterMode.NONE
+    confidential_safe_mode: bool = False
     force_ocr: bool = False
     ocr_lang: str = "eng"
     keep_page_markers: bool = False
@@ -43,6 +44,9 @@ class Config(BaseModel):
     retrieval_chunks_jsonl_filename: str = "retrieval_chunks_rag.jsonl"
     figures_rag_jsonl_filename: str = "figures_rag.jsonl"
     domain_units_jsonl_filename: str = "domain_units_rag.jsonl"
+    requirement_traceability_jsonl_filename: str = "requirement_traceability_rag.jsonl"
+    technical_tables_jsonl_filename: str = "technical_tables_rag.jsonl"
+    sanitized_report_filename: str = "sanitized_report.json"
     assets_dirname: str = "assets"
 
     def selected_pages(self, total_pages: int) -> list[int]:

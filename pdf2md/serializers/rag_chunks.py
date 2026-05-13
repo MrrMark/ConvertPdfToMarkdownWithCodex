@@ -59,7 +59,12 @@ def _make_chunk(
     semantic_types: list[str],
     normative_strength: str | None,
     retrieval_priority: int,
+    boundary_reasons: list[str] | None = None,
+    chunk_group_id: str | None = None,
 ) -> dict[str, Any]:
+    dedupe_key = "|".join(
+        sorted(str(ref.get("source_id")) for ref in source_refs if isinstance(ref, dict) and ref.get("source_id"))
+    )
     return {
         "chunk_id": f"chunk-{index:06d}",
         "chunk_index": index,
@@ -74,6 +79,12 @@ def _make_chunk(
         "retrieval_priority": retrieval_priority,
         "char_count": len(text),
         "token_estimate": _token_estimate(text),
+        "section_path": " > ".join(heading_path),
+        "chunk_group_id": chunk_group_id,
+        "source_record_count": len(source_refs),
+        "source_dedupe_key": dedupe_key or None,
+        "chunk_boundary_policy": "source_record",
+        "chunk_boundary_reasons": sorted(dict.fromkeys(boundary_reasons or ["single_source_record"])),
     }
 
 
@@ -97,6 +108,8 @@ def build_retrieval_chunks(
     requirements: list[dict[str, Any]],
     rag_tables: list[dict[str, Any]],
     domain_units: list[dict[str, Any]] | None = None,
+    requirement_traceability_records: list[dict[str, Any]] | None = None,
+    technical_table_records: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Build deterministic ready-to-index chunks for RAG operations."""
     chunks: list[dict[str, Any]] = []
@@ -118,6 +131,8 @@ def build_retrieval_chunks(
             semantic_types=[str(record.get("block_type") or "text_block")],
             normative_strength=None,
             retrieval_priority=50,
+            boundary_reasons=["text_block_boundary"],
+            chunk_group_id=f"text-page-{_page_of(record):04d}",
         )
 
     for record in sorted(requirements, key=lambda item: int(item.get("semantic_index") or 0)):
@@ -134,6 +149,34 @@ def build_retrieval_chunks(
             semantic_types=["requirement"],
             normative_strength=str(record.get("normative_strength") or "unknown"),
             retrieval_priority=100,
+            boundary_reasons=["requirement_boundary"],
+            chunk_group_id=f"requirement-page-{_page_range_from_record(record)[0]:04d}",
+        )
+
+    for record in sorted(requirement_traceability_records or [], key=lambda item: int(item.get("trace_index") or 0)):
+        text = str(record.get("text") or "").strip()
+        if not text:
+            continue
+        append_chunk(
+            chunk_type="requirement_trace",
+            text=text,
+            source_refs=list(record.get("source_refs") or [])
+            + [
+                {
+                    "source_type": "requirement_trace",
+                    "source_id": record.get("trace_id"),
+                    "page": _page_range_from_record(record)[0],
+                    "bbox": _bbox(record),
+                }
+            ],
+            page_range=_page_range_from_record(record),
+            bbox=_bbox(record),
+            heading_path=_heading_path(record),
+            semantic_types=["requirement_trace"],
+            normative_strength=str(record.get("normative_strength") or "unknown"),
+            retrieval_priority=98,
+            boundary_reasons=["traceability_boundary"],
+            chunk_group_id=f"requirement-trace-page-{_page_range_from_record(record)[0]:04d}",
         )
 
     for record in sorted(semantic_units, key=lambda item: int(item.get("semantic_index") or 0)):
@@ -153,6 +196,8 @@ def build_retrieval_chunks(
             semantic_types=[semantic_type],
             normative_strength=str(record.get("normative_strength") or "unknown"),
             retrieval_priority=80,
+            boundary_reasons=["semantic_unit_boundary"],
+            chunk_group_id=f"semantic-page-{_page_range_from_record(record)[0]:04d}",
         )
 
     for record in sorted(domain_units or [], key=lambda item: int(item.get("domain_unit_index") or 0)):
@@ -177,6 +222,34 @@ def build_retrieval_chunks(
             semantic_types=[str(record.get("unit_type") or "domain_unit")],
             normative_strength=None,
             retrieval_priority=90,
+            boundary_reasons=["domain_unit_boundary"],
+            chunk_group_id=f"domain-{record.get('domain') or 'unknown'}",
+        )
+
+    for record in sorted(technical_table_records or [], key=lambda item: int(item.get("technical_table_unit_index") or 0)):
+        text = str(record.get("text") or "").strip()
+        if not text:
+            continue
+        append_chunk(
+            chunk_type="technical_table",
+            text=text,
+            source_refs=list(record.get("source_refs") or [])
+            + [
+                {
+                    "source_type": "technical_table_unit",
+                    "source_id": record.get("technical_table_unit_id"),
+                    "page": record.get("page"),
+                    "bbox": _bbox(record),
+                }
+            ],
+            page_range=[_page_of(record), _page_of(record)],
+            bbox=_bbox(record),
+            heading_path=[],
+            semantic_types=[str(record.get("unit_type") or "technical_table")],
+            normative_strength=None,
+            retrieval_priority=88,
+            boundary_reasons=["technical_table_row_boundary"],
+            chunk_group_id=f"technical-table-{record.get('table_id') or 'unknown'}",
         )
 
     for record in flatten_rag_table_records(normalize_rag_table_payload(rag_tables)):
@@ -202,9 +275,26 @@ def build_retrieval_chunks(
             semantic_types=["table_row"],
             normative_strength=None,
             retrieval_priority=70,
+            boundary_reasons=["table_row_boundary"],
+            chunk_group_id=f"table-{record.get('table_id') or 'unknown'}",
         )
 
     return chunks
+
+
+def build_retrieval_chunk_diagnostics(records: list[dict[str, Any]], *, target_tokens: int = 512) -> dict[str, Any]:
+    """Return deterministic chunk quality diagnostics for long-spec RAG operations."""
+    token_estimates = [int(record.get("token_estimate") or 0) for record in records]
+    source_keys = [str(record.get("source_dedupe_key") or "") for record in records if record.get("source_dedupe_key")]
+    duplicate_count = len(source_keys) - len(set(source_keys))
+    return {
+        "retrieval_chunk_max_token_estimate": max(token_estimates, default=0),
+        "retrieval_chunk_average_token_estimate": round(sum(token_estimates) / len(token_estimates), 2)
+        if token_estimates
+        else 0.0,
+        "retrieval_chunk_over_target_count": sum(1 for value in token_estimates if value > target_tokens),
+        "retrieval_chunk_duplicate_source_ref_count": duplicate_count,
+    }
 
 
 def serialize_retrieval_chunks_jsonl(records: list[dict[str, Any]]) -> str:

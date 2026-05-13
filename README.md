@@ -58,7 +58,7 @@ PDF 문서를 **신뢰성 있게 Markdown으로 변환**하기 위한 CLI/라이
 - `pdfplumber` 중심으로 텍스트를 추출합니다.
 - 공백 정리는 최소화하되 의미 손실은 피합니다.
 - OCR 결과도 의미를 바꾸는 후처리를 하지 않습니다.
-- RAG 등록을 기본 운영 경로로 보고 `text_blocks_rag.jsonl`, semantic sidecar 3종, `retrieval_chunks_rag.jsonl`, `figures_rag.jsonl`을 기본 생성합니다.
+- RAG 등록을 기본 운영 경로로 보고 `text_blocks_rag.jsonl`, semantic sidecar 3종, `requirement_traceability_rag.jsonl`, `technical_tables_rag.jsonl`, `retrieval_chunks_rag.jsonl`, `figures_rag.jsonl`을 기본 생성합니다.
 
 ### 테이블
 
@@ -330,8 +330,18 @@ python3 -m pdf2md input.pdf -o output/ --domain-adapter nvme --rag-table-output 
 ```
 
 - 기본값은 `none`이며, 도메인 heuristic은 기본 변환 로직에 섞지 않습니다.
-- `nvme` adapter는 표 provenance가 명확한 command/opcode/register field/enum value 행만 `domain_units_rag.jsonl`로 생성합니다.
+- `nvme`, `pcie`, `ocp`, `tcg`, `customer-requirements` adapter는 표 provenance가 명확한 command/opcode/register field/bitfield/log page/requirement/security method 행만 `domain_units_rag.jsonl`로 생성합니다.
 - 생성된 domain unit은 `retrieval_chunks_rag.jsonl`에도 provenance와 함께 포함됩니다.
+
+### 고객 대외비 스펙 안전 모드
+
+```bash
+python3 -m pdf2md input.pdf -o output/ --confidential-safe-mode
+```
+
+- 외부 LLM/embedding 호출이 없음을 `manifest.json` 옵션에 명시합니다.
+- `manifest.json`의 source filename을 마스킹하고 `sanitized_report.json`을 추가 생성합니다.
+- batch/corpus metadata에서 공유용 파일 경로는 가능한 범위에서 filename 또는 document id로 축약합니다.
 
 ### 페이지 마커 제어
 
@@ -446,9 +456,12 @@ output/
   semantic_units_rag.jsonl # 기본 생성되는 스펙 semantic unit sidecar
   requirements_rag.jsonl   # 기본 생성되는 요구사항 filtered sidecar
   cross_refs_rag.jsonl     # 기본 생성되는 section/table/figure 참조 sidecar
+  requirement_traceability_rag.jsonl # 기본 생성되는 requirement trace/conformance sidecar
+  technical_tables_rag.jsonl # 기본 생성되는 register/bitfield/opcode/log page table sidecar
   retrieval_chunks_rag.jsonl # 기본 생성되는 vector DB ingest 후보 chunk
   figures_rag.jsonl       # 기본 생성되는 figure/diagram provenance sidecar
   domain_units_rag.jsonl  # --domain-adapter 사용 시
+  sanitized_report.json   # --confidential-safe-mode 사용 시
   rag_tables.md          # --rag-table-output markdown|both 사용 시
   tables_rag.jsonl       # --rag-table-output jsonl|both 사용 시
   assets/
@@ -508,10 +521,14 @@ pdfs/
 - `options.semantic_units_jsonl_filename`
 - `options.requirements_jsonl_filename`
 - `options.cross_refs_jsonl_filename`
+- `options.requirement_traceability_jsonl_filename`
+- `options.technical_tables_jsonl_filename`
 - `options.retrieval_chunks_jsonl_filename`
 - `options.figures_rag_jsonl_filename`
 - `options.domain_adapter`
 - `options.domain_units_jsonl_filename`
+- `options.confidential_safe_mode`
+- `options.local_only_processing`
 - `options.ocr_lang`
 - `options.repair_hyphenation`
 - `options.figure_crop_fallback`
@@ -571,10 +588,19 @@ pdfs/
 - `summary.normative_requirement_count`
 - `summary.retrieval_chunk_record_count`
 - `summary.retrieval_chunk_file_count`
+- `summary.retrieval_chunk_max_token_estimate`
+- `summary.retrieval_chunk_average_token_estimate`
+- `summary.retrieval_chunk_over_target_count`
+- `summary.retrieval_chunk_duplicate_source_ref_count`
 - `summary.figure_rag_record_count`
 - `summary.figure_rag_file_count`
 - `summary.domain_unit_record_count`
 - `summary.domain_unit_file_count`
+- `summary.requirement_traceability_record_count`
+- `summary.requirement_traceability_file_count`
+- `summary.technical_table_record_count`
+- `summary.technical_table_file_count`
+- `summary.confidential_safe_mode`
 - `summary.font_heading_candidate_count`
 - `summary.footnote_candidate_count`
 - `summary.structure_low_confidence_count`
@@ -587,7 +613,7 @@ pdfs/
 - `summary.structure_marker_suppressed_count`
 
 출력 schema 안정성 정책과 RAG sidecar field 계약은 [docs/OUTPUT_SCHEMA.md](docs/OUTPUT_SCHEMA.md)에 별도로 정리합니다.
-Machine-readable schema는 `docs/schema/manifest.schema.json`, `docs/schema/report.schema.json`, `docs/schema/batch_report.schema.json`, `docs/schema/corpus_manifest.schema.json`에 있으며 `python scripts/export_output_schema.py --check`로 검증합니다.
+Machine-readable schema는 `docs/schema/manifest.schema.json`, `docs/schema/report.schema.json`, `docs/schema/batch_report.schema.json`, `docs/schema/corpus_manifest.schema.json`, `docs/schema/corpus_diff_report.schema.json`에 있으며 `python scripts/export_output_schema.py --check`로 검증합니다.
 
 `summary.table_quality[]`에는 표별 품질 진단이 기록됩니다. 복잡 표에서는
 `header_depth`, `header_confidence`, `stub_column_count`, `footnote_row_count`,
@@ -618,6 +644,12 @@ multi-page table continuation 후보는 `continuation_reasons`,
 - 문서별 `doc_id`, `source_sha256`, `selected_pages`, output file map 기록
 - `text_blocks_rag`, semantic sidecar, retrieval chunk, figure sidecar 경로를 한 곳에서 추적
 - 여러 PDF 스펙을 같은 vector DB corpus로 운영할 때 incremental ingest/diff의 기준으로 사용
+
+### `corpus_diff_report.json`
+
+- `--input-dir`와 `--previous-corpus-manifest`를 함께 사용할 때 생성됩니다.
+- 이전/현재 `corpus_manifest.json`의 `doc_id`와 `source_sha256`을 비교해 `added`, `changed`, `unchanged`, `removed`를 기록합니다.
+- 대량 스펙 corpus 운영에서 재변환과 vector DB re-index 대상을 줄이는 기준으로 사용합니다.
 
 ### 종료 코드와 리포트 해석
 
@@ -668,12 +700,14 @@ python3 -m pdf2md input.pdf -o output/ --table-mode auto --rag-table-output both
 - `text_blocks_rag.jsonl`: 본문 heading/paragraph/list/code/footnote/caption 블록을 page/bbox/heading_path와 함께 기록하는 기본 RAG sidecar입니다.
 - `semantic_units_rag.jsonl`: section/requirement/definition/parameter/procedure_step/note/warning/reference를 원문과 provenance 중심으로 기록합니다.
 - `requirements_rag.jsonl`: `semantic_units_rag.jsonl` 중 명확한 normative keyword가 있는 requirement만 별도 제공하는 filtered view입니다.
-- `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix 참조와 resolved/unresolved 상태를 기록합니다.
-- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/table/domain provenance와 함께 기록합니다.
-- `figures_rag.jsonl`: 이미지/도표 bbox, caption, OCR 후보, nearby heading을 별도 기록합니다.
+- `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix와 requirement/log page/feature/opcode/register 참조의 resolved/unresolved 상태를 기록합니다.
+- `requirement_traceability_rag.jsonl`: Requirement ID, condition, dependency, exception, testability hint를 원문 기반으로 기록합니다.
+- `technical_tables_rag.jsonl`: register, bitfield, command/opcode, log page, feature identifier, enum/value table row를 typed sidecar로 기록합니다.
+- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록합니다.
+- `figures_rag.jsonl`: 이미지/도표 bbox, caption, OCR 후보, nearby heading, figure kind를 별도 기록합니다.
 - `rag_tables.md`: 검색 chunk에 넣기 쉬운 행 단위 Markdown입니다.
 - `tables_rag.jsonl`: `table_id`, `table_row_id`, `page`, `table_index`, `headers`, `cells`, `row_text`, `bbox`, `quality_score`, `fallback_reasons`를 가진 행 단위 JSONL입니다.
-- `domain_units_rag.jsonl`: `--domain-adapter nvme` 같은 opt-in adapter 사용 시 command/opcode/register field/enum value를 기록합니다.
+- `domain_units_rag.jsonl`: `--domain-adapter nvme|pcie|ocp|tcg|customer-requirements` 사용 시 domain unit을 기록합니다.
 - 텍스트 블록 sidecar는 본문을 요약하거나 재서술하지 않고, 추출된 원문 블록과 provenance만 기록합니다.
 - semantic sidecar도 요약/재서술/설명 생성을 하지 않고, 명확한 스펙 신호만 보수적으로 분류합니다.
 - sidecar는 셀 텍스트를 요약하거나 해석하지 않고, 추출된 셀을 행 단위로 재배열만 합니다.
@@ -687,6 +721,8 @@ RAG 검색 품질을 로컬 deterministic 방식으로 점검하려면 `retrieva
 ```bash
 ./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --top-k 5
 ```
+
+Eval fixture에는 `expected_source_ids` 외에 `expected_requirement_source_ids`, `expected_table_field_source_ids`를 넣을 수 있으며 report에는 hit@k, MRR, citation coverage, requirement coverage, table-field coverage, chunk token 분포가 기록됩니다.
 
 `rag_eval_report.json`에는 hit@k, MRR, citation coverage, query별 retrieved chunk/source id가 기록됩니다.
 

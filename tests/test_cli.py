@@ -32,6 +32,8 @@ def test_cli_runs_and_writes_outputs(sample_pdf: Path, tmp_path: Path) -> None:
     assert (output_dir / "semantic_units_rag.jsonl").exists()
     assert (output_dir / "requirements_rag.jsonl").exists()
     assert (output_dir / "cross_refs_rag.jsonl").exists()
+    assert (output_dir / "requirement_traceability_rag.jsonl").exists()
+    assert (output_dir / "technical_tables_rag.jsonl").exists()
     assert (output_dir / "retrieval_chunks_rag.jsonl").exists()
     assert (output_dir / "figures_rag.jsonl").exists()
 
@@ -257,12 +259,15 @@ def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
     assert manifest["options"]["semantic_units_jsonl_filename"] == "semantic_units_rag.jsonl"
     assert manifest["options"]["requirements_jsonl_filename"] == "requirements_rag.jsonl"
     assert manifest["options"]["cross_refs_jsonl_filename"] == "cross_refs_rag.jsonl"
+    assert manifest["options"]["requirement_traceability_jsonl_filename"] == "requirement_traceability_rag.jsonl"
+    assert manifest["options"]["technical_tables_jsonl_filename"] == "technical_tables_rag.jsonl"
     assert manifest["options"]["retrieval_chunks_output"] == "jsonl"
     assert manifest["options"]["retrieval_chunks_jsonl_filename"] == "retrieval_chunks_rag.jsonl"
     assert manifest["options"]["figures_rag_output"] == "jsonl"
     assert manifest["options"]["figures_rag_jsonl_filename"] == "figures_rag.jsonl"
     assert manifest["options"]["domain_adapter"] == "none"
     assert manifest["options"]["domain_units_jsonl_filename"] == "domain_units_rag.jsonl"
+    assert manifest["options"]["confidential_safe_mode"] is False
     assert (output_dir / "debug" / "page-0001-raw-lines.json").exists()
 
 
@@ -314,6 +319,10 @@ def test_cli_batch_mode_generates_per_pdf_outputs(
     assert alpha_entry["files"]["semantic_units_rag"].endswith("alpha/semantic_units_rag.jsonl")
     assert alpha_entry["files"]["requirements_rag"].endswith("alpha/requirements_rag.jsonl")
     assert alpha_entry["files"]["cross_refs_rag"].endswith("alpha/cross_refs_rag.jsonl")
+    assert alpha_entry["files"]["requirement_traceability_rag"].endswith(
+        "alpha/requirement_traceability_rag.jsonl"
+    )
+    assert alpha_entry["files"]["technical_tables_rag"].endswith("alpha/technical_tables_rag.jsonl")
     assert alpha_entry["files"]["retrieval_chunks_rag"].endswith("alpha/retrieval_chunks_rag.jsonl")
     assert alpha_entry["files"]["figures_rag"].endswith("alpha/figures_rag.jsonl")
     corpus_manifest = json.loads((output_root / "corpus_manifest.json").read_text(encoding="utf-8"))
@@ -429,6 +438,91 @@ def test_cli_batch_mode_skip_existing_marks_document_skipped(sample_pdf: Path, t
     corpus_manifest = json.loads((output_root / "corpus_manifest.json").read_text(encoding="utf-8"))
     assert corpus_manifest["documents"][0]["doc_id"] == "alpha"
     assert corpus_manifest["documents"][0]["skipped"] is True
+
+
+def test_cli_confidential_safe_mode_redacts_public_metadata(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "safe-out"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--pages",
+        "1",
+        "--confidential-safe-mode",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["input_file"] == "redacted.pdf"
+    assert manifest["options"]["confidential_safe_mode"] is True
+    assert manifest["options"]["external_llm_calls"] is False
+    assert report["summary"]["confidential_safe_mode"] is True
+    assert (output_dir / "sanitized_report.json").exists()
+
+
+def test_cli_batch_mode_writes_incremental_corpus_diff(sample_pdf: Path, tmp_path: Path) -> None:
+    input_dir = tmp_path / "batch-input-diff"
+    input_dir.mkdir()
+    (input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+    previous_manifest = tmp_path / "previous_corpus_manifest.json"
+    previous_manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "purpose": "rag_corpus_ingest",
+                "input_dir": str(input_dir),
+                "output_dir": str(input_dir / "output"),
+                "documents": [
+                    {
+                        "doc_id": "alpha",
+                        "input_pdf": str(input_dir / "alpha.pdf"),
+                        "source_sha256": "0" * 64,
+                        "output_dir": str(input_dir / "output" / "alpha"),
+                        "status": "success",
+                        "selected_pages": [1],
+                        "skipped": False,
+                        "files": {},
+                    },
+                    {
+                        "doc_id": "removed",
+                        "input_pdf": str(input_dir / "removed.pdf"),
+                        "source_sha256": "1" * 64,
+                        "output_dir": str(input_dir / "output" / "removed"),
+                        "status": "success",
+                        "selected_pages": [1],
+                        "skipped": False,
+                        "files": {},
+                    },
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        "--input-dir",
+        str(input_dir),
+        "--previous-corpus-manifest",
+        str(previous_manifest),
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    diff = json.loads((input_dir / "output" / "corpus_diff_report.json").read_text(encoding="utf-8"))
+    assert diff["summary"]["changed_count"] == 1
+    assert diff["summary"]["removed_count"] == 1
+    assert [entry["status"] for entry in diff["entries"]] == ["changed", "removed"]
 
 
 def test_cli_batch_mode_rejects_output_dir(sample_pdf: Path, tmp_path: Path) -> None:

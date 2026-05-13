@@ -1,0 +1,132 @@
+{
+  "$defs": {
+    "CorpusDiffEntry": {
+      "properties": {
+        "current_output_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Output Dir"
+        },
+        "current_source_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Source Sha256"
+        },
+        "doc_id": {
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "previous_output_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Previous Output Dir"
+        },
+        "previous_source_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Previous Source Sha256"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "doc_id",
+        "status"
+      ],
+      "title": "CorpusDiffEntry",
+      "type": "object"
+    },
+    "CorpusDiffSummary": {
+      "properties": {
+        "added_count": {
+          "default": 0,
+          "title": "Added Count",
+          "type": "integer"
+        },
+        "changed_count": {
+          "default": 0,
+          "title": "Changed Count",
+          "type": "integer"
+        },
+        "removed_count": {
+          "default": 0,
+          "title": "Removed Count",
+          "type": "integer"
+        },
+        "unchanged_count": {
+          "default": 0,
+          "title": "Unchanged Count",
+          "type": "integer"
+        }
+      },
+      "title": "CorpusDiffSummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "current_manifest": {
+      "title": "Current Manifest",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/CorpusDiffEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "previous_manifest": {
+      "title": "Previous Manifest",
+      "type": "string"
+    },
+    "purpose": {
+      "default": "rag_corpus_incremental_diff",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/CorpusDiffSummary"
+    }
+  },
+  "required": [
+    "previous_manifest",
+    "current_manifest"
+  ],
+  "title": "CorpusDiffReport",
+  "type": "object"
+}

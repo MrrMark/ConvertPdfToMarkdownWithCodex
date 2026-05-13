@@ -30,9 +30,17 @@ from pdf2md.models import (
 from pdf2md.reporting import build_report, count_structure_marker_reasons, determine_conversion_status, finalize_page_statuses
 from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown_blocks_result
-from pdf2md.serializers.rag_chunks import build_retrieval_chunks, serialize_retrieval_chunks_jsonl
+from pdf2md.serializers.rag_chunks import (
+    build_retrieval_chunk_diagnostics,
+    build_retrieval_chunks,
+    serialize_retrieval_chunks_jsonl,
+)
 from pdf2md.serializers.rag_domain_adapters import build_domain_units, serialize_domain_units_jsonl
 from pdf2md.serializers.rag_figures import build_figure_records, serialize_figures_jsonl
+from pdf2md.serializers.rag_requirements import (
+    build_requirement_traceability_records,
+    serialize_requirement_traceability_jsonl,
+)
 from pdf2md.serializers.rag_tables import (
     flatten_rag_table_records,
     normalize_rag_table_payload,
@@ -46,6 +54,7 @@ from pdf2md.serializers.rag_semantics import (
     serialize_semantic_units_jsonl,
 )
 from pdf2md.serializers.rag_text_blocks import build_text_blocks, serialize_text_blocks_jsonl
+from pdf2md.serializers.rag_technical_tables import build_technical_table_records, serialize_technical_tables_jsonl
 from pdf2md.serializers.report import serialize_report
 from pdf2md.utils.io import ensure_output_dirs, write_json, write_text
 from pdf2md.utils.pdf import PdfDocumentContext, PdfOpenError
@@ -312,6 +321,19 @@ def _write_domain_unit_output(config: Config, records: list[dict]) -> tuple[int,
     return len(records), 1
 
 
+def _write_requirement_traceability_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(
+        config.output_dir / config.requirement_traceability_jsonl_filename,
+        serialize_requirement_traceability_jsonl(records),
+    )
+    return len(records), 1
+
+
+def _write_technical_table_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(config.output_dir / config.technical_tables_jsonl_filename, serialize_technical_tables_jsonl(records))
+    return len(records), 1
+
+
 def run_conversion(config: Config) -> ConversionResult:
     """Run conversion and write markdown, manifest, and report outputs."""
     started_at = datetime.now(timezone.utc)
@@ -360,10 +382,20 @@ def run_conversion(config: Config) -> ConversionResult:
     normative_requirement_count = 0
     retrieval_chunk_record_count = 0
     retrieval_chunk_file_count = 0
+    retrieval_chunk_diagnostics = {
+        "retrieval_chunk_max_token_estimate": 0,
+        "retrieval_chunk_average_token_estimate": 0.0,
+        "retrieval_chunk_over_target_count": 0,
+        "retrieval_chunk_duplicate_source_ref_count": 0,
+    }
     figure_rag_record_count = 0
     figure_rag_file_count = 0
     domain_unit_record_count = 0
     domain_unit_file_count = 0
+    requirement_traceability_record_count = 0
+    requirement_traceability_file_count = 0
+    technical_table_record_count = 0
+    technical_table_file_count = 0
     engine_usage = {
         "pypdf": True,
         "pdfplumber": True,
@@ -715,12 +747,32 @@ def run_conversion(config: Config) -> ConversionResult:
     normative_requirement_count = semantic_result.normative_requirement_count
     finish_stage("rag_semantics", semantic_started)
 
+    requirement_traceability_started = stage_start()
+    requirement_traceability_records = build_requirement_traceability_records(
+        requirements=semantic_result.requirements,
+        rag_tables=table_result.rag_tables,
+    )
+    requirement_traceability_record_count, requirement_traceability_file_count = _write_requirement_traceability_output(
+        config,
+        requirement_traceability_records,
+    )
+    finish_stage("rag_requirement_traceability", requirement_traceability_started)
+
+    technical_tables_started = stage_start()
+    technical_table_records = build_technical_table_records(table_result.rag_tables)
+    technical_table_record_count, technical_table_file_count = _write_technical_table_output(
+        config,
+        technical_table_records,
+    )
+    finish_stage("rag_technical_tables", technical_tables_started)
+
     domain_units: list[dict] = []
     if domain_adapter is not DomainAdapterMode.NONE:
         domain_started = stage_start()
         domain_units = build_domain_units(
             domain_adapter=domain_adapter,
             rag_tables=table_result.rag_tables,
+            technical_table_records=technical_table_records,
         )
         domain_unit_record_count, domain_unit_file_count = _write_domain_unit_output(config, domain_units)
         finish_stage("rag_domain_adapter", domain_started)
@@ -732,7 +784,10 @@ def run_conversion(config: Config) -> ConversionResult:
         requirements=semantic_result.requirements,
         rag_tables=table_result.rag_tables,
         domain_units=domain_units,
+        requirement_traceability_records=requirement_traceability_records,
+        technical_table_records=technical_table_records,
     )
+    retrieval_chunk_diagnostics = build_retrieval_chunk_diagnostics(retrieval_chunks)
     retrieval_chunk_record_count, retrieval_chunk_file_count = _write_retrieval_chunk_output(
         config,
         retrieval_chunks,
@@ -782,7 +837,7 @@ def run_conversion(config: Config) -> ConversionResult:
 
     manifest_started = stage_start()
     manifest = Manifest(
-        input_file=config.input_pdf.name,
+        input_file="redacted.pdf" if config.confidential_safe_mode else config.input_pdf.name,
         total_pages=total_pages,
         selected_pages=selected_pages,
         options={
@@ -797,12 +852,22 @@ def run_conversion(config: Config) -> ConversionResult:
             "figure_crop_fallback": config.figure_crop_fallback,
             "rag_table_output": rag_table_output.value,
             "domain_adapter": domain_adapter.value,
+            "confidential_safe_mode": config.confidential_safe_mode,
+            "local_only_processing": True,
+            "external_llm_calls": False,
+            "external_embedding_calls": False,
+            "path_redaction": "enabled" if config.confidential_safe_mode else "disabled",
+            "source_filename_masked": config.confidential_safe_mode,
             "rag_text_blocks_output": "jsonl",
             "rag_text_blocks_jsonl_filename": config.rag_text_blocks_jsonl_filename,
             "semantic_layer_output": "jsonl",
             "semantic_units_jsonl_filename": config.semantic_units_jsonl_filename,
             "requirements_jsonl_filename": config.requirements_jsonl_filename,
             "cross_refs_jsonl_filename": config.cross_refs_jsonl_filename,
+            "requirement_traceability_output": "jsonl",
+            "requirement_traceability_jsonl_filename": config.requirement_traceability_jsonl_filename,
+            "technical_tables_output": "jsonl",
+            "technical_tables_jsonl_filename": config.technical_tables_jsonl_filename,
             "retrieval_chunks_output": "jsonl",
             "retrieval_chunks_jsonl_filename": config.retrieval_chunks_jsonl_filename,
             "figures_rag_output": "jsonl",
@@ -901,14 +966,27 @@ def run_conversion(config: Config) -> ConversionResult:
         normative_requirement_count=normative_requirement_count,
         retrieval_chunk_record_count=retrieval_chunk_record_count,
         retrieval_chunk_file_count=retrieval_chunk_file_count,
+        retrieval_chunk_max_token_estimate=retrieval_chunk_diagnostics["retrieval_chunk_max_token_estimate"],
+        retrieval_chunk_average_token_estimate=retrieval_chunk_diagnostics["retrieval_chunk_average_token_estimate"],
+        retrieval_chunk_over_target_count=retrieval_chunk_diagnostics["retrieval_chunk_over_target_count"],
+        retrieval_chunk_duplicate_source_ref_count=retrieval_chunk_diagnostics[
+            "retrieval_chunk_duplicate_source_ref_count"
+        ],
         figure_rag_record_count=figure_rag_record_count,
         figure_rag_file_count=figure_rag_file_count,
         domain_unit_record_count=domain_unit_record_count,
         domain_unit_file_count=domain_unit_file_count,
+        requirement_traceability_record_count=requirement_traceability_record_count,
+        requirement_traceability_file_count=requirement_traceability_file_count,
+        technical_table_record_count=technical_table_record_count,
+        technical_table_file_count=technical_table_file_count,
+        confidential_safe_mode=config.confidential_safe_mode,
     )
     report_path = config.output_dir / config.report_filename
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)
     write_json(report_path, serialize_report(report))
+    if config.confidential_safe_mode:
+        write_json(config.output_dir / config.sanitized_report_filename, serialize_report(report))
     pdf_context.close()
 
     return ConversionResult(

@@ -13,6 +13,9 @@ from pdf2md.models import (
     BatchReport,
     BatchReportSummary,
     CorpusDocument,
+    CorpusDiffEntry,
+    CorpusDiffReport,
+    CorpusDiffSummary,
     CorpusManifest,
     ConversionStatus,
     DomainAdapterMode,
@@ -33,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input-dir", default=None, help="Input directory containing PDF files for batch conversion")
     parser.add_argument("-o", "--output-dir", default=None, help="Output directory for single PDF conversion")
     parser.add_argument("--skip-existing", action="store_true", default=False, help="Skip batch documents with existing core outputs")
+    parser.add_argument(
+        "--previous-corpus-manifest",
+        type=Path,
+        default=None,
+        help="Previous corpus_manifest.json for incremental RAG ingest diff in batch mode.",
+    )
     parser.add_argument("--pages", default=None, help="Page ranges (example: 1-3,5)")
     parser.add_argument("--password", default=None, help="Password for encrypted PDF")
     parser.add_argument(
@@ -56,7 +65,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--domain-adapter",
         choices=[m.value for m in DomainAdapterMode],
         default=DomainAdapterMode.NONE.value,
-        help="Optional domain-specific RAG adapter, for example nvme.",
+        help="Optional domain-specific RAG adapter: nvme, pcie, ocp, tcg, or customer-requirements.",
+    )
+    parser.add_argument(
+        "--confidential-safe-mode",
+        action="store_true",
+        default=False,
+        help="Redact source filenames/paths in public metadata and emit sanitized_report.json.",
     )
     parser.add_argument("--force-ocr", action="store_true", default=False)
     parser.add_argument("--ocr-lang", default="eng", help="Tesseract language code for OCR, for example eng or kor+eng.")
@@ -124,6 +139,7 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         table_mode=TableMode(args.table_mode),
         rag_table_output=RagTableOutputMode(args.rag_table_output),
         domain_adapter=DomainAdapterMode(args.domain_adapter),
+        confidential_safe_mode=args.confidential_safe_mode,
         force_ocr=args.force_ocr,
         ocr_lang=args.ocr_lang,
         keep_page_markers=args.keep_page_markers,
@@ -148,6 +164,7 @@ def _build_batch_config(args: argparse.Namespace, pdf_path: Path, output_dir: Pa
         table_mode=TableMode(args.table_mode),
         rag_table_output=RagTableOutputMode(args.rag_table_output),
         domain_adapter=DomainAdapterMode(args.domain_adapter),
+        confidential_safe_mode=args.confidential_safe_mode,
         force_ocr=args.force_ocr,
         ocr_lang=args.ocr_lang,
         keep_page_markers=args.keep_page_markers,
@@ -173,6 +190,10 @@ def _core_output_paths(config: Config) -> BatchDocumentFiles:
     )
 
 
+def _public_path(path: Path, *, confidential_safe_mode: bool) -> str:
+    return path.name if confidential_safe_mode else str(path)
+
+
 def _document_files(
     config: Config,
     *,
@@ -186,9 +207,13 @@ def _document_files(
     report = report_path or (config.output_dir / config.report_filename if include_expected_core else None)
 
     files = BatchDocumentFiles(
-        markdown=str(markdown) if markdown is not None else None,
-        manifest=str(manifest) if manifest is not None else None,
-        report=str(report) if report is not None else None,
+        markdown=_public_path(markdown, confidential_safe_mode=config.confidential_safe_mode)
+        if markdown is not None
+        else None,
+        manifest=_public_path(manifest, confidential_safe_mode=config.confidential_safe_mode)
+        if manifest is not None
+        else None,
+        report=_public_path(report, confidential_safe_mode=config.confidential_safe_mode) if report is not None else None,
     )
     sidecar_fields = {
         "text_blocks_rag": config.output_dir / config.rag_text_blocks_jsonl_filename,
@@ -198,12 +223,15 @@ def _document_files(
         "retrieval_chunks_rag": config.output_dir / config.retrieval_chunks_jsonl_filename,
         "figures_rag": config.output_dir / config.figures_rag_jsonl_filename,
         "domain_units_rag": config.output_dir / config.domain_units_jsonl_filename,
+        "requirement_traceability_rag": config.output_dir / config.requirement_traceability_jsonl_filename,
+        "technical_tables_rag": config.output_dir / config.technical_tables_jsonl_filename,
         "rag_tables_markdown": config.output_dir / config.rag_tables_markdown_filename,
         "tables_rag_jsonl": config.output_dir / config.rag_tables_jsonl_filename,
+        "sanitized_report": config.output_dir / config.sanitized_report_filename,
     }
     for field_name, path in sidecar_fields.items():
         if path.exists():
-            setattr(files, field_name, str(path))
+            setattr(files, field_name, _public_path(path, confidential_safe_mode=config.confidential_safe_mode))
     return files
 
 
@@ -217,14 +245,15 @@ def _load_json_model(path: Path, model_cls):
 
 
 def _build_skipped_batch_document(pdf_path: Path, config: Config) -> BatchDocumentResult:
+    actual_files = _core_output_paths(config)
     files = _document_files(config, include_expected_core=True)
-    report = _load_json_model(Path(files.report or ""), Report)
-    manifest = _load_json_model(Path(files.manifest or ""), Manifest)
+    report = _load_json_model(Path(actual_files.report or ""), Report)
+    manifest = _load_json_model(Path(actual_files.manifest or ""), Manifest)
     return BatchDocumentResult(
-        input_pdf=str(pdf_path),
+        input_pdf="redacted.pdf" if config.confidential_safe_mode else str(pdf_path),
         status="skipped",
         exit_code=0,
-        output_dir=str(config.output_dir),
+        output_dir=config.output_dir.name if config.confidential_safe_mode else str(config.output_dir),
         started_at=report.started_at,
         finished_at=report.finished_at,
         duration_ms=report.duration_ms,
@@ -243,10 +272,10 @@ def _build_batch_document_result(pdf_path: Path, config: Config, result) -> Batc
     manifest_path = config.output_dir / config.manifest_filename
     manifest = _load_json_model(manifest_path, Manifest) if manifest_path.exists() else None
     return BatchDocumentResult(
-        input_pdf=str(pdf_path),
+        input_pdf="redacted.pdf" if config.confidential_safe_mode else str(pdf_path),
         status=result.status.value,
         exit_code=result.exit_code,
-        output_dir=str(config.output_dir),
+        output_dir=config.output_dir.name if config.confidential_safe_mode else str(config.output_dir),
         started_at=report.started_at,
         finished_at=report.finished_at,
         duration_ms=report.duration_ms,
@@ -289,27 +318,99 @@ def _build_corpus_manifest(
     *,
     input_dir: Path,
     output_dir: Path,
+    pdf_paths: list[Path],
     documents: list[BatchDocumentResult],
+    confidential_safe_mode: bool = False,
 ) -> CorpusManifest:
     corpus_documents: list[CorpusDocument] = []
-    for document in documents:
-        pdf_path = Path(document.input_pdf)
+    for idx, document in enumerate(documents, start=1):
+        pdf_path = pdf_paths[idx - 1]
+        actual_manifest = output_dir / pdf_path.stem / f"{pdf_path.stem}_manifest.json"
+        selected_pages = []
+        if actual_manifest.exists():
+            try:
+                selected_pages = list(_load_json_model(actual_manifest, Manifest).selected_pages)
+            except Exception:  # noqa: BLE001
+                selected_pages = []
         corpus_documents.append(
             CorpusDocument(
-                doc_id=pdf_path.stem,
-                input_pdf=document.input_pdf,
+                doc_id=f"doc-{idx:04d}" if confidential_safe_mode else pdf_path.stem,
+                input_pdf="redacted.pdf" if confidential_safe_mode else str(pdf_path),
                 source_sha256=_file_sha256(pdf_path) if pdf_path.exists() else "",
-                output_dir=document.output_dir,
+                output_dir=document.output_dir if not confidential_safe_mode else f"doc-{idx:04d}",
                 status=document.status,
-                selected_pages=_selected_pages_for_document(document.files),
+                selected_pages=selected_pages,
                 skipped=document.skipped,
                 files=document.files,
             )
         )
     return CorpusManifest(
-        input_dir=str(input_dir),
-        output_dir=str(output_dir),
+        input_dir="redacted-input-dir" if confidential_safe_mode else str(input_dir),
+        output_dir="redacted-output-dir" if confidential_safe_mode else str(output_dir),
         documents=corpus_documents,
+    )
+
+
+def _build_corpus_diff_report(
+    *,
+    previous_manifest_path: Path,
+    current_manifest_path: Path,
+    current_manifest: CorpusManifest,
+) -> CorpusDiffReport:
+    previous = _load_json_model(previous_manifest_path, CorpusManifest)
+    previous_by_id = {document.doc_id: document for document in previous.documents}
+    current_by_id = {document.doc_id: document for document in current_manifest.documents}
+    entries: list[CorpusDiffEntry] = []
+
+    for doc_id in sorted(current_by_id):
+        current = current_by_id[doc_id]
+        previous_doc = previous_by_id.get(doc_id)
+        if previous_doc is None:
+            status = "added"
+            previous_hash = None
+            previous_output = None
+        elif previous_doc.source_sha256 == current.source_sha256:
+            status = "unchanged"
+            previous_hash = previous_doc.source_sha256
+            previous_output = previous_doc.output_dir
+        else:
+            status = "changed"
+            previous_hash = previous_doc.source_sha256
+            previous_output = previous_doc.output_dir
+        entries.append(
+            CorpusDiffEntry(
+                doc_id=doc_id,
+                status=status,
+                previous_source_sha256=previous_hash,
+                current_source_sha256=current.source_sha256,
+                previous_output_dir=previous_output,
+                current_output_dir=current.output_dir,
+            )
+        )
+
+    for doc_id in sorted(set(previous_by_id) - set(current_by_id)):
+        previous_doc = previous_by_id[doc_id]
+        entries.append(
+            CorpusDiffEntry(
+                doc_id=doc_id,
+                status="removed",
+                previous_source_sha256=previous_doc.source_sha256,
+                current_source_sha256=None,
+                previous_output_dir=previous_doc.output_dir,
+                current_output_dir=None,
+            )
+        )
+
+    return CorpusDiffReport(
+        previous_manifest=str(previous_manifest_path),
+        current_manifest=str(current_manifest_path),
+        entries=entries,
+        summary=CorpusDiffSummary(
+            changed_count=sum(1 for entry in entries if entry.status == "changed"),
+            unchanged_count=sum(1 for entry in entries if entry.status == "unchanged"),
+            removed_count=sum(1 for entry in entries if entry.status == "removed"),
+            added_count=sum(1 for entry in entries if entry.status == "added"),
+        ),
     )
 
 
@@ -366,8 +467,22 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
         ),
     )
     write_json(batch_output_root / "batch_report.json", batch_report.model_dump(mode="json"))
-    corpus_manifest = _build_corpus_manifest(input_dir=input_dir, output_dir=batch_output_root, documents=documents)
-    write_json(batch_output_root / "corpus_manifest.json", corpus_manifest.model_dump(mode="json"))
+    corpus_manifest = _build_corpus_manifest(
+        input_dir=input_dir,
+        output_dir=batch_output_root,
+        pdf_paths=pdf_paths,
+        documents=documents,
+        confidential_safe_mode=args.confidential_safe_mode,
+    )
+    current_manifest_path = batch_output_root / "corpus_manifest.json"
+    write_json(current_manifest_path, corpus_manifest.model_dump(mode="json"))
+    if args.previous_corpus_manifest is not None:
+        diff_report = _build_corpus_diff_report(
+            previous_manifest_path=args.previous_corpus_manifest,
+            current_manifest_path=current_manifest_path,
+            current_manifest=corpus_manifest,
+        )
+        write_json(batch_output_root / "corpus_diff_report.json", diff_report.model_dump(mode="json"))
     return final_exit_code
 
 
@@ -380,6 +495,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error("Use either input_pdf or --input-dir, not both.")
     if not args.input_pdf and not args.input_dir:
         parser.error("Provide an input PDF path or --input-dir.")
+    if args.previous_corpus_manifest is not None and not args.input_dir:
+        parser.error("--previous-corpus-manifest is only supported with --input-dir batch mode.")
 
     if args.input_dir:
         if args.output_dir is not None:

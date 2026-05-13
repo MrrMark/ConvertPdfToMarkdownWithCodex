@@ -24,32 +24,32 @@
 
 현재 backlog는 모두 **RAG 운영 목적**의 개선 작업이다. PDF 변환 산출물을 AI Agent/Copilot의 스펙 분석, 요구사항 추적, 테스트 스크립트 구현에 더 안정적으로 쓰기 위한 항목만 남긴다.
 
-### Q16. RAG Chunk Boundary Quality
+### P0 / Q26. Real Technical Corpus Calibration Gate
 
-- `retrieval_chunks_rag.jsonl`의 chunk 길이, section boundary, heading carry-over, 중복 provenance를 정량 진단한다.
-- chunk text는 원문 기반을 유지하고 요약/재서술은 도입하지 않는다.
-- 긴 section과 짧은 requirement chunk가 검색 품질을 해치지 않도록 deterministic packing rule을 개선한다.
+- NVMe, PCIe, OCP, TCG 공개 스펙과 sanitized customer-like fixture를 대표 corpus로 묶어 RAG sidecar 품질 threshold를 정의한다.
+- requirement coverage, table-field coverage, cross-reference resolved coverage, chunk token 분포, conversion duration을 release gate 후보로 승격한다.
+- 대외비 원문은 커밋하지 않고 synthetic/sanitized fixture와 로컬 전용 corpus profile만 사용한다.
 
-### Q17. RAG Evaluation Golden Set
+### P0 / Q27. Requirement Change Impact Matrix
 
-- `scripts/run_rag_eval.py`에 사용할 스펙 질의 golden set과 expected source id fixture를 추가한다.
-- hit@k, MRR, citation coverage, chunk length 분포를 release gate 후보로 승격한다.
-- 초기 평가는 deterministic local retrieval로 유지하고 embedding/외부 서비스는 opt-in 후속으로 둔다.
+- 여러 버전의 스펙 PDF를 비교해 added/changed/removed requirement id와 source_refs를 별도 diff sidecar로 기록한다.
+- 고객 requirement spec 변경 시 AI Agent가 영향 분석과 test script 수정 범위를 빠르게 찾을 수 있도록 `requirement_traceability_rag.jsonl`과 연결한다.
+- 문장 요약/재서술 없이 원문 diff provenance만 제공한다.
 
-### Q18. Incremental Corpus Ingest Diff
+### P1 / Q28. Domain Adapter Deep Fixtures
 
-- `corpus_manifest.json`의 `doc_id`, `source_sha256`, output file map을 기준으로 changed/unchanged/removed 문서를 판정한다.
-- 대량 PDF 스펙 운영에서 재변환과 vector DB re-index 대상을 최소화하는 diff report를 추가한다.
-- 기존 batch 변환 결정성은 유지한다.
+- NVMe command/log page/feature/status, PCIe capability/register/ECN, OCP requirement table, TCG method/object/security table synthetic fixtures를 더 촘촘히 추가한다.
+- `technical_tables_rag.jsonl`과 `domain_units_rag.jsonl`의 unit_type별 golden을 늘려 도메인 heuristic 회귀를 막는다.
+- customer requirement spec은 synthetic/sanitized sample만 사용한다.
 
-### Q19. RAG Cross-Reference Resolution Expansion
+### P1 / Q29. RAG Indexer Integration Recipes
 
-- `cross_refs_rag.jsonl`의 target을 `figures_rag.jsonl`, `tables_rag.jsonl`, `semantic_units_rag.jsonl` record id와 더 적극적으로 연결한다.
-- unresolved reference는 계속 보존하되, resolved coverage를 report summary에 추가한다.
-- 잘못된 resolved보다 unresolved 보존을 우선한다.
+- OpenAI/Azure AI Search/LangChain/LlamaIndex 등에 넣기 위한 field mapping 예시와 ingestion checklist를 문서화한다.
+- 기본 구현은 외부 서비스를 호출하지 않고, JSONL field contract와 chunk 선택 기준만 제공한다.
+- confidential safe mode와 함께 사용할 때 공유 가능한 metadata 범위를 명확히 한다.
 
-### Q20. Domain Adapter Coverage Expansion
+### P2 / Q30. Diagram OCR And Label Recovery Calibration
 
-- `--domain-adapter nvme`의 command set, opcode, register field, enum/value table fixture를 늘린다.
-- adapter별 schema 예시와 golden을 추가해 도메인 heuristic 회귀를 막는다.
-- 기본 변환 로직에는 특정 도메인 heuristic을 추가하지 않고 opt-in adapter 안에 격리한다.
+- state machine, sequence diagram, register layout figure의 label/OCR 후보 품질을 정량 진단한다.
+- 기본 설명 생성은 계속 하지 않고, caption/OCR label/bbox/heading provenance 중심으로 개선한다.
+- 낮은 확신 diagram label은 record로 승격하지 않고 diagnostics에만 남긴다.

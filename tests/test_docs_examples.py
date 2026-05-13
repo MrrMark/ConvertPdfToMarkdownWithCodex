@@ -22,9 +22,13 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "semantic_units_rag.jsonl" in readme
     assert "requirements_rag.jsonl" in readme
     assert "cross_refs_rag.jsonl" in readme
+    assert "requirement_traceability_rag.jsonl" in readme
+    assert "technical_tables_rag.jsonl" in readme
     assert "summary.rag_text_block_record_count" in readme
     assert "summary.semantic_unit_record_count" in readme
     assert "summary.normative_requirement_count" in readme
+    assert "summary.technical_table_record_count" in readme
+    assert "--confidential-safe-mode" in readme
     assert "rag_header_strategy" in readme
     assert "scripts/run_corpus_eval.py" in readme
     assert "scripts/benchmark_conversion.py" in readme
@@ -65,9 +69,13 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "semantic_units_rag.jsonl" in guide
     assert "requirements_rag.jsonl" in guide
     assert "cross_refs_rag.jsonl" in guide
+    assert "requirement_traceability_rag.jsonl" in guide
+    assert "technical_tables_rag.jsonl" in guide
     assert "summary.rag_text_block_record_count" in guide
     assert "summary.semantic_unit_record_count" in guide
     assert "summary.normative_requirement_count" in guide
+    assert "summary.technical_table_record_count" in guide
+    assert "--confidential-safe-mode" in guide
     assert "rag_header_strategy" in guide
     assert "scripts\\run_corpus_eval.py" in guide
     assert "scripts\\benchmark_conversion.py" in guide
@@ -105,8 +113,11 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q10. RAG 운영용 스펙 Semantic Layer" not in next_plan
     assert "Q11. RAG Retrieval Chunk Pack" not in next_plan
     assert "Q15. Domain Adapter" not in next_plan
-    assert "Q16. RAG Chunk Boundary Quality" in next_plan
-    assert "Q20. Domain Adapter Coverage Expansion" in next_plan
+    assert "Q16. Domain-Specific Technical Spec Adapter Framework" not in next_plan
+    assert "Q22. Confidential Corpus Safe Mode" not in next_plan
+    assert "Q25. Domain Adapter Coverage Expansion" not in next_plan
+    assert "Q26. Real Technical Corpus Calibration Gate" in next_plan
+    assert "Q30. Diagram OCR And Label Recovery Calibration" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -119,7 +130,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "retrieval_chunks_rag.jsonl" in output_schema
     assert "figures_rag.jsonl" in output_schema
     assert "domain_units_rag.jsonl" in output_schema
+    assert "requirement_traceability_rag.jsonl" in output_schema
+    assert "technical_tables_rag.jsonl" in output_schema
     assert "corpus_manifest.json" in output_schema
+    assert "corpus_diff_report.json" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema
 
