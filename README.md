@@ -58,6 +58,7 @@ PDF 문서를 **신뢰성 있게 Markdown으로 변환**하기 위한 CLI/라이
 - `pdfplumber` 중심으로 텍스트를 추출합니다.
 - 공백 정리는 최소화하되 의미 손실은 피합니다.
 - OCR 결과도 의미를 바꾸는 후처리를 하지 않습니다.
+- RAG 등록을 기본 운영 경로로 보고 `text_blocks_rag.jsonl`을 기본 생성합니다.
 
 ### 테이블
 
@@ -422,6 +423,7 @@ Windows ZIP 배포본에서는 아래 스크립트로 동일한 목적의 환경
 ```text
 output/
   document.md
+  text_blocks_rag.jsonl # 기본 생성되는 텍스트 블록 RAG sidecar
   rag_tables.md          # --rag-table-output markdown|both 사용 시
   tables_rag.jsonl       # --rag-table-output jsonl|both 사용 시
   assets/
@@ -474,6 +476,8 @@ pdfs/
 - 페이지 수 및 산출물 메타데이터
 - `schema_version`
 - `options.rag_table_output`
+- `options.rag_text_blocks_output`
+- `options.rag_text_blocks_jsonl_filename`
 - `options.ocr_lang`
 - `options.repair_hyphenation`
 - `options.figure_crop_fallback`
@@ -520,6 +524,11 @@ pdfs/
 - `summary.rag_table_output`
 - `summary.rag_table_record_count`
 - `summary.rag_table_file_count`
+- `summary.rag_text_block_record_count`
+- `summary.rag_text_block_file_count`
+- `summary.font_heading_candidate_count`
+- `summary.footnote_candidate_count`
+- `summary.structure_low_confidence_count`
 - `summary.table_fallback_reason_counts`
 - `summary.table_low_quality_count`
 - `summary.table_caption_linked_count`
@@ -597,8 +606,10 @@ python3 -m pdf2md input.pdf -o output/ --table-mode auto --rag-table-output both
 ```
 
 - `document.md`: 사람이 검토할 정본입니다. 복잡 표는 HTML fallback으로 보존합니다.
+- `text_blocks_rag.jsonl`: 본문 heading/paragraph/list/code/footnote/caption 블록을 page/bbox/heading_path와 함께 기록하는 기본 RAG sidecar입니다.
 - `rag_tables.md`: 검색 chunk에 넣기 쉬운 행 단위 Markdown입니다.
 - `tables_rag.jsonl`: `page`, `table_index`, `headers`, `cells`, `row_text`, `bbox`, `quality_score`, `fallback_reasons`를 가진 행 단위 JSONL입니다.
+- 텍스트 블록 sidecar는 본문을 요약하거나 재서술하지 않고, 추출된 원문 블록과 provenance만 기록합니다.
 - sidecar는 셀 텍스트를 요약하거나 해석하지 않고, 추출된 셀을 행 단위로 재배열만 합니다.
 - 캡션은 확실한 인접 table caption만 연결하고, 불확실하면 비워 둡니다.
 - multi-row header가 명확하면 `Parent / Child` 형태로 flatten하고, 첫 번째 열이 row label이면 `stub_cells`에 별도 기록합니다.

@@ -11,6 +11,8 @@
     "ocr_lang": "eng",
     "pages": null,
     "rag_table_output": "both",
+    "rag_text_blocks_jsonl_filename": "text_blocks_rag.jsonl",
+    "rag_text_blocks_output": "jsonl",
     "remove_header_footer": false,
     "repair_hyphenation": false,
     "table_mode": "auto",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+from typing import Any
 
 from pdf2md.utils.structure import is_structure_line
 
@@ -178,3 +179,79 @@ def serialize_markdown(
         keep_page_markers=keep_page_markers,
         page_blocks_by_page=page_blocks_by_page,
     ).markdown
+
+
+def _append_text_block(lines: list[str], block: dict[str, Any], result_counts: dict[str, int]) -> None:
+    block_type = str(block.get("block_type", "paragraph"))
+    text = str(block.get("text", ""))
+    if not text:
+        return
+    if block_type == "heading":
+        _ensure_blank_line(lines)
+        lines.append(_render_heading(text))
+        _ensure_blank_line(lines)
+        result_counts["heading_count"] += 1
+        return
+    if block_type == "list":
+        for item in text.splitlines():
+            if item.strip():
+                lines.append(item)
+                result_counts["list_item_count"] += 1
+        return
+    if block_type == "code":
+        _ensure_blank_line(lines)
+        lines.append("```text")
+        lines.extend(item.rstrip() for item in text.splitlines())
+        lines.append("```")
+        _ensure_blank_line(lines)
+        result_counts["code_block_count"] += 1
+        return
+    if block_type in {"footnote", "caption"}:
+        _ensure_blank_line(lines)
+        lines.extend(item for item in text.splitlines() if item.strip())
+        _ensure_blank_line(lines)
+        return
+    lines.extend(item for item in text.splitlines() if item.strip())
+
+
+def serialize_markdown_blocks_result(
+    page_text_blocks: dict[int, list[dict[str, Any]]],
+    keep_page_markers: bool,
+    page_blocks_by_page: dict[int, list[tuple[int, str]]] | None = None,
+) -> MarkdownSerializationResult:
+    """Serialize RAG text blocks and anchored table/image blocks into Markdown."""
+    lines: list[str] = []
+    page_blocks_by_page = page_blocks_by_page or {}
+    counts = {
+        "heading_count": 0,
+        "list_item_count": 0,
+        "code_block_count": 0,
+    }
+
+    for page in sorted(page_text_blocks):
+        if keep_page_markers:
+            lines.append(f"<!-- page: {page} -->")
+            lines.append("")
+
+        block_entries = sorted(page_blocks_by_page.get(page, []), key=lambda item: item[0])
+        block_idx = 0
+        for text_block in page_text_blocks[page]:
+            line_indices = text_block.get("line_indices") or [0]
+            anchor_line = int(min(line_indices))
+            while block_idx < len(block_entries) and block_entries[block_idx][0] <= anchor_line:
+                _append_block(lines, block_entries[block_idx][1])
+                block_idx += 1
+            _append_text_block(lines, text_block, counts)
+
+        while block_idx < len(block_entries):
+            _append_block(lines, block_entries[block_idx][1])
+            block_idx += 1
+
+        _ensure_blank_line(lines)
+
+    return MarkdownSerializationResult(
+        markdown="\n".join(lines).rstrip() + "\n",
+        heading_count=counts["heading_count"],
+        list_item_count=counts["list_item_count"],
+        code_block_count=counts["code_block_count"],
+    )

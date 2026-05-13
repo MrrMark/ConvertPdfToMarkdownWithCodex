@@ -40,7 +40,7 @@ Required:
 
 Stable nested fields:
 
-- `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.ocr_lang`
+- `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_text_blocks_output`, `options.ocr_lang`
 - `images[].page`, `index`, `path`, `source`, `bbox`, `sha256`
 - `images[].alt_text`, `caption_text`, `caption_source`, `dedupe_of`
 - `excluded_images[].reason`, `classification`, `recovery_strategy`, `ocr_candidates`
@@ -72,6 +72,32 @@ Stable summary fields:
 - `page_cache_hits`, `page_cache_misses`, `text_line_extract_count`
 - `heading_count`, `list_item_count`, `code_block_count`, `hyphenation_repair_count`
 - `rag_table_output`, `rag_table_record_count`, `rag_table_file_count`
+- `rag_text_block_record_count`, `rag_text_block_file_count`
+- `font_heading_candidate_count`, `footnote_candidate_count`, `structure_low_confidence_count`
+
+## text_blocks_rag.jsonl
+
+Default JSONL output for RAG ingestion of normal document text.
+
+Required per JSONL record:
+
+- `block_id`
+- `page`
+- `block_index`
+- `block_type`
+- `text`
+- `bbox`
+- `line_indices`
+- `heading_path`
+- `parent_heading_block_id`
+- `classification_confidence`
+- `classification_reasons`
+
+Policy:
+
+- `block_type` is one of `heading`, `paragraph`, `list`, `code`, `footnote`, `caption`.
+- `text` is extracted source text, not a summary or paraphrase.
+- Ambiguous structure is emitted as `paragraph` with conservative diagnostics in `report.json`.
 
 ## rag_tables.md
 

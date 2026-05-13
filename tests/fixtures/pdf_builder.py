@@ -18,6 +18,7 @@ class PositionedText:
     x: float
     y: float
     size: int = 12
+    font_resource: str = "F1"
 
 
 @dataclass(frozen=True)
@@ -46,7 +47,7 @@ def _text_operand(text: str) -> str:
 
 
 def _text_command(item: PositionedText) -> str:
-    return f"BT /F1 {item.size} Tf {item.x:.2f} {item.y:.2f} Td {_text_operand(item.text)} Tj ET"
+    return f"BT /{item.font_resource} {item.size} Tf {item.x:.2f} {item.y:.2f} Td {_text_operand(item.text)} Tj ET"
 
 
 def _table_commands(table: TableSpec) -> list[str]:
@@ -86,19 +87,36 @@ def _image_stream() -> StreamObject:
 def write_pdf(path: Path, pages: list[PageSpec], password: str | None = None) -> None:
     writer = PdfWriter()
 
-    font = DictionaryObject(
+    helvetica = DictionaryObject(
         {
             NameObject("/Type"): NameObject("/Font"),
             NameObject("/Subtype"): NameObject("/Type1"),
             NameObject("/BaseFont"): NameObject("/Helvetica"),
         }
     )
-    font_ref = writer._add_object(font)  # noqa: SLF001
+    courier = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Courier"),
+        }
+    )
+    helvetica_ref = writer._add_object(helvetica)  # noqa: SLF001
+    courier_ref = writer._add_object(courier)  # noqa: SLF001
     image_ref = writer._add_object(_image_stream()) if any(spec.repeated_image for spec in pages) else None
 
     for spec in pages:
         page = writer.add_blank_page(width=PAGE_WIDTH, height=PAGE_HEIGHT)
-        resources = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_ref})})
+        resources = DictionaryObject(
+            {
+                NameObject("/Font"): DictionaryObject(
+                    {
+                        NameObject("/F1"): helvetica_ref,
+                        NameObject("/F2"): courier_ref,
+                    }
+                )
+            }
+        )
         if spec.repeated_image and image_ref is not None:
             resources[NameObject("/XObject")] = DictionaryObject({NameObject("/Im1"): image_ref})
         page[NameObject("/Resources")] = resources
@@ -206,6 +224,65 @@ def build_structured_text_pdf(path: Path) -> None:
                     PositionedText("1. ordered item", 72, 690),
                     PositionedText("interoper-", 72, 640),
                     PositionedText("ability", 72, 600),
+                ]
+            )
+        ],
+    )
+
+
+def build_font_heading_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("Architecture Overview", 72, 760, 20),
+                ]
+            )
+        ],
+    )
+
+
+def build_uppercase_body_pdf(path: Path) -> None:
+    write_pdf(path, [PageSpec(texts=[PositionedText("THIS IS IMPORTANT BODY TEXT", 72, 760, 10)])])
+
+
+def build_grouped_list_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("- first item", 72, 760, 10),
+                    PositionedText("- second item", 72, 742, 10),
+                ]
+            )
+        ],
+    )
+
+
+def build_code_block_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("value = 1", 108, 760, 10, font_resource="F2"),
+                    PositionedText("return value", 108, 742, 10, font_resource="F2"),
+                ]
+            )
+        ],
+    )
+
+
+def build_bottom_footnote_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("Body paragraph.", 72, 760, 10),
+                    PositionedText("[1] Device-specific note", 72, 72, 7),
                 ]
             )
         ],

@@ -87,6 +87,10 @@ def _merge_text(left: str, right: str) -> str:
     return f"{left_stripped} {right_stripped}".strip()
 
 
+def _is_monospace_like(line: NormalizedLine) -> bool:
+    return "monospace" in (line.font_style_hint or "").lower()
+
+
 def normalize_page_lines(
     *,
     page: int,
@@ -117,6 +121,14 @@ def normalize_page_lines(
             bottom=line.bottom,
             x0=line.x0,
             x1=line.x1,
+            font_size=line.font_size,
+            font_family=line.font_family,
+            font_style_hint=line.font_style_hint,
+            line_height=line.line_height,
+            left_indent=line.left_indent,
+            right_indent=line.right_indent,
+            y_band=line.y_band,
+            source_line_indices=[idx],
         )
         if line_type in {LineType.FIGURE_CAPTION, LineType.TABLE_CAPTION}:
             key = _normalize_for_compare(normalized.text)
@@ -151,6 +163,8 @@ def normalize_page_lines(
             previous.line_type is LineType.BODY_LINE
             and current.line_type is LineType.BODY_LINE
             and (next_line is None or next_line.line_type is LineType.BODY_LINE)
+            and not _is_monospace_like(previous)
+            and not _is_monospace_like(current)
             and abs(previous.x0 - current.x0) <= 6.0
             and (current.top - previous.bottom) <= 18.0
             and not SENTENCE_END_PATTERN.search(previous.text)
@@ -159,6 +173,7 @@ def normalize_page_lines(
             previous.text = _merge_text(previous.text, current.text)
             previous.bottom = max(previous.bottom, current.bottom)
             previous.x1 = max(previous.x1, current.x1)
+            previous.source_line_indices.extend(current.source_line_indices)
             result.line_merge_count += 1
         else:
             merged.append(current)

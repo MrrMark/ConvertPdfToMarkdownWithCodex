@@ -18,6 +18,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert 'status == "skipped"' in readme
     assert "summary.page_cache_hits" in readme
     assert "summary.text_line_extract_count" in readme
+    assert "text_blocks_rag.jsonl" in readme
+    assert "summary.rag_text_block_record_count" in readme
     assert "rag_header_strategy" in readme
     assert "scripts/run_corpus_eval.py" in readme
     assert "scripts/benchmark_conversion.py" in readme
@@ -50,6 +52,8 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "status == \"skipped\"" in guide
     assert "summary.page_cache_hits" in guide
     assert "summary.text_line_extract_count" in guide
+    assert "text_blocks_rag.jsonl" in guide
+    assert "summary.rag_text_block_record_count" in guide
     assert "rag_header_strategy" in guide
     assert "scripts\\run_corpus_eval.py" in guide
     assert "scripts\\benchmark_conversion.py" in guide
@@ -74,9 +78,15 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "python -m pdf2md --help" in workflow
     assert "앞으로 작업할 항목만" in next_plan
     assert "작업이 완료되고 테스트 통과 및 PR merge까지 끝나면" in next_plan
-    assert "Q01. 실문서 Corpus 품질 게이트 고도화" in next_plan
-    assert "Q05. OCR Runtime/Language 사전 점검" in next_plan
+    assert "구현 완료, 테스트 통과, PR merge까지 끝난 항목은" in next_plan
+    assert "Q02. Font/Geometry 기반 텍스트 블록 구조화" not in next_plan
+    assert "Q03. Figure Crop Fallback 시각 검증 및 보정" in next_plan
+    assert "Q08. Release Gate Runner 통합" in next_plan
+    assert "Q09. Machine-readable Output Schema Export" in next_plan
+    assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
+    assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "schema_version" in output_schema
+    assert "text_blocks_rag.jsonl" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema
 

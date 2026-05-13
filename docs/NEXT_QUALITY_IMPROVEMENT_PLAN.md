@@ -13,77 +13,14 @@
   - 기존 작업 완료: 이 문서에서 해당 항목 제거
   - 범위 변경: 항목 내용을 현재 결정사항 기준으로 갱신
 
+## 기본 작업 플로우
+
+1. 작업 시작 전 이 문서에서 해당 backlog 항목을 확인하거나 신규 항목을 추가한다.
+2. 구현 PR에는 가능하면 코드 변경과 함께 이 문서의 항목 추가/삭제/범위 변경을 포함한다.
+3. 구현 완료, 테스트 통과, PR merge까지 끝난 항목은 다음 작업 시작 전에 이 문서에서 제거한다.
+4. 구현 중 발견한 후속 과제는 완료 항목에 남기지 않고 새 Q 항목으로 분리한다.
+
 ## 남은 작업
-
-### Q01. 실문서 Corpus 품질 게이트 고도화
-
-현재 `scripts/run_corpus_eval.py`는 로컬 `pdf/` 같은 비공개 corpus를 평가하고 요약 JSON을 만든다. 다음 단계에서는 릴리스 전 품질 게이트로 쓸 수 있도록 기준선 비교와 threshold 판정을 추가한다.
-
-#### 구현 명세
-
-- `scripts/run_corpus_eval.py`에 기준선 비교 옵션을 추가한다.
-  - `--baseline-report PATH`
-  - `--fail-on-regression`
-  - `--max-partial-rate FLOAT`
-  - `--max-low-quality-table-rate FLOAT`
-  - `--min-pages-per-second FLOAT`
-- 출력 `corpus_eval_report.json`에 regression summary를 추가한다.
-  - `baseline_report`
-  - `regressions`
-  - `passed_quality_gate`
-  - `thresholds`
-- 비교 대상은 결정적 집계값만 사용한다.
-  - success/partial/failed/skipped count
-  - table fallback reason counts
-  - low quality table count
-  - suppressed line count
-  - pages/sec
-  - pdf_open_count
-  - text_line_extract_count
-- 저작권 있는 PDF와 평가 산출물은 repo에 커밋하지 않는다.
-
-#### Acceptance
-
-- 기준선이 없으면 현재처럼 단일 평가 리포트를 만든다.
-- 기준선이 있으면 regression 여부를 deterministic하게 기록한다.
-- `--fail-on-regression` 사용 시 threshold 실패를 non-zero exit code로 반환한다.
-- README/Windows guide에 릴리스 전 품질 게이트 예시 명령이 반영된다.
-- 완료 후 테스트 통과 및 PR merge까지 끝나면 이 항목은 이 문서에서 제거한다.
-
-### Q02. Font/Geometry 기반 텍스트 블록 구조화
-
-현재 serializer는 보수적으로 숫자형 섹션 제목과 명확한 list/code-like block만 처리한다. 다음 단계에서는 PDF raw line의 font/size/geometry 정보를 이용해 원문 손실 없이 heading/list/code/footnote 판단 정확도를 높인다.
-
-#### 구현 명세
-
-- text extraction 단계에서 line metadata를 확장한다.
-  - dominant font size
-  - font family/style hint
-  - left/right indent
-  - line height
-  - page-relative y band
-- block classifier를 추가한다.
-  - 확실한 큰 제목만 heading으로 승격한다.
-  - 대문자 본문이나 표 제목을 heading으로 오탐하지 않는다.
-  - 연속 list item은 Markdown list block으로 안정적으로 묶는다.
-  - 들여쓰기와 monospace-like 패턴이 강한 블록만 fenced code로 처리한다.
-  - 하단 영역의 확실한 각주만 footnote/comment 후보로 분리한다.
-- report summary에 optional 진단을 추가한다.
-  - `font_heading_candidate_count`
-  - `footnote_candidate_count`
-  - `structure_low_confidence_count`
-
-#### Acceptance
-
-- 기본 정책은 계속 보수적이며 애매하면 본문으로 유지한다.
-- 신규 fixture/golden을 추가한다.
-  - title-only heading
-  - uppercase body non-heading
-  - grouped ordered/unordered list
-  - multi-line code block
-  - bottom footnote
-- 기존 document.md golden에서 의도치 않은 heading/list/code 변경이 없어야 한다.
-- 완료 후 테스트 통과 및 PR merge까지 끝나면 이 항목은 이 문서에서 제거한다.
 
 ### Q03. Figure Crop Fallback 시각 검증 및 보정
 
@@ -143,94 +80,59 @@
 - 반복 header가 있는 독립 표를 잘못 연결하지 않는다.
 - 완료 후 테스트 통과 및 PR merge까지 끝나면 이 항목은 이 문서에서 제거한다.
 
-### Q05. OCR Runtime/Language 사전 점검
+### Q08. Release Gate Runner 통합
 
-현재 `--ocr-lang`은 CLI/API에서 OCR runtime으로 전달되며, runtime 부재는 partial success/report warning으로 처리한다. 다음 단계에서는 사용자가 변환 전에 OCR 언어팩과 runtime 상태를 쉽게 확인할 수 있는 사전 점검을 추가한다.
+현재 corpus 품질 게이트, benchmark 성능 게이트, OCR preflight, 패키징 smoke 절차가 각각 존재한다. 다음 단계에서는 릴리스 전에 한 명령으로 필요한 게이트를 실행하고 결과를 하나의 summary로 남기는 runner를 추가한다.
 
 #### 구현 명세
 
-- 새 스크립트를 추가한다.
-  - `scripts/check_ocr_runtime.py`
-- 점검 항목을 JSON과 사람이 읽는 텍스트로 출력한다.
-  - Tesseract executable 발견 여부
-  - pytesseract import 여부
-  - pypdfium2 import 여부
-  - 요청한 language data 발견 여부
-  - 권장 설치 힌트
-- CLI 또는 README 예시에서 `kor+eng` 점검 흐름을 문서화한다.
+- `scripts/run_release_gates.py`를 추가한다.
+- 실행 항목을 옵션으로 제어한다.
+  - OCR runtime/language preflight
+  - corpus quality gate
+  - benchmark performance gate
+  - packaging smoke
+- baseline/report 경로를 명시적으로 받는다.
+  - `--corpus-input-dir`
+  - `--corpus-baseline-report`
+  - `--benchmark-baseline-report`
+  - `--output-dir`
+- 출력 `release_gate_report.json`을 생성한다.
+  - 실행한 gate 목록
+  - 각 gate command/exit code/status
+  - 생성된 report path
+  - 전체 `passed_release_gate`
+- 저작권 있는 PDF, baseline report, release 산출물은 repo에 커밋하지 않는다.
+- README/Windows guide에 릴리스 전 단일 runner 예시를 추가한다.
 
 #### Acceptance
 
-- Tesseract가 없는 환경에서도 deterministic하게 실패 이유를 출력한다.
-- `kor+eng` 같은 복합 language 값에서 누락된 언어팩을 식별한다.
-- 실제 변환 명령은 계속 partial success 정책을 유지한다.
+- 선택한 gate 중 하나라도 실패하면 runner가 non-zero exit code를 반환한다.
+- 기본 CI job에는 무거운 corpus/benchmark를 넣지 않고 수동/릴리스 전 실행으로 유지한다.
+- subprocess를 monkeypatch한 unit test로 성공/실패 summary와 exit code를 검증한다.
 - 완료 후 테스트 통과 및 PR merge까지 끝나면 이 항목은 이 문서에서 제거한다.
 
-### Q06. Benchmark 성능 회귀 게이트
+### Q09. Machine-readable Output Schema Export
 
-현재 `scripts/benchmark_conversion.py`는 synthetic 10/50/100 page 변환 성능과 peak memory를 측정한다. 다음 단계에서는 이 결과를 릴리스 전 성능 회귀 게이트로 사용할 수 있도록 기준선 비교와 예산 초과 판정을 추가한다.
-
-#### 구현 명세
-
-- `scripts/benchmark_conversion.py`에 기준선 비교 옵션을 추가한다.
-  - `--baseline-report PATH`
-  - `--fail-on-regression`
-  - `--max-duration-regression FLOAT`
-  - `--max-memory-regression FLOAT`
-  - `--min-pages-per-second FLOAT`
-- 출력 `benchmark_report.json`에 regression summary를 추가한다.
-  - `baseline_report`
-  - `regressions`
-  - `passed_performance_gate`
-  - `thresholds`
-- 비교 대상은 page count별 결정적 집계값으로 제한한다.
-  - total duration
-  - pages/sec
-  - stage durations
-  - pdf_open_count
-  - text_line_extract_count
-  - peak memory
-- 성능 측정은 CI 기본 job에는 넣지 않고 수동/릴리스 전 게이트로 유지한다.
-
-#### Acceptance
-
-- 기준선이 없으면 현재처럼 benchmark report만 생성한다.
-- 기준선이 있으면 page count별 regression 여부를 deterministic하게 기록한다.
-- `--fail-on-regression` 사용 시 threshold 실패를 non-zero exit code로 반환한다.
-- README/Windows guide에 릴리스 전 성능 게이트 예시 명령이 반영된다.
-- 완료 후 테스트 통과 및 PR merge까지 끝나면 이 항목은 이 문서에서 제거한다.
-
-### Q07. Output Schema / 패키징 릴리스 계약
-
-현재 `manifest.json`, `report.json`, RAG sidecar는 Pydantic model과 golden test로 보호된다. 다음 단계에서는 외부 사용자가 안정적으로 통합할 수 있도록 출력 schema 계약과 배포 artifact 검증을 명시한다.
+현재 출력 계약은 `docs/OUTPUT_SCHEMA.md`와 Pydantic model/contract test로 보호된다. 다음 단계에서는 외부 시스템이 자동 검증에 사용할 수 있도록 machine-readable JSON Schema export를 추가한다.
 
 #### 구현 명세
 
-- `docs/OUTPUT_SCHEMA.md`를 추가하거나 README schema 섹션을 분리한다.
-  - `document.md`
-  - `manifest.json`
-  - `report.json`
-  - `rag_tables.md`
-  - `tables_rag.jsonl`
-  - `debug/` artifact
-- 각 JSON 계열 산출물에 대해 field stability 정책을 명시한다.
-  - required field
-  - optional field
-  - backward-compatible additive field
-  - breaking change 처리 기준
-- schema contract test를 추가한다.
-  - known sample manifest/report가 현재 model에서 읽히는지 확인
-  - 새 optional field 추가가 기존 normalized golden을 깨지 않는지 확인
-- 패키징 smoke를 릴리스 전 검증에 추가한다.
-  - `python -m build`
-  - wheel 설치 후 `python -m pdf2md --help`
-  - console script `pdf2md --help`
-- 새 runtime dependency를 추가할 경우 README/Windows guide/CI matrix가 함께 갱신되도록 문서 규칙을 보강한다.
+- `scripts/export_output_schema.py`를 추가한다.
+- Pydantic model에서 JSON Schema를 생성한다.
+  - `Manifest`
+  - `Report`
+  - `BatchReport`
+- schema 산출물을 `docs/schema/` 아래에 저장한다.
+  - `manifest.schema.json`
+  - `report.schema.json`
+  - `batch_report.schema.json`
+- `docs/OUTPUT_SCHEMA.md`에서 machine-readable schema 위치를 연결한다.
+- schema export가 deterministic한지 테스트한다.
 
 #### Acceptance
 
-- 외부 RAG/indexing 파이프라인이 참조할 출력 field 계약이 문서화된다.
-- 기존 schema sample은 새 코드에서도 읽히고, additive field는 호환 변경으로 유지된다.
-- wheel 설치 smoke가 릴리스 전 절차에 포함된다.
-- README/Windows guide에서 schema 문서와 패키징 검증 절차를 찾을 수 있다.
+- JSON Schema 파일이 stable key order와 LF로 생성된다.
+- 생성된 schema 파일을 current model로 재생성했을 때 diff가 없어야 한다.
+- README/Windows guide 또는 `docs/OUTPUT_SCHEMA.md`에서 schema 파일 경로를 찾을 수 있다.
 - 완료 후 테스트 통과 및 PR merge까지 끝나면 이 항목은 이 문서에서 제거한다.

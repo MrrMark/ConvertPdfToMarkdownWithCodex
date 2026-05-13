@@ -33,6 +33,8 @@
   "status": "success",
   "summary": {
     "code_block_count": 0,
+    "font_heading_candidate_count": 0,
+    "footnote_candidate_count": 0,
     "heading_count": 0,
     "hyphenation_repair_count": 0,
     "list_item_count": 0,
@@ -45,6 +47,8 @@
     "rag_table_file_count": 0,
     "rag_table_output": "none",
     "rag_table_record_count": 0,
+    "rag_text_block_file_count": 1,
+    "rag_text_block_record_count": 1,
     "stage_durations_ms": {
       "image_extraction": 0,
       "manifest": 0,
@@ -55,10 +59,12 @@
       "page_selection": 0,
       "pdf_open": 0,
       "rag_tables": 0,
+      "rag_text_blocks": 0,
       "reporting": 0,
       "table_extraction": 0,
       "text_extraction": 0
     },
+    "structure_low_confidence_count": 0,
     "table_caption_linked_count": 0,
     "table_fallback_count": 0,
     "table_fallback_reason_counts": {},

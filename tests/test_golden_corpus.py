@@ -5,6 +5,10 @@ from pathlib import Path
 
 from fixtures.pdf_builder import (
     build_complex_table_pdf,
+    build_bottom_footnote_pdf,
+    build_code_block_pdf,
+    build_font_heading_pdf,
+    build_grouped_list_pdf,
     build_image_only_pdf,
     build_korean_text_pdf,
     build_password_pdf,
@@ -14,6 +18,7 @@ from fixtures.pdf_builder import (
     build_single_column_pdf,
     build_structured_text_pdf,
     build_two_column_pdf,
+    build_uppercase_body_pdf,
 )
 
 from pdf2md.config import Config
@@ -36,6 +41,11 @@ def test_deterministic_pdf_fixture_builder_covers_priority_corpus(tmp_path: Path
         "image_only.pdf": build_image_only_pdf,
         "korean.pdf": build_korean_text_pdf,
         "structured_text.pdf": build_structured_text_pdf,
+        "font_heading.pdf": build_font_heading_pdf,
+        "uppercase_body.pdf": build_uppercase_body_pdf,
+        "grouped_list.pdf": build_grouped_list_pdf,
+        "code_block.pdf": build_code_block_pdf,
+        "bottom_footnote.pdf": build_bottom_footnote_pdf,
         "password.pdf": build_password_pdf,
     }
 
@@ -55,6 +65,11 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         "complex_table": (build_complex_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
         "repeated_image": (build_repeated_image_pdf, {"dedupe_images": True}),
         "structured_text": (build_structured_text_pdf, {"repair_hyphenation": True}),
+        "font_heading": (build_font_heading_pdf, {}),
+        "uppercase_body": (build_uppercase_body_pdf, {}),
+        "grouped_list": (build_grouped_list_pdf, {}),
+        "code_block": (build_code_block_pdf, {}),
+        "bottom_footnote": (build_bottom_footnote_pdf, {}),
         "password": (lambda path: build_password_pdf(path, password="secret"), {"password": "secret"}),
     }
 
@@ -82,7 +97,7 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         assert normalize_report(json.loads((output_dir / "report.json").read_text(encoding="utf-8"))) == json.loads(
             (golden_dir / "report.json").read_text(encoding="utf-8")
         )
-        for sidecar_name in ("rag_tables.md", "tables_rag.jsonl"):
+        for sidecar_name in ("rag_tables.md", "tables_rag.jsonl", "text_blocks_rag.jsonl"):
             golden_sidecar = golden_dir / sidecar_name
             output_sidecar = output_dir / sidecar_name
             if golden_sidecar.exists():
