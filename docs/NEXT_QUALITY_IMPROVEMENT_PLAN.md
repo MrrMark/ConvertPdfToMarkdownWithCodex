@@ -24,32 +24,32 @@
 
 현재 backlog는 모두 **RAG 운영 목적**의 개선 작업이다. PDF 변환 산출물을 AI Agent/Copilot의 스펙 분석, 요구사항 추적, 테스트 스크립트 구현에 더 안정적으로 쓰기 위한 항목만 남긴다.
 
-### P0 / Q26. Real Technical Corpus Calibration Gate
+### P0 / Q31. Local Corpus Profile Runner
 
-- NVMe, PCIe, OCP, TCG 공개 스펙과 sanitized customer-like fixture를 대표 corpus로 묶어 RAG sidecar 품질 threshold를 정의한다.
-- requirement coverage, table-field coverage, cross-reference resolved coverage, chunk token 분포, conversion duration을 release gate 후보로 승격한다.
-- 대외비 원문은 커밋하지 않고 synthetic/sanitized fixture와 로컬 전용 corpus profile만 사용한다.
+- 로컬 전용 profile JSON을 받아 여러 output directory와 eval set을 한 번에 평가하는 corpus-level RAG calibration runner를 추가한다.
+- document별 `rag_eval_report.json`을 aggregate해 domain별 hit/MRR/coverage/token/duration 분포를 기록한다.
+- 실제 공개 스펙/고객 원문은 계속 커밋하지 않고 synthetic/sanitized profile만 repo에 둔다.
 
-### P0 / Q27. Requirement Change Impact Matrix
+### P0 / Q32. Requirement Impact Review Pack
 
-- 여러 버전의 스펙 PDF를 비교해 added/changed/removed requirement id와 source_refs를 별도 diff sidecar로 기록한다.
-- 고객 requirement spec 변경 시 AI Agent가 영향 분석과 test script 수정 범위를 빠르게 찾을 수 있도록 `requirement_traceability_rag.jsonl`과 연결한다.
-- 문장 요약/재서술 없이 원문 diff provenance만 제공한다.
+- `requirement_change_impact_report.json`을 AI Agent/리뷰어가 바로 쓰기 쉬운 Markdown/JSON summary pack으로 변환한다.
+- changed requirement와 관련 table/technical/domain unit source_refs를 lookup해 test script 수정 후보 범위를 provenance 중심으로 묶는다.
+- 영향도 설명 생성은 하지 않고 원문 diff, source id, page/bbox, changed field만 제공한다.
 
-### P1 / Q28. Domain Adapter Deep Fixtures
+### P1 / Q33. Technical Cross-Reference Resolver Hardening
 
-- NVMe command/log page/feature/status, PCIe capability/register/ECN, OCP requirement table, TCG method/object/security table synthetic fixtures를 더 촘촘히 추가한다.
-- `technical_tables_rag.jsonl`과 `domain_units_rag.jsonl`의 unit_type별 golden을 늘려 도메인 heuristic 회귀를 막는다.
-- customer requirement spec은 synthetic/sanitized sample만 사용한다.
+- NVMe opcode/log page/feature, PCIe register/capability, TCG method/object 참조를 `cross_refs_rag.jsonl`에서 더 안정적으로 resolved 처리한다.
+- unresolved technical ref의 원인 분류와 source_refs를 진단 필드로 남긴다.
+- 합성 fixture와 golden으로 resolver 회귀를 막고, 애매한 참조는 resolved로 승격하지 않는다.
 
-### P1 / Q29. RAG Indexer Integration Recipes
+### P1 / Q34. Offline Index Contract Validator
 
-- OpenAI/Azure AI Search/LangChain/LlamaIndex 등에 넣기 위한 field mapping 예시와 ingestion checklist를 문서화한다.
-- 기본 구현은 외부 서비스를 호출하지 않고, JSONL field contract와 chunk 선택 기준만 제공한다.
-- confidential safe mode와 함께 사용할 때 공유 가능한 metadata 범위를 명확히 한다.
+- OpenAI/Azure AI Search/LangChain/LlamaIndex mapping recipe가 요구하는 필드와 타입을 로컬에서 검증하는 validator script를 추가한다.
+- 외부 서비스 호출 없이 JSONL field contract, metadata 크기, source_refs 보존 여부, confidential-safe 공유 가능 범위를 점검한다.
+- 실패 시 어느 chunk/sidecar/field가 문제인지 deterministic report로 출력한다.
 
-### P2 / Q30. Diagram OCR And Label Recovery Calibration
+### P2 / Q35. Rendered Diagram Fixture Suite
 
-- state machine, sequence diagram, register layout figure의 label/OCR 후보 품질을 정량 진단한다.
-- 기본 설명 생성은 계속 하지 않고, caption/OCR label/bbox/heading provenance 중심으로 개선한다.
-- 낮은 확신 diagram label은 record로 승격하지 않고 diagnostics에만 남긴다.
+- state machine, sequence diagram, register layout synthetic PDF를 렌더링 기반 fixture로 추가한다.
+- `figures_rag.jsonl`의 `diagram_label_diagnostics`와 bbox/caption/heading provenance를 golden으로 고정한다.
+- OCR runtime이 없을 때와 있을 때의 기대 diagnostics를 분리해 CI 안정성을 유지한다.
