@@ -53,6 +53,15 @@ class ImageExtractionResult:
 
 
 @dataclass(frozen=True)
+class CropContentDiagnostics:
+    blank_ratio: float
+    content_ratio: float
+    content_bbox: list[int] | None
+    crop_area_ratio: float
+    rejected_reason: str | None
+
+
+@dataclass(frozen=True)
 class StructureOcrCandidate:
     text: str
     confidence: float | None
@@ -824,6 +833,8 @@ def _append_figure_asset(
     source: str = "embedded",
     caption_confidence: float | None = None,
     crop_reason: str | None = None,
+    crop_content_ratio: float | None = None,
+    crop_rejected_reason: str | None = None,
 ) -> None:
     alt_text = f"Image page-{page_number:04d}-figure-{index:03d}"
     if image_mode == ImageMode.REFERENCED and dedupe_of is None:
@@ -864,6 +875,8 @@ def _append_figure_asset(
             source=source,
             caption_confidence=caption_confidence,
             crop_reason=crop_reason,
+            crop_content_ratio=crop_content_ratio,
+            crop_rejected_reason=crop_rejected_reason,
         )
     )
 
@@ -934,6 +947,67 @@ def _render_page_crop(
     return buffer.getvalue(), cropped.width, cropped.height
 
 
+def _analyze_crop_content(
+    image_bytes: bytes,
+    *,
+    crop_bbox: list[float],
+    page_width: float,
+    page_height: float,
+) -> CropContentDiagnostics:
+    """Estimate whether a rendered crop contains enough non-background pixels."""
+    try:
+        image = Image.open(BytesIO(image_bytes)).convert("L")
+    except Exception:  # noqa: BLE001
+        return CropContentDiagnostics(
+            blank_ratio=1.0,
+            content_ratio=0.0,
+            content_bbox=None,
+            crop_area_ratio=0.0,
+            rejected_reason="crop_decode_failed",
+        )
+    width, height = image.size
+    total_pixels = max(width * height, 1)
+    histogram = image.histogram()
+    background = max(range(len(histogram)), key=lambda idx: histogram[idx])
+    threshold = 18
+    content_pixels = 0
+    min_x = width
+    min_y = height
+    max_x = -1
+    max_y = -1
+    pixels = image.load()
+    for y in range(height):
+        for x in range(width):
+            if abs(int(pixels[x, y]) - background) <= threshold:
+                continue
+            content_pixels += 1
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x)
+            max_y = max(max_y, y)
+
+    content_ratio = round(content_pixels / total_pixels, 6)
+    blank_ratio = round(1.0 - content_ratio, 6)
+    x0, top, x1, bottom = crop_bbox
+    page_area = max(page_width * page_height, 1.0)
+    crop_area_ratio = round(max(0.0, x1 - x0) * max(0.0, bottom - top) / page_area, 6)
+    content_bbox = [min_x, min_y, max_x + 1, max_y + 1] if content_pixels else None
+
+    rejected_reason: str | None = None
+    if content_bbox is None or content_ratio < 0.002:
+        rejected_reason = "near_blank_crop"
+    elif crop_area_ratio < 0.02 or crop_area_ratio > 0.5:
+        rejected_reason = "crop_area_out_of_range"
+
+    return CropContentDiagnostics(
+        blank_ratio=blank_ratio,
+        content_ratio=content_ratio,
+        content_bbox=content_bbox,
+        crop_area_ratio=crop_area_ratio,
+        rejected_reason=rejected_reason,
+    )
+
+
 def _append_figure_crop_fallbacks(
     *,
     result: ImageExtractionResult,
@@ -965,6 +1039,12 @@ def _append_figure_crop_fallbacks(
                 page_number=page_number,
                 bbox=bbox_payload,
             )
+            crop_diagnostics = _analyze_crop_content(
+                image_bytes,
+                crop_bbox=bbox_payload,
+                page_width=page_width,
+                page_height=page_height,
+            )
         except Exception as exc:  # noqa: BLE001
             result.warnings.append(
                 WarningEntry(
@@ -975,6 +1055,45 @@ def _append_figure_crop_fallbacks(
                 )
             )
             continue
+        debug_payload = {
+            "page": page_number,
+            "image_index": None,
+            "width": width,
+            "height": height,
+            "bbox": bbox_payload,
+            "caption_text": caption_text,
+            "excluded": False,
+            "exclude_reason": None,
+            "dedupe_of": None,
+            "path": None,
+            "source": "page_crop",
+            "crop_content_ratio": crop_diagnostics.content_ratio,
+            "crop_blank_ratio": crop_diagnostics.blank_ratio,
+            "crop_content_bbox": crop_diagnostics.content_bbox,
+            "crop_area_ratio": crop_diagnostics.crop_area_ratio,
+            "crop_rejected_reason": crop_diagnostics.rejected_reason,
+        }
+        if crop_diagnostics.rejected_reason is not None:
+            debug_payload["excluded"] = True
+            debug_payload["exclude_reason"] = crop_diagnostics.rejected_reason
+            result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
+            result.warnings.append(
+                WarningEntry(
+                    code=WarningCode.IMAGE_CROP_REJECTED,
+                    message="Figure crop fallback was rejected by pixel diagnostics.",
+                    page=page_number,
+                    details={
+                        "caption_text": caption_text,
+                        "bbox": bbox_payload,
+                        "crop_content_ratio": crop_diagnostics.content_ratio,
+                        "crop_blank_ratio": crop_diagnostics.blank_ratio,
+                        "crop_content_bbox": crop_diagnostics.content_bbox,
+                        "crop_area_ratio": crop_diagnostics.crop_area_ratio,
+                        "crop_rejected_reason": crop_diagnostics.rejected_reason,
+                    },
+                )
+            )
+            continue
         index = 1
         while any(asset.page == page_number and asset.index == index for asset in result.assets):
             index += 1
@@ -982,6 +1101,9 @@ def _append_figure_crop_fallbacks(
         rel_path = f"{assets_dirname}/images/{filename}"
         disk_path = images_root / filename
         sha256 = hashlib.sha256(image_bytes).hexdigest()
+        debug_payload["image_index"] = index
+        debug_payload["sha256"] = sha256
+        debug_payload["path"] = rel_path
         _append_figure_asset(
             result=result,
             image_mode=image_mode,
@@ -1001,23 +1123,10 @@ def _append_figure_crop_fallbacks(
             source="page_crop",
             caption_confidence=0.85,
             crop_reason="captioned_figure_without_embedded_image",
+            crop_content_ratio=crop_diagnostics.content_ratio,
+            crop_rejected_reason=None,
         )
-        result.debug_candidates_by_page.setdefault(page_number, []).append(
-            {
-                "page": page_number,
-                "image_index": index,
-                "sha256": sha256,
-                "width": width,
-                "height": height,
-                "bbox": bbox_payload,
-                "caption_text": caption_text,
-                "excluded": False,
-                "exclude_reason": None,
-                "dedupe_of": None,
-                "path": rel_path,
-                "source": "page_crop",
-            }
-        )
+        result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
 
 
 def extract_images(

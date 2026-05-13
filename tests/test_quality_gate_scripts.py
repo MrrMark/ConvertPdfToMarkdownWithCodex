@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from scripts import benchmark_conversion
 from scripts import check_ocr_runtime
 from scripts import run_corpus_eval
+from scripts import run_release_gates
 
 
 def test_corpus_quality_gate_records_baseline_and_threshold_regressions(tmp_path: Path) -> None:
@@ -153,3 +155,57 @@ def test_ocr_runtime_check_identifies_missing_composite_language(monkeypatch) ->
     assert report["ready"] is False
     assert report["checks"]["language_data"]["requested"] == ["kor", "eng"]
     assert report["checks"]["language_data"]["missing"] == ["kor"]
+
+
+def test_release_gate_runner_writes_success_summary(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        stdout = '{"ready": true}' if any(str(part).endswith("check_ocr_runtime.py") for part in command) else "ok"
+        return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release",
+            gates=["ocr", "corpus", "benchmark", "schema", "packaging"],
+            corpus_input_dir=Path("pdf"),
+            corpus_baseline_report=Path("pdf/baseline/corpus_eval_report.json"),
+            benchmark_baseline_report=Path("pdf/baseline/benchmark_report.json"),
+            benchmark_page_counts="10",
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["summary"]["total_gate_commands"] == 6
+    assert (tmp_path / "release" / "release_gate_report.json").exists()
+    assert (tmp_path / "release" / "ocr_runtime_report.json").exists()
+    assert any(any(str(part).endswith("run_corpus_eval.py") for part in command) for command in calls)
+    assert any(any(str(part).endswith("benchmark_conversion.py") for part in command) for command in calls)
+    assert any(any(str(part).endswith("export_output_schema.py") for part in command) for command in calls)
+
+
+def test_release_gate_runner_fails_when_any_gate_command_fails(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        returncode = 1 if any(str(part).endswith("benchmark_conversion.py") for part in command) else 0
+        stdout = '{"ready": true}' if any(str(part).endswith("check_ocr_runtime.py") for part in command) else ""
+        stderr = "benchmark failed" if returncode else ""
+        return SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-fail",
+            gates=["ocr", "benchmark"],
+            benchmark_page_counts="10",
+        )
+    )
+
+    assert payload["passed_release_gate"] is False
+    assert payload["summary"]["failed_count"] == 1
+    failed = [record for record in payload["gates"] if record["status"] == "failed"]
+    assert failed[0]["gate"] == "benchmark"
+    assert "benchmark failed" in failed[0]["stderr_tail"]

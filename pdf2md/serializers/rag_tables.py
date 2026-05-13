@@ -35,7 +35,7 @@ def serialize_rag_tables_markdown(rag_tables: list[dict[str, Any]]) -> str:
             marker += f" group={group}"
         marker += " -->"
         lines = [marker]
-        lines.append(f"Caption: {caption}")
+        lines.append(f"Caption: {caption}" if caption else "Caption:")
         lines.append("Headers: " + " | ".join(str(header) for header in headers))
         for record in table.get("records", []):
             lines.append(f"Row {record.get('row_index')}: {record.get('row_text', '')}")

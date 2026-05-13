@@ -8,6 +8,7 @@ from pdf2md.config import Config
 from pdf2md.models import Manifest, Report
 from pdf2md.pipeline import run_conversion
 from helpers.normalize_outputs import normalize_manifest, normalize_report
+from scripts import export_output_schema
 
 
 def test_generated_manifest_and_report_match_current_models(sample_pdf: Path, tmp_path: Path) -> None:
@@ -44,3 +45,24 @@ def test_additive_optional_fields_do_not_change_normalized_contract(sample_pdf: 
 
     assert normalize_manifest(manifest_payload) == normalize_manifest(manifest_with_extra)
     assert normalize_report(report_payload) == normalize_report(report_with_extra)
+
+
+def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
+    output_dir = tmp_path / "schema"
+
+    written = export_output_schema.write_schema_files(output_dir)
+
+    assert [path.name for path in written] == [
+        "manifest.schema.json",
+        "report.schema.json",
+        "batch_report.schema.json",
+    ]
+    assert export_output_schema.check_schema_files(output_dir) == []
+    manifest_schema = json.loads((output_dir / "manifest.schema.json").read_text(encoding="utf-8"))
+    assert manifest_schema["properties"]["schema_version"]["default"] == "1.0"
+
+
+def test_committed_output_schemas_match_current_models() -> None:
+    schema_dir = Path("docs/schema")
+
+    assert export_output_schema.check_schema_files(schema_dir) == []

@@ -1,0 +1,129 @@
+{
+  "images": [],
+  "input_file": "continued_table.pdf",
+  "options": {
+    "debug": false,
+    "dedupe_images": false,
+    "figure_crop_fallback": false,
+    "force_ocr": false,
+    "image_mode": "referenced",
+    "keep_page_markers": true,
+    "ocr_lang": "eng",
+    "pages": null,
+    "rag_table_output": "both",
+    "rag_text_blocks_jsonl_filename": "text_blocks_rag.jsonl",
+    "rag_text_blocks_output": "jsonl",
+    "remove_header_footer": false,
+    "repair_hyphenation": false,
+    "table_mode": "auto",
+    "version": "<version>"
+  },
+  "schema_version": "1.0",
+  "selected_pages": [
+    1,
+    2
+  ],
+  "tables": [
+    {
+      "anchor_line_index": 1,
+      "anchor_top": 112.0,
+      "bbox": [
+        72.0,
+        112.0,
+        312.0,
+        160.0
+      ],
+      "caption_source": "nearby_table_caption",
+      "caption_text": "Table 1: Device fields",
+      "continuation_confidence": 1.0,
+      "continuation_features": {
+        "bbox_alignment_similarity": 1.0,
+        "current_caption_distance": null,
+        "header_similarity": 1.0,
+        "page_gap": 1,
+        "repeated_template_penalty": 0.0
+      },
+      "continuation_group": "table-continuation-001",
+      "continuation_reasons": [
+        "adjacent_page",
+        "header_similarity_high",
+        "bbox_alignment_high",
+        "no_current_caption",
+        "repeated_template_penalty_clear"
+      ],
+      "continuation_rejected_reasons": [],
+      "continued_from_page": null,
+      "continued_to_page": 2,
+      "fallback_reasons": [
+        "STUB_COLUMN"
+      ],
+      "index": 1,
+      "mode": "html",
+      "page": 1,
+      "quality_score": 1.0
+    },
+    {
+      "anchor_line_index": 0,
+      "anchor_top": 112.0,
+      "bbox": [
+        72.0,
+        112.0,
+        312.0,
+        160.0
+      ],
+      "caption_source": null,
+      "caption_text": null,
+      "continuation_confidence": 1.0,
+      "continuation_features": {
+        "bbox_alignment_similarity": 1.0,
+        "current_caption_distance": null,
+        "header_similarity": 1.0,
+        "page_gap": 1,
+        "repeated_template_penalty": 0.0
+      },
+      "continuation_group": "table-continuation-001",
+      "continuation_reasons": [
+        "adjacent_page",
+        "header_similarity_high",
+        "bbox_alignment_high",
+        "no_current_caption",
+        "repeated_template_penalty_clear"
+      ],
+      "continuation_rejected_reasons": [],
+      "continued_from_page": 1,
+      "continued_to_page": null,
+      "fallback_reasons": [
+        "STUB_COLUMN"
+      ],
+      "index": 1,
+      "mode": "html",
+      "page": 2,
+      "quality_score": 1.0
+    }
+  ],
+  "total_pages": 2,
+  "warnings": [
+    {
+      "code": "TABLE_COMPLEXITY_HTML_FALLBACK",
+      "details": {
+        "reasons": [
+          "STUB_COLUMN"
+        ],
+        "table_index": 1
+      },
+      "message": "Table was treated as complex and serialized as HTML fallback.",
+      "page": 1
+    },
+    {
+      "code": "TABLE_COMPLEXITY_HTML_FALLBACK",
+      "details": {
+        "reasons": [
+          "STUB_COLUMN"
+        ],
+        "table_index": 1
+      },
+      "message": "Table was treated as complex and serialized as HTML fallback.",
+      "page": 2
+    }
+  ]
+}

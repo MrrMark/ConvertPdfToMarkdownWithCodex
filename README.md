@@ -483,7 +483,7 @@ pdfs/
 - `options.figure_crop_fallback`
 - 이미지별 `alt_text`
 - 인접 캡션이 확실할 때만 `caption_text`, `caption_source`
-- figure crop fallback 사용 시 이미지별 `source`, `caption_confidence`, `crop_reason`
+- figure crop fallback 사용 시 이미지별 `source`, `caption_confidence`, `crop_reason`, `crop_content_ratio`, `crop_rejected_reason`
 - 이미지 중복 제거 사용 시 `dedupe_of`
 - 구조 마커 복구 메타데이터
   - `classification == "STRUCTURE_MARKER"`
@@ -538,11 +538,14 @@ pdfs/
 - `summary.structure_marker_suppressed_count`
 
 출력 schema 안정성 정책과 RAG sidecar field 계약은 [docs/OUTPUT_SCHEMA.md](docs/OUTPUT_SCHEMA.md)에 별도로 정리합니다.
+Machine-readable schema는 `docs/schema/manifest.schema.json`, `docs/schema/report.schema.json`, `docs/schema/batch_report.schema.json`에 있으며 `python scripts/export_output_schema.py --check`로 검증합니다.
 
 `summary.table_quality[]`에는 표별 품질 진단이 기록됩니다. 복잡 표에서는
 `header_depth`, `header_confidence`, `stub_column_count`, `footnote_row_count`,
 `merged_cell_suspected`, `rag_header_strategy` 같은 optional 필드를 통해
 HTML fallback과 RAG sidecar 생성 판단을 추적할 수 있습니다.
+multi-page table continuation 후보는 `continuation_reasons`,
+`continuation_rejected_reasons`, `continuation_features`로 판단 근거를 남깁니다.
 
 ### `debug/`
 
@@ -669,10 +672,12 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 ./.venv311/bin/python scripts/run_corpus_eval.py --input-dir pdf --output-dir pdf/eval_output --baseline-report pdf/baseline/corpus_eval_report.json --max-partial-rate 0.1 --max-low-quality-table-rate 0.05 --min-pages-per-second 1.0 --fail-on-regression
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100 --baseline-report /tmp/pdf2md-baseline/benchmark_report.json --max-duration-regression 0.2 --max-memory-regression 0.2 --min-pages-per-second 1.0 --fail-on-regression
+./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gates --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf/baseline/corpus_eval_report.json --benchmark-baseline-report /tmp/pdf2md-baseline/benchmark_report.json
 ```
 
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
+- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, schema check, packaging smoke command/status summary
 - benchmark는 수동/릴리스 전 검증용이며 기본 CI 테스트에는 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.

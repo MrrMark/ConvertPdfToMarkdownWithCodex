@@ -1,0 +1,561 @@
+{
+  "$defs": {
+    "ConversionStatus": {
+      "enum": [
+        "success",
+        "partial_success",
+        "failed"
+      ],
+      "title": "ConversionStatus",
+      "type": "string"
+    },
+    "PageResult": {
+      "properties": {
+        "char_count": {
+          "default": 0,
+          "title": "Char Count",
+          "type": "integer"
+        },
+        "column_count_estimate": {
+          "default": 1,
+          "title": "Column Count Estimate",
+          "type": "integer"
+        },
+        "dedupe_count": {
+          "default": 0,
+          "title": "Dedupe Count",
+          "type": "integer"
+        },
+        "header_footer_suppressed_count": {
+          "default": 0,
+          "title": "Header Footer Suppressed Count",
+          "type": "integer"
+        },
+        "line_merge_count": {
+          "default": 0,
+          "title": "Line Merge Count",
+          "type": "integer"
+        },
+        "low_conf_token_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Low Conf Token Ratio"
+        },
+        "ocr_attempted": {
+          "default": false,
+          "title": "Ocr Attempted",
+          "type": "boolean"
+        },
+        "ocr_confidence_mean": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ocr Confidence Mean"
+        },
+        "ocr_confidence_median": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ocr Confidence Median"
+        },
+        "ocr_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ocr Reason"
+        },
+        "ocr_runtime_available": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ocr Runtime Available"
+        },
+        "page": {
+          "title": "Page",
+          "type": "integer"
+        },
+        "reading_order_strategy": {
+          "default": "top",
+          "title": "Reading Order Strategy",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/PageStatus",
+          "default": "success"
+        },
+        "structure_line_count": {
+          "default": 0,
+          "title": "Structure Line Count",
+          "type": "integer"
+        },
+        "suppressed_line_count": {
+          "default": 0,
+          "title": "Suppressed Line Count",
+          "type": "integer"
+        },
+        "text_layer_char_count": {
+          "default": 0,
+          "title": "Text Layer Char Count",
+          "type": "integer"
+        },
+        "used_ocr": {
+          "default": false,
+          "title": "Used Ocr",
+          "type": "boolean"
+        },
+        "warning_count": {
+          "default": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "title": "PageResult",
+      "type": "object"
+    },
+    "PageStatus": {
+      "enum": [
+        "success",
+        "partial_success",
+        "failed"
+      ],
+      "title": "PageStatus",
+      "type": "string"
+    },
+    "ReportSummary": {
+      "properties": {
+        "code_block_count": {
+          "default": 0,
+          "title": "Code Block Count",
+          "type": "integer"
+        },
+        "deduplicated_blocks": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Deduplicated Blocks",
+          "type": "array"
+        },
+        "excluded_image_count": {
+          "default": 0,
+          "title": "Excluded Image Count",
+          "type": "integer"
+        },
+        "excluded_images": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Excluded Images",
+          "type": "array"
+        },
+        "failed_page_count": {
+          "default": 0,
+          "title": "Failed Page Count",
+          "type": "integer"
+        },
+        "font_heading_candidate_count": {
+          "default": 0,
+          "title": "Font Heading Candidate Count",
+          "type": "integer"
+        },
+        "footnote_candidate_count": {
+          "default": 0,
+          "title": "Footnote Candidate Count",
+          "type": "integer"
+        },
+        "heading_count": {
+          "default": 0,
+          "title": "Heading Count",
+          "type": "integer"
+        },
+        "hyphenation_repair_count": {
+          "default": 0,
+          "title": "Hyphenation Repair Count",
+          "type": "integer"
+        },
+        "list_item_count": {
+          "default": 0,
+          "title": "List Item Count",
+          "type": "integer"
+        },
+        "low_confidence_pages": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Low Confidence Pages",
+          "type": "array"
+        },
+        "ocr_confidence_by_page": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object"
+          },
+          "title": "Ocr Confidence By Page",
+          "type": "object"
+        },
+        "page_cache_hits": {
+          "default": 0,
+          "title": "Page Cache Hits",
+          "type": "integer"
+        },
+        "page_cache_misses": {
+          "default": 0,
+          "title": "Page Cache Misses",
+          "type": "integer"
+        },
+        "page_status_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Page Status Counts",
+          "type": "object"
+        },
+        "pages_per_second": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pages Per Second"
+        },
+        "partial_success": {
+          "default": false,
+          "title": "Partial Success",
+          "type": "boolean"
+        },
+        "pdf_open_count": {
+          "default": 0,
+          "title": "Pdf Open Count",
+          "type": "integer"
+        },
+        "processed_pages": {
+          "default": 0,
+          "title": "Processed Pages",
+          "type": "integer"
+        },
+        "rag_table_file_count": {
+          "default": 0,
+          "title": "Rag Table File Count",
+          "type": "integer"
+        },
+        "rag_table_output": {
+          "default": "none",
+          "title": "Rag Table Output",
+          "type": "string"
+        },
+        "rag_table_record_count": {
+          "default": 0,
+          "title": "Rag Table Record Count",
+          "type": "integer"
+        },
+        "rag_text_block_file_count": {
+          "default": 0,
+          "title": "Rag Text Block File Count",
+          "type": "integer"
+        },
+        "rag_text_block_record_count": {
+          "default": 0,
+          "title": "Rag Text Block Record Count",
+          "type": "integer"
+        },
+        "stage_durations_ms": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Stage Durations Ms",
+          "type": "object"
+        },
+        "structure_low_confidence_count": {
+          "default": 0,
+          "title": "Structure Low Confidence Count",
+          "type": "integer"
+        },
+        "structure_marker_recovered_context_count": {
+          "default": 0,
+          "title": "Structure Marker Recovered Context Count",
+          "type": "integer"
+        },
+        "structure_marker_recovered_count": {
+          "default": 0,
+          "title": "Structure Marker Recovered Count",
+          "type": "integer"
+        },
+        "structure_marker_recovered_exact_count": {
+          "default": 0,
+          "title": "Structure Marker Recovered Exact Count",
+          "type": "integer"
+        },
+        "structure_marker_suppressed_ambiguous_count": {
+          "default": 0,
+          "title": "Structure Marker Suppressed Ambiguous Count",
+          "type": "integer"
+        },
+        "structure_marker_suppressed_count": {
+          "default": 0,
+          "title": "Structure Marker Suppressed Count",
+          "type": "integer"
+        },
+        "structure_marker_suppressed_no_candidate_count": {
+          "default": 0,
+          "title": "Structure Marker Suppressed No Candidate Count",
+          "type": "integer"
+        },
+        "suppressed_lines": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Suppressed Lines",
+          "type": "array"
+        },
+        "table_caption_linked_count": {
+          "default": 0,
+          "title": "Table Caption Linked Count",
+          "type": "integer"
+        },
+        "table_fallback_count": {
+          "default": 0,
+          "title": "Table Fallback Count",
+          "type": "integer"
+        },
+        "table_fallback_reason_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Table Fallback Reason Counts",
+          "type": "object"
+        },
+        "table_fallbacks": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Table Fallbacks",
+          "type": "array"
+        },
+        "table_gfm_count": {
+          "default": 0,
+          "title": "Table Gfm Count",
+          "type": "integer"
+        },
+        "table_html_count": {
+          "default": 0,
+          "title": "Table Html Count",
+          "type": "integer"
+        },
+        "table_html_forced_count": {
+          "default": 0,
+          "title": "Table Html Forced Count",
+          "type": "integer"
+        },
+        "table_low_quality_count": {
+          "default": 0,
+          "title": "Table Low Quality Count",
+          "type": "integer"
+        },
+        "table_markdown_forced_count": {
+          "default": 0,
+          "title": "Table Markdown Forced Count",
+          "type": "integer"
+        },
+        "table_mode_requested": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Mode Requested"
+        },
+        "table_quality": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Table Quality",
+          "type": "array"
+        },
+        "table_recovered_count": {
+          "default": 0,
+          "title": "Table Recovered Count",
+          "type": "integer"
+        },
+        "table_total": {
+          "default": 0,
+          "title": "Table Total",
+          "type": "integer"
+        },
+        "table_unresolved_count": {
+          "default": 0,
+          "title": "Table Unresolved Count",
+          "type": "integer"
+        },
+        "text_line_extract_count": {
+          "default": 0,
+          "title": "Text Line Extract Count",
+          "type": "integer"
+        },
+        "total_deduplicated_blocks": {
+          "default": 0,
+          "title": "Total Deduplicated Blocks",
+          "type": "integer"
+        },
+        "total_suppressed_lines": {
+          "default": 0,
+          "title": "Total Suppressed Lines",
+          "type": "integer"
+        },
+        "warning_count": {
+          "default": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "title": "ReportSummary",
+      "type": "object"
+    },
+    "WarningEntry": {
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "WarningEntry",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "duration_ms": {
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "engine_usage": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "title": "Engine Usage",
+      "type": "object"
+    },
+    "failed_pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Failed Pages",
+      "type": "array"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "title": "Finished At",
+      "type": "string"
+    },
+    "page_results": {
+      "items": {
+        "$ref": "#/$defs/PageResult"
+      },
+      "title": "Page Results",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/ConversionStatus"
+    },
+    "summary": {
+      "$ref": "#/$defs/ReportSummary"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/WarningEntry"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "started_at",
+    "finished_at",
+    "duration_ms",
+    "status",
+    "engine_usage"
+  ],
+  "title": "Report",
+  "type": "object"
+}

@@ -10,6 +10,21 @@
 - JSON consumer는 모르는 field를 무시해야 한다.
 - 산출물 경로와 asset 파일명은 동일 입력 + 동일 옵션 + 동일 버전에서 결정적으로 유지한다.
 
+## Machine-readable Schema
+
+현재 public JSON 출력의 machine-readable schema는 `docs/schema/` 아래에 커밋한다.
+
+- `docs/schema/manifest.schema.json`
+- `docs/schema/report.schema.json`
+- `docs/schema/batch_report.schema.json`
+
+Schema 파일은 다음 명령으로 재생성하거나 검증한다.
+
+```bash
+python scripts/export_output_schema.py
+python scripts/export_output_schema.py --check
+```
+
 ## document.md
 
 Required:
@@ -43,9 +58,11 @@ Stable nested fields:
 - `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_text_blocks_output`, `options.ocr_lang`
 - `images[].page`, `index`, `path`, `source`, `bbox`, `sha256`
 - `images[].alt_text`, `caption_text`, `caption_source`, `dedupe_of`
+- `images[].caption_confidence`, `crop_reason`, `crop_content_ratio`, `crop_rejected_reason`
 - `excluded_images[].reason`, `classification`, `recovery_strategy`, `ocr_candidates`
 - `tables[].page`, `index`, `mode`, `bbox`, `quality_score`, `fallback_reasons`
 - `tables[].continuation_group`, `continued_from_page`, `continued_to_page`, `continuation_confidence`
+- `tables[].continuation_reasons`, `continuation_rejected_reasons`, `continuation_features`
 
 ## report.json
 
@@ -129,6 +146,15 @@ Required per JSONL record:
 - `header_confidence`
 - `rag_header_strategy`
 
+Optional continuation fields:
+
+- `continuation_group`
+- `continued_from_page`
+- `continued_to_page`
+- `continuation_confidence`
+- `continuation_reasons`
+- `continuation_features`
+
 ## debug/
 
 Debug artifacts are opt-in with `--debug` and are not part of the stable public schema. They should remain deterministic enough for local diagnosis, but external integrations should not depend on their exact field set.
@@ -150,6 +176,7 @@ python -m build
 python -m pip install dist/*.whl
 python -m pdf2md --help
 pdf2md --help
+python scripts/export_output_schema.py --check
 ```
 
 새 runtime dependency를 추가하면 README, Windows guide, CI Python matrix 문서를 함께 갱신한다.
