@@ -180,6 +180,16 @@
           "title": "Deduplicated Blocks",
           "type": "array"
         },
+        "domain_unit_file_count": {
+          "default": 0,
+          "title": "Domain Unit File Count",
+          "type": "integer"
+        },
+        "domain_unit_record_count": {
+          "default": 0,
+          "title": "Domain Unit Record Count",
+          "type": "integer"
+        },
         "excluded_image_count": {
           "default": 0,
           "title": "Excluded Image Count",
@@ -196,6 +206,16 @@
         "failed_page_count": {
           "default": 0,
           "title": "Failed Page Count",
+          "type": "integer"
+        },
+        "figure_rag_file_count": {
+          "default": 0,
+          "title": "Figure Rag File Count",
+          "type": "integer"
+        },
+        "figure_rag_record_count": {
+          "default": 0,
+          "title": "Figure Rag Record Count",
           "type": "integer"
         },
         "font_heading_candidate_count": {
@@ -322,6 +342,16 @@
         "requirement_record_count": {
           "default": 0,
           "title": "Requirement Record Count",
+          "type": "integer"
+        },
+        "retrieval_chunk_file_count": {
+          "default": 0,
+          "title": "Retrieval Chunk File Count",
+          "type": "integer"
+        },
+        "retrieval_chunk_record_count": {
+          "default": 0,
+          "title": "Retrieval Chunk Record Count",
           "type": "integer"
         },
         "semantic_low_confidence_count": {

@@ -32,6 +32,8 @@ def test_cli_runs_and_writes_outputs(sample_pdf: Path, tmp_path: Path) -> None:
     assert (output_dir / "semantic_units_rag.jsonl").exists()
     assert (output_dir / "requirements_rag.jsonl").exists()
     assert (output_dir / "cross_refs_rag.jsonl").exists()
+    assert (output_dir / "retrieval_chunks_rag.jsonl").exists()
+    assert (output_dir / "figures_rag.jsonl").exists()
 
 
 def test_cli_uses_default_output_dir_when_output_dir_is_omitted(sample_pdf: Path) -> None:
@@ -196,6 +198,30 @@ def test_cli_accepts_rag_table_output_mode(sample_pdf: Path, tmp_path: Path) -> 
     assert not (output_dir / "tables_rag.jsonl").exists()
 
 
+def test_cli_accepts_domain_adapter_option(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-out-domain-adapter"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--domain-adapter",
+        "nvme",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["domain_adapter"] == "nvme"
+    assert manifest["options"]["domain_units_jsonl_filename"] == "domain_units_rag.jsonl"
+    assert report["summary"]["domain_unit_file_count"] == 1
+    assert (output_dir / "domain_units_rag.jsonl").exists()
+
+
 def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
     output_dir = tmp_path / "cli-out-quality-options"
     cmd = [
@@ -231,6 +257,12 @@ def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
     assert manifest["options"]["semantic_units_jsonl_filename"] == "semantic_units_rag.jsonl"
     assert manifest["options"]["requirements_jsonl_filename"] == "requirements_rag.jsonl"
     assert manifest["options"]["cross_refs_jsonl_filename"] == "cross_refs_rag.jsonl"
+    assert manifest["options"]["retrieval_chunks_output"] == "jsonl"
+    assert manifest["options"]["retrieval_chunks_jsonl_filename"] == "retrieval_chunks_rag.jsonl"
+    assert manifest["options"]["figures_rag_output"] == "jsonl"
+    assert manifest["options"]["figures_rag_jsonl_filename"] == "figures_rag.jsonl"
+    assert manifest["options"]["domain_adapter"] == "none"
+    assert manifest["options"]["domain_units_jsonl_filename"] == "domain_units_rag.jsonl"
     assert (output_dir / "debug" / "page-0001-raw-lines.json").exists()
 
 
@@ -278,6 +310,21 @@ def test_cli_batch_mode_generates_per_pdf_outputs(
     assert isinstance(alpha_entry["table_count"], int)
     assert isinstance(alpha_entry["image_count"], int)
     assert isinstance(alpha_entry["used_ocr"], bool)
+    assert alpha_entry["files"]["text_blocks_rag"].endswith("alpha/text_blocks_rag.jsonl")
+    assert alpha_entry["files"]["semantic_units_rag"].endswith("alpha/semantic_units_rag.jsonl")
+    assert alpha_entry["files"]["requirements_rag"].endswith("alpha/requirements_rag.jsonl")
+    assert alpha_entry["files"]["cross_refs_rag"].endswith("alpha/cross_refs_rag.jsonl")
+    assert alpha_entry["files"]["retrieval_chunks_rag"].endswith("alpha/retrieval_chunks_rag.jsonl")
+    assert alpha_entry["files"]["figures_rag"].endswith("alpha/figures_rag.jsonl")
+    corpus_manifest = json.loads((output_root / "corpus_manifest.json").read_text(encoding="utf-8"))
+    assert corpus_manifest["schema_version"] == "1.0"
+    assert corpus_manifest["purpose"] == "rag_corpus_ingest"
+    assert [item["doc_id"] for item in corpus_manifest["documents"]] == ["alpha", "beta"]
+    corpus_alpha = next(item for item in corpus_manifest["documents"] if item["doc_id"] == "alpha")
+    assert len(corpus_alpha["source_sha256"]) == 64
+    assert corpus_alpha["selected_pages"] == [1, 2]
+    assert corpus_alpha["files"]["retrieval_chunks_rag"].endswith("alpha/retrieval_chunks_rag.jsonl")
+    assert corpus_alpha["files"]["figures_rag"].endswith("alpha/figures_rag.jsonl")
 
 
 def test_cli_batch_mode_skip_existing_marks_document_skipped(sample_pdf: Path, tmp_path: Path) -> None:
@@ -379,6 +426,9 @@ def test_cli_batch_mode_skip_existing_marks_document_skipped(sample_pdf: Path, t
     assert batch_report["summary"]["skipped_count"] == 1
     assert batch_report["documents"][0]["status"] == "skipped"
     assert batch_report["documents"][0]["skipped"] is True
+    corpus_manifest = json.loads((output_root / "corpus_manifest.json").read_text(encoding="utf-8"))
+    assert corpus_manifest["documents"][0]["doc_id"] == "alpha"
+    assert corpus_manifest["documents"][0]["skipped"] is True
 
 
 def test_cli_batch_mode_rejects_output_dir(sample_pdf: Path, tmp_path: Path) -> None:

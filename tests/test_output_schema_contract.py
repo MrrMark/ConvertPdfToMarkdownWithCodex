@@ -5,7 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from pdf2md.config import Config
-from pdf2md.models import Manifest, Report
+from pdf2md.models import CorpusManifest, Manifest, Report
 from pdf2md.pipeline import run_conversion
 from helpers.normalize_outputs import normalize_manifest, normalize_report
 from scripts import export_output_schema
@@ -56,10 +56,43 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "manifest.schema.json",
         "report.schema.json",
         "batch_report.schema.json",
+        "corpus_manifest.schema.json",
     ]
     assert export_output_schema.check_schema_files(output_dir) == []
     manifest_schema = json.loads((output_dir / "manifest.schema.json").read_text(encoding="utf-8"))
+    corpus_schema = json.loads((output_dir / "corpus_manifest.schema.json").read_text(encoding="utf-8"))
     assert manifest_schema["properties"]["schema_version"]["default"] == "1.0"
+    assert corpus_schema["properties"]["purpose"]["default"] == "rag_corpus_ingest"
+
+
+def test_corpus_manifest_model_accepts_rag_file_map() -> None:
+    corpus = CorpusManifest.model_validate(
+        {
+            "schema_version": "1.0",
+            "purpose": "rag_corpus_ingest",
+            "input_dir": "/tmp/input",
+            "output_dir": "/tmp/input/output",
+            "documents": [
+                {
+                    "doc_id": "spec",
+                    "input_pdf": "/tmp/input/spec.pdf",
+                    "source_sha256": "0" * 64,
+                    "output_dir": "/tmp/input/output/spec",
+                    "status": "success",
+                    "selected_pages": [1, 2],
+                    "skipped": False,
+                    "files": {
+                        "markdown": "/tmp/input/output/spec/spec.md",
+                        "manifest": "/tmp/input/output/spec/spec_manifest.json",
+                        "report": "/tmp/input/output/spec/spec_report.json",
+                        "retrieval_chunks_rag": "/tmp/input/output/spec/retrieval_chunks_rag.jsonl",
+                    },
+                }
+            ],
+        }
+    )
+
+    assert corpus.documents[0].files.retrieval_chunks_rag.endswith("retrieval_chunks_rag.jsonl")
 
 
 def test_committed_output_schemas_match_current_models() -> None:

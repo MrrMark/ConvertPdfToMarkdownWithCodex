@@ -2,6 +2,42 @@
   "$defs": {
     "BatchDocumentFiles": {
       "properties": {
+        "cross_refs_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cross Refs Rag"
+        },
+        "domain_units_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Domain Units Rag"
+        },
+        "figures_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figures Rag"
+        },
         "manifest": {
           "anyOf": [
             {
@@ -26,6 +62,18 @@
           "default": null,
           "title": "Markdown"
         },
+        "rag_tables_markdown": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rag Tables Markdown"
+        },
         "report": {
           "anyOf": [
             {
@@ -37,6 +85,66 @@
           ],
           "default": null,
           "title": "Report"
+        },
+        "requirements_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requirements Rag"
+        },
+        "retrieval_chunks_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrieval Chunks Rag"
+        },
+        "semantic_units_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Semantic Units Rag"
+        },
+        "tables_rag_jsonl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tables Rag Jsonl"
+        },
+        "text_blocks_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text Blocks Rag"
         }
       },
       "title": "BatchDocumentFiles",

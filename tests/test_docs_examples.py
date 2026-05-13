@@ -103,8 +103,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q08. Release Gate Runner 통합" not in next_plan
     assert "Q09. Machine-readable Output Schema Export" not in next_plan
     assert "Q10. RAG 운영용 스펙 Semantic Layer" not in next_plan
-    assert "Q11. RAG Retrieval Chunk Pack" in next_plan
-    assert "Q15. Domain Adapter" in next_plan
+    assert "Q11. RAG Retrieval Chunk Pack" not in next_plan
+    assert "Q15. Domain Adapter" not in next_plan
+    assert "Q16. RAG Chunk Boundary Quality" in next_plan
+    assert "Q20. Domain Adapter Coverage Expansion" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -114,6 +116,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "semantic_units_rag.jsonl" in output_schema
     assert "requirements_rag.jsonl" in output_schema
     assert "cross_refs_rag.jsonl" in output_schema
+    assert "retrieval_chunks_rag.jsonl" in output_schema
+    assert "figures_rag.jsonl" in output_schema
+    assert "domain_units_rag.jsonl" in output_schema
+    assert "corpus_manifest.json" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema
 

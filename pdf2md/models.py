@@ -48,6 +48,11 @@ class RagTableOutputMode(str, Enum):
         return self in {RagTableOutputMode.JSONL, RagTableOutputMode.BOTH}
 
 
+class DomainAdapterMode(str, Enum):
+    NONE = "none"
+    NVME = "nvme"
+
+
 class ConversionStatus(str, Enum):
     SUCCESS = "success"
     PARTIAL_SUCCESS = "partial_success"
@@ -165,6 +170,12 @@ class ReportSummary(BaseModel):
     semantic_low_confidence_count: int = 0
     unresolved_cross_ref_count: int = 0
     normative_requirement_count: int = 0
+    retrieval_chunk_record_count: int = 0
+    retrieval_chunk_file_count: int = 0
+    figure_rag_record_count: int = 0
+    figure_rag_file_count: int = 0
+    domain_unit_record_count: int = 0
+    domain_unit_file_count: int = 0
 
 
 class ImageAsset(BaseModel):
@@ -294,6 +305,15 @@ class BatchDocumentFiles(BaseModel):
     markdown: Optional[str] = None
     manifest: Optional[str] = None
     report: Optional[str] = None
+    text_blocks_rag: Optional[str] = None
+    semantic_units_rag: Optional[str] = None
+    requirements_rag: Optional[str] = None
+    cross_refs_rag: Optional[str] = None
+    retrieval_chunks_rag: Optional[str] = None
+    figures_rag: Optional[str] = None
+    domain_units_rag: Optional[str] = None
+    rag_tables_markdown: Optional[str] = None
+    tables_rag_jsonl: Optional[str] = None
 
 
 class BatchDocumentResult(BaseModel):
@@ -327,3 +347,22 @@ class BatchReport(BaseModel):
     pdf_files: list[str] = Field(default_factory=list)
     documents: list[BatchDocumentResult] = Field(default_factory=list)
     summary: BatchReportSummary = Field(default_factory=BatchReportSummary)
+
+
+class CorpusDocument(BaseModel):
+    doc_id: str
+    input_pdf: str
+    source_sha256: str
+    output_dir: str
+    status: str
+    selected_pages: list[int] = Field(default_factory=list)
+    skipped: bool = False
+    files: BatchDocumentFiles = Field(default_factory=BatchDocumentFiles)
+
+
+class CorpusManifest(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "rag_corpus_ingest"
+    input_dir: str
+    output_dir: str
+    documents: list[CorpusDocument] = Field(default_factory=list)
