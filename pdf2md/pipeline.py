@@ -18,6 +18,7 @@ from pdf2md.models import (
     ConversionStatus,
     ImageMode,
     Manifest,
+    NormalizedLine,
     PageResult,
     PageStatus,
     RagTableOutputMode,
@@ -27,12 +28,13 @@ from pdf2md.models import (
 )
 from pdf2md.reporting import build_report, count_structure_marker_reasons, determine_conversion_status, finalize_page_statuses
 from pdf2md.serializers.manifest import serialize_manifest
-from pdf2md.serializers.markdown import repair_hyphenated_lines, serialize_markdown_result
+from pdf2md.serializers.markdown import serialize_markdown_blocks_result
 from pdf2md.serializers.rag_tables import (
     flatten_rag_table_records,
     serialize_rag_tables_jsonl,
     serialize_rag_tables_markdown,
 )
+from pdf2md.serializers.rag_text_blocks import build_text_blocks, serialize_text_blocks_jsonl
 from pdf2md.serializers.report import serialize_report
 from pdf2md.utils.io import ensure_output_dirs, write_json, write_text
 from pdf2md.utils.pdf import PdfDocumentContext, PdfOpenError
@@ -73,7 +75,23 @@ def _apply_structure_recoveries(
 ) -> list[TextLine]:
     if not recoveries:
         return lines
-    updated = [TextLine(text=line.text, top=line.top, bottom=line.bottom, x0=line.x0, x1=line.x1) for line in lines]
+    updated = [
+        TextLine(
+            text=line.text,
+            top=line.top,
+            bottom=line.bottom,
+            x0=line.x0,
+            x1=line.x1,
+            font_size=line.font_size,
+            font_family=line.font_family,
+            font_style_hint=line.font_style_hint,
+            line_height=line.line_height,
+            left_indent=line.left_indent,
+            right_indent=line.right_indent,
+            y_band=line.y_band,
+        )
+        for line in lines
+    ]
     for recovery in recoveries:
         title_text = str(recovery.get("title_text", "")).strip()
         recovered_text = str(recovery.get("recovered_text", "")).strip()
@@ -105,6 +123,13 @@ def _text_line_payload(line: TextLine) -> dict:
         "bottom": line.bottom,
         "x0": line.x0,
         "x1": line.x1,
+        "font_size": line.font_size,
+        "font_family": line.font_family,
+        "font_style_hint": line.font_style_hint,
+        "line_height": line.line_height,
+        "left_indent": line.left_indent,
+        "right_indent": line.right_indent,
+        "y_band": line.y_band,
     }
 
 
@@ -211,6 +236,43 @@ def _write_rag_table_outputs(
     return record_count, file_count
 
 
+def _repair_hyphenated_normalized_lines(lines: list[NormalizedLine]) -> tuple[list[NormalizedLine], int]:
+    repaired: list[NormalizedLine] = []
+    repair_count = 0
+    idx = 0
+    while idx < len(lines):
+        current = lines[idx].model_copy(deep=True)
+        if idx + 1 < len(lines):
+            next_line = lines[idx + 1]
+            current_text = current.text.rstrip()
+            next_text = next_line.text.lstrip()
+            if (
+                current.line_type.value == "BODY_LINE"
+                and next_line.line_type.value == "BODY_LINE"
+                and len(current_text) >= 2
+                and current_text.endswith("-")
+                and current_text[-2].isalpha()
+                and next_text
+                and next_text[0].islower()
+            ):
+                current.text = f"{current_text[:-1]}{next_text}"
+                current.bottom = max(current.bottom, next_line.bottom)
+                current.x1 = max(current.x1, next_line.x1)
+                current.source_line_indices.extend(next_line.source_line_indices or [next_line.index])
+                repaired.append(current)
+                repair_count += 1
+                idx += 2
+                continue
+        repaired.append(current)
+        idx += 1
+    return repaired, repair_count
+
+
+def _write_rag_text_block_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(config.output_dir / config.rag_text_blocks_jsonl_filename, serialize_text_blocks_jsonl(records))
+    return len(records), 1
+
+
 def run_conversion(config: Config) -> ConversionResult:
     """Run conversion and write markdown, manifest, and report outputs."""
     started_at = datetime.now(timezone.utc)
@@ -238,6 +300,11 @@ def run_conversion(config: Config) -> ConversionResult:
     list_item_count = 0
     code_block_count = 0
     hyphenation_repair_count = 0
+    font_heading_candidate_count = 0
+    footnote_candidate_count = 0
+    structure_low_confidence_count = 0
+    rag_text_block_record_count = 0
+    rag_text_block_file_count = 0
     engine_usage = {
         "pypdf": True,
         "pdfplumber": True,
@@ -471,6 +538,7 @@ def run_conversion(config: Config) -> ConversionResult:
 
     page_text_lines: dict[int, list[str]] = {}
     page_line_tops: dict[int, list[float]] = {}
+    normalized_lines_by_page_for_blocks: dict[int, list[NormalizedLine]] = {}
     deduplicated_blocks_payload: list[dict] = []
     suppressed_lines_payload: list[dict] = list(header_footer_suppressed_payload)
     normalized_lines_debug_by_page: dict[int, list[dict]] = {}
@@ -489,10 +557,15 @@ def run_conversion(config: Config) -> ConversionResult:
             lines=recovered_lines,
             block_regions=block_regions_by_page.get(page, []),
         )
-        page_text_lines[page] = [line.text for line in normalization.lines]
-        page_line_tops[page] = [line.top for line in normalization.lines]
+        normalized_lines = normalization.lines
+        if config.repair_hyphenation:
+            normalized_lines, repair_count = _repair_hyphenated_normalized_lines(normalized_lines)
+            hyphenation_repair_count += repair_count
+        normalized_lines_by_page_for_blocks[page] = normalized_lines
+        page_text_lines[page] = [line.text for line in normalized_lines]
+        page_line_tops[page] = [line.top for line in normalized_lines]
         page_texts[page] = "\n".join(page_text_lines[page]).strip()
-        normalized_lines_debug_by_page[page] = [line.model_dump(mode="json") for line in normalization.lines]
+        normalized_lines_debug_by_page[page] = [line.model_dump(mode="json") for line in normalized_lines]
         page_result = page_results_map.get(page)
         if page_result is not None:
             header_footer_count = header_footer_suppressed_by_page.get(page, 0)
@@ -508,13 +581,6 @@ def run_conversion(config: Config) -> ConversionResult:
             [item.model_dump(mode="json") for item in normalization.deduplicated_blocks]
         )
         suppressed_lines_payload.extend([item.model_dump(mode="json") for item in normalization.suppressed_lines])
-        if config.repair_hyphenation:
-            repair = repair_hyphenated_lines(page_text_lines[page])
-            page_text_lines[page] = repair.lines
-            hyphenation_repair_count += repair.repair_count
-            page_texts[page] = "\n".join(page_text_lines[page]).strip()
-            if page_result is not None:
-                page_result.char_count = len(page_texts[page])
     finish_stage("normalization", normalization_started)
 
     page_blocks_with_anchor: dict[int, list[tuple[int, float, str]]] = {}
@@ -546,9 +612,23 @@ def run_conversion(config: Config) -> ConversionResult:
         entries.sort(key=lambda item: (item[0], item[1]))
         ordered_page_blocks[page] = [(anchor_idx, markdown) for anchor_idx, _, markdown in entries]
 
+    rag_text_started = stage_start()
+    text_block_result = build_text_blocks(normalized_lines_by_page_for_blocks)
+    rag_text_block_record_count, rag_text_block_file_count = _write_rag_text_block_output(
+        config,
+        text_block_result.records,
+    )
+    font_heading_candidate_count = text_block_result.font_heading_candidate_count
+    footnote_candidate_count = text_block_result.footnote_candidate_count
+    structure_low_confidence_count = text_block_result.structure_low_confidence_count
+    finish_stage("rag_text_blocks", rag_text_started)
+
     markdown_started = stage_start()
-    markdown_result = serialize_markdown_result(
-        page_text_lines=page_text_lines,
+    markdown_result = serialize_markdown_blocks_result(
+        page_text_blocks={
+            page: [block.to_record() for block in blocks]
+            for page, blocks in text_block_result.blocks_by_page.items()
+        },
         keep_page_markers=config.keep_page_markers,
         page_blocks_by_page=ordered_page_blocks,
     )
@@ -600,6 +680,8 @@ def run_conversion(config: Config) -> ConversionResult:
             "repair_hyphenation": config.repair_hyphenation,
             "figure_crop_fallback": config.figure_crop_fallback,
             "rag_table_output": rag_table_output.value,
+            "rag_text_blocks_output": "jsonl",
+            "rag_text_blocks_jsonl_filename": config.rag_text_blocks_jsonl_filename,
             "debug": config.debug,
             "pages": config.pages,
             "version": config.version,
@@ -677,6 +759,11 @@ def run_conversion(config: Config) -> ConversionResult:
         list_item_count=list_item_count,
         code_block_count=code_block_count,
         hyphenation_repair_count=hyphenation_repair_count,
+        font_heading_candidate_count=font_heading_candidate_count,
+        footnote_candidate_count=footnote_candidate_count,
+        structure_low_confidence_count=structure_low_confidence_count,
+        rag_text_block_record_count=rag_text_block_record_count,
+        rag_text_block_file_count=rag_text_block_file_count,
     )
     report_path = config.output_dir / config.report_filename
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)

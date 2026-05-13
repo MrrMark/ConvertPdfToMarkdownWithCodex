@@ -35,6 +35,7 @@ class Config(BaseModel):
     report_filename: str = "report.json"
     rag_tables_markdown_filename: str = "rag_tables.md"
     rag_tables_jsonl_filename: str = "tables_rag.jsonl"
+    rag_text_blocks_jsonl_filename: str = "text_blocks_rag.jsonl"
     assets_dirname: str = "assets"
 
     def selected_pages(self, total_pages: int) -> list[int]:

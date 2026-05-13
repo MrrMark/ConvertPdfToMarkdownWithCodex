@@ -28,6 +28,7 @@ def test_cli_runs_and_writes_outputs(sample_pdf: Path, tmp_path: Path) -> None:
     assert (output_dir / "document.md").exists()
     assert (output_dir / "manifest.json").exists()
     assert (output_dir / "report.json").exists()
+    assert (output_dir / "text_blocks_rag.jsonl").exists()
 
 
 def test_cli_uses_default_output_dir_when_output_dir_is_omitted(sample_pdf: Path) -> None:
@@ -221,6 +222,8 @@ def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
     assert manifest["options"]["repair_hyphenation"] is True
     assert manifest["options"]["figure_crop_fallback"] is True
     assert manifest["options"]["ocr_lang"] == "kor+eng"
+    assert manifest["options"]["rag_text_blocks_output"] == "jsonl"
+    assert manifest["options"]["rag_text_blocks_jsonl_filename"] == "text_blocks_rag.jsonl"
     assert (output_dir / "debug" / "page-0001-raw-lines.json").exists()
 
 

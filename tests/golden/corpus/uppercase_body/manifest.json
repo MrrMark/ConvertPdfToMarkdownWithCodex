@@ -1,0 +1,28 @@
+{
+  "images": [],
+  "input_file": "uppercase_body.pdf",
+  "options": {
+    "debug": false,
+    "dedupe_images": false,
+    "figure_crop_fallback": false,
+    "force_ocr": false,
+    "image_mode": "referenced",
+    "keep_page_markers": true,
+    "ocr_lang": "eng",
+    "pages": null,
+    "rag_table_output": "none",
+    "rag_text_blocks_jsonl_filename": "text_blocks_rag.jsonl",
+    "rag_text_blocks_output": "jsonl",
+    "remove_header_footer": false,
+    "repair_hyphenation": false,
+    "table_mode": "auto",
+    "version": "<version>"
+  },
+  "schema_version": "1.0",
+  "selected_pages": [
+    1
+  ],
+  "tables": [],
+  "total_pages": 1,
+  "warnings": []
+}

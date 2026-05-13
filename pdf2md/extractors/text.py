@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unicodedata
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -19,6 +20,13 @@ class TextLine:
     bottom: float
     x0: float
     x1: float
+    font_size: Optional[float] = None
+    font_family: Optional[str] = None
+    font_style_hint: Optional[str] = None
+    line_height: Optional[float] = None
+    left_indent: Optional[float] = None
+    right_indent: Optional[float] = None
+    y_band: Optional[str] = None
 
 
 @dataclass
@@ -89,6 +97,57 @@ def _detect_two_column_layout(lines: list[TextLine], page_width: float) -> tuple
     return True, midpoint, column_top, column_bottom
 
 
+def _font_style_hint(font_family: str | None) -> str | None:
+    if not font_family:
+        return None
+    normalized = font_family.lower()
+    hints: list[str] = []
+    if any(token in normalized for token in ("courier", "mono", "code")):
+        hints.append("monospace")
+    if any(token in normalized for token in ("bold", "black", "heavy")):
+        hints.append("bold")
+    if any(token in normalized for token in ("italic", "oblique")):
+        hints.append("italic")
+    return "+".join(hints) if hints else "regular"
+
+
+def _dominant_value(values: list[Any]) -> Any | None:
+    if not values:
+        return None
+    return Counter(values).most_common(1)[0][0]
+
+
+def _line_y_band(top: float, bottom: float, page_height: float) -> str | None:
+    if page_height <= 0:
+        return None
+    if bottom <= page_height * 0.18:
+        return "top"
+    if top >= page_height * 0.82:
+        return "bottom"
+    return "middle"
+
+
+def _line_metadata(line: dict, page_width: float, page_height: float) -> dict[str, Any]:
+    chars = [char for char in line.get("chars", []) if isinstance(char, dict)]
+    sizes = [round(float(char["size"]), 2) for char in chars if isinstance(char.get("size"), (int, float))]
+    font_names = [str(char.get("fontname")) for char in chars if char.get("fontname")]
+    font_size = _dominant_value(sizes)
+    font_family = _dominant_value(font_names)
+    top = float(line.get("top", 0.0))
+    bottom = float(line.get("bottom", top))
+    x0 = float(line.get("x0", 0.0))
+    x1 = float(line.get("x1", x0))
+    return {
+        "font_size": font_size,
+        "font_family": font_family,
+        "font_style_hint": _font_style_hint(font_family),
+        "line_height": round(max(0.0, bottom - top), 2),
+        "left_indent": round(max(0.0, x0), 2),
+        "right_indent": round(max(0.0, page_width - x1), 2) if page_width > 0 else None,
+        "y_band": _line_y_band(top, bottom, page_height),
+    }
+
+
 def order_text_lines(lines: list[TextLine], page_width: float, page_height: float) -> tuple[list[TextLine], PageLayoutMetadata]:
     """Order page lines conservatively, using column order only for clear two-column pages."""
     ordered_top = sorted(lines, key=lambda item: (item.top, item.x0))
@@ -126,13 +185,15 @@ def order_text_lines(lines: list[TextLine], page_width: float, page_height: floa
     )
 
 
-def _raw_line_payload(line: dict) -> dict:
+def _raw_line_payload(line: dict, page_width: float, page_height: float) -> dict:
+    metadata = _line_metadata(line, page_width, page_height)
     return {
         "text": normalize_text(line.get("text", "")),
         "top": float(line.get("top", 0.0)),
         "bottom": float(line.get("bottom", line.get("top", 0.0))),
         "x0": float(line.get("x0", 0.0)),
         "x1": float(line.get("x1", line.get("x0", 0.0))),
+        **metadata,
     }
 
 
@@ -147,7 +208,9 @@ def _extract_page_text_layout_from_pdf(
         raw_lines = (text_lines_by_page or {}).get(page_number)
         if raw_lines is None:
             raw_lines = page.extract_text_lines() or []
-        result.raw_lines_by_page[page_number] = [_raw_line_payload(line) for line in raw_lines]
+        page_width = float(page.width)
+        page_height = float(page.height)
+        result.raw_lines_by_page[page_number] = [_raw_line_payload(line, page_width, page_height) for line in raw_lines]
         normalized_lines: list[TextLine] = []
         for line in raw_lines:
             text = normalize_text(line.get("text", ""))
@@ -157,6 +220,7 @@ def _extract_page_text_layout_from_pdf(
             bottom = float(line.get("bottom", top))
             x0 = float(line.get("x0", 0.0))
             x1 = float(line.get("x1", x0))
+            metadata = _line_metadata(line, page_width, page_height)
             normalized_lines.append(
                 TextLine(
                     text=text,
@@ -164,12 +228,13 @@ def _extract_page_text_layout_from_pdf(
                     bottom=bottom,
                     x0=x0,
                     x1=x1,
+                    **metadata,
                 )
             )
         ordered_lines, metadata = order_text_lines(
             normalized_lines,
-            page_width=float(page.width),
-            page_height=float(page.height),
+            page_width=page_width,
+            page_height=page_height,
         )
         metadata.page = page_number
         result.lines_by_page[page_number] = ordered_lines

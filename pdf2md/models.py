@@ -151,6 +151,11 @@ class ReportSummary(BaseModel):
     list_item_count: int = 0
     code_block_count: int = 0
     hyphenation_repair_count: int = 0
+    font_heading_candidate_count: int = 0
+    footnote_candidate_count: int = 0
+    structure_low_confidence_count: int = 0
+    rag_text_block_record_count: int = 0
+    rag_text_block_file_count: int = 0
 
 
 class ImageAsset(BaseModel):
@@ -215,6 +220,14 @@ class NormalizedLine(BaseModel):
     bottom: float
     x0: float
     x1: float
+    font_size: Optional[float] = None
+    font_family: Optional[str] = None
+    font_style_hint: Optional[str] = None
+    line_height: Optional[float] = None
+    left_indent: Optional[float] = None
+    right_indent: Optional[float] = None
+    y_band: Optional[str] = None
+    source_line_indices: list[int] = Field(default_factory=list)
 
 
 class DedupDecision(BaseModel):

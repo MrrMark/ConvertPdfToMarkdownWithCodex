@@ -13,6 +13,13 @@ def _line(text: str, top: float, x0: float = 72.0) -> TextLine:
     )
 
 
+def _mono_line(text: str, top: float, x0: float = 72.0) -> TextLine:
+    line = _line(text, top, x0=x0)
+    line.font_family = "Courier"
+    line.font_style_hint = "monospace"
+    return line
+
+
 def test_heading_index_is_not_merged_with_body() -> None:
     result = normalize_page_lines(
         page=1,
@@ -79,6 +86,18 @@ def test_hyphen_split_is_restored_on_merge() -> None:
     )
     assert len(result.lines) == 1
     assert result.lines[0].text == "characteristics"
+
+
+def test_monospace_lines_are_not_reflowed_before_code_classification() -> None:
+    result = normalize_page_lines(
+        page=4,
+        lines=[
+            _mono_line("value = 1", 50),
+            _mono_line("return value", 62),
+        ],
+    )
+    assert [line.text for line in result.lines] == ["value = 1", "return value"]
+    assert result.line_merge_count == 0
 
 
 def test_line_suppression_for_overlapping_block() -> None:

@@ -350,6 +350,8 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 
 - `schema_version`
 - `options.rag_table_output`
+- `options.rag_text_blocks_output`
+- `options.rag_text_blocks_jsonl_filename`
 - `options.ocr_lang`
 - `options.repair_hyphenation`
 - `options.figure_crop_fallback`
@@ -386,6 +388,11 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - `summary.list_item_count`
 - `summary.code_block_count`
 - `summary.hyphenation_repair_count`
+- `summary.rag_text_block_record_count`
+- `summary.rag_text_block_file_count`
+- `summary.font_heading_candidate_count`
+- `summary.footnote_candidate_count`
+- `summary.structure_low_confidence_count`
 
 출력 schema 안정성 정책과 RAG sidecar field 계약은 `docs\OUTPUT_SCHEMA.md`에서 확인합니다.
 - `summary.rag_table_output`
@@ -411,6 +418,7 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - 문서 품질 점검 시 표 fallback뿐 아니라 구조 마커 복구도 같이 확인하는 것이 좋습니다.
 - 확인 위치:
   - `document.md`
+  - `text_blocks_rag.jsonl`
   - `manifest.json`
   - `report.json`
 
