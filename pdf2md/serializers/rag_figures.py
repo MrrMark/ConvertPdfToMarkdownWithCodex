@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from pdf2md.models import ExcludedImageAsset, ImageAsset
@@ -71,6 +72,34 @@ def _nearby_heading_path(
     return _heading_path(sorted(page_records, key=lambda item: int(item.get("block_index") or 0))[0])
 
 
+def _figure_text(*values: Any) -> str:
+    parts: list[str] = []
+    for value in values:
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    text = str(item.get("text") or "").strip()
+                    if text:
+                        parts.append(text)
+    return " ".join(parts)
+
+
+def _figure_kind(text: str) -> tuple[str, list[str], list[str]]:
+    lowered = text.lower()
+    labels = sorted(dict.fromkeys(re.findall(r"\b(?:[A-Z]{2,}[A-Z0-9_-]*-\d+|[A-Z]{2,}[0-9]+|[A-Z][A-Za-z]+)\b", text)))
+    if any(token in lowered for token in ("state machine", "state diagram", "state transition")):
+        return "state_machine", labels, ["state_machine_text"]
+    if any(token in lowered for token in ("sequence diagram", "message sequence", "timing diagram")):
+        return "sequence_diagram", labels, ["sequence_or_timing_text"]
+    if any(token in lowered for token in ("register layout", "bit field", "bitfield", "bits ")):
+        return "register_layout", labels, ["register_layout_text"]
+    if any(token in lowered for token in ("diagram", "flow", "architecture")):
+        return "diagram", labels, ["diagram_text"]
+    return "image", labels, ["image_asset"]
+
+
 def _figure_record(
     *,
     figure_id: str,
@@ -84,6 +113,7 @@ def _figure_record(
         anchor_top=asset.anchor_top,
         text_block_records=text_block_records,
     )
+    kind, labels, kind_reasons = _figure_kind(_figure_text(asset.caption_text, asset.alt_text, heading_path))
     return {
         "figure_id": figure_id,
         "page": asset.page,
@@ -106,6 +136,10 @@ def _figure_record(
         "crop_content_ratio": asset.crop_content_ratio,
         "crop_rejected_reason": asset.crop_rejected_reason,
         "ocr_candidates": [],
+        "figure_kind": kind,
+        "diagram_candidate": kind != "image",
+        "detected_labels": labels,
+        "nearby_text_refs": [],
         "source_refs": [
             {
                 "source_type": "figure",
@@ -116,7 +150,7 @@ def _figure_record(
             }
         ],
         "classification_confidence": round(float(asset.caption_confidence or 0.75), 2),
-        "classification_reasons": ["image_asset"],
+        "classification_reasons": sorted(dict.fromkeys(["image_asset"] + kind_reasons)),
     }
 
 
@@ -136,6 +170,9 @@ def _excluded_figure_record(
     reasons = ["excluded_image_asset", str(asset.reason)]
     if asset.recovered_text:
         reasons.append("recovered_text")
+    kind, labels, kind_reasons = _figure_kind(
+        _figure_text(asset.recovered_text, asset.ocr_candidates, heading_path, asset.parent_heading_index)
+    )
     return {
         "figure_id": figure_id,
         "page": asset.page,
@@ -158,6 +195,10 @@ def _excluded_figure_record(
         "crop_content_ratio": None,
         "crop_rejected_reason": asset.reason,
         "ocr_candidates": asset.ocr_candidates,
+        "figure_kind": kind,
+        "diagram_candidate": kind != "image",
+        "detected_labels": labels,
+        "nearby_text_refs": [],
         "source_refs": [
             {
                 "source_type": "excluded_figure",
@@ -167,7 +208,7 @@ def _excluded_figure_record(
             }
         ],
         "classification_confidence": round(float(asset.recovered_confidence or 0.5), 2),
-        "classification_reasons": sorted(dict.fromkeys(reasons)),
+        "classification_reasons": sorted(dict.fromkeys(reasons + kind_reasons)),
     }
 
 

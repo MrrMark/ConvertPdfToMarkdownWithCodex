@@ -18,6 +18,7 @@
 - `docs/schema/report.schema.json`
 - `docs/schema/batch_report.schema.json`
 - `docs/schema/corpus_manifest.schema.json`
+- `docs/schema/corpus_diff_report.schema.json`
 
 Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 
@@ -58,7 +59,9 @@ Stable nested fields:
 
 - `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_text_blocks_output`, `options.semantic_layer_output`, `options.ocr_lang`
 - `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
+- `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
 - `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
+- `options.confidential_safe_mode`, `options.local_only_processing`, `options.external_llm_calls`, `options.external_embedding_calls`, `options.path_redaction`
 - `images[].page`, `index`, `path`, `source`, `bbox`, `sha256`
 - `images[].alt_text`, `caption_text`, `caption_source`, `dedupe_of`
 - `images[].caption_confidence`, `crop_reason`, `crop_content_ratio`, `crop_rejected_reason`
@@ -98,8 +101,13 @@ Stable summary fields:
 - `cross_ref_record_count`, `cross_ref_file_count`
 - `semantic_low_confidence_count`, `unresolved_cross_ref_count`, `normative_requirement_count`
 - `retrieval_chunk_record_count`, `retrieval_chunk_file_count`
+- `retrieval_chunk_max_token_estimate`, `retrieval_chunk_average_token_estimate`
+- `retrieval_chunk_over_target_count`, `retrieval_chunk_duplicate_source_ref_count`
 - `figure_rag_record_count`, `figure_rag_file_count`
 - `domain_unit_record_count`, `domain_unit_file_count`
+- `requirement_traceability_record_count`, `requirement_traceability_file_count`
+- `technical_table_record_count`, `technical_table_file_count`
+- `confidential_safe_mode`
 - `font_heading_candidate_count`, `footnote_candidate_count`, `structure_low_confidence_count`
 
 ## text_blocks_rag.jsonl
@@ -209,7 +217,7 @@ Policy:
 
 ## cross_refs_rag.jsonl
 
-Default JSONL output for section/table/figure/appendix reference provenance.
+Default JSONL output for section/table/figure/appendix and technical reference provenance.
 
 Required per JSONL record:
 
@@ -226,8 +234,73 @@ Required per JSONL record:
 
 Policy:
 
-- `target_type` is one of `section`, `table`, `figure`, `appendix`, `unknown`.
+- `target_type` may include `section`, `table`, `figure`, `appendix`, `requirement`, `log_page`, `feature`, `opcode`, `register`, or `unknown`.
 - Unresolved references are preserved with `resolved: false` for downstream diagnostics.
+
+## requirement_traceability_rag.jsonl
+
+Default JSONL output for requirement traceability and conformance matrix ingestion.
+
+Required per JSONL record:
+
+- `trace_id`
+- `trace_index`
+- `requirement_id`
+- `normative_strength`
+- `text`
+- `condition`
+- `applicability`
+- `dependency_refs`
+- `exception_text`
+- `testability_hint`
+- `page_range`
+- `bbox`
+- `heading_path`
+- `source_refs`
+- `classification_confidence`
+- `classification_reasons`
+
+Policy:
+
+- Records are derived from conservative requirement semantic units and stable table rows such as OCP-style `Requirement ID / Description` tables.
+- `testability_hint` is deterministic metadata only. It is not a generated test case.
+- Customer-confidential source text is preserved only in local output; use `--confidential-safe-mode` when sharing metadata outside the local workspace.
+
+## technical_tables_rag.jsonl
+
+Default JSONL output for typed technical table rows used by storage/security spec RAG.
+
+Required per JSONL record:
+
+- `technical_table_unit_id`
+- `technical_table_unit_index`
+- `unit_type`
+- `page`
+- `table_id`
+- `table_row_id`
+- `row_index`
+- `text`
+- `raw_cells`
+- `bit_range`
+- `field_name`
+- `value`
+- `meaning`
+- `reset_default`
+- `access`
+- `requirement_ref`
+- `opcode`
+- `command`
+- `log_identifier`
+- `feature_identifier`
+- `bbox`
+- `source_refs`
+- `classification_confidence`
+- `classification_reasons`
+
+Policy:
+
+- `unit_type` is conservative and may include `command_opcode`, `opcode`, `log_page`, `feature_identifier`, `register_field`, `bitfield`, `enum_value`, `requirement_row`, `security_method`, or `technical_parameter`.
+- Original `raw_cells` and `text` remain the source of truth. Normalized fields are populated only when header/cell evidence is clear.
 
 ## retrieval_chunks_rag.jsonl
 
@@ -248,11 +321,18 @@ Required per JSONL record:
 - `retrieval_priority`
 - `char_count`
 - `token_estimate`
+- `section_path`
+- `chunk_group_id`
+- `source_record_count`
+- `source_dedupe_key`
+- `chunk_boundary_policy`
+- `chunk_boundary_reasons`
 
 Policy:
 
 - `text` remains extracted source text or deterministic row text, not a summary or paraphrase.
-- `source_refs` must be sufficient to trace a chunk back to the originating block, table row, requirement, or domain unit.
+- `source_refs` must be sufficient to trace a chunk back to the originating block, table row, requirement, requirement trace, technical table unit, or domain unit.
+- Chunk boundary fields are deterministic diagnostics for long technical specs; they do not summarize or rewrite source text.
 
 ## figures_rag.jsonl
 
@@ -273,12 +353,17 @@ Required per JSONL record:
 - `heading_path`
 - `ocr_candidates`
 - `source_refs`
+- `figure_kind`
+- `diagram_candidate`
+- `detected_labels`
+- `nearby_text_refs`
 - `classification_confidence`
 - `classification_reasons`
 
 Policy:
 
 - The sidecar records extracted image assets and excluded image candidates.
+- `figure_kind` is conservative metadata such as `image`, `diagram`, `state_machine`, `sequence_diagram`, or `register_layout`.
 - No generated visual description is added by default.
 
 ## domain_units_rag.jsonl
@@ -305,7 +390,8 @@ Required per JSONL record:
 Policy:
 
 - Default adapter is `none`, so this file is only written when a domain adapter is explicitly selected.
-- `--domain-adapter nvme` currently extracts conservative command/opcode/register field/enum value records from table rows with clear headers.
+- Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, and `customer-requirements`.
+- Adapter profiles consume the typed technical table sidecar where possible and keep domain heuristics out of the default conversion path.
 
 ## corpus_manifest.json
 
@@ -334,6 +420,42 @@ Policy:
 
 - `purpose` is `rag_corpus_ingest`.
 - `files` contains core outputs and any generated RAG sidecars for that document.
+
+## corpus_diff_report.json
+
+Batch-mode JSON output emitted when `--previous-corpus-manifest` is provided.
+
+Required:
+
+- `schema_version`
+- `purpose`
+- `previous_manifest`
+- `current_manifest`
+- `entries`
+- `summary`
+
+Stable fields:
+
+- `entries[].doc_id`
+- `entries[].status`: one of `added`, `changed`, `unchanged`, `removed`
+- `entries[].previous_source_sha256`
+- `entries[].current_source_sha256`
+- `summary.changed_count`, `summary.unchanged_count`, `summary.removed_count`, `summary.added_count`
+
+Policy:
+
+- Diffing is deterministic and based on `doc_id` plus `source_sha256`.
+- It is intended to minimize corpus reconversion and vector DB re-indexing.
+
+## sanitized_report.json
+
+Optional JSON output emitted by `--confidential-safe-mode`.
+
+Policy:
+
+- The report schema matches `report.json`.
+- Public metadata records `confidential_safe_mode: true` and local-only/no-external-call options in `manifest.json`.
+- Batch file maps and manifest paths are redacted to filenames or document ids where possible.
 
 ## debug/
 

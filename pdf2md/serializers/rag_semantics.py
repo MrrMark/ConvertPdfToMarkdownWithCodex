@@ -33,6 +33,27 @@ REFERENCE_PATTERN = re.compile(
     r"\b(?P<kind>Section|Clause|Table|Figure|Appendix)\s+(?P<label>[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*)",
     re.IGNORECASE,
 )
+REQUIREMENT_REF_PATTERN = re.compile(
+    r"\b(?:Requirement\s+ID|Requirement|Req(?:uirement)?\.?)\s+"
+    r"(?P<label>[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-\d+)\b",
+    re.IGNORECASE,
+)
+LOG_IDENTIFIER_REF_PATTERN = re.compile(
+    r"\b(?:Log\s+(?:Identifier|Page)|LID)\s+(?P<label>(?:0x[0-9A-Fa-f]+|[0-9A-Fa-f]+h))\b",
+    re.IGNORECASE,
+)
+FEATURE_IDENTIFIER_REF_PATTERN = re.compile(
+    r"\b(?:Feature\s+Identifier|FID)\s+(?P<label>(?:0x[0-9A-Fa-f]+|[0-9A-Fa-f]+h))\b",
+    re.IGNORECASE,
+)
+OPCODE_REF_PATTERN = re.compile(
+    r"\b(?:Opcode|Command\s+Opcode)\s+(?P<label>(?:0x[0-9A-Fa-f]+|[0-9A-Fa-f]+h))\b",
+    re.IGNORECASE,
+)
+REGISTER_REF_PATTERN = re.compile(
+    r"\b(?:Register|Capability)\s+(?P<label>[A-Za-z][A-Za-z0-9 _/-]{1,80})",
+    re.IGNORECASE,
+)
 NUMERIC_HEADING_PATTERN = re.compile(r"^(?P<label>\d+(?:\.\d+)*)\b")
 APPENDIX_HEADING_PATTERN = re.compile(r"^Appendix\s+(?P<label>[A-Za-z0-9]+)\b", re.IGNORECASE)
 TABLE_CAPTION_PATTERN = re.compile(r"\bTable\s+(?P<label>[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*)", re.IGNORECASE)
@@ -226,7 +247,17 @@ def _build_reference_targets(
     text_block_records: list[dict[str, Any]],
     rag_tables: list[dict[str, Any]],
 ) -> dict[str, dict[str, str]]:
-    targets: dict[str, dict[str, str]] = {"section": {}, "table": {}, "figure": {}, "appendix": {}}
+    targets: dict[str, dict[str, str]] = {
+        "section": {},
+        "table": {},
+        "figure": {},
+        "appendix": {},
+        "requirement": {},
+        "log_page": {},
+        "feature": {},
+        "opcode": {},
+        "register": {},
+    }
     for record in text_block_records:
         text = str(record.get("text") or "").strip()
         block_id = str(record.get("block_id") or "")
@@ -253,7 +284,69 @@ def _build_reference_targets(
         table_match = TABLE_CAPTION_PATTERN.search(caption)
         if table_id and table_match is not None:
             targets["table"][table_match.group("label")] = table_id
+        for row in table.get("records", []):
+            if not isinstance(row, dict):
+                continue
+            row_id = str(row.get("table_row_id") or "")
+            if not row_id:
+                continue
+            row_text = str(row.get("row_text") or "")
+            cells = row.get("cells")
+            if isinstance(cells, dict):
+                for key, value in cells.items():
+                    key_text = str(key)
+                    value_text = str(value).strip()
+                    if not value_text:
+                        continue
+                    clean_key = re.sub(r"[^a-z0-9]+", "", key_text.lower())
+                    if clean_key in {"requirementid", "requirement", "reqid", "id"}:
+                        targets["requirement"][value_text] = row_id
+                    elif clean_key in {"logidentifier", "lid", "logpage"}:
+                        targets["log_page"][value_text] = row_id
+                    elif clean_key in {"featureidentifier", "fid", "feature"}:
+                        targets["feature"][value_text] = row_id
+                    elif clean_key in {"opcode", "commandopcode"}:
+                        targets["opcode"][value_text] = row_id
+                    elif clean_key in {"register", "capability", "field"}:
+                        targets["register"][value_text] = row_id
+            for pattern, target_type in (
+                (REQUIREMENT_REF_PATTERN, "requirement"),
+                (LOG_IDENTIFIER_REF_PATTERN, "log_page"),
+                (FEATURE_IDENTIFIER_REF_PATTERN, "feature"),
+                (OPCODE_REF_PATTERN, "opcode"),
+            ):
+                for match in pattern.finditer(row_text):
+                    targets[target_type][match.group("label")] = row_id
     return targets
+
+
+def _extra_reference_matches(text: str) -> list[tuple[re.Match[str], str, str]]:
+    matches: list[tuple[re.Match[str], str, str]] = []
+    for pattern, target_type, label_prefix in (
+        (REQUIREMENT_REF_PATTERN, "requirement", "Requirement"),
+        (LOG_IDENTIFIER_REF_PATTERN, "log_page", "Log Identifier"),
+        (FEATURE_IDENTIFIER_REF_PATTERN, "feature", "Feature Identifier"),
+        (OPCODE_REF_PATTERN, "opcode", "Opcode"),
+        (REGISTER_REF_PATTERN, "register", "Register"),
+    ):
+        for match in pattern.finditer(text):
+            label = match.group("label").strip(" .,;:")
+            if target_type == "register":
+                label = re.split(r"\s+(?:and|for|in|of|is|shall|must|should|may)\b", label, maxsplit=1)[0].strip()
+            if label:
+                matches.append((match, target_type, f"{label_prefix} {label}"))
+    matches.sort(key=lambda item: item[0].start())
+    return matches
+
+
+def _target_key_from_label(target_label: str) -> str:
+    for prefix in ("Log Identifier ", "Feature Identifier ", "Requirement ", "Opcode ", "Register "):
+        if target_label.startswith(prefix):
+            return target_label[len(prefix) :]
+    parts = target_label.split(" ", 1)
+    if len(parts) == 2:
+        return parts[1]
+    return target_label
 
 
 def _known_parameter_headers(headers: list[Any]) -> bool:
@@ -465,6 +558,25 @@ def build_semantic_layer(
                 reasons=["reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
             )
 
+        for match, target_type, target_label in _extra_reference_matches(text):
+            target_key = _target_key_from_label(target_label)
+            target_ref = targets.get(target_type, {}).get(target_key)
+            resolved = target_ref is not None
+            source_text = _reference_source_text(text, match.start(), match.end())
+            cross_ref_recorder.add(
+                page=page,
+                source_refs=source_refs,
+                source_text=source_text,
+                target_type=target_type,
+                target_label=target_label,
+                target_ref=target_ref,
+                resolved=resolved,
+                heading_path=heading_path,
+                confidence=0.82 if resolved else 0.62,
+                reasons=["technical_reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
+            )
+            result.unresolved_cross_ref_count += int(not resolved)
+
     for record in table_records:
         headers = record.get("headers")
         cells = record.get("cells")
@@ -508,6 +620,25 @@ def build_semantic_layer(
                 heading_path=[],
                 confidence=0.85 if resolved else 0.65,
                 reasons=["reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
+            )
+            result.unresolved_cross_ref_count += int(not resolved)
+
+        for match, target_type, target_label in _extra_reference_matches(row_text):
+            target_key = _target_key_from_label(target_label)
+            target_ref = targets.get(target_type, {}).get(target_key)
+            resolved = target_ref is not None
+            source_text = _reference_source_text(row_text, match.start(), match.end())
+            cross_ref_recorder.add(
+                page=page,
+                source_refs=source_refs,
+                source_text=source_text,
+                target_type=target_type,
+                target_label=target_label,
+                target_ref=target_ref,
+                resolved=resolved,
+                heading_path=[],
+                confidence=0.82 if resolved else 0.62,
+                reasons=["technical_reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
             )
             result.unresolved_cross_ref_count += int(not resolved)
 

@@ -142,6 +142,48 @@ def test_cross_refs_are_resolved_when_targets_exist_and_kept_when_unresolved() -
     assert len(reference_units) == 3
 
 
+def test_technical_cross_refs_include_requirement_and_log_identifier_targets() -> None:
+    rag_tables = normalize_rag_table_payload(
+        [
+            {
+                "page": 1,
+                "table_index": 1,
+                "headers": ["Requirement ID", "Description"],
+                "records": [
+                    {
+                        "page": 1,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Requirement ID", "Description"],
+                        "cells": {"Requirement ID": "GLP-ACC-1", "Description": "Log pages shall be accessible."},
+                        "row_text": "Requirement ID = GLP-ACC-1 | Description = Log pages shall be accessible.",
+                    },
+                    {
+                        "page": 1,
+                        "table_index": 1,
+                        "row_index": 2,
+                        "headers": ["Log Identifier", "Description"],
+                        "cells": {"Log Identifier": "C0h", "Description": "SMART / Health Information Extended"},
+                        "row_text": "Log Identifier = C0h | Description = SMART / Health Information Extended",
+                    },
+                ],
+            }
+        ]
+    )
+
+    result = build_semantic_layer(
+        text_block_records=[
+            _text_block("See Requirement GLP-ACC-1 and Log Identifier C0h for sanitize behavior.")
+        ],
+        rag_tables=rag_tables,
+    )
+
+    assert [(record["target_type"], record["target_label"], record["resolved"]) for record in result.cross_refs] == [
+        ("requirement", "Requirement GLP-ACC-1", True),
+        ("log_page", "Log Identifier C0h", True),
+    ]
+
+
 def test_semantic_jsonl_is_deterministic() -> None:
     result = build_semantic_layer(
         text_block_records=[_text_block("The controller shall return SUCCESS.")],

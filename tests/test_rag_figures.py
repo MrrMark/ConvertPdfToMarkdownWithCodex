@@ -23,7 +23,7 @@ def test_figure_records_include_available_and_excluded_image_provenance() -> Non
         page=1,
         index=1,
         path="assets/images/page-0001-figure-001.png",
-        caption_text="Figure 1: Flow",
+        caption_text="Figure 1: State machine flow",
         caption_source="nearby_caption",
         caption_confidence=0.92,
         bbox=[72.0, 90.0, 200.0, 180.0],
@@ -51,6 +51,8 @@ def test_figure_records_include_available_and_excluded_image_provenance() -> Non
         "page-0001-figure-0002",
     ]
     assert records[0]["record_type"] == "image"
+    assert records[0]["figure_kind"] == "state_machine"
+    assert records[0]["diagram_candidate"] is True
     assert records[0]["heading_path"] == ["1 Figures"]
     assert records[0]["source_refs"][0]["path"].endswith("page-0001-figure-001.png")
     assert records[1]["record_type"] == "excluded_image"

@@ -25,11 +25,25 @@ def test_rag_eval_reports_hit_mrr_and_citation_coverage() -> None:
 
     report = evaluate_queries(
         chunks=chunks,
-        queries=[{"query": "controller success", "expected_source_ids": ["page-0001-block-0001"]}],
+        queries=[
+            {
+                "query": "controller success",
+                "expected_source_ids": ["page-0001-block-0001"],
+                "expected_requirement_source_ids": ["page-0001-block-0001"],
+            }
+        ],
         top_k=1,
     )
 
-    assert report["metrics"] == {"hit_at_k": 1.0, "mrr": 1.0, "citation_coverage": 1.0}
+    assert report["metrics"] == {
+        "hit_at_k": 1.0,
+        "mrr": 1.0,
+        "citation_coverage": 1.0,
+        "requirement_coverage": 1.0,
+        "table_field_coverage": 0.0,
+        "chunk_token_max": 0,
+        "chunk_token_p95": 0,
+    }
     assert report["results"][0]["retrieved"][0]["chunk_id"] == "chunk-000001"
 
 
@@ -49,6 +63,7 @@ def test_rag_eval_cli_writes_report(tmp_path: Path) -> None:
                     {
                         "query": "current status field",
                         "expected_source_ids": ["page-0001-table-0001-row-0001"],
+                        "expected_table_field_source_ids": ["page-0001-table-0001-row-0001"],
                     }
                 ]
             }
@@ -59,3 +74,4 @@ def test_rag_eval_cli_writes_report(tmp_path: Path) -> None:
     assert main(["--output-dir", str(output_dir), "--eval-set", str(eval_set), "--top-k", "3"]) == 0
     report = json.loads((output_dir / "rag_eval_report.json").read_text(encoding="utf-8"))
     assert report["metrics"]["hit_at_k"] == 1.0
+    assert report["metrics"]["table_field_coverage"] == 1.0

@@ -169,6 +169,8 @@ python -m pdf2md .\sample.pdf
 - `sample_output\semantic_units_rag.jsonl`
 - `sample_output\requirements_rag.jsonl`
 - `sample_output\cross_refs_rag.jsonl`
+- `sample_output\requirement_traceability_rag.jsonl`
+- `sample_output\technical_tables_rag.jsonl`
 - `sample_output\retrieval_chunks_rag.jsonl`
 - `sample_output\figures_rag.jsonl`
 - `sample_output\manifest.json`
@@ -227,7 +229,7 @@ python -m pdf2md .\sample.pdf -o .\output --rag-table-output jsonl
 - `tables_rag.jsonl`: 행 단위 structured JSONL
 - 명확한 multi-row header는 `Parent / Child` 형태로 정리되고, row label 성격의 첫 번째 열은 `stub_cells`에 기록될 수 있습니다.
 - adjacent page의 같은 header 표는 확실할 때만 `continuation_group`으로 연결됩니다.
-- 텍스트/semantic/retrieval chunk/figure sidecar는 RAG 운영용으로 기본 생성됩니다.
+- 텍스트/semantic/requirement trace/technical table/retrieval chunk/figure sidecar는 RAG 운영용으로 기본 생성됩니다.
 
 RAG용 도메인 adapter:
 
@@ -236,7 +238,16 @@ python -m pdf2md .\sample.pdf -o .\output --domain-adapter nvme --rag-table-outp
 ```
 
 - 기본값은 `none`입니다.
-- `nvme` adapter는 명확한 표 header가 있는 command/opcode/register field/enum value만 `domain_units_rag.jsonl`로 생성합니다.
+- `nvme`, `pcie`, `ocp`, `tcg`, `customer-requirements` adapter는 명확한 표 header가 있는 command/opcode/register field/bitfield/log page/requirement/security method만 `domain_units_rag.jsonl`로 생성합니다.
+
+고객 대외비 스펙을 공유 가능한 metadata로 점검해야 하면:
+
+```powershell
+python -m pdf2md .\sample.pdf -o .\output --confidential-safe-mode
+```
+
+- source filename/path를 public metadata에서 마스킹하고 `sanitized_report.json`을 생성합니다.
+- 외부 LLM/embedding 호출이 없음을 `manifest.json` 옵션에 기록합니다.
 
 이미지 모드:
 
@@ -374,10 +385,14 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - `options.semantic_units_jsonl_filename`
 - `options.requirements_jsonl_filename`
 - `options.cross_refs_jsonl_filename`
+- `options.requirement_traceability_jsonl_filename`
+- `options.technical_tables_jsonl_filename`
 - `options.retrieval_chunks_jsonl_filename`
 - `options.figures_rag_jsonl_filename`
 - `options.domain_adapter`
 - `options.domain_units_jsonl_filename`
+- `options.confidential_safe_mode`
+- `options.local_only_processing`
 - `options.ocr_lang`
 - `options.repair_hyphenation`
 - `options.figure_crop_fallback`
@@ -431,12 +446,21 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - `summary.figure_rag_file_count`
 - `summary.domain_unit_record_count`
 - `summary.domain_unit_file_count`
+- `summary.requirement_traceability_record_count`
+- `summary.requirement_traceability_file_count`
+- `summary.technical_table_record_count`
+- `summary.technical_table_file_count`
+- `summary.retrieval_chunk_max_token_estimate`
+- `summary.retrieval_chunk_average_token_estimate`
+- `summary.retrieval_chunk_over_target_count`
+- `summary.retrieval_chunk_duplicate_source_ref_count`
+- `summary.confidential_safe_mode`
 - `summary.font_heading_candidate_count`
 - `summary.footnote_candidate_count`
 - `summary.structure_low_confidence_count`
 
 출력 schema 안정성 정책과 RAG sidecar field 계약은 `docs\OUTPUT_SCHEMA.md`에서 확인합니다.
-Machine-readable schema는 `docs\schema\manifest.schema.json`, `docs\schema\report.schema.json`, `docs\schema\batch_report.schema.json`, `docs\schema\corpus_manifest.schema.json`에 있으며 `python scripts\export_output_schema.py --check`로 검증합니다.
+Machine-readable schema는 `docs\schema\manifest.schema.json`, `docs\schema\report.schema.json`, `docs\schema\batch_report.schema.json`, `docs\schema\corpus_manifest.schema.json`, `docs\schema\corpus_diff_report.schema.json`에 있으며 `python scripts\export_output_schema.py --check`로 검증합니다.
 - `summary.rag_table_output`
 - `summary.rag_table_record_count`
 - `summary.rag_table_file_count`
@@ -464,6 +488,8 @@ Machine-readable schema는 `docs\schema\manifest.schema.json`, `docs\schema\repo
   - `semantic_units_rag.jsonl`
   - `requirements_rag.jsonl`
   - `cross_refs_rag.jsonl`
+  - `requirement_traceability_rag.jsonl`
+  - `technical_tables_rag.jsonl`
   - `retrieval_chunks_rag.jsonl`
   - `figures_rag.jsonl`
   - `manifest.json`

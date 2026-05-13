@@ -142,6 +142,8 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
             "semantic_units_rag.jsonl",
             "requirements_rag.jsonl",
             "cross_refs_rag.jsonl",
+            "requirement_traceability_rag.jsonl",
+            "technical_tables_rag.jsonl",
             "retrieval_chunks_rag.jsonl",
             "figures_rag.jsonl",
         ):

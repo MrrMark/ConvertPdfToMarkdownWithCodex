@@ -162,6 +162,11 @@
           "title": "Code Block Count",
           "type": "integer"
         },
+        "confidential_safe_mode": {
+          "default": false,
+          "title": "Confidential Safe Mode",
+          "type": "boolean"
+        },
         "cross_ref_file_count": {
           "default": 0,
           "title": "Cross Ref File Count",
@@ -344,9 +349,39 @@
           "title": "Requirement Record Count",
           "type": "integer"
         },
+        "requirement_traceability_file_count": {
+          "default": 0,
+          "title": "Requirement Traceability File Count",
+          "type": "integer"
+        },
+        "requirement_traceability_record_count": {
+          "default": 0,
+          "title": "Requirement Traceability Record Count",
+          "type": "integer"
+        },
+        "retrieval_chunk_average_token_estimate": {
+          "default": 0.0,
+          "title": "Retrieval Chunk Average Token Estimate",
+          "type": "number"
+        },
+        "retrieval_chunk_duplicate_source_ref_count": {
+          "default": 0,
+          "title": "Retrieval Chunk Duplicate Source Ref Count",
+          "type": "integer"
+        },
         "retrieval_chunk_file_count": {
           "default": 0,
           "title": "Retrieval Chunk File Count",
+          "type": "integer"
+        },
+        "retrieval_chunk_max_token_estimate": {
+          "default": 0,
+          "title": "Retrieval Chunk Max Token Estimate",
+          "type": "integer"
+        },
+        "retrieval_chunk_over_target_count": {
+          "default": 0,
+          "title": "Retrieval Chunk Over Target Count",
           "type": "integer"
         },
         "retrieval_chunk_record_count": {
@@ -502,6 +537,16 @@
         "table_unresolved_count": {
           "default": 0,
           "title": "Table Unresolved Count",
+          "type": "integer"
+        },
+        "technical_table_file_count": {
+          "default": 0,
+          "title": "Technical Table File Count",
+          "type": "integer"
+        },
+        "technical_table_record_count": {
+          "default": 0,
+          "title": "Technical Table Record Count",
           "type": "integer"
         },
         "text_line_extract_count": {

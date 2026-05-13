@@ -107,10 +107,19 @@ def build_report(
     normative_requirement_count: int = 0,
     retrieval_chunk_record_count: int = 0,
     retrieval_chunk_file_count: int = 0,
+    retrieval_chunk_max_token_estimate: int = 0,
+    retrieval_chunk_average_token_estimate: float = 0.0,
+    retrieval_chunk_over_target_count: int = 0,
+    retrieval_chunk_duplicate_source_ref_count: int = 0,
     figure_rag_record_count: int = 0,
     figure_rag_file_count: int = 0,
     domain_unit_record_count: int = 0,
     domain_unit_file_count: int = 0,
+    requirement_traceability_record_count: int = 0,
+    requirement_traceability_file_count: int = 0,
+    technical_table_record_count: int = 0,
+    technical_table_file_count: int = 0,
+    confidential_safe_mode: bool = False,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
     excluded_images = excluded_images or []
@@ -202,10 +211,19 @@ def build_report(
         normative_requirement_count=normative_requirement_count,
         retrieval_chunk_record_count=retrieval_chunk_record_count,
         retrieval_chunk_file_count=retrieval_chunk_file_count,
+        retrieval_chunk_max_token_estimate=retrieval_chunk_max_token_estimate,
+        retrieval_chunk_average_token_estimate=retrieval_chunk_average_token_estimate,
+        retrieval_chunk_over_target_count=retrieval_chunk_over_target_count,
+        retrieval_chunk_duplicate_source_ref_count=retrieval_chunk_duplicate_source_ref_count,
         figure_rag_record_count=figure_rag_record_count,
         figure_rag_file_count=figure_rag_file_count,
         domain_unit_record_count=domain_unit_record_count,
         domain_unit_file_count=domain_unit_file_count,
+        requirement_traceability_record_count=requirement_traceability_record_count,
+        requirement_traceability_file_count=requirement_traceability_file_count,
+        technical_table_record_count=technical_table_record_count,
+        technical_table_file_count=technical_table_file_count,
+        confidential_safe_mode=confidential_safe_mode,
     )
 
     return Report(

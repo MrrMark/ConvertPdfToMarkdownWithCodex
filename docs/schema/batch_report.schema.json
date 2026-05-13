@@ -86,6 +86,18 @@
           "default": null,
           "title": "Report"
         },
+        "requirement_traceability_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requirement Traceability Rag"
+        },
         "requirements_rag": {
           "anyOf": [
             {
@@ -110,6 +122,18 @@
           "default": null,
           "title": "Retrieval Chunks Rag"
         },
+        "sanitized_report": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sanitized Report"
+        },
         "semantic_units_rag": {
           "anyOf": [
             {
@@ -133,6 +157,18 @@
           ],
           "default": null,
           "title": "Tables Rag Jsonl"
+        },
+        "technical_tables_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Technical Tables Rag"
         },
         "text_blocks_rag": {
           "anyOf": [

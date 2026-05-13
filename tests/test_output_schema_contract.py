@@ -57,12 +57,15 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "report.schema.json",
         "batch_report.schema.json",
         "corpus_manifest.schema.json",
+        "corpus_diff_report.schema.json",
     ]
     assert export_output_schema.check_schema_files(output_dir) == []
     manifest_schema = json.loads((output_dir / "manifest.schema.json").read_text(encoding="utf-8"))
     corpus_schema = json.loads((output_dir / "corpus_manifest.schema.json").read_text(encoding="utf-8"))
     assert manifest_schema["properties"]["schema_version"]["default"] == "1.0"
     assert corpus_schema["properties"]["purpose"]["default"] == "rag_corpus_ingest"
+    diff_schema = json.loads((output_dir / "corpus_diff_report.schema.json").read_text(encoding="utf-8"))
+    assert diff_schema["properties"]["purpose"]["default"] == "rag_corpus_incremental_diff"
 
 
 def test_corpus_manifest_model_accepts_rag_file_map() -> None:
@@ -86,6 +89,8 @@ def test_corpus_manifest_model_accepts_rag_file_map() -> None:
                         "manifest": "/tmp/input/output/spec/spec_manifest.json",
                         "report": "/tmp/input/output/spec/spec_report.json",
                         "retrieval_chunks_rag": "/tmp/input/output/spec/retrieval_chunks_rag.jsonl",
+                        "requirement_traceability_rag": "/tmp/input/output/spec/requirement_traceability_rag.jsonl",
+                        "technical_tables_rag": "/tmp/input/output/spec/technical_tables_rag.jsonl",
                     },
                 }
             ],
@@ -93,6 +98,7 @@ def test_corpus_manifest_model_accepts_rag_file_map() -> None:
     )
 
     assert corpus.documents[0].files.retrieval_chunks_rag.endswith("retrieval_chunks_rag.jsonl")
+    assert corpus.documents[0].files.technical_tables_rag.endswith("technical_tables_rag.jsonl")
 
 
 def test_committed_output_schemas_match_current_models() -> None:

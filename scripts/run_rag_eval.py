@@ -33,6 +33,13 @@ def _source_ids(chunk: dict[str, Any]) -> set[str]:
     return ids
 
 
+def _coverage_for_expected_ids(retrieved: list[dict[str, Any]], expected_ids: set[str]) -> set[str]:
+    covered: set[str] = set()
+    for chunk in retrieved:
+        covered.update(_source_ids(chunk) & expected_ids)
+    return covered
+
+
 def score_chunk(query: str, chunk: dict[str, Any]) -> float:
     """Return a deterministic local retrieval score for smoke/eval gates."""
     query_tokens = _tokens(query)
@@ -69,10 +76,16 @@ def evaluate_queries(
     reciprocal_rank_sum = 0.0
     expected_total = 0
     covered_total = 0
+    requirement_expected_total = 0
+    requirement_covered_total = 0
+    table_field_expected_total = 0
+    table_field_covered_total = 0
 
     for idx, case in enumerate(queries, start=1):
         query = str(case.get("query") or "").strip()
         expected_ids = {str(item) for item in case.get("expected_source_ids", [])}
+        expected_requirement_ids = {str(item) for item in case.get("expected_requirement_source_ids", [])}
+        expected_table_field_ids = {str(item) for item in case.get("expected_table_field_source_ids", [])}
         retrieved = retrieve(query, chunks, top_k=top_k)
         first_rank: int | None = None
         covered: set[str] = set()
@@ -87,6 +100,12 @@ def evaluate_queries(
         reciprocal_rank_sum += (1.0 / first_rank) if first_rank else 0.0
         expected_total += len(expected_ids)
         covered_total += len(covered)
+        requirement_covered = _coverage_for_expected_ids(retrieved, expected_requirement_ids)
+        table_field_covered = _coverage_for_expected_ids(retrieved, expected_table_field_ids)
+        requirement_expected_total += len(expected_requirement_ids)
+        requirement_covered_total += len(requirement_covered)
+        table_field_expected_total += len(expected_table_field_ids)
+        table_field_covered_total += len(table_field_covered)
         results.append(
             {
                 "query_index": idx,
@@ -95,6 +114,10 @@ def evaluate_queries(
                 "hit": hit,
                 "first_hit_rank": first_rank,
                 "covered_source_ids": sorted(covered),
+                "expected_requirement_source_ids": sorted(expected_requirement_ids),
+                "covered_requirement_source_ids": sorted(requirement_covered),
+                "expected_table_field_source_ids": sorted(expected_table_field_ids),
+                "covered_table_field_source_ids": sorted(table_field_covered),
                 "retrieved": [
                     {
                         "chunk_id": chunk.get("chunk_id"),
@@ -108,6 +131,9 @@ def evaluate_queries(
         )
 
     query_count = len(queries)
+    token_lengths = [int(chunk.get("token_estimate") or 0) for chunk in chunks]
+    token_lengths_sorted = sorted(token_lengths)
+    p95_index = int(round((len(token_lengths_sorted) - 1) * 0.95)) if token_lengths_sorted else 0
     return {
         "schema_version": "1.0",
         "top_k": top_k,
@@ -116,6 +142,14 @@ def evaluate_queries(
             "hit_at_k": round(hit_count / query_count, 4) if query_count else 0.0,
             "mrr": round(reciprocal_rank_sum / query_count, 4) if query_count else 0.0,
             "citation_coverage": round(covered_total / expected_total, 4) if expected_total else 0.0,
+            "requirement_coverage": round(requirement_covered_total / requirement_expected_total, 4)
+            if requirement_expected_total
+            else 0.0,
+            "table_field_coverage": round(table_field_covered_total / table_field_expected_total, 4)
+            if table_field_expected_total
+            else 0.0,
+            "chunk_token_max": max(token_lengths, default=0),
+            "chunk_token_p95": token_lengths_sorted[p95_index] if token_lengths_sorted else 0,
         },
         "results": results,
     }
