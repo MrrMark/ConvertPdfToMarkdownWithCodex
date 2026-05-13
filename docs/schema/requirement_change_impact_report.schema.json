@@ -1,0 +1,190 @@
+{
+  "$defs": {
+    "RequirementChangeImpactEntry": {
+      "properties": {
+        "changed_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Changed Fields",
+          "type": "array"
+        },
+        "current_normative_strengths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Current Normative Strengths",
+          "type": "array"
+        },
+        "current_source_refs": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Current Source Refs",
+          "type": "array"
+        },
+        "current_testability_hints": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Current Testability Hints",
+          "type": "array"
+        },
+        "current_texts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Current Texts",
+          "type": "array"
+        },
+        "current_trace_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Current Trace Ids",
+          "type": "array"
+        },
+        "doc_id": {
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "previous_normative_strengths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Previous Normative Strengths",
+          "type": "array"
+        },
+        "previous_source_refs": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Previous Source Refs",
+          "type": "array"
+        },
+        "previous_testability_hints": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Previous Testability Hints",
+          "type": "array"
+        },
+        "previous_texts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Previous Texts",
+          "type": "array"
+        },
+        "previous_trace_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Previous Trace Ids",
+          "type": "array"
+        },
+        "requirement_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requirement Id"
+        },
+        "requirement_key": {
+          "title": "Requirement Key",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "doc_id",
+        "requirement_key",
+        "status"
+      ],
+      "title": "RequirementChangeImpactEntry",
+      "type": "object"
+    },
+    "RequirementChangeImpactSummary": {
+      "properties": {
+        "added_count": {
+          "default": 0,
+          "title": "Added Count",
+          "type": "integer"
+        },
+        "changed_count": {
+          "default": 0,
+          "title": "Changed Count",
+          "type": "integer"
+        },
+        "documents_compared": {
+          "default": 0,
+          "title": "Documents Compared",
+          "type": "integer"
+        },
+        "documents_with_requirement_changes": {
+          "default": 0,
+          "title": "Documents With Requirement Changes",
+          "type": "integer"
+        },
+        "removed_count": {
+          "default": 0,
+          "title": "Removed Count",
+          "type": "integer"
+        },
+        "unchanged_count": {
+          "default": 0,
+          "title": "Unchanged Count",
+          "type": "integer"
+        }
+      },
+      "title": "RequirementChangeImpactSummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "current_manifest": {
+      "title": "Current Manifest",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/RequirementChangeImpactEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "previous_manifest": {
+      "title": "Previous Manifest",
+      "type": "string"
+    },
+    "purpose": {
+      "default": "rag_requirement_change_impact",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/RequirementChangeImpactSummary"
+    }
+  },
+  "required": [
+    "previous_manifest",
+    "current_manifest"
+  ],
+  "title": "RequirementChangeImpactReport",
+  "type": "object"
+}

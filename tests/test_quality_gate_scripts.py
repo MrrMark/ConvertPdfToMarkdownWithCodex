@@ -209,3 +209,35 @@ def test_release_gate_runner_fails_when_any_gate_command_fails(monkeypatch, tmp_
     failed = [record for record in payload["gates"] if record["status"] == "failed"]
     assert failed[0]["gate"] == "benchmark"
     assert "benchmark failed" in failed[0]["stderr_tail"]
+
+
+def test_release_gate_runner_supports_optional_rag_calibration_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="Wrote rag_eval_report.json", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-rag",
+            gates=["rag"],
+            rag_output_dir=tmp_path / "converted-spec",
+            rag_eval_set=tmp_path / "rag_eval_queries.json",
+            rag_min_requirement_coverage=0.9,
+            rag_min_table_field_coverage=0.85,
+            rag_min_cross_ref_resolved_coverage=0.8,
+            rag_max_chunk_token_p95=512,
+            rag_max_conversion_duration_ms=10_000,
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["gates"][0]["gate"] == "rag"
+    command = calls[0]
+    assert any(str(part).endswith("run_rag_eval.py") for part in command)
+    assert "--fail-on-threshold" in command
+    assert "--min-requirement-coverage" in command
+    assert "--max-conversion-duration-ms" in command

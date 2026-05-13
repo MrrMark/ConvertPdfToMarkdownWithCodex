@@ -407,3 +407,39 @@ class CorpusDiffReport(BaseModel):
     current_manifest: str
     entries: list[CorpusDiffEntry] = Field(default_factory=list)
     summary: CorpusDiffSummary = Field(default_factory=CorpusDiffSummary)
+
+
+class RequirementChangeImpactEntry(BaseModel):
+    doc_id: str
+    requirement_key: str
+    requirement_id: Optional[str] = None
+    status: str
+    changed_fields: list[str] = Field(default_factory=list)
+    previous_trace_ids: list[str] = Field(default_factory=list)
+    current_trace_ids: list[str] = Field(default_factory=list)
+    previous_texts: list[str] = Field(default_factory=list)
+    current_texts: list[str] = Field(default_factory=list)
+    previous_source_refs: list[dict[str, Any]] = Field(default_factory=list)
+    current_source_refs: list[dict[str, Any]] = Field(default_factory=list)
+    previous_normative_strengths: list[str] = Field(default_factory=list)
+    current_normative_strengths: list[str] = Field(default_factory=list)
+    previous_testability_hints: list[str] = Field(default_factory=list)
+    current_testability_hints: list[str] = Field(default_factory=list)
+
+
+class RequirementChangeImpactSummary(BaseModel):
+    changed_count: int = 0
+    removed_count: int = 0
+    added_count: int = 0
+    unchanged_count: int = 0
+    documents_compared: int = 0
+    documents_with_requirement_changes: int = 0
+
+
+class RequirementChangeImpactReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "rag_requirement_change_impact"
+    previous_manifest: str
+    current_manifest: str
+    entries: list[RequirementChangeImpactEntry] = Field(default_factory=list)
+    summary: RequirementChangeImpactSummary = Field(default_factory=RequirementChangeImpactSummary)

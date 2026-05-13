@@ -5,7 +5,14 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pdf2md.models import BatchReport, CorpusDiffReport, CorpusManifest, Manifest, Report
+from pdf2md.models import (
+    BatchReport,
+    CorpusDiffReport,
+    CorpusManifest,
+    Manifest,
+    Report,
+    RequirementChangeImpactReport,
+)
 
 
 SCHEMA_FILES: dict[str, type] = {
@@ -14,6 +21,7 @@ SCHEMA_FILES: dict[str, type] = {
     "batch_report.schema.json": BatchReport,
     "corpus_manifest.schema.json": CorpusManifest,
     "corpus_diff_report.schema.json": CorpusDiffReport,
+    "requirement_change_impact_report.schema.json": RequirementChangeImpactReport,
 }
 
 

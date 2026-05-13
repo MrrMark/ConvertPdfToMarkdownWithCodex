@@ -19,6 +19,7 @@
 - `docs/schema/batch_report.schema.json`
 - `docs/schema/corpus_manifest.schema.json`
 - `docs/schema/corpus_diff_report.schema.json`
+- `docs/schema/requirement_change_impact_report.schema.json`
 
 Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 
@@ -356,6 +357,7 @@ Required per JSONL record:
 - `figure_kind`
 - `diagram_candidate`
 - `detected_labels`
+- `diagram_label_diagnostics`
 - `nearby_text_refs`
 - `classification_confidence`
 - `classification_reasons`
@@ -364,6 +366,7 @@ Policy:
 
 - The sidecar records extracted image assets and excluded image candidates.
 - `figure_kind` is conservative metadata such as `image`, `diagram`, `state_machine`, `sequence_diagram`, or `register_layout`.
+- Low-confidence OCR/label candidates stay in `diagram_label_diagnostics.rejected_ocr_candidates`; only promoted candidates appear in `detected_labels`.
 - No generated visual description is added by default.
 
 ## domain_units_rag.jsonl
@@ -446,6 +449,40 @@ Policy:
 
 - Diffing is deterministic and based on `doc_id` plus `source_sha256`.
 - It is intended to minimize corpus reconversion and vector DB re-indexing.
+
+## requirement_change_impact_report.json
+
+Batch-mode JSON output emitted with `corpus_diff_report.json` when `--previous-corpus-manifest` is provided.
+
+Required:
+
+- `schema_version`
+- `purpose`
+- `previous_manifest`
+- `current_manifest`
+- `entries`
+- `summary`
+
+Stable fields:
+
+- `entries[].doc_id`
+- `entries[].requirement_key`
+- `entries[].requirement_id`
+- `entries[].status`: one of `added`, `changed`, `removed`
+- `entries[].changed_fields`
+- `entries[].previous_trace_ids`, `entries[].current_trace_ids`
+- `entries[].previous_texts`, `entries[].current_texts`
+- `entries[].previous_source_refs`, `entries[].current_source_refs`
+- `entries[].previous_normative_strengths`, `entries[].current_normative_strengths`
+- `entries[].previous_testability_hints`, `entries[].current_testability_hints`
+- `summary.changed_count`, `summary.removed_count`, `summary.added_count`, `summary.unchanged_count`
+- `summary.documents_compared`, `summary.documents_with_requirement_changes`
+
+Policy:
+
+- The report compares `requirement_traceability_rag.jsonl` records across corpus manifests.
+- It preserves original requirement text and source refs; it does not summarize, paraphrase, or infer impact.
+- Records without explicit requirement IDs use deterministic `unidentified:<source_id>` keys so downstream tools can still trace source provenance.
 
 ## sanitized_report.json
 

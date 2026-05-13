@@ -24,6 +24,18 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _read_optional_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    return _read_jsonl(path)
+
+
+def _read_optional_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def _source_ids(chunk: dict[str, Any]) -> set[str]:
     ids: set[str] = set()
     for ref in chunk.get("source_refs") or []:
@@ -163,20 +175,170 @@ def _load_eval_set(path: Path) -> list[dict[str, Any]]:
     return [dict(item) for item in queries]
 
 
+def collect_output_diagnostics(output_dir: Path) -> dict[str, Any]:
+    """Collect deterministic RAG operation diagnostics from a conversion output."""
+    cross_refs = _read_optional_jsonl(output_dir / "cross_refs_rag.jsonl")
+    resolved_cross_refs = sum(1 for record in cross_refs if bool(record.get("resolved")))
+    report = _read_optional_json(output_dir / "report.json")
+    duration_ms = report.get("duration_ms") if isinstance(report, dict) else None
+    cross_ref_total = len(cross_refs)
+    return {
+        "cross_ref_total": cross_ref_total,
+        "cross_ref_resolved_count": resolved_cross_refs,
+        "cross_ref_resolved_coverage": round(resolved_cross_refs / cross_ref_total, 4)
+        if cross_ref_total
+        else 0.0,
+        "conversion_duration_ms": duration_ms if isinstance(duration_ms, int) else None,
+    }
+
+
+def _threshold_failure(
+    *,
+    metric: str,
+    current: Any,
+    limit: float,
+    direction: str,
+) -> dict[str, Any] | None:
+    if isinstance(current, bool) or not isinstance(current, (int, float)):
+        return {
+            "type": "threshold_unavailable",
+            "metric": metric,
+            "limit": limit,
+            "current": current,
+            "direction": direction,
+        }
+    failed = current < limit if direction == "min" else current > limit
+    if not failed:
+        return None
+    return {
+        "type": "threshold_failure",
+        "metric": metric,
+        "limit": limit,
+        "current": current,
+        "direction": direction,
+    }
+
+
+def _profile_thresholds(path: Path | None) -> tuple[str | None, dict[str, float]]:
+    if path is None:
+        return None, {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    profile_name = None
+    if isinstance(payload, dict):
+        profile_name = payload.get("profile_name") or payload.get("name")
+    thresholds = payload.get("thresholds") if isinstance(payload, dict) else None
+    if not isinstance(thresholds, dict):
+        raise ValueError("Calibration profile must contain a 'thresholds' object.")
+    return str(profile_name) if profile_name else path.stem, {
+        str(key): float(value) for key, value in thresholds.items() if isinstance(value, (int, float))
+    }
+
+
+def apply_calibration_gate(
+    report: dict[str, Any],
+    *,
+    calibration_profile: str | None = None,
+    thresholds: dict[str, float],
+) -> dict[str, Any]:
+    """Apply local RAG calibration thresholds without external service calls."""
+    metrics = report.setdefault("metrics", {})
+    failures: list[dict[str, Any]] = []
+    min_metrics = {
+        "hit_at_k": "min_hit_at_k",
+        "mrr": "min_mrr",
+        "citation_coverage": "min_citation_coverage",
+        "requirement_coverage": "min_requirement_coverage",
+        "table_field_coverage": "min_table_field_coverage",
+        "cross_ref_resolved_coverage": "min_cross_ref_resolved_coverage",
+    }
+    max_metrics = {
+        "chunk_token_p95": "max_chunk_token_p95",
+        "chunk_token_max": "max_chunk_token_max",
+        "conversion_duration_ms": "max_conversion_duration_ms",
+    }
+    for metric, threshold_name in min_metrics.items():
+        if threshold_name not in thresholds:
+            continue
+        failure = _threshold_failure(
+            metric=metric,
+            current=metrics.get(metric),
+            limit=thresholds[threshold_name],
+            direction="min",
+        )
+        if failure is not None:
+            failures.append(failure)
+    for metric, threshold_name in max_metrics.items():
+        if threshold_name not in thresholds:
+            continue
+        failure = _threshold_failure(
+            metric=metric,
+            current=metrics.get(metric),
+            limit=thresholds[threshold_name],
+            direction="max",
+        )
+        if failure is not None:
+            failures.append(failure)
+
+    report["calibration_profile"] = calibration_profile
+    report["thresholds"] = thresholds
+    report["gate_failures"] = failures
+    report["passed_calibration_gate"] = len(failures) == 0
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate RAG retrieval chunks with deterministic local scoring.")
     parser.add_argument("--output-dir", type=Path, required=True, help="pdf2md output directory.")
     parser.add_argument("--eval-set", type=Path, required=True, help="JSON eval set with queries.")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--report-path", type=Path, default=None)
+    parser.add_argument("--calibration-profile", type=Path, help="JSON file containing profile_name and thresholds.")
+    parser.add_argument("--profile-name", default=None, help="Human-readable local calibration profile name.")
+    parser.add_argument("--fail-on-threshold", action="store_true", help="Return non-zero when calibration fails.")
+    parser.add_argument("--min-hit-at-k", type=float)
+    parser.add_argument("--min-mrr", type=float)
+    parser.add_argument("--min-citation-coverage", type=float)
+    parser.add_argument("--min-requirement-coverage", type=float)
+    parser.add_argument("--min-table-field-coverage", type=float)
+    parser.add_argument("--min-cross-ref-resolved-coverage", type=float)
+    parser.add_argument("--max-chunk-token-p95", type=float)
+    parser.add_argument("--max-chunk-token-max", type=float)
+    parser.add_argument("--max-conversion-duration-ms", type=float)
     args = parser.parse_args(argv)
 
     chunks = _read_jsonl(args.output_dir / "retrieval_chunks_rag.jsonl")
     queries = _load_eval_set(args.eval_set)
     report = evaluate_queries(chunks=chunks, queries=queries, top_k=args.top_k)
+    report["metrics"].update(collect_output_diagnostics(args.output_dir))
+    profile_name, thresholds = _profile_thresholds(args.calibration_profile)
+    thresholds.update(
+        {
+            key: value
+            for key, value in {
+                "min_hit_at_k": args.min_hit_at_k,
+                "min_mrr": args.min_mrr,
+                "min_citation_coverage": args.min_citation_coverage,
+                "min_requirement_coverage": args.min_requirement_coverage,
+                "min_table_field_coverage": args.min_table_field_coverage,
+                "min_cross_ref_resolved_coverage": args.min_cross_ref_resolved_coverage,
+                "max_chunk_token_p95": args.max_chunk_token_p95,
+                "max_chunk_token_max": args.max_chunk_token_max,
+                "max_conversion_duration_ms": args.max_conversion_duration_ms,
+            }.items()
+            if value is not None
+        }
+    )
+    if thresholds or args.fail_on_threshold:
+        report = apply_calibration_gate(
+            report,
+            calibration_profile=args.profile_name or profile_name,
+            thresholds=thresholds,
+        )
     report_path = args.report_path or args.output_dir / "rag_eval_report.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Wrote {report_path}")
+    if args.fail_on_threshold and not report.get("passed_calibration_gate", True):
+        return 1
     return 0
 
 

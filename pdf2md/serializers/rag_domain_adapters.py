@@ -75,27 +75,46 @@ def _known_domain_row(record: dict[str, Any], tokens: set[str]) -> bool:
     return len(normalized_headers & tokens) >= 2
 
 
-def _unit_from_row(record: dict[str, Any]) -> tuple[str, str, str | None, str | None, list[str]] | None:
+def _reason_prefix(domain_adapter: DomainAdapterMode) -> str:
+    return domain_adapter.value.replace("-", "_")
+
+
+def _unit_from_row(
+    record: dict[str, Any],
+    *,
+    domain_adapter: DomainAdapterMode,
+) -> tuple[str, str, str | None, str | None, list[str]] | None:
     cells = record.get("cells")
     if not isinstance(cells, dict):
         return None
+    prefix = _reason_prefix(domain_adapter)
     command = _cell_value(cells, "Command", "Name")
     opcode = _cell_value(cells, "Opcode")
     field = _cell_value(cells, "Field", "Parameter")
     bits = _cell_value(cells, "Bits")
     value = _cell_value(cells, "Value")
     description = _cell_value(cells, "Description")
+    requirement_id = _cell_value(cells, "Requirement ID", "Req ID", "ID", "Requirement")
+    capability = _cell_value(cells, "Capability", "Register", "Register Name")
+    method = _cell_value(cells, "Method", "Method ID", "Object", "Authority", "UID")
+
+    if domain_adapter in {DomainAdapterMode.OCP, DomainAdapterMode.CUSTOMER_REQUIREMENTS} and requirement_id:
+        return "requirement", requirement_id, requirement_id, description, [f"{prefix}_requirement_id_row"]
+    if domain_adapter is DomainAdapterMode.TCG and method:
+        return "security_method", method, value or opcode, description, [f"{prefix}_security_method_or_object_row"]
+    if domain_adapter is DomainAdapterMode.PCIE and (capability or field):
+        return "register_field", capability or field or "", bits or value, description, [f"{prefix}_register_or_capability_row"]
 
     if command and opcode:
-        return "command", command, opcode, description, ["nvme_command_opcode_row"]
+        return "command", command, opcode, description, [f"{prefix}_command_opcode_row"]
     if opcode:
-        return "opcode", opcode, opcode, description, ["nvme_opcode_row"]
+        return "opcode", opcode, opcode, description, [f"{prefix}_opcode_row"]
     if field and bits:
-        return "register_field", field, bits, description, ["nvme_register_field_row"]
+        return "register_field", field, bits, description, [f"{prefix}_register_field_row"]
     if value and description:
-        return "enum_value", value, value, description, ["nvme_enum_value_row"]
+        return "enum_value", value, value, description, [f"{prefix}_enum_value_row"]
     if field and description:
-        return "field", field, bits or value, description, ["nvme_field_row"]
+        return "field", field, bits or value, description, [f"{prefix}_field_row"]
     return None
 
 
@@ -226,7 +245,7 @@ def build_domain_units(
     for table_row in flatten_rag_table_records(normalize_rag_table_payload(rag_tables)):
         if not _known_domain_row(table_row, _domain_tokens(domain_adapter)):
             continue
-        unit = _unit_from_row(table_row)
+        unit = _unit_from_row(table_row, domain_adapter=domain_adapter)
         if unit is None:
             continue
         unit_type, name, value, description, reasons = unit
