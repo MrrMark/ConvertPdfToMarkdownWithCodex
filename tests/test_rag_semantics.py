@@ -66,6 +66,32 @@ def test_will_and_uppercase_body_are_not_requirements() -> None:
     assert result.semantic_low_confidence_count == 1
 
 
+def test_legal_notice_and_toc_entries_are_not_requirements() -> None:
+    result = build_semantic_layer(
+        text_block_records=[
+            _text_block(
+                "Copyright 2026 Example Group. All rights reserved. Permission must be requested before copying.",
+                block_id="page-0001-block-0001",
+                block_index=1,
+            ),
+            _text_block(
+                "Table 4: Optional Admin Commands ........ 37",
+                block_id="page-0001-block-0002",
+                block_index=2,
+            ),
+            _text_block(
+                "The controller shall report SMART status.",
+                block_id="page-0006-block-0001",
+                block_index=1,
+            )
+            | {"page": 6},
+        ],
+        rag_tables=[],
+    )
+
+    assert [record["text"] for record in result.requirements] == ["The controller shall report SMART status."]
+
+
 def test_definition_pattern_preserves_source_text() -> None:
     result = build_semantic_layer(
         text_block_records=[

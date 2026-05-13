@@ -145,8 +145,10 @@ pdf2md/
     rag_chunks.py
     rag_domain_adapters.py
     rag_figures.py
+    rag_requirements.py
     rag_semantics.py
     rag_tables.py
+    rag_technical_tables.py
     rag_text_blocks.py
     report.py
   utils/
@@ -164,7 +166,14 @@ scripts/
   setup_windows_env.bat
   run_batch_folder_windows.ps1
   run_batch_folder_windows.bat
+  benchmark_conversion.py
+  check_ocr_runtime.py
+  export_output_schema.py
+  run_corpus_eval.py
   run_rag_eval.py
+  run_release_gates.py
+  run_ssd_corpus_profile.py
+  validate_ssd_rag_contract.py
 ```
 
 ---
@@ -266,6 +275,8 @@ python3 -m pdf2md --input-dir ./pdfs
 - `./pdfs/output/<pdf_stem>/<pdf_stem>_assets/images/...`
 - `./pdfs/output/batch_report.json`
 - `./pdfs/output/corpus_manifest.json`
+- `./pdfs/output/corpus_diff_report.json` # `--previous-corpus-manifest` 사용 시
+- `./pdfs/output/requirement_change_impact_report.json` # `--previous-corpus-manifest` 사용 시
 
 배치 모드 주의사항:
 
@@ -330,7 +341,7 @@ python3 -m pdf2md input.pdf -o output/ --domain-adapter nvme --rag-table-output 
 ```
 
 - 기본값은 `none`이며, 도메인 heuristic은 기본 변환 로직에 섞지 않습니다.
-- `nvme`, `pcie`, `ocp`, `tcg`, `customer-requirements` adapter는 표 provenance가 명확한 command/opcode/register field/bitfield/log page/requirement/security method 행만 `domain_units_rag.jsonl`로 생성합니다.
+- `nvme`, `pcie`, `ocp`, `tcg`, `customer-requirements` adapter는 표 provenance가 명확한 command/opcode/register field/bitfield/log page/requirement/security method/security object/security authority/security field 행만 `domain_units_rag.jsonl`로 생성합니다.
 - 생성된 domain unit은 `retrieval_chunks_rag.jsonl`에도 provenance와 함께 포함됩니다.
 
 ### 고객 대외비 스펙 안전 모드
@@ -390,6 +401,16 @@ pdf2md input.pdf -o output/ --debug
 ```bash
 python3 -m pdf2md --input-dir ./pdfs --skip-existing
 ```
+
+### 이전 corpus와 비교해 재색인/요구사항 변경 범위 찾기
+
+```bash
+python3 -m pdf2md --input-dir ./pdfs_v2 --previous-corpus-manifest ./pdfs_v1/output/corpus_manifest.json
+```
+
+- `corpus_diff_report.json`: PDF 단위 `added`, `changed`, `unchanged`, `removed`를 기록합니다.
+- `requirement_change_impact_report.json`: `requirement_traceability_rag.jsonl` 기준 requirement 단위 `added`, `changed`, `removed`와 원문 `source_refs`를 기록합니다.
+- 문장 요약/재서술 없이 diff provenance만 제공하므로 AI Agent의 영향 분석 입력으로 쓰기 좋습니다.
 
 ### 실행기 표기 정책
 
@@ -499,6 +520,8 @@ pdfs/
         images/
     batch_report.json
     corpus_manifest.json
+    corpus_diff_report.json                # --previous-corpus-manifest 사용 시
+    requirement_change_impact_report.json  # --previous-corpus-manifest 사용 시
 ```
 
 ### `document.md`
@@ -709,7 +732,7 @@ python3 -m pdf2md input.pdf -o output/ --table-mode auto --rag-table-output both
 - `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix와 requirement/log page/feature/opcode/register 참조의 resolved/unresolved 상태를 기록합니다.
 - `requirement_traceability_rag.jsonl`: Requirement ID, condition, dependency, exception, testability hint를 원문 기반으로 기록합니다.
 - `technical_tables_rag.jsonl`: register, bitfield, command/opcode, log page, feature identifier, enum/value table row를 typed sidecar로 기록합니다.
-- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록합니다.
+- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록하며, 각 chunk에 `schema_version`과 원본 PDF `source_sha256`를 포함합니다.
 - `figures_rag.jsonl`: 이미지/도표 bbox, caption, OCR 후보, nearby heading, figure kind를 별도 기록합니다.
 - `rag_tables.md`: 검색 chunk에 넣기 쉬운 행 단위 Markdown입니다.
 - `tables_rag.jsonl`: `table_id`, `table_row_id`, `page`, `table_index`, `headers`, `cells`, `row_text`, `bbox`, `quality_score`, `fallback_reasons`를 가진 행 단위 JSONL입니다.
@@ -733,6 +756,17 @@ RAG 검색 품질을 로컬 deterministic 방식으로 점검하려면 `retrieva
 Eval fixture에는 `expected_source_ids` 외에 `expected_requirement_source_ids`, `expected_table_field_source_ids`를 넣을 수 있으며 report에는 hit@k, MRR, citation coverage, requirement coverage, table-field coverage, cross-reference resolved coverage, chunk token 분포, conversion duration이 기록됩니다.
 
 `rag_eval_report.json`에는 hit@k, MRR, citation coverage, query별 retrieved chunk/source id, threshold 통과/실패 정보가 기록됩니다.
+
+SSD 검증 에이전트 연동 운영에서는 `document.md` 단독 업로드보다 `retrieval_chunks_rag.jsonl` 중심의 sidecar-aware ingest를 권장합니다. Secure RAG adapter는 `chunk_id`, `text`, `page_range[0]`, `section_path`, `source_refs`, `schema_version`, `source_sha256`를 SSD 에이전트의 `RagChunk/RagCitation` metadata로 보존해야 합니다.
+
+```bash
+python3 -m pdf2md nvme.pdf -o output/nvme --domain-adapter nvme --rag-table-output jsonl --remove-header-footer --confidential-safe-mode
+python3 scripts/validate_ssd_rag_contract.py --output-dir output/nvme --ssd-agent-domain HIL --ssd-agent-spec-type NVMe --domain-adapter nvme
+python3 scripts/validate_ssd_rag_contract.py --output-dir output/tcg --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
+python3 scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error
+```
+
+Profile mapping은 `nvme -> HIL/NVMe`, `pcie -> HIL/PCIe`, `ocp -> HIL/OCP`, `tcg -> HIL/TCG`를 기준으로 합니다. TCG는 `CustomerRequirement` fallback 없이 first-class `spec_type=TCG`로 검증합니다. `tables_rag.jsonl`은 운영 profile에서 `--rag-table-output jsonl|both`로 생성하고, `domain_units_rag.jsonl`은 profile별 `--domain-adapter`를 필수로 지정해 생성합니다.
 
 ### 구조 마커 복구 운영 포인트
 

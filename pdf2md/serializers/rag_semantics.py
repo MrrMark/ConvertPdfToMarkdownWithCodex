@@ -17,6 +17,18 @@ RECOMMENDED_PATTERN = re.compile(r"\b(?:should|recommended)\b", re.IGNORECASE)
 OPTIONAL_PATTERN = re.compile(r"\b(?:may(?!\s+(?:\d{1,2}|\d{4})\b)|optional)\b", re.IGNORECASE)
 LOW_CONFIDENCE_MODAL_PATTERN = re.compile(r"\b(?:will|can|could|would|expected\s+to|needs\s+to)\b", re.IGNORECASE)
 SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9(\[])")
+LEGAL_NOTICE_PATTERN = re.compile(
+    r"\b(?:all\s+rights\s+reserved|copyright|disclaimer|liabilit(?:y|ies)|license|licensed|"
+    r"no\s+part\s+of\s+this\s+publication|permission|proprietary|trademark|warrant(?:y|ies))\b",
+    re.IGNORECASE,
+)
+LEGAL_HEADING_PATTERN = re.compile(r"\b(?:copyright|disclaimer|legal|license|notice|trademark)\b", re.IGNORECASE)
+TOC_HEADING_PATTERN = re.compile(r"^\s*(?:table\s+of\s+contents|contents)\s*$", re.IGNORECASE)
+TOC_ENTRY_PATTERN = re.compile(
+    r"^\s*(?:\d+(?:\.\d+)*\s+)?(?:[A-Z][\w()/-]+(?:\s+[A-Z0-9][\w()/-]+){0,14}|"
+    r"(?:Table|Figure)\s+[A-Za-z0-9.\-]+[:.\s].+?)\s*(?:\.{2,}|\s{3,})\s*\d+\s*$",
+    re.IGNORECASE,
+)
 DEFINITION_PATTERNS = [
     re.compile(r"^(?P<term>[A-Z][A-Za-z0-9 /_()\-]{1,80})\s*:\s+\S"),
     re.compile(r"^(?P<term>[A-Z][A-Za-z0-9 /_()\-]{1,80})\s+-\s+\S"),
@@ -222,6 +234,27 @@ def _normative_strength(text: str) -> str | None:
     if OPTIONAL_PATTERN.search(text):
         return "optional"
     return None
+
+
+def _is_legal_notice(record: dict[str, Any], text: str) -> bool:
+    heading_text = " ".join(_heading_path_of(record))
+    page = _page_of(record)
+    if LEGAL_HEADING_PATTERN.search(heading_text) and LEGAL_NOTICE_PATTERN.search(text):
+        return True
+    return page <= 5 and LEGAL_NOTICE_PATTERN.search(text) is not None
+
+
+def _is_toc_noise(record: dict[str, Any], text: str) -> bool:
+    heading_path = _heading_path_of(record)
+    if any(TOC_HEADING_PATTERN.search(item) for item in heading_path):
+        return True
+    if TOC_HEADING_PATTERN.search(text):
+        return True
+    return TOC_ENTRY_PATTERN.search(text) is not None
+
+
+def _should_skip_requirement_candidates(record: dict[str, Any], text: str) -> bool:
+    return _is_legal_notice(record, text) or _is_toc_noise(record, text)
 
 
 def _definition_term(text: str) -> str | None:
@@ -431,6 +464,8 @@ def build_semantic_layer(
             continue
 
         if block_type in {"caption", "code", "footnote"}:
+            continue
+        if _should_skip_requirement_candidates(record, text):
             continue
 
         is_warning = bool(WARNING_PATTERN.search(text))

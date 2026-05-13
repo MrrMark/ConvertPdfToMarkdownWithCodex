@@ -59,6 +59,8 @@ def _make_chunk(
     semantic_types: list[str],
     normative_strength: str | None,
     retrieval_priority: int,
+    schema_version: str,
+    source_sha256: str,
     boundary_reasons: list[str] | None = None,
     chunk_group_id: str | None = None,
 ) -> dict[str, Any]:
@@ -67,9 +69,11 @@ def _make_chunk(
     )
     return {
         "chunk_id": f"chunk-{index:06d}",
+        "schema_version": schema_version,
         "chunk_index": index,
         "chunk_type": chunk_type,
         "text": text,
+        "source_sha256": source_sha256,
         "source_refs": source_refs,
         "page_range": page_range,
         "bbox": bbox,
@@ -110,12 +114,21 @@ def build_retrieval_chunks(
     domain_units: list[dict[str, Any]] | None = None,
     requirement_traceability_records: list[dict[str, Any]] | None = None,
     technical_table_records: list[dict[str, Any]] | None = None,
+    schema_version: str = "1.0",
+    source_sha256: str = "",
 ) -> list[dict[str, Any]]:
     """Build deterministic ready-to-index chunks for RAG operations."""
     chunks: list[dict[str, Any]] = []
 
     def append_chunk(**kwargs: Any) -> None:
-        chunks.append(_make_chunk(index=len(chunks) + 1, **kwargs))
+        chunks.append(
+            _make_chunk(
+                index=len(chunks) + 1,
+                schema_version=schema_version,
+                source_sha256=source_sha256,
+                **kwargs,
+            )
+        )
 
     for record in sorted(text_block_records, key=lambda item: (_page_of(item), int(item.get("block_index") or 0))):
         text = str(record.get("text") or "").strip()

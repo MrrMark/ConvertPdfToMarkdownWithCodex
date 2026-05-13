@@ -31,12 +31,53 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-13 | Storage/PCIe/Security Spec RAG 운영툴 | 94/100 | +2 | RAG calibration gate, requirement change impact report, domain deep fixtures, indexer recipes, diagram label diagnostics 구현 |
 | 2026-05-13 | Storage/PCIe/Security Spec RAG 변환툴 | 92/100 | +5 | domain adapter profile, requirement traceability, technical table sidecar, safe mode, corpus diff, chunk diagnostics 구현 |
 | 2026-05-13 | Storage/PCIe/Security Spec RAG 변환툴 | 87/100 | +2 / -4 | NVMe/OCP/PCIe/TCG/customer spec 기준으로는 domain table, requirement traceability, confidential-safe 운영 보강 필요 |
 | 2026-05-13 | RAG용 PDF to MD 변환툴 | 91/100 | +6 | RAG text/semantic/retrieval/figure/domain/corpus sidecar, schema 계약, CI 3.11/3.14 통과 |
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-13 (Q26-Q30 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **NVMe/PCIe/OCP/TCG/고객 Requirement Spec용 RAG 운영툴**로 보면 **94/100점** 수준으로 평가한다.
+
+직전 Q16-Q25 구현 후 평가 92/100점 대비 **+2점** 상승했다. 상승 요인은 `scripts/run_rag_eval.py`의 calibration threshold, `scripts/run_release_gates.py`의 optional `rag` gate, batch mode의 `requirement_change_impact_report.json`, 도메인별 deep fixture, indexer integration recipe, `figures_rag.jsonl`의 diagram label confidence diagnostics가 실제 운영 경로에 들어간 점이다.
+
+아직 95점 이상으로 보지는 않는다. 실제 공개 스펙/고객 유사 corpus는 보안 정책상 repo에 커밋하지 않고 로컬 profile로만 운영하므로, corpus-level aggregate runner와 rendered diagram fixture suite가 더 필요하다.
+
+#### 세부 점수
+
+| 항목 | 점수 | 직전 평가 대비 | 평가 |
+|---|---:|---:|---|
+| 핵심 변환 완성도 | 17/18 | 0 | 기본 변환 안정성과 partial success 정책은 유지됐다. 새 운영 sidecar는 기존 Markdown 정본을 침범하지 않는다. |
+| 표 변환/RAG 대응 | 18/18 | +1 | table row, technical table, domain unit, requirement trace가 retrieval/eval gate와 연결됐다. |
+| 텍스트 구조 보존 | 15/16 | 0 | 원문 requirement diff provenance를 보존하고, 요약/재서술 없이 변경 영향 분석 입력을 제공한다. |
+| 이미지/OCR 신뢰도 | 13/14 | +1 | diagram OCR/label 후보를 confidence 기준으로 promoted/rejected diagnostics에 분리한다. |
+| 성능/효율 | 10/12 | 0 | conversion duration과 chunk token 분포가 RAG calibration gate에 포함됐다. 대량 corpus aggregate runner는 다음 단계다. |
+| 테스트/결정성/CI | 12/12 | 0 | `143 tests collected`, 전체 pytest, schema check, GitHub Actions Python 3.11/3.14 통과로 회귀 방어가 좋다. |
+| 운영/릴리스 준비도 | 9/10 | 0 | indexer recipe, calibration profile, schema 계약이 보강됐다. offline index contract validator는 아직 남았다. |
+
+#### 다음 개선 참조
+
+Q26-Q30은 완료되어 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에서 제거했다. 다음 RAG 운영 목적 개선 과제는 Q31-Q35로 정리했다.
+
+- Q31. Local Corpus Profile Runner
+- Q32. Requirement Impact Review Pack
+- Q33. Technical Cross-Reference Resolver Hardening
+- Q34. Offline Index Contract Validator
+- Q35. Rendered Diagram Fixture Suite
+
+#### 검증 기준
+
+- `./.venv311/bin/python -m pytest -q`: 정상
+- `./.venv311/bin/python scripts/export_output_schema.py --check`: 정상
+- `git diff --check`: 정상
+- `./.venv311/bin/python -m pdf2md --help`: 정상
+- GitHub Actions CI: PR #17/#18에서 Python 3.11, 3.14 통과
 
 ### 2026-05-13 (Q16-Q25 구현 후)
 

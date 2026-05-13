@@ -167,6 +167,73 @@ def test_domain_adapter_profiles_extract_pcie_ocp_tcg_and_customer_units() -> No
     assert customer[0]["classification_reasons"] == ["customer_requirement_id_row"]
 
 
+def test_tcg_domain_adapter_extracts_security_method_authority_object_and_field_units() -> None:
+    tcg_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "headers": ["Method", "UID", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Method", "UID", "Description"],
+                    "cells": {"Method": "StartSession", "UID": "0001h", "Description": "Starts a session"},
+                    "row_text": "Method = StartSession | UID = 0001h | Description = Starts a session",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 2,
+            "headers": ["Authority", "UID", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 2,
+                    "row_index": 1,
+                    "headers": ["Authority", "UID", "Description"],
+                    "cells": {"Authority": "SID", "UID": "0002h", "Description": "Security identifier authority"},
+                    "row_text": "Authority = SID | UID = 0002h | Description = Security identifier authority",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 3,
+            "headers": ["Security Field", "Bits", "Security Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 3,
+                    "row_index": 1,
+                    "headers": ["Security Field", "Bits", "Security Description"],
+                    "cells": {
+                        "Security Field": "ReadLockEnabled",
+                        "Bits": "0",
+                        "Security Description": "Read locking state",
+                    },
+                    "row_text": (
+                        "Security Field = ReadLockEnabled | Bits = 0 | "
+                        "Security Description = Read locking state"
+                    ),
+                }
+            ],
+        },
+    ]
+
+    records = build_domain_units(domain_adapter=DomainAdapterMode.TCG, rag_tables=tcg_tables)
+
+    assert [record["unit_type"] for record in records] == [
+        "security_method",
+        "security_authority",
+        "security_field",
+    ]
+    assert records[0]["value"] == "0001h"
+    assert records[2]["name"] == "ReadLockEnabled"
+
+
 def test_domain_adapter_deep_fixtures_cover_storage_pcie_ocp_tcg_and_customer_shapes() -> None:
     nvme_tables = [
         {
@@ -310,5 +377,5 @@ def test_domain_adapter_deep_fixtures_cover_storage_pcie_ocp_tcg_and_customer_sh
     assert pcie[0]["unit_type"] == "register_field"
     assert pcie[0]["name"] == "Advanced Error Reporting"
     assert ocp[0]["name"] == "SLIFE-12"
-    assert tcg[0]["unit_type"] == "security_method"
+    assert tcg[0]["unit_type"] == "security_object"
     assert customer[0]["classification_reasons"] == ["customer_requirement_id_row"]

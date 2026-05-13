@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import logging
 from pathlib import Path
 from typing import Optional
@@ -76,6 +77,14 @@ class ConversionResult:
     warnings: list[WarningEntry]
     status: ConversionStatus
     report: Report | None = None
+
+
+def _file_sha256(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def _find_anchor_index(line_tops: list[float], block_top: float) -> int:
@@ -338,6 +347,7 @@ def run_conversion(config: Config) -> ConversionResult:
     """Run conversion and write markdown, manifest, and report outputs."""
     started_at = datetime.now(timezone.utc)
     logger.info("Starting conversion input=%s output_dir=%s", config.input_pdf, config.output_dir)
+    source_sha256 = _file_sha256(config.input_pdf) if config.input_pdf.exists() else ""
     image_mode = config.image_mode if isinstance(config.image_mode, ImageMode) else ImageMode(config.image_mode)
     table_mode = config.table_mode if isinstance(config.table_mode, TableMode) else TableMode(config.table_mode)
     rag_table_output = (
@@ -786,6 +796,7 @@ def run_conversion(config: Config) -> ConversionResult:
         domain_units=domain_units,
         requirement_traceability_records=requirement_traceability_records,
         technical_table_records=technical_table_records,
+        source_sha256=source_sha256,
     )
     retrieval_chunk_diagnostics = build_retrieval_chunk_diagnostics(retrieval_chunks)
     retrieval_chunk_record_count, retrieval_chunk_file_count = _write_retrieval_chunk_output(

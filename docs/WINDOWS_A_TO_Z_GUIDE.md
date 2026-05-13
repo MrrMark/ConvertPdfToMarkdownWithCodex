@@ -238,7 +238,7 @@ python -m pdf2md .\sample.pdf -o .\output --domain-adapter nvme --rag-table-outp
 ```
 
 - 기본값은 `none`입니다.
-- `nvme`, `pcie`, `ocp`, `tcg`, `customer-requirements` adapter는 명확한 표 header가 있는 command/opcode/register field/bitfield/log page/requirement/security method만 `domain_units_rag.jsonl`로 생성합니다.
+- `nvme`, `pcie`, `ocp`, `tcg`, `customer-requirements` adapter는 명확한 표 header가 있는 command/opcode/register field/bitfield/log page/requirement/security method/security object/security authority/security field만 `domain_units_rag.jsonl`로 생성합니다.
 
 고객 대외비 스펙을 공유 가능한 metadata로 점검해야 하면:
 
@@ -298,6 +298,8 @@ python -m pdf2md --input-dir .\pdfs
 - `pdfs\output\alpha\alpha_assets\images\...`
 - `pdfs\output\batch_report.json`
 - `pdfs\output\corpus_manifest.json`
+- `pdfs\output\corpus_diff_report.json` (`--previous-corpus-manifest` 사용 시)
+- `pdfs\output\requirement_change_impact_report.json` (`--previous-corpus-manifest` 사용 시)
 
 배치 모드 주의사항:
 
@@ -311,6 +313,15 @@ python -m pdf2md --input-dir .\pdfs
 ```powershell
 python -m pdf2md --input-dir .\pdfs --skip-existing
 ```
+
+이전 corpus manifest와 비교해 재색인/요구사항 변경 범위를 찾으려면:
+
+```powershell
+python -m pdf2md --input-dir .\pdfs_v2 --previous-corpus-manifest .\pdfs_v1\output\corpus_manifest.json
+```
+
+- `corpus_diff_report.json`: PDF 단위 `added`, `changed`, `unchanged`, `removed`
+- `requirement_change_impact_report.json`: requirement trace 단위 `added`, `changed`, `removed`와 원문 `source_refs`
 
 `batch_report.json`에서 확인할 핵심 값:
 
@@ -513,6 +524,8 @@ python scripts\benchmark_conversion.py --output-dir .\benchmark_output --page-co
 python scripts\run_rag_eval.py --output-dir .\output --eval-set .\rag_eval_queries.json --top-k 5
 python scripts\run_rag_eval.py --output-dir .\output --eval-set .\rag_eval_queries.json --top-k 5 --min-requirement-coverage 0.9 --min-table-field-coverage 0.85 --min-cross-ref-resolved-coverage 0.8 --max-chunk-token-p95 512 --max-conversion-duration-ms 10000 --fail-on-threshold
 python scripts\run_rag_eval.py --output-dir .\output --eval-set .\rag_eval_queries.json --calibration-profile docs\rag_calibration_profile.example.json --fail-on-threshold
+python scripts\validate_ssd_rag_contract.py --output-dir .\output --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
+python scripts\run_ssd_corpus_profile.py --profile .\local_ssd_corpus_profile.json --fail-on-error
 python scripts\run_release_gates.py --output-dir .\release_gate_output --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf\baseline\corpus_eval_report.json --benchmark-baseline-report .\benchmark_baseline\benchmark_report.json
 python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag --rag-output-dir .\output --rag-eval-set .\rag_eval_queries.json --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
 ```
@@ -521,6 +534,8 @@ python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag 
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
 - `rag_eval_report.json`: hit@k, MRR, citation coverage, requirement/table-field/cross-ref coverage, chunk token 분포, query별 retrieved chunk/source id
+- `ssd_rag_contract_report.json`: `retrieval_chunks_rag.jsonl`이 SSD 에이전트 `RagChunk/RagCitation` 계약으로 매핑 가능한지 검사한 결과. TCG는 `HIL/TCG` first-class spec_type으로 검증합니다.
+- `ssd_corpus_profile_report.json`: local-only NVMe/PCIe/OCP/TCG profile 변환 및 SSD 계약 검증 집계
 - `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, schema check, packaging smoke command/status summary
 - benchmark는 수동/릴리스 전 검증용이며 기본 테스트에 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
