@@ -36,19 +36,39 @@ def _read_optional_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _source_ids(chunk: dict[str, Any]) -> set[str]:
+def _source_ids(
+    chunk: dict[str, Any],
+    *,
+    source_types: set[str] | None = None,
+    include_chunk_id: bool = True,
+) -> set[str]:
     ids: set[str] = set()
+    normalized_types = {item.casefold() for item in source_types or set() if item}
+    if include_chunk_id:
+        chunk_id = chunk.get("chunk_id")
+        if chunk_id and (not normalized_types or normalized_types & {"chunk", "retrieval_chunk"}):
+            ids.add(str(chunk_id))
     for ref in chunk.get("source_refs") or []:
-        source_id = ref.get("source_id") if isinstance(ref, dict) else None
+        if not isinstance(ref, dict):
+            continue
+        source_type = str(ref.get("source_type") or "").casefold()
+        if normalized_types and source_type not in normalized_types:
+            continue
+        source_id = ref.get("source_id")
         if source_id:
             ids.add(str(source_id))
     return ids
 
 
-def _coverage_for_expected_ids(retrieved: list[dict[str, Any]], expected_ids: set[str]) -> set[str]:
+def _coverage_for_expected_ids(
+    retrieved: list[dict[str, Any]],
+    expected_ids: set[str],
+    *,
+    source_types: set[str] | None = None,
+) -> set[str]:
     covered: set[str] = set()
     for chunk in retrieved:
-        covered.update(_source_ids(chunk) & expected_ids)
+        covered.update(_source_ids(chunk, source_types=source_types) & expected_ids)
     return covered
 
 
@@ -88,6 +108,7 @@ def evaluate_queries(
     reciprocal_rank_sum = 0.0
     expected_total = 0
     covered_total = 0
+    expected_source_hit_count = 0
     requirement_expected_total = 0
     requirement_covered_total = 0
     table_field_expected_total = 0
@@ -96,19 +117,21 @@ def evaluate_queries(
     for idx, case in enumerate(queries, start=1):
         query = str(case.get("query") or "").strip()
         expected_ids = {str(item) for item in case.get("expected_source_ids", [])}
+        expected_source_types = {str(item) for item in case.get("expected_source_types", [])}
         expected_requirement_ids = {str(item) for item in case.get("expected_requirement_source_ids", [])}
         expected_table_field_ids = {str(item) for item in case.get("expected_table_field_source_ids", [])}
         retrieved = retrieve(query, chunks, top_k=top_k)
         first_rank: int | None = None
         covered: set[str] = set()
         for rank, chunk in enumerate(retrieved, start=1):
-            matched = _source_ids(chunk) & expected_ids
+            matched = _source_ids(chunk, source_types=expected_source_types) & expected_ids
             if matched and first_rank is None:
                 first_rank = rank
             covered.update(matched)
 
         hit = first_rank is not None if expected_ids else bool(retrieved)
         hit_count += int(hit)
+        expected_source_hit_count += int(bool(covered)) if expected_ids else 0
         reciprocal_rank_sum += (1.0 / first_rank) if first_rank else 0.0
         expected_total += len(expected_ids)
         covered_total += len(covered)
@@ -123,9 +146,11 @@ def evaluate_queries(
                 "query_index": idx,
                 "query": query,
                 "expected_source_ids": sorted(expected_ids),
+                "expected_source_types": sorted(expected_source_types),
                 "hit": hit,
                 "first_hit_rank": first_rank,
                 "covered_source_ids": sorted(covered),
+                "missing_expected_source_ids": sorted(expected_ids - covered),
                 "expected_requirement_source_ids": sorted(expected_requirement_ids),
                 "covered_requirement_source_ids": sorted(requirement_covered),
                 "expected_table_field_source_ids": sorted(expected_table_field_ids),
@@ -136,6 +161,13 @@ def evaluate_queries(
                         "chunk_type": chunk.get("chunk_type"),
                         "score": chunk.get("score"),
                         "source_ids": sorted(_source_ids(chunk)),
+                        "source_types": sorted(
+                            {
+                                str(ref.get("source_type"))
+                                for ref in chunk.get("source_refs") or []
+                                if isinstance(ref, dict) and ref.get("source_type")
+                            }
+                        ),
                     }
                     for chunk in retrieved
                 ],
@@ -154,6 +186,10 @@ def evaluate_queries(
             "hit_at_k": round(hit_count / query_count, 4) if query_count else 0.0,
             "mrr": round(reciprocal_rank_sum / query_count, 4) if query_count else 0.0,
             "citation_coverage": round(covered_total / expected_total, 4) if expected_total else 0.0,
+            "expected_source_coverage": round(covered_total / expected_total, 4) if expected_total else 0.0,
+            "expected_source_hit_count": expected_source_hit_count,
+            "expected_source_total_count": expected_total,
+            "expected_source_miss_count": max(expected_total - covered_total, 0),
             "requirement_coverage": round(requirement_covered_total / requirement_expected_total, 4)
             if requirement_expected_total
             else 0.0,
@@ -247,6 +283,7 @@ def apply_calibration_gate(
         "hit_at_k": "min_hit_at_k",
         "mrr": "min_mrr",
         "citation_coverage": "min_citation_coverage",
+        "expected_source_coverage": "min_expected_source_coverage",
         "requirement_coverage": "min_requirement_coverage",
         "table_field_coverage": "min_table_field_coverage",
         "cross_ref_resolved_coverage": "min_cross_ref_resolved_coverage",
@@ -298,6 +335,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-hit-at-k", type=float)
     parser.add_argument("--min-mrr", type=float)
     parser.add_argument("--min-citation-coverage", type=float)
+    parser.add_argument("--min-expected-source-coverage", type=float)
     parser.add_argument("--min-requirement-coverage", type=float)
     parser.add_argument("--min-table-field-coverage", type=float)
     parser.add_argument("--min-cross-ref-resolved-coverage", type=float)
@@ -318,6 +356,7 @@ def main(argv: list[str] | None = None) -> int:
                 "min_hit_at_k": args.min_hit_at_k,
                 "min_mrr": args.min_mrr,
                 "min_citation_coverage": args.min_citation_coverage,
+                "min_expected_source_coverage": args.min_expected_source_coverage,
                 "min_requirement_coverage": args.min_requirement_coverage,
                 "min_table_field_coverage": args.min_table_field_coverage,
                 "min_cross_ref_resolved_coverage": args.min_cross_ref_resolved_coverage,

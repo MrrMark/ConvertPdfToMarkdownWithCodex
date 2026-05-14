@@ -252,6 +252,7 @@ def test_release_gate_runner_supports_optional_rag_calibration_gate(monkeypatch,
             gates=["rag"],
             rag_output_dir=tmp_path / "converted-spec",
             rag_eval_set=tmp_path / "rag_eval_queries.json",
+            rag_min_expected_source_coverage=0.9,
             rag_min_requirement_coverage=0.9,
             rag_min_table_field_coverage=0.85,
             rag_min_cross_ref_resolved_coverage=0.8,
@@ -265,6 +266,7 @@ def test_release_gate_runner_supports_optional_rag_calibration_gate(monkeypatch,
     command = calls[0]
     assert any(str(part).endswith("run_rag_eval.py") for part in command)
     assert "--fail-on-threshold" in command
+    assert "--min-expected-source-coverage" in command
     assert "--min-requirement-coverage" in command
     assert "--max-conversion-duration-ms" in command
 

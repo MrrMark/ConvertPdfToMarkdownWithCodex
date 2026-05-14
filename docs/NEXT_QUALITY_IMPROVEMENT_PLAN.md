@@ -22,15 +22,9 @@
 
 ## 남은 작업
 
-현재 backlog는 **RAG 운영 목적**의 개선 작업만 남긴다. Q43 scorecard refresh 이후에는 대표 질의 기반 평가와 도메인 technical table typed coverage를 우선한다.
+현재 backlog는 **RAG 운영 목적**의 개선 작업만 남긴다. Q46 expected source coverage 이후에는 도메인 technical table typed coverage를 우선한다.
 
 상세 개발 명세는 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에서 관리한다.
-
-### P1 / Q46. RAG Golden Query Expected Source Coverage
-
-- 대표 RAG query set에 expected source id를 고정해 hit@k/MRR뿐 아니라 source coverage를 검증한다.
-- requirement, table row, technical table unit, cross-reference 질의를 포함한다.
-- release gate의 `rag` 경로에서 threshold로 사용할 수 있는 deterministic local metric을 추가한다.
 
 ### P1 / Q44. Domain Technical Table Coverage Expansion
 

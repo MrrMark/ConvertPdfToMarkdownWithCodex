@@ -529,19 +529,19 @@ python scripts\run_corpus_eval.py --input-dir pdf --output-dir pdf\eval_output -
 python scripts\benchmark_conversion.py --output-dir .\benchmark_output --page-counts 10,50,100
 python scripts\benchmark_conversion.py --output-dir .\benchmark_output --page-counts 10,50,100 --baseline-report .\benchmark_baseline\benchmark_report.json --max-duration-regression 0.2 --max-memory-regression 0.2 --min-pages-per-second 1.0 --fail-on-regression
 python scripts\run_rag_eval.py --output-dir .\output --eval-set .\rag_eval_queries.json --top-k 5
-python scripts\run_rag_eval.py --output-dir .\output --eval-set .\rag_eval_queries.json --top-k 5 --min-requirement-coverage 0.9 --min-table-field-coverage 0.85 --min-cross-ref-resolved-coverage 0.8 --max-chunk-token-p95 512 --max-conversion-duration-ms 10000 --fail-on-threshold
+python scripts\run_rag_eval.py --output-dir .\output --eval-set .\rag_eval_queries.json --top-k 5 --min-expected-source-coverage 0.9 --min-requirement-coverage 0.9 --min-table-field-coverage 0.85 --min-cross-ref-resolved-coverage 0.8 --max-chunk-token-p95 512 --max-conversion-duration-ms 10000 --fail-on-threshold
 python scripts\run_rag_eval.py --output-dir .\output --eval-set .\rag_eval_queries.json --calibration-profile docs\rag_calibration_profile.example.json --fail-on-threshold
 python scripts\validate_ssd_rag_contract.py --output-dir .\output --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
 python scripts\run_ssd_corpus_profile.py --profile .\local_ssd_corpus_profile.json --fail-on-error
 python scripts\build_requirement_impact_review_pack.py --impact-report .\output\requirement_change_impact_report.json
 python scripts\run_release_gates.py --output-dir .\release_gate_output --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf\baseline\corpus_eval_report.json --benchmark-baseline-report .\benchmark_baseline\benchmark_report.json
-python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag --rag-output-dir .\output --rag-eval-set .\rag_eval_queries.json --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
+python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag --rag-output-dir .\output --rag-eval-set .\rag_eval_queries.json --rag-min-expected-source-coverage 0.9 --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
 ```
 
 - 실제 PDF는 `pdf\` 같은 로컬 디렉터리에만 두고 repo에 커밋하지 않습니다.
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
-- `rag_eval_report.json`: hit@k, MRR, citation coverage, requirement/table-field/cross-ref coverage, chunk token 분포, query별 retrieved chunk/source id
+- `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref coverage, chunk token 분포, query별 retrieved chunk/source id와 missing expected source id
 - `ssd_rag_contract_report.json`: `retrieval_chunks_rag.jsonl`이 SSD 에이전트 `RagChunk/RagCitation` 계약으로 매핑 가능한지 검사한 결과. TCG는 `HIL/TCG` first-class spec_type으로 검증합니다.
 - `ssd_corpus_profile_report.json`: local-only NVMe/PCIe/OCP/TCG profile 변환, SSD 계약 검증, 선택적 RAG eval aggregate 집계
 - `requirement_impact_review_pack.json` / `.md`: requirement change impact를 리뷰어/AI Agent가 바로 확인할 수 있게 정리한 provenance 중심 요약

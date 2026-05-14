@@ -41,6 +41,7 @@ class ReleaseGateConfig:
     rag_min_hit_at_k: float | None = None
     rag_min_mrr: float | None = None
     rag_min_citation_coverage: float | None = None
+    rag_min_expected_source_coverage: float | None = None
     rag_min_requirement_coverage: float | None = None
     rag_min_table_field_coverage: float | None = None
     rag_min_cross_ref_resolved_coverage: float | None = None
@@ -218,6 +219,7 @@ def _rag_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     _append_optional_arg(command, "--min-hit-at-k", config.rag_min_hit_at_k)
     _append_optional_arg(command, "--min-mrr", config.rag_min_mrr)
     _append_optional_arg(command, "--min-citation-coverage", config.rag_min_citation_coverage)
+    _append_optional_arg(command, "--min-expected-source-coverage", config.rag_min_expected_source_coverage)
     _append_optional_arg(command, "--min-requirement-coverage", config.rag_min_requirement_coverage)
     _append_optional_arg(command, "--min-table-field-coverage", config.rag_min_table_field_coverage)
     _append_optional_arg(command, "--min-cross-ref-resolved-coverage", config.rag_min_cross_ref_resolved_coverage)
@@ -424,6 +426,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rag-min-hit-at-k", type=float)
     parser.add_argument("--rag-min-mrr", type=float)
     parser.add_argument("--rag-min-citation-coverage", type=float)
+    parser.add_argument("--rag-min-expected-source-coverage", type=float)
     parser.add_argument("--rag-min-requirement-coverage", type=float)
     parser.add_argument("--rag-min-table-field-coverage", type=float)
     parser.add_argument("--rag-min-cross-ref-resolved-coverage", type=float)
@@ -478,6 +481,7 @@ def main(argv: list[str] | None = None) -> int:
             rag_min_hit_at_k=args.rag_min_hit_at_k,
             rag_min_mrr=args.rag_min_mrr,
             rag_min_citation_coverage=args.rag_min_citation_coverage,
+            rag_min_expected_source_coverage=args.rag_min_expected_source_coverage,
             rag_min_requirement_coverage=args.rag_min_requirement_coverage,
             rag_min_table_field_coverage=args.rag_min_table_field_coverage,
             rag_min_cross_ref_resolved_coverage=args.rag_min_cross_ref_resolved_coverage,
