@@ -35,6 +35,8 @@ TECHNICAL_HEADER_HINTS = {
     "register",
     "reset",
     "security",
+    "securityfield",
+    "securitydescription",
     "status",
     "uid",
     "value",
@@ -78,18 +80,32 @@ def _unit_type(headers: list[Any], cells: dict[str, Any], row_text: str) -> tupl
     reasons = [f"header_{hint}" for hint in sorted(hints)]
     command = _cell(cells, "Command", "Command Name", "Name")
     opcode = _cell(cells, "Opcode", "Command Opcode")
-    field = _cell(cells, "Field", "Field Name", "Parameter")
+    field = _cell(cells, "Field", "Field Name", "Parameter", "Security Field")
     bits = _cell(cells, "Bits", "Bit", "Bit Range")
     log_identifier = _cell(cells, "Log Identifier", "LID", "Log Page", "Identifier")
     feature_identifier = _cell(cells, "Feature Identifier", "FID", "Feature")
     register = _cell(cells, "Register", "Register Name")
-    method = _cell(cells, "Method", "Method ID", "Object", "Authority", "UID")
+    method = _cell(cells, "Method", "Method ID")
+    security_object = _cell(cells, "Object", "Object ID")
+    authority = _cell(cells, "Authority")
+    uid = _cell(cells, "UID", "Protocol ID", "ProtocolID")
+    security_field = _cell(cells, "Security Field")
     value = _cell(cells, "Value", "Status", "Code")
 
     if command and opcode:
         return "command_opcode", reasons + ["command_and_opcode"]
     if opcode:
         return "opcode", reasons + ["opcode"]
+    if method and {"method", "uid", "protocolid"} & hints:
+        return "security_method", reasons + ["security_method_header"]
+    if security_object and {"object", "uid", "protocolid"} & hints:
+        return "security_object", reasons + ["security_object_header"]
+    if authority and {"authority", "uid"} & hints:
+        return "security_authority", reasons + ["security_authority_header"]
+    if security_field and {"securityfield", "security", "bits", "field"} & hints:
+        return "security_field", reasons + ["security_field_header"]
+    if uid and {"uid", "object", "protocolid"} & hints and _cell(cells, "Description", "Security Description"):
+        return "security_object", reasons + ["security_uid_header"]
     if log_identifier and HEX_VALUE_PATTERN.search(log_identifier):
         return "log_page", reasons + ["log_identifier"]
     if feature_identifier and HEX_VALUE_PATTERN.search(feature_identifier):
@@ -100,8 +116,6 @@ def _unit_type(headers: list[Any], cells: dict[str, Any], row_text: str) -> tupl
         return "bitfield", reasons + ["field_and_bits"]
     if value and _cell(cells, "Description", "Meaning"):
         return "enum_value", reasons + ["value_description"]
-    if method and {"method", "uid", "object", "protocolid"} & hints:
-        return "security_method", reasons + ["security_method_header"]
     if REQ_ID_PATTERN.search(row_text):
         return "requirement_row", reasons + ["requirement_id_pattern"]
     if len(hints) >= 2 and (field or value or command):
@@ -143,9 +157,9 @@ def build_technical_table_records(rag_tables: list[dict[str, Any]]) -> list[dict
             "text": row_text,
             "raw_cells": cells,
             "bit_range": bit_range,
-            "field_name": _cell(cells, "Field", "Field Name", "Parameter", "Name"),
-            "value": _cell(cells, "Value", "Status", "Code"),
-            "meaning": _cell(cells, "Description", "Meaning"),
+            "field_name": _cell(cells, "Field", "Field Name", "Parameter", "Name", "Security Field"),
+            "value": _cell(cells, "Value", "Status", "Code", "UID", "Protocol ID", "ProtocolID"),
+            "meaning": _cell(cells, "Description", "Meaning", "Security Description", "Requirement Description"),
             "reset_default": _cell(cells, "Reset", "Default", "Reset Default"),
             "access": _cell(cells, "Access", "Attributes"),
             "requirement_ref": _requirement_ref(cells, row_text),
@@ -164,7 +178,17 @@ def build_technical_table_records(rag_tables: list[dict[str, Any]]) -> list[dict
                     "bbox": row.get("bbox"),
                 }
             ],
-            "classification_confidence": 0.9 if unit_type in {"command_opcode", "bitfield"} else 0.84,
+            "classification_confidence": 0.9
+            if unit_type
+            in {
+                "command_opcode",
+                "bitfield",
+                "security_method",
+                "security_object",
+                "security_authority",
+                "security_field",
+            }
+            else 0.84,
             "classification_reasons": sorted(dict.fromkeys(reasons)),
         }
         records.append(record)

@@ -22,12 +22,6 @@
 
 ## 남은 작업
 
-현재 backlog는 **RAG 운영 목적**의 개선 작업만 남긴다. Q46 expected source coverage 이후에는 도메인 technical table typed coverage를 우선한다.
+현재 남은 quality backlog는 없다.
 
-상세 개발 명세는 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에서 관리한다.
-
-### P1 / Q44. Domain Technical Table Coverage Expansion
-
-- NVMe/PCIe/OCP/TCG technical table row를 더 명확한 typed unit으로 분류한다.
-- register map, bitfield, command/opcode, log page, feature identifier, security method/object/authority/field fixture를 보강한다.
-- `technical_tables_rag.jsonl`과 domain adapter output의 source_refs, row provenance, classification confidence를 회귀 테스트로 고정한다.
+새 개선 과제가 발견되면 구현 전에 이 섹션에 신규 Q 항목으로 추가한다.
