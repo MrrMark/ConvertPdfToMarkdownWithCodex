@@ -644,3 +644,68 @@ Q36에서 도입한 `--page-workers` text/read-order 병렬 경로를 table cand
 - `extract_tables`는 precomputed page candidate를 받아 parent에서 selected page 순서로 pruning, fallback warning, table index, continuation, RAG table ordering을 재확정한다.
 - image extraction, OCR, manifest/report write는 single parent path를 유지한다.
 - benchmark smoke는 `scripts/benchmark_conversion.py --page-workers 1,2`처럼 worker count별 실행과 core artifact hash 동등성 신호를 기록한다.
+
+## P1 / Q43. Quality Scorecard Refresh
+
+### 목표
+
+Q31-Q42 구현 후 현재 품질 상태를 97/100 기준으로 재평가하고, 다음 backlog를 Q46/Q44로 축소한다.
+
+### 구현 범위
+
+- `docs/QUALITY_SCORECARD.md`에 2026-05-14 평가 항목을 추가한다.
+- `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에는 완료된 Q43을 남기지 않고 다음 실제 작업인 Q46, Q44만 유지한다.
+- Q46/Q44는 기능 구현 전 개발 명세와 테스트 기준을 이 문서에 추가한다.
+
+### 완료 조건
+
+- scorecard가 현재 merge 상태와 남은 리스크를 설명한다.
+- next plan에는 앞으로 할 작업만 남는다.
+- 문서 계약 테스트와 diff check가 통과한다.
+
+## P1 / Q46. RAG Golden Query Expected Source Coverage
+
+### 목표
+
+RAG 평가가 단순 keyword hit뿐 아니라 expected source id를 맞히는지 검증한다.
+
+### 구현 범위
+
+- eval set query에 `expected_source_ids`와 optional `expected_source_types`를 지원한다.
+- `scripts/run_rag_eval.py`는 retrieved chunk의 `source_refs[].source_id`와 chunk id를 비교해 source coverage를 계산한다.
+- report summary에 `expected_source_coverage`, `expected_source_hit_count`, `expected_source_total_count`를 추가한다.
+- release gate threshold로 `--min-expected-source-coverage`를 추가한다.
+
+### 검증 대상
+
+- requirement query가 requirement/text source id를 찾는지 확인한다.
+- table-field query가 table row 또는 technical table unit source id를 찾는지 확인한다.
+- missing source id는 query별 diagnostics와 gate regression으로 남긴다.
+
+### 완료 조건
+
+- Q46 fixture/eval test가 deterministic하게 통과한다.
+- 기존 hit@k/MRR/citation coverage 동작은 유지된다.
+- release gate `rag` command에서 expected source coverage threshold를 전달할 수 있다.
+
+## P1 / Q44. Domain Technical Table Coverage Expansion
+
+### 목표
+
+NVMe/PCIe/OCP/TCG technical table row를 더 구체적인 typed unit으로 분류해 agent가 register/opcode/security table provenance를 안정적으로 추적하게 한다.
+
+### 구현 범위
+
+- `technical_tables_rag.jsonl` classification을 보강한다.
+- register map/bitfield, command opcode, log page, feature identifier, security method/object/authority/field fixture를 확장한다.
+- domain adapter output이 technical table unit provenance를 유지하는지 테스트한다.
+
+### 검증 대상
+
+- `unit_type`, `bit_range`, `field_name`, `opcode`, `command`, `log_identifier`, `feature_identifier`, `source_refs`가 안정적으로 채워지는지 확인한다.
+- conservative confidence와 classification reasons가 불명확한 row를 과분류하지 않는지 확인한다.
+
+### 완료 조건
+
+- `tests/test_rag_technical_tables.py`, `tests/test_rag_domain_adapters.py`, golden corpus 또는 focused fixture가 통과한다.
+- Q46 expected source coverage query가 Q44 technical table source ids를 검증할 수 있다.

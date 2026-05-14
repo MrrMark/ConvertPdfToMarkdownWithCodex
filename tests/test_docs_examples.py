@@ -136,6 +136,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q35. Rendered Diagram Fixture Suite" not in next_plan
     assert "Q36. Page-Level Parallel Extractor" not in next_plan
     assert "Q42. Full Page Worker Table Candidate Parallelization" not in next_plan
+    assert "Q43. Quality Scorecard Refresh" not in next_plan
+    assert "Q46. RAG Golden Query Expected Source Coverage" in next_plan
+    assert "Q44. Domain Technical Table Coverage Expansion" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -156,6 +159,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "requirement_change_impact_report.json" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema
+    assert "97/100" in quality_scorecard
+    assert "Q46. RAG Golden Query Expected Source Coverage" in quality_scorecard
+    assert "Q44. Domain Technical Table Coverage Expansion" in quality_scorecard
     assert "94/100" in quality_scorecard
     assert "Q31. Local Corpus Profile Runner" in quality_scorecard
     assert "Q35. Rendered Diagram Fixture Suite" in quality_scorecard
