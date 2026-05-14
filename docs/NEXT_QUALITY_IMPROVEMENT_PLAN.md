@@ -26,14 +26,8 @@
 
 상세 개발 명세는 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에서 관리한다.
 
-### P2 / Q35. Rendered Diagram Fixture Suite
+### P2 / Q42. Full Page Worker Table Candidate Parallelization
 
-- state machine, sequence diagram, register layout synthetic PDF를 렌더링 기반 fixture로 추가한다.
-- `figures_rag.jsonl`의 `diagram_label_diagnostics`와 bbox/caption/heading provenance를 golden으로 고정한다.
-- OCR runtime이 없을 때와 있을 때의 기대 diagnostics를 분리해 CI 안정성을 유지한다.
-
-### P2 / Q36. Page-Level Parallel Extractor
-
-- 문서 단위 증분 캐시 이후, page extraction/read-order/table 후보 생성을 page worker 단위로 병렬화할 수 있는 executor를 추가한다.
-- 출력 순서, warning/report ordering, asset naming은 기존 deterministic contract를 유지한다.
-- 기본값은 single-worker로 두고, `--page-workers` opt-in에서 benchmark gate로 속도 향상과 결과 동일성을 함께 검증한다.
+- Q36에서 안전하게 도입한 `--page-workers` text/read-order 병렬 경로를 table candidate extraction까지 확장한다.
+- page-local table 후보 생성은 worker에서 수행하되 continuation grouping, warning ordering, asset/table index 재확정은 parent merge에서 deterministic하게 처리한다.
+- benchmark gate에 `--page-workers 1`과 `--page-workers > 1` 결과 동일성 및 최소 성능 신호를 함께 고정한다.

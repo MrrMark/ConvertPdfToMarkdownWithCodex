@@ -9,6 +9,8 @@ def normalize_manifest(payload: dict[str, Any]) -> dict[str, Any]:
     options = normalized.get("options")
     if isinstance(options, dict):
         options["version"] = "<version>"
+        for key in ("page_workers", "page_worker_effective_count", "page_parallel_enabled"):
+            options.pop(key, None)
     images = normalized.get("images", [])
     if isinstance(images, list):
         for image in images:

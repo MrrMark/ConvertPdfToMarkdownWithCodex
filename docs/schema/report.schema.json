@@ -280,12 +280,27 @@
           "title": "Page Cache Misses",
           "type": "integer"
         },
+        "page_parallel_enabled": {
+          "default": false,
+          "title": "Page Parallel Enabled",
+          "type": "boolean"
+        },
         "page_status_counts": {
           "additionalProperties": {
             "type": "integer"
           },
           "title": "Page Status Counts",
           "type": "object"
+        },
+        "page_worker_count": {
+          "default": 1,
+          "title": "Page Worker Count",
+          "type": "integer"
+        },
+        "page_worker_effective_count": {
+          "default": 1,
+          "title": "Page Worker Effective Count",
+          "type": "integer"
         },
         "pages_per_second": {
           "anyOf": [

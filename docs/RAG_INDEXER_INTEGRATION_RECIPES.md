@@ -48,17 +48,22 @@ Indexer나 framework SDK를 호출하기 전에 local-only validator로 field co
 python scripts/validate_index_contract.py --output-dir output --target all --fail-on-error
 python scripts/validate_index_contract.py --output-dir output --target azure-ai-search --metadata-max-bytes 32768 --fail-on-error
 python scripts/validate_index_contract.py --output-dir output --target all --confidential-safe --fail-on-warning
+python scripts/validate_provenance_integrity.py --output-dir output --fail-on-error
+python scripts/validate_artifact_integrity.py --output-dir output --fail-on-error
 ```
 
 생성물:
 
 - `index_contract_report.json`: target별 mapping 가능 여부, JSONL field/type 오류, metadata size guardrail, `source_refs` provenance, confidential-safe metadata finding
+- `provenance_integrity_report.json`: sidecar 간 `source_refs` 해소 여부, page/bbox/count/dedupe 정합성 finding
+- `artifact_integrity_report.json`: Markdown image link, asset file, manifest path, sidecar count, batch/corpus file map 정합성 finding
 
 운영 체크:
 
 - 이 validator는 OpenAI, Azure AI Search, LangChain, LlamaIndex SDK를 import하거나 외부 서비스에 접속하지 않는다.
 - `--confidential-safe`는 path/filename/source hash 노출을 점검하지만 원문 `text`를 익명화하지 않는다.
 - `--metadata-max-bytes`는 운영 profile의 보수적 guardrail로 지정한다. 실제 서비스 제한이 바뀔 수 있으므로 배포 profile에서 값을 명시하는 편이 안전하다.
+- index contract는 target별 mapping 가능성을, provenance integrity는 sidecar 내부 참조 무결성을, artifact integrity는 실제 파일 세트 소비 가능성을 검증한다. 운영 release gate에서는 셋을 함께 실행하는 편이 안전하다.
 
 ## OpenAI Vector Store / Generic Embedding Pipeline
 

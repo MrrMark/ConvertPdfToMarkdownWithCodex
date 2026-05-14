@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
 from pdf2md.utils.page_range import parse_page_range
@@ -31,6 +31,7 @@ class Config(BaseModel):
     debug: bool = False
     verbose: bool = False
     skip_existing: bool = False
+    page_workers: int = 1
     version: str = Field(default="0.1.0")
     markdown_filename: str = "document.md"
     manifest_filename: str = "manifest.json"
@@ -51,6 +52,13 @@ class Config(BaseModel):
 
     def selected_pages(self, total_pages: int) -> list[int]:
         return parse_page_range(self.pages, total_pages)
+
+    @field_validator("page_workers")
+    @classmethod
+    def _validate_page_workers(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("page_workers must be >= 1")
+        return value
 
 
 def default_output_dir_for_input(input_pdf: Path) -> Path:

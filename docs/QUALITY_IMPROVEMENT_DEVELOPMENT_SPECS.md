@@ -440,3 +440,200 @@ python scripts/benchmark_conversion.py --input tests/fixtures/multi_page.pdf --p
 - OCR 병렬화
 - image extraction/file write 병렬화
 - distributed execution
+
+## P1 / Q37. Cross-Sidecar Provenance Integrity Validator
+
+### 목표
+
+Q34의 index mapping 검증을 통과한 산출물이라도 내부 sidecar provenance가 깨져 있으면 RAG citation과 test script 수정 범위 계산이 잘못될 수 있다.
+Q37은 모든 RAG sidecar의 `source_refs`가 실제 원본 record로 해소되는지 local-only로 검증한다.
+
+### 주요 검증
+
+- `retrieval_chunks_rag.jsonl.source_refs[].source_id`가 대응 sidecar record id에 존재하는지 확인한다.
+- `source_refs[].page`, chunk `page_range`, record `page`, `bbox`가 상호 모순되지 않는지 확인한다.
+- `source_record_count`가 실제 `source_refs` 개수와 일치하는지 확인한다.
+- `source_dedupe_key`가 source id 집합에서 deterministic하게 복원 가능한지 확인한다.
+- manifest/report summary count와 실제 JSONL record count가 어긋나면 warning 또는 error로 분류한다.
+
+### 구현 위치
+
+- 새 스크립트: `scripts/validate_provenance_integrity.py`
+- 필요 시 helper: `pdf2md/utils/provenance_integrity.py`
+- 출력 report: `provenance_integrity_report.json`
+- release gate optional: `--gates provenance-integrity`
+
+### 테스트
+
+- 정상 golden corpus가 통과하는 test
+- 없는 `source_id`, 잘못된 page, bbox page mismatch, count mismatch fixture test
+- finding 정렬과 line/record id 위치가 deterministic인지 확인
+
+### 완료 조건
+
+- 외부 서비스 호출 없이 단일 output directory를 검증한다.
+- 오류가 어느 sidecar/file/line/source_ref에서 발생했는지 report로 추적 가능하다.
+- release gate에서 opt-in으로 실행 가능하다.
+
+## P1 / Q38. Layout Stress Golden Corpus
+
+### 목표
+
+기존 synthetic corpus는 핵심 경로를 잘 막지만, 실제 기술 문서에서 문제가 되는 multi-column, sidebar, floated figure, footnote, mixed-language layout 조합은 더 강한 회귀 방어가 필요하다.
+Q38은 reading order와 heading/source provenance 품질을 golden corpus로 고정한다.
+
+### Fixture 범위
+
+- 2-column 본문 + 우측 sidebar note
+- figure가 본문 중간에 떠 있고 caption이 다음 줄/이전 줄에 있는 page
+- 하단 footnote가 많은 page
+- section heading이 다음 column/page 본문에 carry-over되는 page
+- Korean/English mixed paragraph와 list
+
+### 검증 대상
+
+- `document.md`의 원문 순서
+- `text_blocks_rag.jsonl.block_type`, `heading_path`, `parent_heading_block_id`
+- `semantic_units_rag.jsonl.source_refs`
+- `retrieval_chunks_rag.jsonl.page_range`, `section_path`, `source_refs`
+- `report.summary.structure_low_confidence_count`, `page_results[].reading_order_strategy`
+
+### 테스트
+
+- `tests/fixtures/pdf_builder.py` 또는 별도 builder에 layout stress PDF 생성 함수 추가
+- `tests/golden/corpus/layout_*` golden 추가
+- volatile field normalize 후 golden corpus test에 포함
+
+### 완료 조건
+
+- layout stress fixture가 기본 CI에서 안정적으로 통과한다.
+- reading order가 바뀌면 `document.md` 또는 RAG sidecar golden diff로 바로 드러난다.
+
+## P1 / Q39. Table Reconstruction Accuracy Pack
+
+### 목표
+
+표는 이 프로젝트의 두 번째 우선순위이며 RAG 운영에서는 table row, technical table unit, domain unit의 source of truth다.
+Q39는 복잡 표를 억지로 GFM으로 내보내지 않는 정책과 row-level structured sidecar 정확도를 더 강하게 검증한다.
+
+### Fixture 범위
+
+- merged cell / multi-row header
+- stub column + footnote row
+- continued table with repeated header
+- repeated template table false-positive 방지
+- register bitfield layout: `31:16`, `15:8`, `7:0`
+- command/opcode/log page/feature/security method 형태의 technical table
+
+### 검증 대상
+
+- 단순 표만 GFM 사용
+- 복잡 표는 HTML fallback 유지
+- `tables_rag.jsonl.headers`, `cells`, `row_text`, `bbox`, `fallback_reasons`
+- `technical_tables_rag.jsonl.unit_type`, `bit_range`, `field_name`, `value`, `source_refs`
+- `report.summary.table_fallback_reason_counts`, `table_low_quality_count`
+
+### 테스트
+
+- 기존 `tests/test_tables.py`, `tests/test_rag_tables.py`, `tests/test_rag_technical_tables.py` 확장
+- golden corpus에 table accuracy pack 추가
+- unsafe GFM coercion이 발생하면 실패하는 regression test 추가
+
+### 완료 조건
+
+- 잘못된 GFM 표 생성 가능성이 낮아진다.
+- register/bitfield/technical table row provenance가 RAG sidecar에서 안정적으로 추적된다.
+
+## P2 / Q40. OCR Confidence And Language Calibration Matrix
+
+### 목표
+
+OCR은 환경 의존성이 크므로, runtime 없음/있음과 언어 데이터 상태에 따른 기대 diagnostics를 명확히 분리해야 한다.
+Q40은 OCR 결과를 임의 교정하지 않는 원문 보존 정책과 confidence warning/report 계약을 고정한다.
+
+### Fixture 범위
+
+- OCR runtime unavailable path
+- low-confidence scanned text
+- empty OCR result
+- Korean+English mixed scanned page
+- scanned simple table
+
+### 검증 대상
+
+- `warnings[].code`: `OCR_RUNTIME_UNAVAILABLE`, `OCR_CONFIDENCE_WARN`, `OCR_CONFIDENCE_CRITICAL`, `OCR_EMPTY_RESULT`
+- `page_results[].ocr_attempted`, `ocr_runtime_available`, `ocr_confidence_mean`, `low_conf_token_ratio`
+- OCR text가 spelling correction이나 paraphrase 없이 그대로 sidecar/Markdown에 들어가는지 확인
+
+### 테스트
+
+- OCR 없는 환경에서도 통과하는 deterministic test
+- OCR runtime이 있는 경우에만 실행되는 conditional test
+- language data missing report test
+
+### 완료 조건
+
+- OCR 환경 차이 때문에 CI가 흔들리지 않는다.
+- 낮은 confidence 결과가 정답처럼 소비되지 않고 warning/report로 드러난다.
+
+## P2 / Q41. Output Artifact Integrity Gate
+
+### 목표
+
+변환 자체가 성공해도 Markdown link, asset file, manifest/report count, sidecar file map이 어긋나면 downstream agent가 실패한다.
+Q41은 산출물 파일 간 무결성을 local gate로 검증한다.
+
+### 주요 검증
+
+- `document.md`의 image relative link가 실제 asset file을 가리키는지 확인한다.
+- manifest `images[]`, `tables[]`, report summary count, 실제 sidecar record count가 일치하는지 확인한다.
+- batch/corpus manifest의 file map이 실제 파일과 일치하는지 확인한다.
+- orphan asset, missing asset, stale path, sidecar count mismatch를 deterministic finding으로 출력한다.
+
+### 구현 위치
+
+- 새 스크립트: `scripts/validate_artifact_integrity.py`
+- 출력 report: `artifact_integrity_report.json`
+- release gate optional: `--gates artifact-integrity`
+
+### 테스트
+
+- 정상 single output과 batch/corpus output 통과 test
+- missing image file, broken Markdown link, stale manifest path, sidecar count mismatch fixture test
+- confidential-safe mode에서 absolute path가 섞이지 않는지 확인
+
+### 완료 조건
+
+- 변환 결과가 downstream에서 바로 소비 가능한 파일 세트인지 자동 점검할 수 있다.
+- partial success와 실제 artifact 누락을 report에서 구분할 수 있다.
+
+## P2 / Q42. Full Page Worker Table Candidate Parallelization
+
+### 목표
+
+Q36에서 도입한 `--page-workers` text/read-order 병렬 경로를 table candidate extraction까지 확장한다.
+기본값 `page_workers=1`의 기존 deterministic 경로는 유지하고, `--page-workers > 1`에서만 page-local table 후보 생성을 worker로 분산한다.
+
+### 구현 범위
+
+- `extract_tables`의 public behavior는 유지한다.
+- page-local table candidate collection은 worker에서 수행한다.
+- continuation grouping, table asset index, warning/report ordering, RAG table record ordering은 parent merge에서 selected page 순서로 재확정한다.
+- image extraction, OCR, manifest/report write는 계속 single path로 둔다.
+
+### 검증 대상
+
+- `document.md`, `manifest.json`, `report.json`, `tables_rag.jsonl`, `technical_tables_rag.jsonl`가 worker 수와 무관하게 동일해야 한다.
+- continuation table, repeated template table, complex HTML fallback, simple GFM table fixture에서 결과 동일성을 확인한다.
+- `report.summary.page_worker_effective_count`, `page_parallel_enabled`, `pdf_open_count`가 병렬 실행을 설명할 수 있어야 한다.
+
+### 테스트
+
+- single-worker와 multi-worker output diff test
+- worker 내부 table candidate 실패 시 page-scoped warning ordering test
+- benchmark smoke 또는 release gate optional check
+
+### 완료 조건
+
+- table candidate extraction까지 병렬화해도 기존 golden corpus가 변하지 않는다.
+- multi-worker 경로의 결과 동일성과 최소 성능 신호가 CI 또는 release gate에서 검증된다.

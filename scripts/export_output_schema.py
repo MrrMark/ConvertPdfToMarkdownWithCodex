@@ -6,11 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from pdf2md.models import (
+    ArtifactIntegrityReport,
     BatchReport,
     CorpusDiffReport,
     CorpusManifest,
     IndexContractReport,
     Manifest,
+    ProvenanceIntegrityReport,
     Report,
     RequirementChangeImpactReport,
 )
@@ -24,6 +26,8 @@ SCHEMA_FILES: dict[str, type] = {
     "corpus_diff_report.schema.json": CorpusDiffReport,
     "requirement_change_impact_report.schema.json": RequirementChangeImpactReport,
     "index_contract_report.schema.json": IndexContractReport,
+    "provenance_integrity_report.schema.json": ProvenanceIntegrityReport,
+    "artifact_integrity_report.schema.json": ArtifactIntegrityReport,
 }
 
 

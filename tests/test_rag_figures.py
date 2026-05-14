@@ -95,3 +95,80 @@ def test_diagram_ocr_labels_require_confidence_for_promotion() -> None:
     assert "IDLE" not in records[1]["detected_labels"]
     assert records[1]["diagram_label_diagnostics"]["rejected_ocr_candidate_count"] == 1
     assert records[1]["diagram_label_diagnostics"]["rejected_ocr_candidates"][0]["reason"] == "low_confidence"
+
+
+def test_figure_records_use_nearby_crop_text_for_diagram_labels() -> None:
+    text_blocks = [
+        {
+            "block_id": "page-0001-block-0001",
+            "page": 1,
+            "block_index": 1,
+            "block_type": "heading",
+            "text": "2.1 State Machine",
+            "bbox": [72.0, 40.0, 200.0, 58.0],
+            "line_indices": [0],
+            "heading_path": ["2.1 State Machine"],
+        },
+        {
+            "block_id": "page-0001-block-0002",
+            "page": 1,
+            "block_index": 2,
+            "block_type": "caption",
+            "text": "Figure 1: State machine diagram",
+            "bbox": [72.0, 80.0, 230.0, 94.0],
+            "line_indices": [1],
+            "heading_path": ["2.1 State Machine"],
+        },
+        {
+            "block_id": "page-0001-block-0003",
+            "page": 1,
+            "block_index": 3,
+            "block_type": "paragraph",
+            "text": "IDLE READY ERROR RESET",
+            "bbox": [96.0, 132.0, 360.0, 150.0],
+            "line_indices": [2],
+            "heading_path": ["2.1 State Machine"],
+        },
+        {
+            "block_id": "page-0001-block-0004",
+            "page": 1,
+            "block_index": 4,
+            "block_type": "paragraph",
+            "text": "outside text",
+            "bbox": [72.0, 360.0, 180.0, 378.0],
+            "line_indices": [3],
+            "heading_path": ["2.1 State Machine"],
+        },
+    ]
+    image = ImageAsset(
+        page=1,
+        index=1,
+        path="assets/images/page-0001-figure-001.png",
+        caption_text="Figure 1: State machine diagram",
+        caption_source="nearby_caption",
+        caption_confidence=0.85,
+        bbox=[72.0, 104.0, 520.0, 320.0],
+        width=896,
+        height=432,
+        sha256="abc",
+        source="page_crop",
+        crop_reason="captioned_figure_without_embedded_image",
+        anchor_line_index=1,
+        anchor_top=80.0,
+    )
+
+    records = build_figure_records(images=[image], excluded_images=[], text_block_records=text_blocks)
+
+    assert records[0]["nearby_text_refs"] == [
+        {
+            "block_id": "page-0001-block-0003",
+            "page": 1,
+            "block_index": 3,
+            "block_type": "paragraph",
+            "text": "IDLE READY ERROR RESET",
+            "bbox": [96.0, 132.0, 360.0, 150.0],
+        }
+    ]
+    assert "READY" in records[0]["detected_labels"]
+    assert "ERROR" in records[0]["detected_labels"]
+    assert "outside" not in records[0]["detected_labels"]

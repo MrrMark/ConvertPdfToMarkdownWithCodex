@@ -20,6 +20,10 @@ def _heading_path(record: dict[str, Any]) -> list[str]:
     return [str(item) for item in value] if isinstance(value, list) else []
 
 
+def _local_heading_context(heading_path: list[str]) -> list[str]:
+    return [heading_path[-1]] if heading_path else []
+
+
 def _line_max(record: dict[str, Any]) -> int | None:
     indices = record.get("line_indices")
     if not isinstance(indices, list) or not indices:
@@ -38,6 +42,47 @@ def _block_top(record: dict[str, Any]) -> float | None:
         return float(bbox[1])
     except (TypeError, ValueError):
         return None
+
+
+def _nearby_text_refs(
+    *,
+    page: int,
+    bbox: list[float] | None,
+    text_block_records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not bbox or len(bbox) < 4:
+        return []
+    x0, top, x1, bottom = (float(value) for value in bbox[:4])
+    refs: list[dict[str, Any]] = []
+    for record in text_block_records:
+        if int(record.get("page") or 0) != page:
+            continue
+        record_bbox = _bbox(record.get("bbox"))
+        if not record_bbox or len(record_bbox) < 4:
+            continue
+        record_x0, record_top, record_x1, record_bottom = (float(value) for value in record_bbox[:4])
+        center_x = (record_x0 + record_x1) / 2.0
+        center_y = (record_top + record_bottom) / 2.0
+        if not (x0 <= center_x <= x1 and top <= center_y <= bottom):
+            continue
+        block_type = str(record.get("block_type") or "")
+        if block_type in {"caption", "heading"}:
+            continue
+        text = str(record.get("text") or "").strip()
+        if not text:
+            continue
+        refs.append(
+            {
+                "block_id": record.get("block_id"),
+                "page": page,
+                "block_index": record.get("block_index"),
+                "block_type": block_type,
+                "text": text,
+                "bbox": record_bbox,
+            }
+        )
+    refs.sort(key=lambda item: (int(item.get("block_index") or 0), str(item.get("block_id") or "")))
+    return refs
 
 
 def _nearby_heading_path(
@@ -209,7 +254,10 @@ def _figure_record(
         anchor_top=asset.anchor_top,
         text_block_records=text_block_records,
     )
-    kind, labels, kind_reasons = _figure_kind(_figure_text(asset.caption_text, asset.alt_text, heading_path))
+    nearby_text_refs = _nearby_text_refs(page=asset.page, bbox=asset.bbox, text_block_records=text_block_records)
+    kind, labels, kind_reasons = _figure_kind(
+        _figure_text(asset.caption_text, asset.alt_text, _local_heading_context(heading_path), nearby_text_refs)
+    )
     labels, label_diagnostics = _diagram_label_diagnostics(caption_labels=labels, ocr_candidates=[])
     record = {
         "figure_id": figure_id,
@@ -236,7 +284,7 @@ def _figure_record(
         "figure_kind": kind,
         "diagram_candidate": kind != "image",
         "detected_labels": labels,
-        "nearby_text_refs": [],
+        "nearby_text_refs": nearby_text_refs,
         "source_refs": [
             {
                 "source_type": "figure",
@@ -282,7 +330,9 @@ def _excluded_figure_record(
         for candidate in label_diagnostics["promoted_ocr_candidates"]
         if isinstance(candidate, dict)
     ]
-    kind, labels, kind_reasons = _figure_kind(_figure_text(*promoted_ocr_text, heading_path, asset.parent_heading_index))
+    kind, labels, kind_reasons = _figure_kind(
+        _figure_text(*promoted_ocr_text, _local_heading_context(heading_path), asset.parent_heading_index)
+    )
     labels = sorted(dict.fromkeys(labels + candidate_labels))
     record = {
         "figure_id": figure_id,

@@ -21,6 +21,8 @@
 - `docs/schema/corpus_diff_report.schema.json`
 - `docs/schema/requirement_change_impact_report.schema.json`
 - `docs/schema/index_contract_report.schema.json`
+- `docs/schema/provenance_integrity_report.schema.json`
+- `docs/schema/artifact_integrity_report.schema.json`
 
 Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 
@@ -64,6 +66,7 @@ Stable nested fields:
 - `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
 - `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
 - `options.confidential_safe_mode`, `options.local_only_processing`, `options.external_llm_calls`, `options.external_embedding_calls`, `options.path_redaction`
+- `options.page_workers`, `options.page_worker_effective_count`, `options.page_parallel_enabled`
 - `images[].page`, `index`, `path`, `source`, `bbox`, `sha256`
 - `images[].alt_text`, `caption_text`, `caption_source`, `dedupe_of`
 - `images[].caption_confidence`, `crop_reason`, `crop_content_ratio`, `crop_rejected_reason`
@@ -94,6 +97,7 @@ Stable summary fields:
 - `table_total`, `table_html_count`, `table_gfm_count`, `table_fallback_count`
 - `table_fallback_reason_counts`, `table_low_quality_count`, `table_quality`
 - `stage_durations_ms`, `pdf_open_count`, `pages_per_second`
+- `page_worker_count`, `page_worker_effective_count`, `page_parallel_enabled`
 - `page_cache_hits`, `page_cache_misses`, `text_line_extract_count`
 - `heading_count`, `list_item_count`, `code_block_count`, `hyphenation_repair_count`
 - `rag_table_output`, `rag_table_record_count`, `rag_table_file_count`
@@ -518,6 +522,68 @@ Policy:
 - `severity` is one of `error`, `warning`, or `info`.
 - The validator must not call external services or create embeddings.
 - Confidential-safe findings are advisory for metadata sharing. The validator does not redact source `text`.
+
+## provenance_integrity_report.json
+
+Local-only JSON output from `scripts/validate_provenance_integrity.py`.
+
+Required:
+
+- `schema_version`
+- `purpose`
+- `status`
+- `passed`
+- `output_dir`
+- `summary`
+- `files`
+- `findings`
+
+Policy:
+
+- `purpose` is `rag_provenance_integrity_validation`.
+- `findings[]` are sorted deterministically by severity, file, line, field, code, source type, and source id.
+- `source_refs` must resolve to the corresponding local sidecar record whenever the source type is supported.
+- Retrieval chunk `source_record_count` and `source_dedupe_key` are checked against actual `source_refs`.
+- The validator must not call external services or infer missing provenance.
+
+## artifact_integrity_report.json
+
+Local-only JSON output from `scripts/validate_artifact_integrity.py`.
+
+Required:
+
+- `schema_version`
+- `purpose`
+- `status`
+- `passed`
+- `output_dir`
+- `summary`
+- `files`
+- `findings`
+
+Stable summary fields:
+
+- `checked_files`, `checked_records`, `checked_links`, `checked_assets`
+- `missing_assets`, `orphan_assets`, `sidecar_count_mismatches`, `file_map_missing_count`
+- `error_count`, `warning_count`, `info_count`
+
+Finding fields:
+
+- `severity`
+- `code`
+- `file`
+- `line`
+- `record_id`
+- `field`
+- `path`
+- `message`
+
+Policy:
+
+- `purpose` is `output_artifact_integrity_validation`.
+- Missing referenced assets and sidecar count mismatches are errors.
+- Orphan assets and confidential-safe absolute paths are warnings.
+- The validator checks local files only and does not mutate conversion outputs.
 
 ## requirement_impact_review_pack.json / requirement_impact_review_pack.md
 

@@ -1,0 +1,234 @@
+{
+  "images": [
+    {
+      "alt_text": "Image page-0001-figure-001",
+      "anchor_line_index": 1,
+      "anchor_top": 114.07000000000005,
+      "bbox": [
+        47.6,
+        132.07000000000005,
+        547.4,
+        352.07000000000005
+      ],
+      "caption_confidence": 0.85,
+      "caption_source": "nearby_caption",
+      "caption_text": "Figure 1: State machine diagram READY ERROR RESET",
+      "crop_content_ratio": 0.016221,
+      "crop_reason": "captioned_figure_without_embedded_image",
+      "crop_rejected_reason": null,
+      "dedupe_of": null,
+      "height": 440,
+      "index": 1,
+      "page": 1,
+      "path": "assets/images/page-0001-figure-001.png",
+      "sha256": "<sha256>",
+      "source": "page_crop",
+      "width": 999
+    },
+    {
+      "alt_text": "Image page-0002-figure-001",
+      "anchor_line_index": 1,
+      "anchor_top": 114.07000000000005,
+      "bbox": [
+        47.6,
+        132.07000000000005,
+        547.4,
+        352.07000000000005
+      ],
+      "caption_confidence": 0.85,
+      "caption_source": "nearby_caption",
+      "caption_text": "Figure 2: Sequence diagram Command Completion",
+      "crop_content_ratio": 0.012246,
+      "crop_reason": "captioned_figure_without_embedded_image",
+      "crop_rejected_reason": null,
+      "dedupe_of": null,
+      "height": 440,
+      "index": 1,
+      "page": 2,
+      "path": "assets/images/page-0002-figure-001.png",
+      "sha256": "<sha256>",
+      "source": "page_crop",
+      "width": 999
+    },
+    {
+      "alt_text": "Image page-0003-figure-001",
+      "anchor_line_index": 1,
+      "anchor_top": 114.07000000000005,
+      "bbox": [
+        47.6,
+        132.07000000000005,
+        547.4,
+        352.07000000000005
+      ],
+      "caption_confidence": 0.85,
+      "caption_source": "nearby_caption",
+      "caption_text": "Figure 3: Register layout bit field RSVD STATUS ENABLE",
+      "crop_content_ratio": 0.017167,
+      "crop_reason": "captioned_figure_without_embedded_image",
+      "crop_rejected_reason": null,
+      "dedupe_of": null,
+      "height": 440,
+      "index": 1,
+      "page": 3,
+      "path": "assets/images/page-0003-figure-001.png",
+      "sha256": "<sha256>",
+      "source": "page_crop",
+      "width": 999
+    }
+  ],
+  "input_file": "diagram_suite.pdf",
+  "options": {
+    "confidential_safe_mode": false,
+    "cross_refs_jsonl_filename": "cross_refs_rag.jsonl",
+    "debug": false,
+    "dedupe_images": false,
+    "domain_adapter": "none",
+    "domain_units_jsonl_filename": "domain_units_rag.jsonl",
+    "external_embedding_calls": false,
+    "external_llm_calls": false,
+    "figure_crop_fallback": true,
+    "figures_rag_jsonl_filename": "figures_rag.jsonl",
+    "figures_rag_output": "jsonl",
+    "force_ocr": false,
+    "image_mode": "referenced",
+    "keep_page_markers": true,
+    "local_only_processing": true,
+    "ocr_lang": "eng",
+    "pages": null,
+    "path_redaction": "disabled",
+    "rag_table_output": "none",
+    "rag_text_blocks_jsonl_filename": "text_blocks_rag.jsonl",
+    "rag_text_blocks_output": "jsonl",
+    "remove_header_footer": false,
+    "repair_hyphenation": false,
+    "requirement_traceability_jsonl_filename": "requirement_traceability_rag.jsonl",
+    "requirement_traceability_output": "jsonl",
+    "requirements_jsonl_filename": "requirements_rag.jsonl",
+    "retrieval_chunks_jsonl_filename": "retrieval_chunks_rag.jsonl",
+    "retrieval_chunks_output": "jsonl",
+    "semantic_layer_output": "jsonl",
+    "semantic_units_jsonl_filename": "semantic_units_rag.jsonl",
+    "source_filename_masked": false,
+    "table_mode": "auto",
+    "technical_tables_jsonl_filename": "technical_tables_rag.jsonl",
+    "technical_tables_output": "jsonl",
+    "version": "<version>"
+  },
+  "schema_version": "1.0",
+  "selected_pages": [
+    1,
+    2,
+    3
+  ],
+  "tables": [
+    {
+      "anchor_line_index": 2,
+      "anchor_top": 193.65599999999995,
+      "bbox": [
+        90.0,
+        193.65599999999995,
+        410.0,
+        251.65599999999995
+      ],
+      "caption_source": null,
+      "caption_text": null,
+      "continuation_confidence": null,
+      "continuation_features": {},
+      "continuation_group": null,
+      "continuation_reasons": [],
+      "continuation_rejected_reasons": [],
+      "continued_from_page": null,
+      "continued_to_page": null,
+      "fallback_reasons": [],
+      "index": 1,
+      "mode": "gfm",
+      "page": 1,
+      "quality_score": 0.83
+    },
+    {
+      "anchor_line_index": 2,
+      "anchor_top": 210.86300000000006,
+      "bbox": [
+        150.0,
+        210.86300000000006,
+        400.0,
+        263.86300000000006
+      ],
+      "caption_source": null,
+      "caption_text": null,
+      "continuation_confidence": null,
+      "continuation_features": {
+        "bbox_alignment_similarity": 0.8542,
+        "current_caption_distance": null,
+        "header_similarity": 0.2,
+        "page_gap": 1,
+        "repeated_template_penalty": 0.0
+      },
+      "continuation_group": null,
+      "continuation_reasons": [],
+      "continuation_rejected_reasons": [
+        "header_similarity_below_threshold",
+        "continuation_confidence_below_threshold"
+      ],
+      "continued_from_page": null,
+      "continued_to_page": null,
+      "fallback_reasons": [
+        "AMBIGUOUS_GRID",
+        "TOO_FEW_COLUMNS"
+      ],
+      "index": 1,
+      "mode": "html",
+      "page": 2,
+      "quality_score": 0.9
+    },
+    {
+      "anchor_line_index": 2,
+      "anchor_top": 178.0,
+      "bbox": [
+        88.0,
+        178.0,
+        478.0,
+        232.0
+      ],
+      "caption_source": null,
+      "caption_text": null,
+      "continuation_confidence": null,
+      "continuation_features": {
+        "bbox_alignment_similarity": 0.7607,
+        "current_caption_distance": null,
+        "header_similarity": 0.0,
+        "page_gap": 1,
+        "repeated_template_penalty": 0.0
+      },
+      "continuation_group": null,
+      "continuation_reasons": [],
+      "continuation_rejected_reasons": [
+        "header_similarity_below_threshold",
+        "bbox_alignment_below_threshold",
+        "continuation_confidence_below_threshold"
+      ],
+      "continued_from_page": null,
+      "continued_to_page": null,
+      "fallback_reasons": [],
+      "index": 1,
+      "mode": "gfm",
+      "page": 3,
+      "quality_score": 1.0
+    }
+  ],
+  "total_pages": 3,
+  "warnings": [
+    {
+      "code": "TABLE_COMPLEXITY_HTML_FALLBACK",
+      "details": {
+        "reasons": [
+          "AMBIGUOUS_GRID",
+          "TOO_FEW_COLUMNS"
+        ],
+        "table_index": 1
+      },
+      "message": "Table was treated as complex and serialized as HTML fallback.",
+      "page": 2
+    }
+  ]
+}

@@ -13,7 +13,7 @@ from pdf2md.utils.io import write_json
 
 
 DEFAULT_GATES = ("ocr", "corpus", "benchmark", "schema", "packaging")
-OPTIONAL_GATES = ("rag", "index-contract")
+OPTIONAL_GATES = ("rag", "index-contract", "provenance-integrity", "artifact-integrity")
 KNOWN_GATES = DEFAULT_GATES + OPTIONAL_GATES
 
 
@@ -51,6 +51,11 @@ class ReleaseGateConfig:
     index_contract_metadata_max_bytes: int | None = None
     index_contract_confidential_safe: bool = False
     index_contract_fail_on_warning: bool = False
+    provenance_integrity_output_dir: Path | None = None
+    provenance_integrity_fail_on_warning: bool = False
+    artifact_integrity_output_dir: Path | None = None
+    artifact_integrity_confidential_safe: bool = False
+    artifact_integrity_fail_on_warning: bool = False
 
 
 def _split_gates(raw_gates: str) -> list[str]:
@@ -252,6 +257,64 @@ def _index_contract_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     return [_run_command(gate="index-contract", command=command, report_path=report_path)]
 
 
+def _provenance_integrity_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    report_path = config.output_dir / "provenance_integrity_report.json"
+    if config.provenance_integrity_output_dir is None:
+        return [
+            {
+                "gate": "provenance-integrity",
+                "command": [],
+                "exit_code": 2,
+                "status": "failed",
+                "report_path": str(report_path),
+                "stdout_tail": "",
+                "stderr_tail": "--provenance-integrity-output-dir is required when --gates includes provenance-integrity.",
+            }
+        ]
+    command = [
+        sys.executable,
+        "scripts/validate_provenance_integrity.py",
+        "--output-dir",
+        str(config.provenance_integrity_output_dir),
+        "--report-file",
+        str(report_path),
+        "--fail-on-error",
+    ]
+    if config.provenance_integrity_fail_on_warning:
+        command.append("--fail-on-warning")
+    return [_run_command(gate="provenance-integrity", command=command, report_path=report_path)]
+
+
+def _artifact_integrity_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    report_path = config.output_dir / "artifact_integrity_report.json"
+    if config.artifact_integrity_output_dir is None:
+        return [
+            {
+                "gate": "artifact-integrity",
+                "command": [],
+                "exit_code": 2,
+                "status": "failed",
+                "report_path": str(report_path),
+                "stdout_tail": "",
+                "stderr_tail": "--artifact-integrity-output-dir is required when --gates includes artifact-integrity.",
+            }
+        ]
+    command = [
+        sys.executable,
+        "scripts/validate_artifact_integrity.py",
+        "--output-dir",
+        str(config.artifact_integrity_output_dir),
+        "--report-file",
+        str(report_path),
+        "--fail-on-error",
+    ]
+    if config.artifact_integrity_confidential_safe:
+        command.append("--confidential-safe")
+    if config.artifact_integrity_fail_on_warning:
+        command.append("--fail-on-warning")
+    return [_run_command(gate="artifact-integrity", command=command, report_path=report_path)]
+
+
 def _schema_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     return [
         _run_command(
@@ -302,6 +365,10 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
             records.extend(_rag_gate(config))
         elif gate == "index-contract":
             records.extend(_index_contract_gate(config))
+        elif gate == "provenance-integrity":
+            records.extend(_provenance_integrity_gate(config))
+        elif gate == "artifact-integrity":
+            records.extend(_artifact_integrity_gate(config))
         elif gate == "schema":
             records.extend(_schema_gate(config))
         elif gate == "packaging":
@@ -329,7 +396,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--gates",
         default=",".join(DEFAULT_GATES),
-        help="Comma-separated gates: ocr,corpus,benchmark,schema,packaging,rag,index-contract.",
+        help=(
+            "Comma-separated gates: "
+            "ocr,corpus,benchmark,schema,packaging,rag,index-contract,provenance-integrity,artifact-integrity."
+        ),
     )
     parser.add_argument("--ocr-lang", default="eng")
     parser.add_argument("--corpus-input-dir", type=Path, default=Path("pdf"))
@@ -365,6 +435,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--index-contract-metadata-max-bytes", type=int)
     parser.add_argument("--index-contract-confidential-safe", action="store_true")
     parser.add_argument("--index-contract-fail-on-warning", action="store_true")
+    parser.add_argument("--provenance-integrity-output-dir", type=Path)
+    parser.add_argument("--provenance-integrity-fail-on-warning", action="store_true")
+    parser.add_argument("--artifact-integrity-output-dir", type=Path)
+    parser.add_argument("--artifact-integrity-confidential-safe", action="store_true")
+    parser.add_argument("--artifact-integrity-fail-on-warning", action="store_true")
     return parser
 
 
@@ -409,6 +484,11 @@ def main(argv: list[str] | None = None) -> int:
             index_contract_metadata_max_bytes=args.index_contract_metadata_max_bytes,
             index_contract_confidential_safe=args.index_contract_confidential_safe,
             index_contract_fail_on_warning=args.index_contract_fail_on_warning,
+            provenance_integrity_output_dir=args.provenance_integrity_output_dir,
+            provenance_integrity_fail_on_warning=args.provenance_integrity_fail_on_warning,
+            artifact_integrity_output_dir=args.artifact_integrity_output_dir,
+            artifact_integrity_confidential_safe=args.artifact_integrity_confidential_safe,
+            artifact_integrity_fail_on_warning=args.artifact_integrity_fail_on_warning,
         )
     )
     print(f"Wrote {args.output_dir / 'release_gate_report.json'}")
