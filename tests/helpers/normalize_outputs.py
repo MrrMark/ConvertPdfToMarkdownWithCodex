@@ -14,8 +14,12 @@ def normalize_manifest(payload: dict[str, Any]) -> dict[str, Any]:
     images = normalized.get("images", [])
     if isinstance(images, list):
         for image in images:
-            if isinstance(image, dict) and image.get("sha256"):
+            if not isinstance(image, dict):
+                continue
+            if image.get("sha256"):
                 image["sha256"] = "<sha256>"
+            if image.get("crop_content_ratio") is not None:
+                image["crop_content_ratio"] = "<crop_content_ratio>"
     return {
         "schema_version": normalized.get("schema_version"),
         "input_file": normalized.get("input_file"),

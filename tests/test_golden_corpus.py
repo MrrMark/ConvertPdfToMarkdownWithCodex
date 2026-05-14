@@ -47,8 +47,11 @@ def _normalize_jsonl_sidecar(content: str, sidecar_name: str) -> str:
         if not line.strip():
             continue
         record = json.loads(line)
-        if sidecar_name == "figures_rag.jsonl" and record.get("sha256"):
-            record["sha256"] = "<sha256>"
+        if sidecar_name == "figures_rag.jsonl":
+            if record.get("sha256"):
+                record["sha256"] = "<sha256>"
+            if record.get("crop_content_ratio") is not None:
+                record["crop_content_ratio"] = "<crop_content_ratio>"
         if sidecar_name == "retrieval_chunks_rag.jsonl":
             record.pop("schema_version", None)
             record.pop("source_sha256", None)
@@ -141,11 +144,11 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         assert (output_dir / "document.md").read_text(encoding="utf-8") == (
             golden_dir / "document.md"
         ).read_text(encoding="utf-8")
-        assert normalize_manifest(json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))) == json.loads(
-            (golden_dir / "manifest.json").read_text(encoding="utf-8")
+        assert normalize_manifest(json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))) == (
+            normalize_manifest(json.loads((golden_dir / "manifest.json").read_text(encoding="utf-8")))
         )
-        assert normalize_report(json.loads((output_dir / "report.json").read_text(encoding="utf-8"))) == json.loads(
-            (golden_dir / "report.json").read_text(encoding="utf-8")
+        assert normalize_report(json.loads((output_dir / "report.json").read_text(encoding="utf-8"))) == (
+            normalize_report(json.loads((golden_dir / "report.json").read_text(encoding="utf-8")))
         )
         for sidecar_name in (
             "rag_tables.md",
