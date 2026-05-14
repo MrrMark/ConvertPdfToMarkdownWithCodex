@@ -24,11 +24,7 @@
 
 현재 backlog는 모두 **RAG 운영 목적**의 개선 작업이다. PDF 변환 산출물을 AI Agent/Copilot의 스펙 분석, 요구사항 추적, 테스트 스크립트 구현에 더 안정적으로 쓰기 위한 항목만 남긴다.
 
-### P1 / Q34. Offline Index Contract Validator
-
-- OpenAI/Azure AI Search/LangChain/LlamaIndex mapping recipe가 요구하는 필드와 타입을 로컬에서 검증하는 validator script를 추가한다.
-- 외부 서비스 호출 없이 JSONL field contract, metadata 크기, source_refs 보존 여부, confidential-safe 공유 가능 범위를 점검한다.
-- 실패 시 어느 chunk/sidecar/field가 문제인지 deterministic report로 출력한다.
+상세 개발 명세는 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에서 관리한다.
 
 ### P2 / Q35. Rendered Diagram Fixture Suite
 

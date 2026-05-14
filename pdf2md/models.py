@@ -443,3 +443,43 @@ class RequirementChangeImpactReport(BaseModel):
     current_manifest: str
     entries: list[RequirementChangeImpactEntry] = Field(default_factory=list)
     summary: RequirementChangeImpactSummary = Field(default_factory=RequirementChangeImpactSummary)
+
+
+class IndexContractFinding(BaseModel):
+    severity: str
+    code: str
+    target: str
+    file: Optional[str] = None
+    line: Optional[int] = None
+    record_id: Optional[str] = None
+    field: Optional[str] = None
+    message: str
+
+
+class IndexContractFileSummary(BaseModel):
+    file: str
+    exists: bool
+    record_count: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+
+
+class IndexContractSummary(BaseModel):
+    checked_files: int = 0
+    checked_records: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+
+
+class IndexContractReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "rag_index_contract_validation"
+    status: str
+    passed: bool
+    output_dir: str
+    targets: list[str] = Field(default_factory=list)
+    summary: IndexContractSummary = Field(default_factory=IndexContractSummary)
+    files: list[IndexContractFileSummary] = Field(default_factory=list)
+    findings: list[IndexContractFinding] = Field(default_factory=list)

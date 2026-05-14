@@ -132,7 +132,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q31. Local Corpus Profile Runner" not in next_plan
     assert "Q32. Requirement Impact Review Pack" not in next_plan
     assert "Q33. Technical Cross-Reference Resolver Hardening" not in next_plan
-    assert "Q34. Offline Index Contract Validator" in next_plan
+    assert "Q34. Offline Index Contract Validator" not in next_plan
     assert "Q35. Rendered Diagram Fixture Suite" in next_plan
     assert "Q36. Page-Level Parallel Extractor" in next_plan
     assert "현재 남은 작업 없음." not in next_plan

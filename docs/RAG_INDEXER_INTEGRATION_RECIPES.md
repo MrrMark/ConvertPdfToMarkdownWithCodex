@@ -40,6 +40,26 @@ Vector DB에는 보통 `retrieval_chunks_rag.jsonl`만 넣고, 나머지 sidecar
 | `schema_version` | `schema_version` | chunk contract version |
 | `source_sha256` | `source_sha256` | 원본 PDF identity / corpus diff guard |
 
+## Offline Index Contract Validation
+
+Indexer나 framework SDK를 호출하기 전에 local-only validator로 field contract와 metadata mapping 가능성을 점검한다.
+
+```bash
+python scripts/validate_index_contract.py --output-dir output --target all --fail-on-error
+python scripts/validate_index_contract.py --output-dir output --target azure-ai-search --metadata-max-bytes 32768 --fail-on-error
+python scripts/validate_index_contract.py --output-dir output --target all --confidential-safe --fail-on-warning
+```
+
+생성물:
+
+- `index_contract_report.json`: target별 mapping 가능 여부, JSONL field/type 오류, metadata size guardrail, `source_refs` provenance, confidential-safe metadata finding
+
+운영 체크:
+
+- 이 validator는 OpenAI, Azure AI Search, LangChain, LlamaIndex SDK를 import하거나 외부 서비스에 접속하지 않는다.
+- `--confidential-safe`는 path/filename/source hash 노출을 점검하지만 원문 `text`를 익명화하지 않는다.
+- `--metadata-max-bytes`는 운영 profile의 보수적 guardrail로 지정한다. 실제 서비스 제한이 바뀔 수 있으므로 배포 profile에서 값을 명시하는 편이 안전하다.
+
 ## OpenAI Vector Store / Generic Embedding Pipeline
 
 권장 payload:

@@ -20,6 +20,7 @@
 - `docs/schema/corpus_manifest.schema.json`
 - `docs/schema/corpus_diff_report.schema.json`
 - `docs/schema/requirement_change_impact_report.schema.json`
+- `docs/schema/index_contract_report.schema.json`
 
 Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 
@@ -492,6 +493,31 @@ Policy:
 - The report compares `requirement_traceability_rag.jsonl` records across corpus manifests.
 - It preserves original requirement text and source refs; it does not summarize, paraphrase, or infer impact.
 - Records without explicit requirement IDs use deterministic `unidentified:<source_id>` keys so downstream tools can still trace source provenance.
+
+## index_contract_report.json
+
+Local-only JSON output from `scripts/validate_index_contract.py`.
+
+Required:
+
+- `schema_version`
+- `purpose`
+- `status`
+- `passed`
+- `output_dir`
+- `targets`
+- `summary`
+- `files`
+- `findings`
+
+Policy:
+
+- `purpose` is `rag_index_contract_validation`.
+- `targets` may include `openai`, `azure-ai-search`, `langchain`, and `llamaindex`.
+- `findings[]` are sorted deterministically by severity, file, line, field, and code.
+- `severity` is one of `error`, `warning`, or `info`.
+- The validator must not call external services or create embeddings.
+- Confidential-safe findings are advisory for metadata sharing. The validator does not redact source `text`.
 
 ## requirement_impact_review_pack.json / requirement_impact_review_pack.md
 

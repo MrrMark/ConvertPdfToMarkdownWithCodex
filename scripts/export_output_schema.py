@@ -9,6 +9,7 @@ from pdf2md.models import (
     BatchReport,
     CorpusDiffReport,
     CorpusManifest,
+    IndexContractReport,
     Manifest,
     Report,
     RequirementChangeImpactReport,
@@ -22,6 +23,7 @@ SCHEMA_FILES: dict[str, type] = {
     "corpus_manifest.schema.json": CorpusManifest,
     "corpus_diff_report.schema.json": CorpusDiffReport,
     "requirement_change_impact_report.schema.json": RequirementChangeImpactReport,
+    "index_contract_report.schema.json": IndexContractReport,
 }
 
 

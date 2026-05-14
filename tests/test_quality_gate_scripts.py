@@ -241,3 +241,35 @@ def test_release_gate_runner_supports_optional_rag_calibration_gate(monkeypatch,
     assert "--fail-on-threshold" in command
     assert "--min-requirement-coverage" in command
     assert "--max-conversion-duration-ms" in command
+
+
+def test_release_gate_runner_supports_optional_index_contract_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="Wrote index_contract_report.json", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-index",
+            gates=["index-contract"],
+            index_contract_output_dir=tmp_path / "converted-spec",
+            index_contract_target="azure-ai-search",
+            index_contract_metadata_max_bytes=2048,
+            index_contract_confidential_safe=True,
+            index_contract_fail_on_warning=True,
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["gates"][0]["gate"] == "index-contract"
+    command = calls[0]
+    assert any(str(part).endswith("validate_index_contract.py") for part in command)
+    assert "--target" in command
+    assert "azure-ai-search" in command
+    assert "--metadata-max-bytes" in command
+    assert "--confidential-safe" in command
+    assert "--fail-on-warning" in command
