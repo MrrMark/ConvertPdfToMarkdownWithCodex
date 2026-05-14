@@ -637,3 +637,10 @@ Q36에서 도입한 `--page-workers` text/read-order 병렬 경로를 table cand
 
 - table candidate extraction까지 병렬화해도 기존 golden corpus가 변하지 않는다.
 - multi-worker 경로의 결과 동일성과 최소 성능 신호가 CI 또는 release gate에서 검증된다.
+
+### 구현 결과
+
+- `--page-workers > 1` 경로에서 worker가 isolated PDF open 1회로 page-local text/read-order와 table raw candidate를 함께 수집한다.
+- `extract_tables`는 precomputed page candidate를 받아 parent에서 selected page 순서로 pruning, fallback warning, table index, continuation, RAG table ordering을 재확정한다.
+- image extraction, OCR, manifest/report write는 single parent path를 유지한다.
+- benchmark smoke는 `scripts/benchmark_conversion.py --page-workers 1,2`처럼 worker count별 실행과 core artifact hash 동등성 신호를 기록한다.

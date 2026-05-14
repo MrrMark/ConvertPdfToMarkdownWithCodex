@@ -14,7 +14,7 @@ from pdf2md.extractors.images import extract_images
 from pdf2md.extractors.ocr import run_ocr
 from pdf2md.extractors.page_worker import PageWorkerInput
 from pdf2md.extractors.structure_normalizer import BlockRegion, normalize_page_lines
-from pdf2md.extractors.tables import extract_tables
+from pdf2md.extractors.tables import PageTableCandidateResult, extract_tables
 from pdf2md.extractors.text import PageLayoutMetadata, TextExtractionError, TextLine, extract_page_text_layout_result
 from pdf2md.models import (
     ConversionStatus,
@@ -242,6 +242,20 @@ def _count_low_quality_tables(table_quality: list[dict]) -> int:
 
 def _count_caption_linked_tables(table_quality: list[dict]) -> int:
     return sum(1 for item in table_quality if str(item.get("caption_text") or "").strip())
+
+
+def _order_warnings_by_selected_page(
+    warning_entries: list[WarningEntry],
+    selected_pages: list[int],
+) -> list[WarningEntry]:
+    page_order = {page: idx for idx, page in enumerate(selected_pages)}
+    return [
+        warning
+        for _, warning in sorted(
+            enumerate(warning_entries),
+            key=lambda item: (page_order.get(item[1].page, len(page_order)), item[0]),
+        )
+    ]
 
 
 def _write_rag_table_outputs(
@@ -496,6 +510,8 @@ def run_conversion(config: Config) -> ConversionResult:
     page_texts: dict[int, str] = {}
     raw_lines_by_page: dict[int, list[dict]] = {}
     text_metadata_by_page: dict[int, PageLayoutMetadata] = {}
+    table_candidates_by_page: dict[int, PageTableCandidateResult] = {}
+    page_worker_table_warnings: list[WarningEntry] = []
     shared_plumber_pdf = None
     text_started = stage_start()
     try:
@@ -512,6 +528,7 @@ def run_conversion(config: Config) -> ConversionResult:
                         pdf_path=config.input_pdf,
                         page=page,
                         password=config.password,
+                        collect_table_candidates=True,
                     )
                     for page in selected_pages
                 ],
@@ -519,7 +536,22 @@ def run_conversion(config: Config) -> ConversionResult:
             )
             for worker_result in worker_results:
                 page_worker_pdf_open_count += worker_result.pdf_open_count
-                warnings.extend(worker_result.warnings)
+                for warning in worker_result.warnings:
+                    if (
+                        warning.code == WarningCode.TABLE_EXTRACTION_FAILED
+                        and warning.details.get("phase") == "table_candidate_collection"
+                    ):
+                        page_worker_table_warnings.append(warning)
+                    else:
+                        warnings.append(warning)
+                if worker_result.table_candidate_result is not None:
+                    table_candidates_by_page[worker_result.page] = worker_result.table_candidate_result
+                else:
+                    table_candidates_by_page[worker_result.page] = PageTableCandidateResult(
+                        page=worker_result.page,
+                        page_width=0.0,
+                        page_height=0.0,
+                    )
                 if worker_result.failed:
                     failed_pages.append(worker_result.page)
                     page_layout_lines[worker_result.page] = []
@@ -633,6 +665,7 @@ def run_conversion(config: Config) -> ConversionResult:
         table_mode,
         pdf=shared_plumber_pdf,
         text_lines_by_page=raw_lines_by_page,
+        precomputed_candidates_by_page=table_candidates_by_page if page_parallel_enabled else None,
     )
     finish_stage("table_extraction", table_started)
     table_result.rag_tables = normalize_rag_table_payload(table_result.rag_tables)
@@ -656,7 +689,7 @@ def run_conversion(config: Config) -> ConversionResult:
     finish_stage("image_extraction", image_started)
     engine_usage["tables"] = len(table_result.assets) > 0
     engine_usage["images"] = len(image_result.assets) > 0
-    warnings.extend(table_result.warnings)
+    warnings.extend(_order_warnings_by_selected_page(page_worker_table_warnings + table_result.warnings, selected_pages))
     warnings.extend(image_result.warnings)
     structure_marker_counts = count_structure_marker_reasons(image_result.excluded_assets)
 
