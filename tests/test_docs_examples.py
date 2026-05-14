@@ -50,6 +50,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "python -m build" in readme
     assert "benchmark_report.json" in readme
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
+    assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
+    assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
     assert "pdf/v10" not in readme
     assert "프로젝트 scaffold 생성" not in readme
     assert "metadata.py" not in readme
@@ -102,12 +104,16 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "python -m build" in guide
     assert "benchmark_report.json" in guide
     assert "docs\\NEXT_QUALITY_IMPROVEMENT_PLAN.md" in guide
+    assert "docs\\QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in guide
+    assert "docs\\QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in guide
     assert "- Git\n  - `git clone`, `git pull` 같은 저장소 동기화 흐름에서만 필요" in guide
 
 
 def test_ci_and_next_plan_contracts_are_present() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
     next_plan = Path("docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md").read_text(encoding="utf-8")
+    development_specs = Path("docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md").read_text(encoding="utf-8")
+    implemented_specs = Path("docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md").read_text(encoding="utf-8")
     output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
     quality_scorecard = Path("docs/QUALITY_SCORECARD.md").read_text(encoding="utf-8")
 
@@ -118,6 +124,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "앞으로 작업할 항목만" in next_plan
     assert "작업이 완료되고 테스트 통과 및 PR merge까지 끝나면" in next_plan
     assert "구현 완료, 테스트 통과, PR merge까지 끝난 항목은" in next_plan
+    assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in next_plan
+    assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in next_plan
     assert "Q02. Font/Geometry 기반 텍스트 블록 구조화" not in next_plan
     assert "Q03. Figure Crop Fallback 시각 검증 및 보정" not in next_plan
     assert "Q04. Multi-page Table Continuation 보정" not in next_plan
@@ -144,6 +152,15 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
+    assert "현재 Active Development Specs" in development_specs
+    assert "현재 active quality backlog가 없으므로" in development_specs
+    assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
+    assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
+    assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q34. Offline Index Contract Validator" in implemented_specs
+    assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
+    assert "Q46. RAG Golden Query Expected Source Coverage" in implemented_specs
+    assert "Q44. Domain Technical Table Coverage Expansion" in implemented_specs
     assert "schema_version" in output_schema
     assert "docs/schema/manifest.schema.json" in output_schema
     assert "text_blocks_rag.jsonl" in output_schema
@@ -161,6 +178,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "requirement_change_impact_report.json" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema
+    assert "2026-05-15" in quality_scorecard
+    assert "active quality backlog는 없다" in quality_scorecard
     assert "97/100" in quality_scorecard
     assert "Q46. RAG Golden Query Expected Source Coverage" in quality_scorecard
     assert "Q44. Domain Technical Table Coverage Expansion" in quality_scorecard
