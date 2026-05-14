@@ -32,6 +32,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "rag_header_strategy" in readme
     assert "scripts/run_corpus_eval.py" in readme
     assert "scripts/benchmark_conversion.py" in readme
+    assert "--min-expected-source-coverage" in readme
     assert "scripts/check_ocr_runtime.py --ocr-lang kor+eng" in readme
     assert "scripts/run_release_gates.py" in readme
     assert "scripts/run_ssd_corpus_profile.py" in readme
@@ -85,6 +86,7 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "rag_header_strategy" in guide
     assert "scripts\\run_corpus_eval.py" in guide
     assert "scripts\\benchmark_conversion.py" in guide
+    assert "--min-expected-source-coverage" in guide
     assert "scripts\\check_ocr_runtime.py --ocr-lang kor+eng" in guide
     assert "scripts\\run_release_gates.py" in guide
     assert "scripts\\run_ssd_corpus_profile.py" in guide
@@ -137,7 +139,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q36. Page-Level Parallel Extractor" not in next_plan
     assert "Q42. Full Page Worker Table Candidate Parallelization" not in next_plan
     assert "Q43. Quality Scorecard Refresh" not in next_plan
-    assert "Q46. RAG Golden Query Expected Source Coverage" in next_plan
+    assert "Q46. RAG Golden Query Expected Source Coverage" not in next_plan
     assert "Q44. Domain Technical Table Coverage Expansion" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan

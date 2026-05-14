@@ -688,6 +688,13 @@ RAG 평가가 단순 keyword hit뿐 아니라 expected source id를 맞히는지
 - 기존 hit@k/MRR/citation coverage 동작은 유지된다.
 - release gate `rag` command에서 expected source coverage threshold를 전달할 수 있다.
 
+### 구현 결과
+
+- eval set query에 `expected_source_types`를 추가해 chunk id와 source_refs source type을 함께 검증할 수 있다.
+- `rag_eval_report.json` metrics에 `expected_source_coverage`, hit/total/miss count를 추가했다.
+- query별 결과에 `missing_expected_source_ids`를 기록해 golden source id 누락 원인을 바로 추적할 수 있다.
+- `scripts/run_release_gates.py`의 `rag` gate가 `--rag-min-expected-source-coverage` threshold를 전달한다.
+
 ## P1 / Q44. Domain Technical Table Coverage Expansion
 
 ### 목표

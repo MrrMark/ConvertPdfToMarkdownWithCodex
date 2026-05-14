@@ -10,6 +10,7 @@
     "min_hit_at_k": 0.9,
     "min_mrr": 0.75,
     "min_citation_coverage": 0.9,
+    "min_expected_source_coverage": 0.9,
     "min_requirement_coverage": 0.9,
     "min_table_field_coverage": 0.85,
     "min_cross_ref_resolved_coverage": 0.8,

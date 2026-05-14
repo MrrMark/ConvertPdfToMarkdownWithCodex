@@ -6,13 +6,13 @@ from pathlib import Path
 from scripts.run_rag_eval import apply_calibration_gate, evaluate_queries, main
 
 
-def _chunk(chunk_id: str, text: str, source_id: str, priority: int = 50) -> dict:
+def _chunk(chunk_id: str, text: str, source_id: str, priority: int = 50, source_type: str = "text_block") -> dict:
     return {
         "chunk_id": chunk_id,
         "chunk_index": int(chunk_id.rsplit("-", 1)[1]),
         "chunk_type": "text_block",
         "text": text,
-        "source_refs": [{"source_type": "text_block", "source_id": source_id, "page": 1}],
+        "source_refs": [{"source_type": source_type, "source_id": source_id, "page": 1}],
         "retrieval_priority": priority,
     }
 
@@ -39,12 +39,41 @@ def test_rag_eval_reports_hit_mrr_and_citation_coverage() -> None:
         "hit_at_k": 1.0,
         "mrr": 1.0,
         "citation_coverage": 1.0,
+        "expected_source_coverage": 1.0,
+        "expected_source_hit_count": 1,
+        "expected_source_total_count": 1,
+        "expected_source_miss_count": 0,
         "requirement_coverage": 1.0,
         "table_field_coverage": 0.0,
         "chunk_token_max": 0,
         "chunk_token_p95": 0,
     }
     assert report["results"][0]["retrieved"][0]["chunk_id"] == "chunk-000001"
+
+
+def test_rag_eval_matches_chunk_ids_and_filters_expected_source_types() -> None:
+    chunks = [
+        _chunk("chunk-000001", "Status field table row.", "page-0001-table-0001-row-0001", 80, "table_row"),
+        _chunk("chunk-000002", "Status field text block.", "page-0001-block-0001", 80),
+    ]
+
+    report = evaluate_queries(
+        chunks=chunks,
+        queries=[
+            {
+                "query": "status field",
+                "expected_source_ids": ["chunk-000001", "page-0001-table-0001-row-0001", "page-0001-block-0001"],
+                "expected_source_types": ["chunk", "table_row"],
+            }
+        ],
+        top_k=2,
+    )
+
+    result = report["results"][0]
+    assert report["metrics"]["expected_source_coverage"] == 0.6667
+    assert report["metrics"]["expected_source_hit_count"] == 1
+    assert result["covered_source_ids"] == ["chunk-000001", "page-0001-table-0001-row-0001"]
+    assert result["missing_expected_source_ids"] == ["page-0001-block-0001"]
 
 
 def test_rag_eval_cli_writes_report(tmp_path: Path) -> None:
@@ -74,6 +103,7 @@ def test_rag_eval_cli_writes_report(tmp_path: Path) -> None:
     assert main(["--output-dir", str(output_dir), "--eval-set", str(eval_set), "--top-k", "3"]) == 0
     report = json.loads((output_dir / "rag_eval_report.json").read_text(encoding="utf-8"))
     assert report["metrics"]["hit_at_k"] == 1.0
+    assert report["metrics"]["expected_source_coverage"] == 1.0
     assert report["metrics"]["table_field_coverage"] == 1.0
 
 
@@ -125,6 +155,8 @@ def test_rag_eval_calibration_gate_uses_thresholds_and_output_diagnostics(tmp_pa
             str(eval_set),
             "--min-hit-at-k",
             "1.0",
+            "--min-expected-source-coverage",
+            "1.0",
             "--min-cross-ref-resolved-coverage",
             "0.75",
             "--max-conversion-duration-ms",
@@ -142,6 +174,24 @@ def test_rag_eval_calibration_gate_uses_thresholds_and_output_diagnostics(tmp_pa
         "cross_ref_resolved_coverage",
         "conversion_duration_ms",
     }
+
+
+def test_rag_eval_calibration_gate_fails_expected_source_coverage() -> None:
+    result = apply_calibration_gate(
+        {"metrics": {"expected_source_coverage": 0.5}},
+        thresholds={"min_expected_source_coverage": 0.75},
+    )
+
+    assert result["passed_calibration_gate"] is False
+    assert result["gate_failures"] == [
+        {
+            "type": "threshold_failure",
+            "metric": "expected_source_coverage",
+            "limit": 0.75,
+            "current": 0.5,
+            "direction": "min",
+        }
+    ]
 
 
 def test_rag_eval_calibration_gate_can_pass_without_threshold_failures() -> None:
