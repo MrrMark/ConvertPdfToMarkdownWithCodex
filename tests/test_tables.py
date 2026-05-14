@@ -10,6 +10,7 @@ from pdf2md.extractors.tables import (
     _split_notes,
     _quality_score,
     analyze_table_complexity,
+    collect_table_candidates_for_page,
     extract_tables,
     is_simple_table,
 )
@@ -237,6 +238,29 @@ def test_extract_tables_html_alias_matches_html_only(monkeypatch) -> None:
 
     assert html_result.blocks_by_page[1][0].markdown == legacy_result.blocks_by_page[1][0].markdown
     assert html_result.assets[0].mode == "html"
+
+
+def test_extract_tables_materializes_precomputed_page_candidates(monkeypatch) -> None:
+    rows = [["Field", "Value"], ["alpha", "beta"]]
+    page = _FakePage(rows)
+    candidate_result = collect_table_candidates_for_page(page, page_number=1)
+    monkeypatch.setattr(
+        "pdf2md.extractors.tables.pdfplumber.open",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("parent PDF should not be reopened")),
+    )
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.AUTO,
+        precomputed_candidates_by_page={1: candidate_result},
+    )
+
+    assert result.assets[0].page == 1
+    assert result.assets[0].index == 1
+    assert result.assets[0].mode == "gfm"
+    assert "| Field | Value |" in result.blocks_by_page[1][0].markdown
 
 
 def test_extract_tables_legacy_gfm_only_still_falls_back_to_html(monkeypatch) -> None:

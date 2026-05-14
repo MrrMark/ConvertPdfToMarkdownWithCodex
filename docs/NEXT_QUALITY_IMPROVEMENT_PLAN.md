@@ -22,12 +22,6 @@
 
 ## 남은 작업
 
-현재 backlog는 모두 **RAG 운영 목적**의 개선 작업이다. PDF 변환 산출물을 AI Agent/Copilot의 스펙 분석, 요구사항 추적, 테스트 스크립트 구현에 더 안정적으로 쓰기 위한 항목만 남긴다.
+현재 남은 quality backlog는 없다.
 
-상세 개발 명세는 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에서 관리한다.
-
-### P2 / Q42. Full Page Worker Table Candidate Parallelization
-
-- Q36에서 안전하게 도입한 `--page-workers` text/read-order 병렬 경로를 table candidate extraction까지 확장한다.
-- page-local table 후보 생성은 worker에서 수행하되 continuation grouping, warning ordering, asset/table index 재확정은 parent merge에서 deterministic하게 처리한다.
-- benchmark gate에 `--page-workers 1`과 `--page-workers > 1` 결과 동일성 및 최소 성능 신호를 함께 고정한다.
+새 개선 과제가 발견되면 구현 전에 이 섹션에 신규 Q 항목으로 추가한다.

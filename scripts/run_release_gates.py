@@ -26,6 +26,7 @@ class ReleaseGateConfig:
     corpus_baseline_report: Path | None = None
     benchmark_baseline_report: Path | None = None
     benchmark_page_counts: str = "10,50,100"
+    benchmark_page_workers: str = "1"
     max_partial_rate: float | None = None
     max_low_quality_table_rate: float | None = None
     corpus_min_pages_per_second: float | None = None
@@ -165,6 +166,8 @@ def _benchmark_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
         str(output_dir),
         "--page-counts",
         config.benchmark_page_counts,
+        "--page-workers",
+        config.benchmark_page_workers,
         "--fail-on-regression",
         "--max-duration-regression",
         str(config.max_duration_regression),
@@ -406,6 +409,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--corpus-baseline-report", type=Path)
     parser.add_argument("--benchmark-baseline-report", type=Path)
     parser.add_argument("--benchmark-page-counts", default="10,50,100")
+    parser.add_argument("--benchmark-page-workers", default="1")
     parser.add_argument("--max-partial-rate", type=float)
     parser.add_argument("--max-low-quality-table-rate", type=float)
     parser.add_argument("--corpus-min-pages-per-second", type=float)
@@ -459,6 +463,7 @@ def main(argv: list[str] | None = None) -> int:
             corpus_baseline_report=args.corpus_baseline_report,
             benchmark_baseline_report=args.benchmark_baseline_report,
             benchmark_page_counts=args.benchmark_page_counts,
+            benchmark_page_workers=args.benchmark_page_workers,
             max_partial_rate=args.max_partial_rate,
             max_low_quality_table_rate=args.max_low_quality_table_rate,
             corpus_min_pages_per_second=args.corpus_min_pages_per_second,

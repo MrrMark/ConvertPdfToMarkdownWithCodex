@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import time
 import tracemalloc
@@ -12,6 +13,7 @@ from pypdf import PdfWriter
 from pypdf.generic import DictionaryObject, NameObject, StreamObject
 
 from pdf2md.config import Config
+from pdf2md.models import RagTableOutputMode
 from pdf2md.pipeline import run_conversion
 from pdf2md.utils.io import write_json
 
@@ -39,6 +41,17 @@ def _write_benchmark_pdf(path: Path, page_count: int) -> None:
         lines = [
             f"BT /F1 12 Tf 72 760 Td {_text_operand(f'Benchmark page {page_number}')} Tj ET",
             f"BT /F1 10 Tf 72 730 Td {_text_operand('Alpha beta gamma delta')} Tj ET",
+            "1 w",
+            "72.00 690.00 m 312.00 690.00 l S",
+            "72.00 666.00 m 312.00 666.00 l S",
+            "72.00 642.00 m 312.00 642.00 l S",
+            "72.00 690.00 m 72.00 642.00 l S",
+            "192.00 690.00 m 192.00 642.00 l S",
+            "312.00 690.00 m 312.00 642.00 l S",
+            f"BT /F1 9 Tf 76 674 Td {_text_operand('Field')} Tj ET",
+            f"BT /F1 9 Tf 196 674 Td {_text_operand('Value')} Tj ET",
+            f"BT /F1 9 Tf 76 650 Td {_text_operand(f'page-{page_number}')} Tj ET",
+            f"BT /F1 9 Tf 196 650 Td {_text_operand('ok')} Tj ET",
         ]
         content = StreamObject()
         content._data = "\n".join(lines).encode("utf-8")  # noqa: SLF001
@@ -49,6 +62,28 @@ def _write_benchmark_pdf(path: Path, page_count: int) -> None:
 
 def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _parse_int_list(raw_value: str) -> list[int]:
+    values = [int(value.strip()) for value in raw_value.split(",") if value.strip()]
+    return sorted(set(values)) or [1]
+
+
+def _file_sha256(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _artifact_hashes(output_dir: Path) -> dict[str, str]:
+    hashes: dict[str, str] = {}
+    for filename in ("document.md", "tables_rag.jsonl", "technical_tables_rag.jsonl"):
+        path = output_dir / filename
+        if path.exists():
+            hashes[filename] = _file_sha256(path)
+    return hashes
 
 
 def _as_number(value: Any) -> float | None:
@@ -167,6 +202,17 @@ def apply_performance_gate(
     }
     regressions: list[dict[str, Any]] = []
     current_runs = payload.get("runs", [])
+    for mismatch in payload.get("worker_equivalence", {}).get("mismatches", []):
+        regressions.append(
+            {
+                "type": "worker_equivalence_failure",
+                "page_count": mismatch.get("page_count"),
+                "metric": "worker_output_hashes",
+                "baseline_page_workers": mismatch.get("baseline_page_workers"),
+                "current_page_workers": mismatch.get("page_workers"),
+                "different_artifacts": mismatch.get("different_artifacts", []),
+            }
+        )
 
     if baseline_report is not None:
         baseline_by_page_count = {
@@ -247,42 +293,98 @@ def apply_performance_gate(
     return payload
 
 
-def run_benchmark(output_dir: Path, page_counts: list[int]) -> dict[str, Any]:
+def run_benchmark(output_dir: Path, page_counts: list[int], page_workers: list[int] | None = None) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
+    page_workers = sorted(set(page_workers or [1]))
     runs: list[dict[str, Any]] = []
+    hashes_by_page_count: dict[int, list[dict[str, Any]]] = {}
     for page_count in page_counts:
         pdf_path = output_dir / f"benchmark-{page_count}.pdf"
-        document_output = output_dir / f"benchmark-{page_count}-output"
         _write_benchmark_pdf(pdf_path, page_count)
-        tracemalloc.start()
-        started = time.perf_counter()
-        result = run_conversion(Config(input_pdf=pdf_path, output_dir=document_output, keep_page_markers=True))
-        elapsed_ms = int((time.perf_counter() - started) * 1000)
-        _, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-        report = _read_json(document_output / "report.json")
-        summary = report.get("summary", {})
-        runs.append(
-            {
-                "page_count": page_count,
-                "status": getattr(result.status, "value", str(result.status)),
-                "exit_code": result.exit_code,
-                "elapsed_ms": elapsed_ms,
-                "total_duration_ms": elapsed_ms,
-                "peak_memory_bytes": peak,
-                "stage_durations_ms": summary.get("stage_durations_ms", {}),
-                "pages_per_second": summary.get("pages_per_second"),
-                "pdf_open_count": summary.get("pdf_open_count"),
-                "text_line_extract_count": summary.get("text_line_extract_count"),
-            }
-        )
-    return {"runs": runs}
+        for page_worker_count in page_workers:
+            document_output = output_dir / f"benchmark-{page_count}-workers-{page_worker_count}-output"
+            tracemalloc.start()
+            started = time.perf_counter()
+            result = run_conversion(
+                Config(
+                    input_pdf=pdf_path,
+                    output_dir=document_output,
+                    keep_page_markers=True,
+                    page_workers=page_worker_count,
+                    rag_table_output=RagTableOutputMode.JSONL,
+                )
+            )
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            report = _read_json(document_output / "report.json")
+            summary = report.get("summary", {})
+            artifact_hashes = _artifact_hashes(document_output)
+            hashes_by_page_count.setdefault(page_count, []).append(
+                {
+                    "page_workers": page_worker_count,
+                    "artifact_hashes": artifact_hashes,
+                }
+            )
+            runs.append(
+                {
+                    "page_count": page_count,
+                    "page_workers": page_worker_count,
+                    "page_worker_effective_count": summary.get("page_worker_effective_count"),
+                    "page_parallel_enabled": summary.get("page_parallel_enabled"),
+                    "status": getattr(result.status, "value", str(result.status)),
+                    "exit_code": result.exit_code,
+                    "elapsed_ms": elapsed_ms,
+                    "total_duration_ms": elapsed_ms,
+                    "peak_memory_bytes": peak,
+                    "stage_durations_ms": summary.get("stage_durations_ms", {}),
+                    "pages_per_second": summary.get("pages_per_second"),
+                    "pdf_open_count": summary.get("pdf_open_count"),
+                    "text_line_extract_count": summary.get("text_line_extract_count"),
+                    "table_total": summary.get("table_total"),
+                    "table_gfm_count": summary.get("table_gfm_count"),
+                    "rag_table_record_count": summary.get("rag_table_record_count"),
+                    "technical_table_record_count": summary.get("technical_table_record_count"),
+                    "artifact_hashes": artifact_hashes,
+                }
+            )
+
+    mismatches: list[dict[str, Any]] = []
+    for page_count, hash_records in sorted(hashes_by_page_count.items()):
+        if not hash_records:
+            continue
+        baseline = hash_records[0]
+        baseline_hashes = baseline["artifact_hashes"]
+        for current in hash_records[1:]:
+            different_artifacts = [
+                filename
+                for filename in sorted(set(baseline_hashes) | set(current["artifact_hashes"]))
+                if baseline_hashes.get(filename) != current["artifact_hashes"].get(filename)
+            ]
+            if different_artifacts:
+                mismatches.append(
+                    {
+                        "page_count": page_count,
+                        "baseline_page_workers": baseline["page_workers"],
+                        "page_workers": current["page_workers"],
+                        "different_artifacts": different_artifacts,
+                    }
+                )
+    return {
+        "runs": runs,
+        "worker_equivalence": {
+            "page_workers": page_workers,
+            "mismatches": mismatches,
+            "passed": not mismatches,
+        },
+    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Benchmark pdf2md conversion with synthetic PDFs.")
     parser.add_argument("--output-dir", default="benchmark_output")
     parser.add_argument("--page-counts", default="10,50,100")
+    parser.add_argument("--page-workers", default="1", help="Comma-separated page worker counts, for example 1,4.")
     parser.add_argument("--baseline-report", type=Path, help="Previous benchmark_report.json to compare against.")
     parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero when the performance gate fails.")
     parser.add_argument(
@@ -299,8 +401,9 @@ def main() -> int:
     )
     parser.add_argument("--min-pages-per-second", type=float, help="Minimum allowed pages/sec for each run.")
     args = parser.parse_args()
-    page_counts = [int(value) for value in args.page_counts.split(",") if value.strip()]
-    payload = run_benchmark(Path(args.output_dir), page_counts)
+    page_counts = _parse_int_list(args.page_counts)
+    page_workers = _parse_int_list(args.page_workers)
+    payload = run_benchmark(Path(args.output_dir), page_counts, page_workers)
     baseline_report = _read_json(args.baseline_report) if args.baseline_report else None
     payload = apply_performance_gate(
         payload,

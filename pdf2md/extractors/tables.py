@@ -69,6 +69,14 @@ class TableExtractionCandidate:
 
 
 @dataclass
+class PageTableCandidateResult:
+    page: int
+    page_width: float
+    page_height: float
+    candidates: list[TableExtractionCandidate] = field(default_factory=list)
+
+
+@dataclass
 class TableRow:
     index: int
     cells: list[str]
@@ -596,15 +604,24 @@ def _serialize_markdown_forced(rows: list[list[str]], notes: list[str]) -> str:
     return rendered + "\n\n" + "\n".join(note_lines)
 
 
+def _candidate_rank_for_page_size(
+    page_width: float,
+    page_height: float,
+    bbox: tuple[float, float, float, float],
+    quality_score: float,
+) -> float:
+    area = _bbox_area(bbox)
+    page_area = float(page_width * page_height)
+    area_ratio = (area / page_area) if page_area > 0 else 0.0
+    return quality_score + min(area_ratio * 0.2, 0.1)
+
+
 def _candidate_rank(
     page: pdfplumber.page.Page,
     bbox: tuple[float, float, float, float],
     quality_score: float,
 ) -> float:
-    area = _bbox_area(bbox)
-    page_area = float(page.width * page.height)
-    area_ratio = (area / page_area) if page_area > 0 else 0.0
-    return quality_score + min(area_ratio * 0.2, 0.1)
+    return _candidate_rank_for_page_size(float(page.width), float(page.height), bbox, quality_score)
 
 
 def _is_fragment_candidate(
@@ -739,16 +756,34 @@ def _collect_candidates_for_page(page: pdfplumber.page.Page) -> list[TableExtrac
     return list(candidates_by_bbox.values())
 
 
+def collect_table_candidates_for_page(page: pdfplumber.page.Page, page_number: int) -> PageTableCandidateResult:
+    """Collect page-local raw table candidates without assigning document-level table indexes."""
+    return PageTableCandidateResult(
+        page=page_number,
+        page_width=float(page.width),
+        page_height=float(page.height),
+        candidates=_collect_candidates_for_page(page),
+    )
+
+
 def _prune_candidates_with_debug(
-    page: pdfplumber.page.Page,
+    page: pdfplumber.page.Page | None,
     candidates: list[TableExtractionCandidate],
+    *,
+    page_width: float | None = None,
+    page_height: float | None = None,
 ) -> tuple[list[TableExtractionCandidate], list[dict[str, Any]]]:
+    if page is not None:
+        page_width = float(page.width)
+        page_height = float(page.height)
+    page_width = float(page_width or 0.0)
+    page_height = float(page_height or 0.0)
     debug_by_id: dict[int, dict[str, Any]] = {
         id(candidate): _candidate_debug_payload(candidate, accepted=False) for candidate in candidates
     }
     ranked = list(candidates)
     ranked.sort(
-        key=lambda item: (_candidate_rank(page, item.bbox, item.quality_score), _bbox_area(item.bbox)),
+        key=lambda item: (_candidate_rank_for_page_size(page_width, page_height, item.bbox, item.quality_score), _bbox_area(item.bbox)),
         reverse=True,
     )
     deduped: list[TableExtractionCandidate] = []
@@ -834,7 +869,7 @@ def _horizontal_overlap_ratio(
 
 
 def _find_table_caption_match(
-    page: pdfplumber.page.Page,
+    page: pdfplumber.page.Page | None,
     bbox: tuple[float, float, float, float],
     text_lines: list[dict] | None = None,
 ) -> TableCaptionMatch | None:
@@ -1330,6 +1365,175 @@ def _annotate_table_continuations(result: TableExtractionResult) -> None:
         previous = (asset, rag_table, signature)
 
 
+def _materialize_page_table_candidates(
+    *,
+    result: TableExtractionResult,
+    page_number: int,
+    page: pdfplumber.page.Page | None,
+    candidate_result: PageTableCandidateResult,
+    table_mode: TableMode,
+    text_lines_by_page: dict[int, list[dict]] | None,
+) -> None:
+    deduped, debug_candidates = _prune_candidates_with_debug(
+        page,
+        candidate_result.candidates,
+        page_width=candidate_result.page_width,
+        page_height=candidate_result.page_height,
+    )
+    result.debug_candidates_by_page[page_number] = debug_candidates
+
+    page_blocks: list[TableBlock] = []
+    for index, candidate in enumerate(deduped, start=1):
+        mode, fallback_reason, reasons = _pick_mode(
+            table_mode,
+            candidate.rows,
+            complexity_reasons=candidate.decision.reasons,
+        )
+        if fallback_reason:
+            result.warnings.append(
+                WarningEntry(
+                    code=WarningCode.TABLE_GFM_UNSAFE_FALLBACK_HTML,
+                    message=fallback_reason,
+                    page=page_number,
+                    details={"table_index": index, "reasons": reasons},
+                )
+            )
+        elif mode == TableModeEmission.HTML and table_mode == TableMode.AUTO:
+            result.warnings.append(
+                WarningEntry(
+                    code=WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK,
+                    message="Table was treated as complex and serialized as HTML fallback.",
+                    page=page_number,
+                    details={"table_index": index, "reasons": reasons},
+                )
+            )
+        elif mode == TableModeEmission.MARKDOWN and reasons:
+            result.warnings.append(
+                WarningEntry(
+                    code=WarningCode.TABLE_COMPLEXITY_MARKDOWN_COERCED,
+                    message="Table was treated as complex and coerced into Markdown output.",
+                    page=page_number,
+                    details={"table_index": index, "reasons": reasons},
+                )
+            )
+
+        if mode == TableModeEmission.HTML:
+            result.fallbacks.append(
+                {
+                    "page": page_number,
+                    "table_index": index,
+                    "mode": mode,
+                    "reasons": reasons,
+                    "selected_strategy": candidate.metrics.selected_strategy,
+                    "quality_score": candidate.metrics.quality_score,
+                }
+            )
+
+        if mode == TableModeEmission.HTML:
+            rendered = _serialize_html(candidate.rows, candidate.notes)
+        elif mode == TableModeEmission.MARKDOWN:
+            rendered = _serialize_markdown_forced(candidate.rows, candidate.notes)
+        else:
+            rendered = _serialize_gfm(candidate.rows)
+
+        comment_mode = TableModeEmission.MARKDOWN if mode == TableModeEmission.MARKDOWN else mode
+        comment = f"<!-- table: page={page_number} index={index} mode={comment_mode} -->"
+        x0, top, x1, bottom = candidate.bbox
+        asset_mode = TableModeEmission.GFM if mode == TableModeEmission.MARKDOWN else mode
+        caption_match = _find_table_caption_match(
+            page,
+            candidate.bbox,
+            text_lines=(text_lines_by_page or {}).get(page_number),
+        )
+        caption_text = caption_match.text if caption_match is not None else None
+        caption_distance = caption_match.distance if caption_match is not None else None
+        caption_position = caption_match.position if caption_match is not None else None
+        fallback_reasons = reasons if asset_mode == TableModeEmission.HTML else []
+
+        page_blocks.append(
+            TableBlock(
+                page=page_number,
+                index=index,
+                mode=asset_mode,
+                markdown=f"{comment}\n{rendered}",
+                top=top,
+                bbox=(x0, top, x1, bottom),
+                rows=candidate.rows,
+                caption_text=caption_text,
+                quality_score=candidate.metrics.quality_score,
+                fallback_reasons=fallback_reasons,
+            )
+        )
+        result.assets.append(
+            TableAsset(
+                page=page_number,
+                index=index,
+                mode=asset_mode,
+                bbox=[x0, top, x1, bottom],
+                quality_score=candidate.metrics.quality_score,
+                fallback_reasons=fallback_reasons,
+                caption_text=caption_text,
+                caption_source="nearby_table_caption" if caption_text else None,
+            )
+        )
+        result.rag_tables.append(
+            _build_rag_table_payload(
+                page_number=page_number,
+                table_index=index,
+                source_mode=asset_mode,
+                candidate=candidate,
+                caption_text=caption_text,
+                fallback_reasons=fallback_reasons,
+                caption_distance=caption_distance,
+                caption_position=caption_position,
+            )
+        )
+        result.table_quality.append(
+            {
+                "page": page_number,
+                "table_index": index,
+                "selected_strategy": candidate.metrics.selected_strategy,
+                "empty_cell_ratio": candidate.metrics.empty_cell_ratio,
+                "all_empty_rows_removed": candidate.metrics.all_empty_rows_removed,
+                "columns_compacted": candidate.metrics.columns_compacted,
+                "columns_merged": candidate.metrics.columns_merged,
+                "quality_score": candidate.metrics.quality_score,
+                "data_density": candidate.metrics.data_density,
+                "header_fill_ratio": candidate.metrics.header_fill_ratio,
+                "reasons": candidate.decision.reasons,
+                "unresolved": candidate.decision.unresolved,
+                "mode": asset_mode,
+                "caption_text": caption_text,
+                "caption_distance": caption_distance,
+                "caption_position": caption_position,
+                "caption_source": "nearby_table_caption" if caption_text else None,
+                "header_depth": candidate.diagnostics.header_depth,
+                "header_confidence": candidate.diagnostics.header_confidence,
+                "stub_column_count": candidate.diagnostics.stub_column_count,
+                "footnote_row_count": candidate.diagnostics.footnote_row_count,
+                "merged_cell_suspected": candidate.diagnostics.merged_cell_suspected,
+                "rag_header_strategy": candidate.diagnostics.rag_header_strategy,
+            }
+        )
+
+        result.table_counts["table_total"] += 1
+        if asset_mode == TableModeEmission.GFM:
+            result.table_counts["table_gfm_count"] += 1
+        else:
+            result.table_counts["table_html_count"] += 1
+        if table_mode in {TableMode.HTML, TableMode.HTML_ONLY}:
+            result.table_counts["table_html_forced_count"] += 1
+        if table_mode == TableMode.MARKDOWN:
+            result.table_counts["table_markdown_forced_count"] += 1
+        if candidate.metrics.columns_compacted > 0 or candidate.metrics.columns_merged > 0:
+            result.table_counts["table_recovered_count"] += 1
+        if candidate.decision.unresolved:
+            result.table_counts["table_unresolved_count"] += 1
+
+    if page_blocks:
+        result.blocks_by_page[page_number] = page_blocks
+
+
 def extract_tables(
     pdf_path: Path,
     selected_pages: list[int],
@@ -1337,177 +1541,50 @@ def extract_tables(
     table_mode: TableMode,
     pdf: Any = None,
     text_lines_by_page: dict[int, list[dict]] | None = None,
+    precomputed_candidates_by_page: dict[int, PageTableCandidateResult] | None = None,
 ) -> TableExtractionResult:
     result = TableExtractionResult()
+    precomputed_candidates_by_page = precomputed_candidates_by_page or {}
 
     try:
+        needs_pdf = pdf is not None or any(page not in precomputed_candidates_by_page for page in selected_pages)
         if pdf is not None:
             opened_pdf = pdf
             close_after = False
-        else:
+        elif needs_pdf:
             opened_pdf = pdfplumber.open(str(pdf_path), password=password)
+            close_after = True
+        else:
+            opened_pdf = None
             close_after = True
         try:
             for page_number in selected_pages:
-                page = opened_pdf.pages[page_number - 1]
                 logger.debug("Extracting tables for page=%s", page_number)
-                candidates = _collect_candidates_for_page(page)
-                deduped, debug_candidates = _prune_candidates_with_debug(page, candidates)
-                result.debug_candidates_by_page[page_number] = debug_candidates
-
-                page_blocks: list[TableBlock] = []
-                for index, candidate in enumerate(deduped, start=1):
-                    mode, fallback_reason, reasons = _pick_mode(
-                        table_mode,
-                        candidate.rows,
-                        complexity_reasons=candidate.decision.reasons,
-                    )
-                    if fallback_reason:
-                        result.warnings.append(
-                            WarningEntry(
-                                code=WarningCode.TABLE_GFM_UNSAFE_FALLBACK_HTML,
-                                message=fallback_reason,
-                                page=page_number,
-                                details={"table_index": index, "reasons": reasons},
-                            )
-                        )
-                    elif mode == TableModeEmission.HTML and table_mode == TableMode.AUTO:
-                        result.warnings.append(
-                            WarningEntry(
-                                code=WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK,
-                                message="Table was treated as complex and serialized as HTML fallback.",
-                                page=page_number,
-                                details={"table_index": index, "reasons": reasons},
-                            )
-                        )
-                    elif mode == TableModeEmission.MARKDOWN and reasons:
-                        result.warnings.append(
-                            WarningEntry(
-                                code=WarningCode.TABLE_COMPLEXITY_MARKDOWN_COERCED,
-                                message="Table was treated as complex and coerced into Markdown output.",
-                                page=page_number,
-                                details={"table_index": index, "reasons": reasons},
-                            )
-                        )
-
-                    if mode == TableModeEmission.HTML:
-                        result.fallbacks.append(
-                            {
-                                "page": page_number,
-                                "table_index": index,
-                                "mode": mode,
-                                "reasons": reasons,
-                                "selected_strategy": candidate.metrics.selected_strategy,
-                                "quality_score": candidate.metrics.quality_score,
-                            }
-                        )
-
-                    if mode == TableModeEmission.HTML:
-                        rendered = _serialize_html(candidate.rows, candidate.notes)
-                    elif mode == TableModeEmission.MARKDOWN:
-                        rendered = _serialize_markdown_forced(candidate.rows, candidate.notes)
-                    else:
-                        rendered = _serialize_gfm(candidate.rows)
-
-                    comment_mode = TableModeEmission.MARKDOWN if mode == TableModeEmission.MARKDOWN else mode
-                    comment = f"<!-- table: page={page_number} index={index} mode={comment_mode} -->"
-                    x0, top, x1, bottom = candidate.bbox
-                    asset_mode = TableModeEmission.GFM if mode == TableModeEmission.MARKDOWN else mode
-                    caption_match = _find_table_caption_match(
-                        page,
-                        candidate.bbox,
-                        text_lines=(text_lines_by_page or {}).get(page_number),
-                    )
-                    caption_text = caption_match.text if caption_match is not None else None
-                    caption_distance = caption_match.distance if caption_match is not None else None
-                    caption_position = caption_match.position if caption_match is not None else None
-                    fallback_reasons = reasons if asset_mode == TableModeEmission.HTML else []
-
-                    page_blocks.append(
-                        TableBlock(
+                if page_number in precomputed_candidates_by_page:
+                    candidate_result = precomputed_candidates_by_page[page_number]
+                    page = None
+                else:
+                    if opened_pdf is None:
+                        candidate_result = PageTableCandidateResult(
                             page=page_number,
-                            index=index,
-                            mode=asset_mode,
-                            markdown=f"{comment}\n{rendered}",
-                            top=top,
-                            bbox=(x0, top, x1, bottom),
-                            rows=candidate.rows,
-                            caption_text=caption_text,
-                            quality_score=candidate.metrics.quality_score,
-                            fallback_reasons=fallback_reasons,
+                            page_width=0.0,
+                            page_height=0.0,
                         )
-                    )
-                    result.assets.append(
-                        TableAsset(
-                            page=page_number,
-                            index=index,
-                            mode=asset_mode,
-                            bbox=[x0, top, x1, bottom],
-                            quality_score=candidate.metrics.quality_score,
-                            fallback_reasons=fallback_reasons,
-                            caption_text=caption_text,
-                            caption_source="nearby_table_caption" if caption_text else None,
-                        )
-                    )
-                    result.rag_tables.append(
-                        _build_rag_table_payload(
-                            page_number=page_number,
-                            table_index=index,
-                            source_mode=asset_mode,
-                            candidate=candidate,
-                            caption_text=caption_text,
-                            fallback_reasons=fallback_reasons,
-                            caption_distance=caption_distance,
-                            caption_position=caption_position,
-                        )
-                    )
-                    result.table_quality.append(
-                        {
-                            "page": page_number,
-                            "table_index": index,
-                            "selected_strategy": candidate.metrics.selected_strategy,
-                            "empty_cell_ratio": candidate.metrics.empty_cell_ratio,
-                            "all_empty_rows_removed": candidate.metrics.all_empty_rows_removed,
-                            "columns_compacted": candidate.metrics.columns_compacted,
-                            "columns_merged": candidate.metrics.columns_merged,
-                            "quality_score": candidate.metrics.quality_score,
-                            "data_density": candidate.metrics.data_density,
-                            "header_fill_ratio": candidate.metrics.header_fill_ratio,
-                            "reasons": candidate.decision.reasons,
-                            "unresolved": candidate.decision.unresolved,
-                            "mode": asset_mode,
-                            "caption_text": caption_text,
-                            "caption_distance": caption_distance,
-                            "caption_position": caption_position,
-                            "caption_source": "nearby_table_caption" if caption_text else None,
-                            "header_depth": candidate.diagnostics.header_depth,
-                            "header_confidence": candidate.diagnostics.header_confidence,
-                            "stub_column_count": candidate.diagnostics.stub_column_count,
-                            "footnote_row_count": candidate.diagnostics.footnote_row_count,
-                            "merged_cell_suspected": candidate.diagnostics.merged_cell_suspected,
-                            "rag_header_strategy": candidate.diagnostics.rag_header_strategy,
-                        }
-                    )
-
-                    result.table_counts["table_total"] += 1
-                    if asset_mode == TableModeEmission.GFM:
-                        result.table_counts["table_gfm_count"] += 1
+                        page = None
                     else:
-                        result.table_counts["table_html_count"] += 1
-                    if table_mode in {TableMode.HTML, TableMode.HTML_ONLY}:
-                        result.table_counts["table_html_forced_count"] += 1
-                    if table_mode == TableMode.MARKDOWN:
-                        result.table_counts["table_markdown_forced_count"] += 1
-                    if candidate.metrics.columns_compacted > 0 or candidate.metrics.columns_merged > 0:
-                        result.table_counts["table_recovered_count"] += 1
-                    if candidate.decision.unresolved:
-                        result.table_counts["table_unresolved_count"] += 1
-
-                if page_blocks:
-                    result.blocks_by_page[page_number] = page_blocks
+                        page = opened_pdf.pages[page_number - 1]
+                        candidate_result = collect_table_candidates_for_page(page, page_number)
+                _materialize_page_table_candidates(
+                    result=result,
+                    page_number=page_number,
+                    page=page,
+                    candidate_result=candidate_result,
+                    table_mode=table_mode,
+                    text_lines_by_page=text_lines_by_page,
+                )
             _annotate_table_continuations(result)
         finally:
-            if close_after:
+            if close_after and opened_pdf is not None:
                 close = getattr(opened_pdf, "close", None)
                 if close is not None:
                     close()

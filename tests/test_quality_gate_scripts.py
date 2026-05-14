@@ -131,6 +131,30 @@ def test_benchmark_performance_gate_records_page_count_regressions(tmp_path: Pat
     assert "text_line_extract_count" in metrics
 
 
+def test_benchmark_performance_gate_records_worker_equivalence_failures() -> None:
+    payload = {
+        "runs": [],
+        "worker_equivalence": {
+            "mismatches": [
+                {
+                    "page_count": 10,
+                    "baseline_page_workers": 1,
+                    "page_workers": 2,
+                    "different_artifacts": ["tables_rag.jsonl"],
+                }
+            ],
+            "passed": False,
+        },
+    }
+
+    result = benchmark_conversion.apply_performance_gate(payload)
+
+    assert result["passed_performance_gate"] is False
+    assert result["regressions"][0]["type"] == "worker_equivalence_failure"
+    assert result["regressions"][0]["metric"] == "worker_output_hashes"
+    assert result["regressions"][0]["different_artifacts"] == ["tables_rag.jsonl"]
+
+
 def test_ocr_runtime_check_reports_missing_tesseract(monkeypatch) -> None:  # noqa: ANN001
     monkeypatch.setattr(check_ocr_runtime, "_discover_tesseract", lambda: None)
     monkeypatch.setattr(check_ocr_runtime, "_module_available", lambda module_name: module_name == "pytesseract")
@@ -185,6 +209,8 @@ def test_release_gate_runner_writes_success_summary(monkeypatch, tmp_path: Path)
     assert any(any(str(part).endswith("run_corpus_eval.py") for part in command) for command in calls)
     assert any(any(str(part).endswith("benchmark_conversion.py") for part in command) for command in calls)
     assert any(any(str(part).endswith("export_output_schema.py") for part in command) for command in calls)
+    benchmark_command = next(command for command in calls if any(str(part).endswith("benchmark_conversion.py") for part in command))
+    assert "--page-workers" in benchmark_command
 
 
 def test_release_gate_runner_fails_when_any_gate_command_fails(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001

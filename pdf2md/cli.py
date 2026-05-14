@@ -89,7 +89,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--page-workers",
         type=int,
         default=1,
-        help="Opt-in page-level text extraction workers. Use 1 for the deterministic single-worker path.",
+        help="Opt-in page-level text/read-order/table-candidate workers. Use 1 for the deterministic single-worker path.",
     )
     parser.add_argument(
         "--remove-header-footer",
