@@ -59,6 +59,7 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "corpus_manifest.schema.json",
         "corpus_diff_report.schema.json",
         "requirement_change_impact_report.schema.json",
+        "index_contract_report.schema.json",
     ]
     assert export_output_schema.check_schema_files(output_dir) == []
     manifest_schema = json.loads((output_dir / "manifest.schema.json").read_text(encoding="utf-8"))
@@ -71,6 +72,8 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         (output_dir / "requirement_change_impact_report.schema.json").read_text(encoding="utf-8")
     )
     assert impact_schema["properties"]["purpose"]["default"] == "rag_requirement_change_impact"
+    index_contract_schema = json.loads((output_dir / "index_contract_report.schema.json").read_text(encoding="utf-8"))
+    assert index_contract_schema["properties"]["purpose"]["default"] == "rag_index_contract_validation"
 
 
 def test_corpus_manifest_model_accepts_rag_file_map() -> None:

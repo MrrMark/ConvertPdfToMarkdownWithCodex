@@ -1,0 +1,442 @@
+# Quality Improvement Development Specs
+
+이 문서는 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`의 Q 작업을 실제 구현 PR로 옮기기 위한 개발 명세다.
+각 명세는 backlog 항목 하나와 대응하며, 구현 중 범위가 바뀌면 이 문서를 함께 갱신한다.
+
+## 공통 원칙
+
+- 외부 RAG/indexing 서비스 호출은 구현 범위에 포함하지 않는다.
+- 모든 검증과 fixture 생성은 local-only, deterministic 동작을 기본으로 한다.
+- PDF 원문 텍스트, 표, 이미지 provenance는 요약하거나 재서술하지 않는다.
+- 새 public JSON 출력이 생기면 `docs/OUTPUT_SCHEMA.md`와 `docs/schema/` 계약을 함께 갱신한다.
+- 실패는 가능한 한 구조화된 report로 남기고, 어느 파일/record/field/page가 문제인지 식별 가능해야 한다.
+- 테스트는 작은 unit test, script smoke test, golden regression test를 우선한다.
+
+## P1 / Q34. Offline Index Contract Validator
+
+### 목표
+
+`pdf2md`가 생성한 RAG sidecar를 OpenAI Vector Store/generic embedding pipeline, Azure AI Search, LangChain, LlamaIndex mapping recipe에 넣기 전에 local-only로 검증하는 validator를 추가한다.
+검증은 외부 네트워크나 실제 indexer 호출 없이 수행하며, 실패 위치를 deterministic JSON report로 남긴다.
+
+### 사용자 가치
+
+- 운영자가 `retrieval_chunks_rag.jsonl`과 관련 sidecar를 업로드하기 전에 field 누락, 타입 불일치, metadata 과대, source provenance 손실을 빠르게 발견한다.
+- confidential-safe 공유 모드에서 path, filename, source hash 같은 민감 metadata가 노출되는지 사전 점검한다.
+- RAG adapter별 mapping recipe가 문서에만 머무르지 않고 CI에서 검증 가능한 계약이 된다.
+
+### 입력
+
+- 기본 입력: `--output-dir`로 지정한 단일 변환 산출물 디렉터리
+- 필수 검증 대상: `retrieval_chunks_rag.jsonl`
+- 선택 검증 대상:
+  - `text_blocks_rag.jsonl`
+  - `semantic_units_rag.jsonl`
+  - `requirements_rag.jsonl`
+  - `cross_refs_rag.jsonl`
+  - `requirement_traceability_rag.jsonl`
+  - `technical_tables_rag.jsonl`
+  - `tables_rag.jsonl`
+  - `figures_rag.jsonl`
+  - `domain_units_rag.jsonl`
+  - `manifest.json`
+  - `report.json`
+
+### CLI 설계
+
+새 스크립트:
+
+```bash
+python scripts/validate_index_contract.py --output-dir output
+python scripts/validate_index_contract.py --output-dir output --target openai
+python scripts/validate_index_contract.py --output-dir output --target azure-ai-search
+python scripts/validate_index_contract.py --output-dir output --target langchain
+python scripts/validate_index_contract.py --output-dir output --target llamaindex
+python scripts/validate_index_contract.py --output-dir output --target all --confidential-safe --fail-on-error
+```
+
+권장 옵션:
+
+- `--output-dir`: 변환 산출물 디렉터리
+- `--target`: `all`, `openai`, `azure-ai-search`, `langchain`, `llamaindex`
+- `--report-file`: 기본값 `index_contract_report.json`
+- `--confidential-safe`: confidential-safe 공유 가능 metadata만 허용하는 추가 검사
+- `--metadata-max-bytes`: metadata payload 크기 제한. target별 기본값을 갖고 명시값으로 override 가능
+- `--fail-on-warning`: warning이 있어도 exit code 1
+- `--fail-on-error`: error가 있으면 exit code 1
+
+### 검증 규칙
+
+공통 record contract:
+
+- JSONL 각 줄은 유효한 JSON object여야 한다.
+- `retrieval_chunks_rag.jsonl` record는 `docs/OUTPUT_SCHEMA.md`의 required field를 포함해야 한다.
+- `chunk_id`, `chunk_index`, `chunk_type`, `text`, `source_refs`, `page_range`, `source_dedupe_key` 타입을 엄격히 검증한다.
+- `schema_version`과 `source_sha256`은 모든 retrieval chunk에 존재해야 한다.
+- `source_refs`는 비어 있으면 error다.
+- `source_refs[]`의 `source_type`, `source_id`, `page`는 citation lookup에 필요한 최소 field로 취급한다.
+- `page_range`는 `[start, end]` 형태의 양의 정수 배열이어야 하며 `start <= end`여야 한다.
+- `token_estimate`, `char_count`, `retrieval_priority`는 정수여야 한다.
+
+Target별 mapping contract:
+
+- OpenAI/generic:
+  - `id`, `text`, `metadata`로 매핑 가능해야 한다.
+  - metadata는 JSON 직렬화 가능해야 하고 target metadata size limit을 넘으면 warning 또는 error로 분류한다.
+- Azure AI Search:
+  - key field `id`는 문자열이고 비어 있으면 안 된다.
+  - `page_start`, `page_end`, `retrieval_priority`, `token_estimate`는 정수형 index field로 변환 가능해야 한다.
+  - `semantic_types`는 문자열 collection으로 변환 가능해야 한다.
+  - `source_refs_json`은 deterministic JSON string으로 직렬화 가능해야 한다.
+- LangChain:
+  - `page_content=record["text"]`가 빈 문자열이면 error다.
+  - metadata에 들어가는 값은 JSON-serializable scalar/list/dict여야 한다.
+- LlamaIndex:
+  - `TextNode(id_=chunk_id, text=text, metadata=...)`로 매핑 가능해야 한다.
+  - metadata key는 문자열이어야 하고, nested object는 deterministic JSON-compatible이어야 한다.
+
+Confidential-safe contract:
+
+- public metadata allowlist를 둔다.
+- 허용 기본 field: `chunk_id`, `chunk_type`, `page_range`, `section_path`, `semantic_types`, `retrieval_priority`, `token_estimate`, redacted `source_refs`
+- raw `input_pdf` path, absolute asset path, local output path, 원본 filename, customer/product codename 후보는 warning 이상으로 보고한다.
+- `source_sha256`는 공유 전 검토 대상으로 warning 처리한다.
+- 원문 `text` 자동 익명화는 하지 않는다. 대신 report에 `text_redaction_not_performed` advisory를 남긴다.
+
+### 출력 report
+
+기본 파일: `index_contract_report.json`
+
+필수 구조:
+
+```json
+{
+  "schema_version": "1.0",
+  "purpose": "rag_index_contract_validation",
+  "status": "passed",
+  "targets": ["openai", "azure-ai-search", "langchain", "llamaindex"],
+  "summary": {
+    "checked_files": 1,
+    "checked_records": 10,
+    "error_count": 0,
+    "warning_count": 0
+  },
+  "files": [],
+  "findings": []
+}
+```
+
+Finding field:
+
+- `severity`: `error`, `warning`, `info`
+- `code`: deterministic snake_case code
+- `target`: target 이름 또는 `common`
+- `file`: 산출물 파일명
+- `line`: JSONL line number, 파일 단위 finding이면 `null`
+- `record_id`: `chunk_id` 또는 sidecar record id
+- `field`: 문제 field path
+- `message`: 사람이 읽는 설명
+
+정렬 순서:
+
+1. severity: error, warning, info
+2. file name
+3. line number
+4. field
+5. code
+
+### 구현 위치
+
+- `scripts/validate_index_contract.py`
+- 필요 시 순수 로직 모듈: `pdf2md/utils/index_contract.py`
+- target별 mapping helper는 스크립트 내부 함수로 시작하고, 중복이 커질 때만 모듈화한다.
+- report 모델이 public schema로 승격되면 `pdf2md/models.py`, `docs/schema/`에 추가한다.
+
+### 테스트
+
+- `tests/test_index_contract_validator.py`
+- 정상 `retrieval_chunks_rag.jsonl` fixture가 모든 target에서 passed 되는지 확인한다.
+- required field 누락, 타입 오류, 빈 `source_refs`, 잘못된 `page_range`를 각각 error로 검증한다.
+- metadata size 초과를 warning/error 정책에 맞게 검증한다.
+- confidential-safe 모드에서 absolute path와 filename 노출을 탐지한다.
+- JSONL line number와 finding 정렬이 deterministic인지 확인한다.
+- script smoke:
+
+```bash
+python scripts/validate_index_contract.py --output-dir output --target all --fail-on-error
+```
+
+### 완료 조건
+
+- validator가 외부 서비스 호출 없이 동작한다.
+- 정상 golden corpus는 통과하고, 의도적으로 깨진 fixture는 안정적인 finding을 낸다.
+- `docs/RAG_INDEXER_INTEGRATION_RECIPES.md`에 local validation 명령이 추가된다.
+- release/rag gate에 optional로 연결할 수 있는 함수 또는 script command가 준비된다.
+
+### 비범위
+
+- OpenAI/Azure/LangChain/LlamaIndex SDK 의존성 추가
+- 실제 embedding 생성 또는 index upload
+- 원문 text anonymization
+
+## P2 / Q35. Rendered Diagram Fixture Suite
+
+### 목표
+
+state machine, sequence diagram, register layout을 포함한 synthetic PDF fixture를 렌더링 기반으로 추가하고, `figures_rag.jsonl`의 diagram provenance와 diagnostics를 golden으로 고정한다.
+OCR runtime 유무에 따라 기대 diagnostics를 분리해 CI가 환경 차이 때문에 흔들리지 않게 한다.
+
+### 사용자 가치
+
+- 다이어그램/그림 sidecar가 단순 이미지 추출을 넘어 bbox, caption, heading, label diagnostics를 안정적으로 유지하는지 회귀 방지한다.
+- OCR이 없는 CI에서도 deterministic golden을 유지하고, OCR이 있는 로컬/확장 CI에서는 더 풍부한 label diagnostics를 검증한다.
+- storage/security spec의 state/register/sequence diagram 분석용 RAG provenance 품질을 높인다.
+
+### Fixture 범위
+
+추가 synthetic PDF:
+
+- state machine diagram
+  - 상태 노드 3개 이상
+  - 전이 화살표 2개 이상
+  - transition label 예: `READY`, `ERROR`, `RESET`
+  - Figure caption과 section heading 포함
+- sequence diagram
+  - lifeline 2개 이상
+  - message arrow 2개 이상
+  - message label 예: `Command`, `Completion`
+  - Figure caption과 nearby text 포함
+- register layout
+  - bit range cell 예: `31:16`, `15:8`, `7:0`
+  - field label 예: `RSVD`, `STATUS`, `ENABLE`
+  - table이 아니라 figure/diagram 후보로도 잡힐 수 있는 렌더링 케이스 포함
+
+권장 위치:
+
+- 생성 helper: `tests/fixtures/pdf_builder.py` 확장 또는 `tests/fixtures/diagram_pdf_builder.py`
+- golden output: `tests/golden/corpus/diagram_*`
+- fixture source PDF는 repo policy에 따라 작고 deterministic한 synthetic 파일만 커밋한다.
+
+### 기대 산출물
+
+각 fixture 변환 시 최소 확인 대상:
+
+- `document.md`
+- `manifest.json`
+- `report.json`
+- `figures_rag.jsonl`
+- 필요한 경우 `text_blocks_rag.jsonl`, `retrieval_chunks_rag.jsonl`
+
+`figures_rag.jsonl` golden에서 고정할 field:
+
+- `figure_id`
+- `page`
+- `figure_index`
+- `record_type`
+- `status`
+- `path`
+- `bbox`
+- `caption_text`
+- `caption_source`
+- `caption_confidence`
+- `heading_path`
+- `source_refs`
+- `figure_kind`
+- `diagram_candidate`
+- `detected_labels`
+- `diagram_label_diagnostics`
+- `nearby_text_refs`
+- `classification_confidence`
+- `classification_reasons`
+
+### OCR 분기 정책
+
+기본 CI 경로:
+
+- OCR runtime이 없어도 통과해야 한다.
+- `ocr_candidates`는 비어 있거나 runtime unavailable diagnostic을 가진다.
+- low-confidence 또는 unavailable OCR 결과는 promoted label로 고정하지 않는다.
+
+OCR available 경로:
+
+- 별도 test marker 또는 runtime preflight로 분기한다.
+- OCR label 후보가 `diagram_label_diagnostics.ocr_candidates` 또는 동등 diagnostics에 남는지 확인한다.
+- promoted `detected_labels`는 confidence threshold를 넘는 deterministic 후보만 허용한다.
+
+권장 test 구성:
+
+- OCR-independent golden test: 항상 실행
+- OCR runtime dependent test: `pytest.importorskip` 또는 기존 OCR runtime check helper로 조건부 실행
+
+### 구현 요구사항
+
+- synthetic PDF는 폰트/좌표/도형을 고정해 플랫폼별 layout drift를 최소화한다.
+- bbox 비교는 소수점 고정 또는 tolerance-normalization helper를 사용한다.
+- asset filename은 기존 deterministic 규칙을 따른다.
+- caption과 heading provenance는 source_refs로 추적 가능해야 한다.
+- register layout이 table extractor와 충돌하는 경우에도 figure diagnostics가 보존되는지 확인한다.
+
+### 테스트
+
+- `tests/test_rag_figures.py`에 diagram fixture 단위 테스트 추가
+- `tests/test_golden_corpus.py`에 diagram corpus golden 포함
+- OCR 없는 환경에서 `figures_rag.jsonl` expected output 고정
+- OCR 있는 환경에서 label candidate diagnostics 별도 assertion
+- caption/heading/source_refs가 누락되면 실패
+
+권장 smoke:
+
+```bash
+python -m pytest tests/test_rag_figures.py tests/test_golden_corpus.py
+python -m pdf2md tests/fixtures/diagram_state_machine.pdf -o /tmp/pdf2md-diagram-smoke --figure-crop-fallback
+```
+
+### 완료 조건
+
+- state machine, sequence diagram, register layout fixture가 추가된다.
+- OCR 미설치 CI에서 golden이 안정적으로 통과한다.
+- OCR 설치 환경에서 추가 diagnostics test가 통과한다.
+- `figures_rag.jsonl`의 diagram/caption/heading/source provenance 회귀가 잡힌다.
+
+### 비범위
+
+- 다이어그램 의미 해석 완성
+- VLM 기반 이미지 설명 생성
+- Mermaid/PlantUML로의 변환
+
+## P2 / Q36. Page-Level Parallel Extractor
+
+### 목표
+
+문서 단위 증분 캐시 이후 page extraction, read-order, table 후보 생성을 page worker 단위로 병렬화할 수 있는 executor를 추가한다.
+기본값은 기존 single-worker 경로를 유지하고, `--page-workers`를 명시했을 때만 병렬 경로를 사용한다.
+병렬 실행에서도 출력 순서, warning/report ordering, asset naming, JSONL record order는 기존 deterministic contract를 유지해야 한다.
+
+### 사용자 가치
+
+- 긴 기술 PDF 변환 시간을 줄인다.
+- 병렬화를 opt-in으로 두어 기존 안정성을 유지한다.
+- 운영자는 benchmark gate로 속도 향상과 결과 동일성을 함께 확인할 수 있다.
+
+### CLI/API 설계
+
+CLI 옵션:
+
+```bash
+python -m pdf2md spec.pdf -o output --page-workers 4
+python -m pdf2md spec.pdf -o output --page-workers 1
+```
+
+Config 추가:
+
+- `page_workers: int = 1`
+
+Validation:
+
+- `page_workers >= 1`
+- 기본값 `1`
+- `1`이면 기존 single-worker behavior와 동일해야 한다.
+- 너무 큰 값은 page 수 또는 CPU 수 기준으로 내부 cap을 둘 수 있지만, cap 적용 시 report에 diagnostic을 남긴다.
+
+Manifest/report 추가 후보:
+
+- `manifest.options.page_workers`
+- `report.summary.page_worker_count`
+- `report.summary.page_parallel_enabled`
+- `report.summary.page_worker_effective_count`
+
+public schema에 추가하면 `docs/OUTPUT_SCHEMA.md`, schema export test를 함께 갱신한다.
+
+### 병렬화 대상
+
+1차 범위:
+
+- page text extraction/read-order 후보 생성
+- page table candidate extraction
+- page-level structure normalization 준비 데이터
+
+보수적 제외 대상:
+
+- final Markdown serialization
+- manifest/report write
+- RAG sidecar write
+- image asset file write와 asset naming
+- OCR execution
+
+이미지 추출은 파일명과 dedupe ordering이 민감하므로 Q36 1차 구현에서는 single path를 유지한다.
+
+### 아키텍처
+
+권장 구조:
+
+- `pdf2md/extractors/page_worker.py`
+  - `PageWorkerInput`
+  - `PageWorkerResult`
+  - `extract_page_worker(input) -> PageWorkerResult`
+- `pdf2md/utils/page_executor.py`
+  - `run_page_workers(inputs, worker_count) -> list[PageWorkerResult]`
+
+Worker result는 page number를 포함하고, parent process에서 반드시 page number 순으로 merge한다.
+
+`PageWorkerResult` 최소 field:
+
+- `page`
+- `text_lines`
+- `raw_lines`
+- `text_metadata`
+- `page_text`
+- `table_assets`
+- `table_blocks`
+- `rag_tables`
+- `table_debug_candidates`
+- `warnings`
+- `failed`
+- `duration_ms`
+
+### 결정성 규칙
+
+- merge는 항상 `selected_pages` 순서를 기준으로 한다.
+- warning은 `(page, code, message)` 기준으로 정렬하거나 selected page merge 순서를 유지한다.
+- table/image/figure asset index는 병렬 worker 내부 최종값을 그대로 믿지 말고 parent merge 단계에서 page-local deterministic index를 재확정한다.
+- JSONL record는 기존 builder의 입력 순서를 page-sorted로 제공한다.
+- stage duration은 전체 wall-clock duration과 worker duration aggregate를 구분한다.
+- debug artifact 파일명은 기존 `page-0001-*` 규칙을 유지한다.
+
+### 구현 단계
+
+1. `Config`와 CLI에 `page_workers`를 추가하고, `1`일 때 기존 테스트가 그대로 통과하게 한다.
+2. text extraction을 page worker로 호출할 수 있도록 순수 page 단위 함수 경계를 만든다.
+3. table 후보 추출을 page 단위로 분리하되, 기존 `extract_tables` public behavior는 유지한다.
+4. `--page-workers > 1`에서 executor를 사용하고 parent merge로 기존 자료구조를 복원한다.
+5. 동일 입력에 대해 single-worker와 multi-worker output diff가 없는지 테스트한다.
+6. benchmark script 또는 release gate에 opt-in 성능 검증을 연결한다.
+
+### 테스트
+
+- CLI parser test: `--page-workers` 기본값과 validation
+- config/model test: `page_workers` serialization
+- deterministic equivalence test:
+  - 같은 fixture를 `--page-workers 1`과 `--page-workers 2`로 변환
+  - volatile field를 normalize한 뒤 `document.md`, `manifest.json`, `report.json`, JSONL sidecar 비교
+- partial failure ordering test:
+  - 특정 page worker 실패를 모의하고 warning/report ordering이 안정적인지 확인
+- benchmark smoke:
+
+```bash
+python scripts/benchmark_conversion.py --input tests/fixtures/multi_page.pdf --page-workers 1
+python scripts/benchmark_conversion.py --input tests/fixtures/multi_page.pdf --page-workers 4
+```
+
+### 완료 조건
+
+- 기본 `page_workers=1` 경로에서 기존 golden이 변하지 않는다.
+- `--page-workers > 1`에서 결과 산출물 내용이 single-worker와 동일하다.
+- report에 worker count와 parallel enabled 여부가 남는다.
+- benchmark gate가 결과 동일성과 최소 성능 신호를 함께 확인한다.
+
+### 비범위
+
+- batch document-level 병렬화
+- OCR 병렬화
+- image extraction/file write 병렬화
+- distributed execution
