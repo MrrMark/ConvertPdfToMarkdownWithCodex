@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-15 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | 0 | Q46 expected source coverage와 Q44 domain technical table typed coverage까지 구현되어 active quality backlog 없음 |
 | 2026-05-14 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | +3 | corpus/profile/evidence gates, offline index/provenance/artifact validators, layout/table/OCR/diagram golden packs, page-worker table candidate parallelization 구현 |
 | 2026-05-13 | Storage/PCIe/Security Spec RAG 운영툴 | 94/100 | +2 | RAG calibration gate, requirement change impact report, domain deep fixtures, indexer recipes, diagram label diagnostics 구현 |
 | 2026-05-13 | Storage/PCIe/Security Spec RAG 변환툴 | 92/100 | +5 | domain adapter profile, requirement traceability, technical table sidecar, safe mode, corpus diff, chunk diagnostics 구현 |
@@ -39,6 +40,49 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-15 (Q46/Q44 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴**로 보면 **97/100점** 수준을 유지한다.
+
+Q46으로 RAG golden query가 `expected_source_ids`와 `expected_source_types`를 검증하고, Q44로 NVMe/PCIe/OCP/TCG technical table row의 typed coverage와 `technical_table_unit` provenance가 보강됐다. 2026-05-14 평가에서 다음 작업으로 지목했던 두 병목은 실제 코드, golden fixture, release gate wiring, GitHub Actions CI까지 반영되어 닫혔다.
+
+점수를 100점으로 올리지 않는 이유는 남은 리스크가 “다음에 구현할 명확한 backlog”라기보다, 공개 저장소에 넣기 어려운 실제 대형/비공개 technical corpus에서 장기적으로 더 많은 증거를 쌓아야 하는 영역이기 때문이다. 현재 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에는 active quality backlog가 없다.
+
+#### 세부 점수
+
+| 항목 | 점수 | 직전 평가 대비 | 평가 |
+|---|---:|---:|---|
+| 핵심 변환 완성도 | 18/18 | 0 | text/table/image/OCR/manifest/report/partial success 경로가 golden corpus와 release gate에서 안정적으로 유지된다. |
+| 표 변환/RAG 대응 | 18/18 | 0 | table row, technical table, domain unit, requirement trace가 retrieval chunks와 expected source coverage 검증에 연결된다. Q44 이후 TCG security method/object/authority/field typed unit도 회귀 테스트로 고정됐다. |
+| 텍스트 구조 보존 | 15/16 | 0 | layout stress, header/footer, hyphenation, heading/list/code/footnote fixture가 회귀를 방어한다. 매우 긴 clause/appendix carry-over는 실제 corpus evidence가 더 쌓이면 재평가한다. |
+| 이미지/OCR 신뢰도 | 13/14 | 0 | rendered diagram fixture와 OCR confidence calibration이 안정적이다. caption 없는 diagram 의미 해석은 여전히 opt-in 영역으로 남긴다. |
+| 성능/효율 | 11/12 | 0 | page cache와 page-worker text/read-order/table-candidate 병렬 경로가 worker count별 동일성 검증과 benchmark smoke에 연결됐다. |
+| 테스트/결정성/CI | 12/12 | 0 | 전체 pytest, golden corpus, schema check, GitHub Actions Python 3.11/3.14가 결정적 출력 계약을 방어한다. |
+| 운영/릴리스 준비도 | 10/10 | 0 | schema, release gates, offline index/provenance/artifact validators, README/Windows 운영 문서가 local-only 운영 흐름을 설명한다. |
+
+#### 남은 리스크
+
+- 비공개/대형 실제 technical corpus는 repo golden fixture로 직접 커밋하지 않으므로, 장기 운영 중 새 failure pattern이 발견되면 별도 Q 항목으로 추가해야 한다.
+- 외부 OpenAI/Azure/LangChain/LlamaIndex index upload 자체는 의도적으로 local validator 범위 밖이다.
+- caption 없는 diagram의 의미 해석이나 OCR 기반 label 승격은 환각 방지를 위해 보수적으로 남겨둔다.
+- 매우 긴 appendix, nested clause, vendor-specific requirement table은 현재 fixture보다 넓은 corpus evidence가 생길 때 추가 검증 후보가 된다.
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다.
+
+새 개선 과제가 발견되면 먼저 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 신규 Q 항목을 추가하고, active 개발 명세는 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에 작성한다. 완료된 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+
+#### 검증 기준
+
+- Q46 PR #25: GitHub Actions Python 3.11, 3.14 통과
+- Q44 PR #26: GitHub Actions Python 3.11, 3.14 통과
+- `env PYTHONPATH=. pytest`
+- `env PYTHONPATH=. /Library/Frameworks/Python.framework/Versions/3.9/bin/python3 scripts/export_output_schema.py --check`
+- `git diff --check`
 
 ### 2026-05-14 (Q31-Q42 구현 후)
 

@@ -550,6 +550,7 @@ python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag 
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
 - 향후 작업 backlog는 `docs\NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 새 작업만 남기고, 완료된 항목은 제거합니다.
+- active 개발 명세는 `docs\QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에 작성하고, 완료된 명세는 `docs\QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관합니다.
 
 ---
 

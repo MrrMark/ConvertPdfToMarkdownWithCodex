@@ -842,6 +842,7 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
 - 향후 작업 backlog는 [docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md](docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md)에 새 작업만 남기고, 완료된 항목은 제거합니다.
+- active 개발 명세는 [docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md](docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md)에 작성하고, 완료된 명세는 [docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md](docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md)에 보관합니다.
 
 lint / format 도입 시 예시:
 
@@ -857,6 +858,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
+- 현재 active quality backlog는 없습니다. 새 개선 과제가 발견되면 Next Plan에 신규 Q 항목을 먼저 추가합니다.
 
 ### 이후 후보
 
