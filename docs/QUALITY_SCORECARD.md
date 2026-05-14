@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-14 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | +3 | corpus/profile/evidence gates, offline index/provenance/artifact validators, layout/table/OCR/diagram golden packs, page-worker table candidate parallelization 구현 |
 | 2026-05-13 | Storage/PCIe/Security Spec RAG 운영툴 | 94/100 | +2 | RAG calibration gate, requirement change impact report, domain deep fixtures, indexer recipes, diagram label diagnostics 구현 |
 | 2026-05-13 | Storage/PCIe/Security Spec RAG 변환툴 | 92/100 | +5 | domain adapter profile, requirement traceability, technical table sidecar, safe mode, corpus diff, chunk diagnostics 구현 |
 | 2026-05-13 | Storage/PCIe/Security Spec RAG 변환툴 | 87/100 | +2 / -4 | NVMe/OCP/PCIe/TCG/customer spec 기준으로는 domain table, requirement traceability, confidential-safe 운영 보강 필요 |
@@ -38,6 +39,49 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-14 (Q31-Q42 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴**로 보면 **97/100점** 수준으로 평가한다.
+
+직전 Q26-Q30 구현 후 평가 94/100점 대비 **+3점** 상승했다. 상승 요인은 local corpus profile runner, requirement impact review pack, technical cross-reference hardening, offline index contract validator, rendered diagram fixture suite, cross-sidecar provenance validator, layout/table/OCR/artifact integrity gates, 그리고 Q42의 page-worker table candidate 병렬화가 모두 실제 검증 경로에 들어간 점이다.
+
+아직 100점으로 보지는 않는다. 남은 리스크는 기능의 존재 여부보다 **대표 RAG 질의와 expected source id coverage**, 그리고 **도메인 technical table typed coverage**가 실제 NVMe/PCIe/OCP/TCG 운영 질문을 얼마나 잘 막아내는지에 있다. 다음 작업은 이 두 영역을 우선한다.
+
+#### 세부 점수
+
+| 항목 | 점수 | 직전 평가 대비 | 평가 |
+|---|---:|---:|---|
+| 핵심 변환 완성도 | 18/18 | +1 | text/table/image/OCR/manifest/report/partial success 경로가 golden corpus와 release gate에서 안정적으로 유지된다. |
+| 표 변환/RAG 대응 | 18/18 | 0 | table row, technical table, domain unit, requirement trace가 RAG sidecar와 retrieval chunks에 연결된다. 다만 도메인별 typed field coverage는 다음 개선 대상이다. |
+| 텍스트 구조 보존 | 15/16 | 0 | layout stress, header/footer, hyphenation, heading/list/code/footnote fixture가 회귀를 방어한다. 긴 표준 문서의 nested clause coverage는 추가 여지가 있다. |
+| 이미지/OCR 신뢰도 | 13/14 | 0 | rendered diagram fixture와 OCR confidence calibration으로 provenance 품질은 좋아졌다. caption 없는 diagram 의미 해석은 의도적으로 opt-in 영역에 남긴다. |
+| 성능/효율 | 11/12 | +1 | page cache와 page-worker text/read-order/table-candidate 병렬 경로가 worker count별 동일성 검증과 benchmark smoke에 연결됐다. |
+| 테스트/결정성/CI | 12/12 | 0 | 전체 pytest, golden corpus, schema check, GitHub Actions Python 3.11/3.14가 결정적 출력 계약을 방어한다. |
+| 운영/릴리스 준비도 | 10/10 | +1 | schema, release gates, offline index/provenance/artifact validators, Windows/README 운영 문서가 실제 local-only 운영 흐름을 설명한다. |
+
+#### 남은 리스크
+
+- 대표 RAG query set의 expected source id coverage가 아직 점수 상승의 가장 직접적인 병목이다.
+- `technical_tables_rag.jsonl`은 유용하지만 register map, bitfield, opcode, log page, security method/object/security field typed coverage를 더 넓혀야 한다.
+- domain adapter 출력은 보수적으로 동작하지만, 도메인별 golden query와 table-field coverage가 더 강해지면 운영 신뢰도가 올라간다.
+- 긴 clause/appendix/requirement table 주변 heading carry-over는 현재 안전하지만 더 넓은 fixture로 고정할 가치가 있다.
+
+#### 다음 개선 참조
+
+Q31-Q42는 완료되어 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에서 제거했다. 다음 작업은 평가 병목을 직접 줄이는 순서로 진행한다.
+
+- Q46. RAG Golden Query Expected Source Coverage
+- Q44. Domain Technical Table Coverage Expansion
+
+#### 검증 기준
+
+- `env PYTHONPATH=. pytest`
+- `env PYTHONPATH=. /Library/Frameworks/Python.framework/Versions/3.9/bin/python3 scripts/export_output_schema.py --check`
+- `git diff --check`
+- GitHub Actions CI: PR #23에서 Python 3.11, 3.14 통과
 
 ### 2026-05-13 (Q26-Q30 구현 후)
 
