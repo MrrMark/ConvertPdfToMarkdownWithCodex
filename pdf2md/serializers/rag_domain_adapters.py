@@ -191,15 +191,15 @@ def _unit_from_technical_record(
         authority = _cell_value(raw_cells, "Authority")
         uid = _cell_value(raw_cells, "UID", "Protocol ID", "ProtocolID")
         security_field = _cell_value(raw_cells, "Security Field", "Field", "Parameter") or field
-        if method:
-            return "security_method", method, uid or value or None, description, ["tcg_security_method_row"]
-        if security_object:
-            return "security_object", security_object, uid or value or None, description, ["tcg_security_object_row"]
-        if authority:
-            return "security_authority", authority, uid or value or None, description, ["tcg_security_authority_row"]
+        if method or unit_type == "security_method":
+            return "security_method", method or field, uid or value or None, description, ["tcg_security_method_row"]
+        if security_object or unit_type == "security_object":
+            return "security_object", security_object or uid or field, uid or value or None, description, ["tcg_security_object_row"]
+        if authority or unit_type == "security_authority":
+            return "security_authority", authority or field, uid or value or None, description, ["tcg_security_authority_row"]
         if uid and description:
             return "security_object", uid, uid, description, ["tcg_security_uid_row"]
-        if unit_type in {"bitfield", "register_field", "technical_parameter", "security_method"} and security_field:
+        if unit_type in {"bitfield", "register_field", "technical_parameter", "security_method", "security_field"} and security_field:
             return "security_field", security_field, uid or value or None, description, ["tcg_security_field_row"]
 
     if domain_adapter is DomainAdapterMode.CUSTOMER_REQUIREMENTS:
@@ -240,6 +240,15 @@ def build_domain_units(
         unit_type, name, value, description, reasons = unit
         page = _page(technical_record)
         index = len(records) + 1
+        source_refs = list(technical_record.get("source_refs") or [])
+        source_refs.append(
+            {
+                "source_type": "technical_table_unit",
+                "source_id": technical_record.get("technical_table_unit_id"),
+                "page": page,
+                "bbox": technical_record.get("bbox"),
+            }
+        )
         records.append(
             {
                 "domain_unit_id": f"domain-{domain_adapter.value}-{index:06d}",
@@ -261,7 +270,7 @@ def build_domain_units(
                     "access": technical_record.get("access"),
                     "reset_default": technical_record.get("reset_default"),
                 },
-                "source_refs": list(technical_record.get("source_refs") or []),
+                "source_refs": source_refs,
                 "page_range": [page, page],
                 "bbox": technical_record.get("bbox"),
                 "heading_path": [],

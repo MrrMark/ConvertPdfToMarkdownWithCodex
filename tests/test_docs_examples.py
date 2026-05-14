@@ -140,7 +140,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q42. Full Page Worker Table Candidate Parallelization" not in next_plan
     assert "Q43. Quality Scorecard Refresh" not in next_plan
     assert "Q46. RAG Golden Query Expected Source Coverage" not in next_plan
-    assert "Q44. Domain Technical Table Coverage Expansion" in next_plan
+    assert "Q44. Domain Technical Table Coverage Expansion" not in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan

@@ -52,6 +52,8 @@ def test_nvme_domain_adapter_extracts_command_and_register_units() -> None:
     assert records[0]["name"] == "KV Store"
     assert records[0]["value"] == "0x81"
     assert records[0]["source_refs"][0]["source_id"] == "page-0001-table-0001-row-0001"
+    assert records[0]["source_refs"][1]["source_type"] == "technical_table_unit"
+    assert records[0]["source_refs"][1]["source_id"] == "tech-table-000001"
     assert records[1]["source_refs"][0]["source_id"] == "page-0001-table-0002-row-0001"
 
     jsonl = serialize_domain_units_jsonl(records)
@@ -232,6 +234,7 @@ def test_tcg_domain_adapter_extracts_security_method_authority_object_and_field_
     ]
     assert records[0]["value"] == "0001h"
     assert records[2]["name"] == "ReadLockEnabled"
+    assert all(record["source_refs"][1]["source_type"] == "technical_table_unit" for record in records)
 
 
 def test_domain_adapter_deep_fixtures_cover_storage_pcie_ocp_tcg_and_customer_shapes() -> None:
