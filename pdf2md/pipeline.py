@@ -12,6 +12,7 @@ from pdf2md.constants import WarningCode
 from pdf2md.extractors.header_footer import remove_repeated_header_footer
 from pdf2md.extractors.images import extract_images
 from pdf2md.extractors.ocr import run_ocr
+from pdf2md.extractors.page_worker import PageWorkerInput
 from pdf2md.extractors.structure_normalizer import BlockRegion, normalize_page_lines
 from pdf2md.extractors.tables import extract_tables
 from pdf2md.extractors.text import PageLayoutMetadata, TextExtractionError, TextLine, extract_page_text_layout_result
@@ -58,6 +59,7 @@ from pdf2md.serializers.rag_text_blocks import build_text_blocks, serialize_text
 from pdf2md.serializers.rag_technical_tables import build_technical_table_records, serialize_technical_tables_jsonl
 from pdf2md.serializers.report import serialize_report
 from pdf2md.utils.io import ensure_output_dirs, write_json, write_text
+from pdf2md.utils.page_executor import effective_page_worker_count, run_page_workers
 from pdf2md.utils.pdf import PdfDocumentContext, PdfOpenError
 
 
@@ -486,6 +488,10 @@ def run_conversion(config: Config) -> ConversionResult:
         )
     finish_stage("page_selection", page_selection_started)
 
+    requested_page_workers = config.page_workers
+    effective_page_workers = effective_page_worker_count(requested_page_workers, len(selected_pages))
+    page_parallel_enabled = effective_page_workers > 1
+    page_worker_pdf_open_count = 0
     page_layout_lines: dict[int, list[TextLine]] = {}
     page_texts: dict[int, str] = {}
     raw_lines_by_page: dict[int, list[dict]] = {}
@@ -493,23 +499,61 @@ def run_conversion(config: Config) -> ConversionResult:
     shared_plumber_pdf = None
     text_started = stage_start()
     try:
-        logger.info("Extracting text for pages=%s", selected_pages)
-        shared_plumber_pdf = pdf_context.get_pdfplumber_pdf()
-        cached_text_lines_by_page = {page: pdf_context.get_text_lines(page) for page in selected_pages}
-        text_layout = extract_page_text_layout_result(
-            config.input_pdf,
+        logger.info(
+            "Extracting text for pages=%s page_workers=%s effective=%s",
             selected_pages,
-            config.password,
-            pdf=shared_plumber_pdf,
-            text_lines_by_page=cached_text_lines_by_page,
+            requested_page_workers,
+            effective_page_workers,
         )
-        layout = text_layout.lines_by_page
-        raw_lines_by_page = text_layout.raw_lines_by_page
-        text_metadata_by_page = text_layout.metadata_by_page
+        if page_parallel_enabled:
+            worker_results = run_page_workers(
+                [
+                    PageWorkerInput(
+                        pdf_path=config.input_pdf,
+                        page=page,
+                        password=config.password,
+                    )
+                    for page in selected_pages
+                ],
+                effective_page_workers,
+            )
+            for worker_result in worker_results:
+                page_worker_pdf_open_count += worker_result.pdf_open_count
+                warnings.extend(worker_result.warnings)
+                if worker_result.failed:
+                    failed_pages.append(worker_result.page)
+                    page_layout_lines[worker_result.page] = []
+                    page_texts[worker_result.page] = ""
+                    page_results_map[worker_result.page] = PageResult(
+                        page=worker_result.page,
+                        status=PageStatus.FAILED,
+                        text_layer_char_count=0,
+                    )
+                    continue
+                page_layout_lines[worker_result.page] = worker_result.text_lines
+                raw_lines_by_page[worker_result.page] = worker_result.raw_lines
+                if worker_result.text_metadata is not None:
+                    text_metadata_by_page[worker_result.page] = worker_result.text_metadata
+        else:
+            shared_plumber_pdf = pdf_context.get_pdfplumber_pdf()
+            cached_text_lines_by_page = {page: pdf_context.get_text_lines(page) for page in selected_pages}
+            text_layout = extract_page_text_layout_result(
+                config.input_pdf,
+                selected_pages,
+                config.password,
+                pdf=shared_plumber_pdf,
+                text_lines_by_page=cached_text_lines_by_page,
+            )
+            page_layout_lines = text_layout.lines_by_page
+            raw_lines_by_page = text_layout.raw_lines_by_page
+            text_metadata_by_page = text_layout.metadata_by_page
+        layout = page_layout_lines
         for page in selected_pages:
             lines = layout.get(page, [])
             page_layout_lines[page] = lines
             page_texts[page] = "\n".join(item.text for item in lines).strip()
+            if page in failed_pages and page in page_results_map:
+                continue
             metadata = text_metadata_by_page.get(page)
             page_results_map[page] = PageResult(
                 page=page,
@@ -861,6 +905,9 @@ def run_conversion(config: Config) -> ConversionResult:
             "dedupe_images": config.dedupe_images,
             "repair_hyphenation": config.repair_hyphenation,
             "figure_crop_fallback": config.figure_crop_fallback,
+            "page_workers": requested_page_workers,
+            "page_worker_effective_count": effective_page_workers,
+            "page_parallel_enabled": page_parallel_enabled,
             "rag_table_output": rag_table_output.value,
             "domain_adapter": domain_adapter.value,
             "confidential_safe_mode": config.confidential_safe_mode,
@@ -946,8 +993,11 @@ def run_conversion(config: Config) -> ConversionResult:
         page_status_counts=page_status_counts,
         structure_marker_counts=structure_marker_counts,
         stage_durations_ms=stage_durations_ms,
-        pdf_open_count=pdf_context.pdf_open_count + ocr_result.pdf_open_count,
+        pdf_open_count=pdf_context.pdf_open_count + ocr_result.pdf_open_count + page_worker_pdf_open_count,
         pages_per_second=pages_per_second,
+        page_worker_count=requested_page_workers,
+        page_parallel_enabled=page_parallel_enabled,
+        page_worker_effective_count=effective_page_workers,
         rag_table_output=rag_table_output.value,
         rag_table_record_count=rag_table_record_count,
         rag_table_file_count=rag_table_file_count,

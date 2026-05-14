@@ -60,3 +60,73 @@ def test_technical_tables_extract_bitfield_and_opcode_units() -> None:
 
     jsonl = serialize_technical_tables_jsonl(records)
     assert json.loads(jsonl.splitlines()[1])["field_name"] == "Status"
+
+
+def test_technical_tables_extract_storage_identifier_and_security_units() -> None:
+    rag_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "headers": ["Log Identifier", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Log Identifier", "Description"],
+                    "cells": {"Log Identifier": "02h", "Description": "SMART information"},
+                    "row_text": "Log Identifier = 02h | Description = SMART information",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 2,
+            "headers": ["Feature Identifier", "Value", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 2,
+                    "row_index": 1,
+                    "headers": ["Feature Identifier", "Value", "Description"],
+                    "cells": {
+                        "Feature Identifier": "06h",
+                        "Value": "Volatile Write Cache",
+                        "Description": "Feature setting",
+                    },
+                    "row_text": (
+                        "Feature Identifier = 06h | Value = Volatile Write Cache | "
+                        "Description = Feature setting"
+                    ),
+                }
+            ],
+        },
+        {
+            "page": 2,
+            "table_index": 1,
+            "headers": ["Method", "ProtocolID", "Description"],
+            "records": [
+                {
+                    "page": 2,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Method", "ProtocolID", "Description"],
+                    "cells": {"Method": "Erase", "ProtocolID": "01h", "Description": "Security method"},
+                    "row_text": "Method = Erase | ProtocolID = 01h | Description = Security method",
+                }
+            ],
+        },
+    ]
+
+    records = build_technical_table_records(rag_tables)
+
+    assert [record["unit_type"] for record in records] == [
+        "log_page",
+        "feature_identifier",
+        "security_method",
+    ]
+    assert records[0]["log_identifier"] == "02h"
+    assert records[1]["feature_identifier"] == "06h"
+    assert records[2]["raw_cells"]["Method"] == "Erase"
+    assert records[2]["source_refs"][0]["source_id"] == "page-0002-table-0001-row-0001"
+    assert json.loads(serialize_technical_tables_jsonl(records).splitlines()[2])["unit_type"] == "security_method"

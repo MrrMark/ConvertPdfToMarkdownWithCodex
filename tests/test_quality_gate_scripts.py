@@ -273,3 +273,59 @@ def test_release_gate_runner_supports_optional_index_contract_gate(monkeypatch, 
     assert "--metadata-max-bytes" in command
     assert "--confidential-safe" in command
     assert "--fail-on-warning" in command
+
+
+def test_release_gate_runner_supports_optional_provenance_integrity_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="Wrote provenance_integrity_report.json", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-provenance",
+            gates=["provenance-integrity"],
+            provenance_integrity_output_dir=tmp_path / "converted-spec",
+            provenance_integrity_fail_on_warning=True,
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["gates"][0]["gate"] == "provenance-integrity"
+    command = calls[0]
+    assert any(str(part).endswith("validate_provenance_integrity.py") for part in command)
+    assert "--output-dir" in command
+    assert "--fail-on-error" in command
+    assert "--fail-on-warning" in command
+
+
+def test_release_gate_runner_supports_optional_artifact_integrity_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="Wrote artifact_integrity_report.json", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-artifacts",
+            gates=["artifact-integrity"],
+            artifact_integrity_output_dir=tmp_path / "converted-spec",
+            artifact_integrity_confidential_safe=True,
+            artifact_integrity_fail_on_warning=True,
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["gates"][0]["gate"] == "artifact-integrity"
+    command = calls[0]
+    assert any(str(part).endswith("validate_artifact_integrity.py") for part in command)
+    assert "--output-dir" in command
+    assert "--fail-on-error" in command
+    assert "--confidential-safe" in command
+    assert "--fail-on-warning" in command

@@ -333,6 +333,41 @@ def test_extract_tables_flattens_multi_row_headers_for_rag(monkeypatch) -> None:
     assert result.rag_tables[0]["records"][0]["cells"]["Latency / Max"] == "3"
 
 
+def test_extract_tables_auto_falls_back_for_complex_accuracy_pack(monkeypatch) -> None:
+    rows = [
+        ["", "Latency", "Latency", "Latency"],
+        ["Command", "Min", "Max", "Typical"],
+        ["Read", "1", "3", "2"],
+        ["Write", "2", "4", "3"],
+        ["Notes: values are cycles", "", "", ""],
+    ]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    markdown = result.blocks_by_page[1][0].markdown
+    fallback_reasons = result.rag_tables[0]["fallback_reasons"]
+    assert result.assets[0].mode == "html"
+    assert "<table>" in markdown
+    assert "| Command |" not in markdown
+    assert "MULTI_ROW_HEADER" in fallback_reasons
+    assert "MERGED_CELL_SUSPECTED" in fallback_reasons
+    assert "STUB_COLUMN" in fallback_reasons
+    assert "FOOTNOTE_ROW" in fallback_reasons
+    assert result.rag_tables[0]["headers"] == [
+        "Command",
+        "Latency / Min",
+        "Latency / Max",
+        "Latency / Typical",
+    ]
+    assert result.rag_tables[0]["records"][0]["stub_cells"] == ["Read"]
+
+
 def test_extract_tables_records_stub_and_footnote_diagnostics(monkeypatch) -> None:
     rows = [
         ["", "Min", "Max"],

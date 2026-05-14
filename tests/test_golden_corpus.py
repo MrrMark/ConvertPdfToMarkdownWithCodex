@@ -8,10 +8,12 @@ from fixtures.pdf_builder import (
     build_bottom_footnote_pdf,
     build_code_block_pdf,
     build_continued_table_pdf,
+    build_diagram_suite_pdf,
     build_font_heading_pdf,
     build_grouped_list_pdf,
     build_image_only_pdf,
     build_korean_text_pdf,
+    build_layout_stress_pdf,
     build_password_pdf,
     build_repeated_template_table_pdf,
     build_repeated_header_footer_pdf,
@@ -23,6 +25,7 @@ from fixtures.pdf_builder import (
     build_semantic_requirements_pdf,
     build_semantic_table_parameters_pdf,
     build_structured_text_pdf,
+    build_table_accuracy_pack_pdf,
     build_two_column_pdf,
     build_uppercase_body_pdf,
 )
@@ -44,8 +47,11 @@ def _normalize_jsonl_sidecar(content: str, sidecar_name: str) -> str:
         if not line.strip():
             continue
         record = json.loads(line)
-        if sidecar_name == "figures_rag.jsonl" and record.get("sha256"):
-            record["sha256"] = "<sha256>"
+        if sidecar_name == "figures_rag.jsonl":
+            if record.get("sha256"):
+                record["sha256"] = "<sha256>"
+            if record.get("crop_content_ratio") is not None:
+                record["crop_content_ratio"] = "<crop_content_ratio>"
         if sidecar_name == "retrieval_chunks_rag.jsonl":
             record.pop("schema_version", None)
             record.pop("source_sha256", None)
@@ -57,10 +63,13 @@ def test_deterministic_pdf_fixture_builder_covers_priority_corpus(tmp_path: Path
     builders = {
         "single_column.pdf": build_single_column_pdf,
         "two_column.pdf": build_two_column_pdf,
+        "layout_stress.pdf": build_layout_stress_pdf,
         "header_footer.pdf": build_repeated_header_footer_pdf,
         "simple_table.pdf": build_simple_table_pdf,
         "complex_table.pdf": build_complex_table_pdf,
         "continued_table.pdf": build_continued_table_pdf,
+        "table_accuracy_pack.pdf": build_table_accuracy_pack_pdf,
+        "diagram_suite.pdf": build_diagram_suite_pdf,
         "repeated_template_table.pdf": build_repeated_template_table_pdf,
         "repeated_image.pdf": build_repeated_image_pdf,
         "image_only.pdf": build_image_only_pdf,
@@ -89,10 +98,13 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
     cases = {
         "single_column": (build_single_column_pdf, {}),
         "two_column": (build_two_column_pdf, {}),
+        "layout_stress": (build_layout_stress_pdf, {}),
         "header_footer": (build_repeated_header_footer_pdf, {"remove_header_footer": True}),
         "simple_table": (build_simple_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
         "complex_table": (build_complex_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
         "continued_table": (build_continued_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
+        "table_accuracy_pack": (build_table_accuracy_pack_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
+        "diagram_suite": (build_diagram_suite_pdf, {"figure_crop_fallback": True}),
         "repeated_template_table": (
             build_repeated_template_table_pdf,
             {"rag_table_output": RagTableOutputMode.BOTH},
@@ -132,11 +144,11 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         assert (output_dir / "document.md").read_text(encoding="utf-8") == (
             golden_dir / "document.md"
         ).read_text(encoding="utf-8")
-        assert normalize_manifest(json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))) == json.loads(
-            (golden_dir / "manifest.json").read_text(encoding="utf-8")
+        assert normalize_manifest(json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))) == (
+            normalize_manifest(json.loads((golden_dir / "manifest.json").read_text(encoding="utf-8")))
         )
-        assert normalize_report(json.loads((output_dir / "report.json").read_text(encoding="utf-8"))) == json.loads(
-            (golden_dir / "report.json").read_text(encoding="utf-8")
+        assert normalize_report(json.loads((output_dir / "report.json").read_text(encoding="utf-8"))) == (
+            normalize_report(json.loads((golden_dir / "report.json").read_text(encoding="utf-8")))
         )
         for sidecar_name in (
             "rag_tables.md",

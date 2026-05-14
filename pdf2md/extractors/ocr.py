@@ -20,6 +20,10 @@ except Exception:  # noqa: BLE001
     pytesseract = None
 
 ALNUM_PATTERN = re.compile(r"[A-Za-z0-9]")
+LANGUAGE_DATA_MISSING_PATTERN = re.compile(
+    r"(?:failed loading language|error opening data file|could not initialize tesseract|traineddata)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -70,6 +74,10 @@ def _extract_confidence_metrics(data: dict) -> OcrMetrics:
     median = round(float(statistics.median(confidences)), 2)
     low_ratio = round(low_count / total_count, 4) if total_count else 1.0
     return OcrMetrics(mean=mean, median=median, low_conf_token_ratio=low_ratio)
+
+
+def _is_language_data_missing(exc: Exception) -> bool:
+    return bool(LANGUAGE_DATA_MISSING_PATTERN.search(str(exc)))
 
 
 def run_ocr(
@@ -182,6 +190,16 @@ def run_ocr(
                     )
                 )
         except Exception as exc:  # noqa: BLE001
+            if _is_language_data_missing(exc):
+                result.warnings.append(
+                    WarningEntry(
+                        code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
+                        message=f"OCR language data is unavailable for '{ocr_lang}'.",
+                        page=page_number,
+                        details={"ocr_lang": ocr_lang, "reason": "language_data_missing"},
+                    )
+                )
+                continue
             result.warnings.append(
                 WarningEntry(
                     code=WarningCode.OCR_FAILED,

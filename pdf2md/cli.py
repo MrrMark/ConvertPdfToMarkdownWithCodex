@@ -86,6 +86,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--force-ocr", action="store_true", default=False)
     parser.add_argument("--ocr-lang", default="eng", help="Tesseract language code for OCR, for example eng or kor+eng.")
     parser.add_argument(
+        "--page-workers",
+        type=int,
+        default=1,
+        help="Opt-in page-level text extraction workers. Use 1 for the deterministic single-worker path.",
+    )
+    parser.add_argument(
         "--remove-header-footer",
         action="store_true",
         default=False,
@@ -161,6 +167,7 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         dedupe_images=args.dedupe_images,
         repair_hyphenation=args.repair_hyphenation,
         figure_crop_fallback=args.figure_crop_fallback,
+        page_workers=args.page_workers,
         debug=args.debug,
         verbose=args.verbose,
         skip_existing=args.skip_existing,
@@ -186,6 +193,7 @@ def _build_batch_config(args: argparse.Namespace, pdf_path: Path, output_dir: Pa
         dedupe_images=args.dedupe_images,
         repair_hyphenation=args.repair_hyphenation,
         figure_crop_fallback=args.figure_crop_fallback,
+        page_workers=args.page_workers,
         debug=args.debug,
         verbose=args.verbose,
         skip_existing=args.skip_existing,

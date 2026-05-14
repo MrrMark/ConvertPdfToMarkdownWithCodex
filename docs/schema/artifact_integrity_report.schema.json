@@ -1,0 +1,239 @@
+{
+  "$defs": {
+    "ArtifactIntegrityFileSummary": {
+      "properties": {
+        "error_count": {
+          "default": 0,
+          "title": "Error Count",
+          "type": "integer"
+        },
+        "exists": {
+          "title": "Exists",
+          "type": "boolean"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "info_count": {
+          "default": 0,
+          "title": "Info Count",
+          "type": "integer"
+        },
+        "link_count": {
+          "default": 0,
+          "title": "Link Count",
+          "type": "integer"
+        },
+        "record_count": {
+          "default": 0,
+          "title": "Record Count",
+          "type": "integer"
+        },
+        "warning_count": {
+          "default": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "file",
+        "exists"
+      ],
+      "title": "ArtifactIntegrityFileSummary",
+      "type": "object"
+    },
+    "ArtifactIntegrityFinding": {
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "record_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Record Id"
+        },
+        "severity": {
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ],
+      "title": "ArtifactIntegrityFinding",
+      "type": "object"
+    },
+    "ArtifactIntegritySummary": {
+      "properties": {
+        "checked_assets": {
+          "default": 0,
+          "title": "Checked Assets",
+          "type": "integer"
+        },
+        "checked_files": {
+          "default": 0,
+          "title": "Checked Files",
+          "type": "integer"
+        },
+        "checked_links": {
+          "default": 0,
+          "title": "Checked Links",
+          "type": "integer"
+        },
+        "checked_records": {
+          "default": 0,
+          "title": "Checked Records",
+          "type": "integer"
+        },
+        "error_count": {
+          "default": 0,
+          "title": "Error Count",
+          "type": "integer"
+        },
+        "file_map_missing_count": {
+          "default": 0,
+          "title": "File Map Missing Count",
+          "type": "integer"
+        },
+        "info_count": {
+          "default": 0,
+          "title": "Info Count",
+          "type": "integer"
+        },
+        "missing_assets": {
+          "default": 0,
+          "title": "Missing Assets",
+          "type": "integer"
+        },
+        "orphan_assets": {
+          "default": 0,
+          "title": "Orphan Assets",
+          "type": "integer"
+        },
+        "sidecar_count_mismatches": {
+          "default": 0,
+          "title": "Sidecar Count Mismatches",
+          "type": "integer"
+        },
+        "warning_count": {
+          "default": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "title": "ArtifactIntegritySummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "files": {
+      "items": {
+        "$ref": "#/$defs/ArtifactIntegrityFileSummary"
+      },
+      "title": "Files",
+      "type": "array"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/ArtifactIntegrityFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "output_dir": {
+      "title": "Output Dir",
+      "type": "string"
+    },
+    "passed": {
+      "title": "Passed",
+      "type": "boolean"
+    },
+    "purpose": {
+      "default": "output_artifact_integrity_validation",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/ArtifactIntegritySummary"
+    }
+  },
+  "required": [
+    "status",
+    "passed",
+    "output_dir"
+  ],
+  "title": "ArtifactIntegrityReport",
+  "type": "object"
+}

@@ -147,6 +147,9 @@ class ReportSummary(BaseModel):
     stage_durations_ms: dict[str, int] = Field(default_factory=dict)
     pdf_open_count: int = 0
     pages_per_second: Optional[float] = None
+    page_worker_count: int = 1
+    page_parallel_enabled: bool = False
+    page_worker_effective_count: int = 1
     rag_table_output: str = "none"
     rag_table_record_count: int = 0
     rag_table_file_count: int = 0
@@ -483,3 +486,92 @@ class IndexContractReport(BaseModel):
     summary: IndexContractSummary = Field(default_factory=IndexContractSummary)
     files: list[IndexContractFileSummary] = Field(default_factory=list)
     findings: list[IndexContractFinding] = Field(default_factory=list)
+
+
+class ProvenanceIntegrityFinding(BaseModel):
+    severity: str
+    code: str
+    file: Optional[str] = None
+    line: Optional[int] = None
+    record_id: Optional[str] = None
+    field: Optional[str] = None
+    source_type: Optional[str] = None
+    source_id: Optional[str] = None
+    message: str
+
+
+class ProvenanceIntegrityFileSummary(BaseModel):
+    file: str
+    exists: bool
+    record_count: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+
+
+class ProvenanceIntegritySummary(BaseModel):
+    checked_files: int = 0
+    checked_records: int = 0
+    checked_source_refs: int = 0
+    resolved_source_refs: int = 0
+    unresolved_source_refs: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+
+
+class ProvenanceIntegrityReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "rag_provenance_integrity_validation"
+    status: str
+    passed: bool
+    output_dir: str
+    summary: ProvenanceIntegritySummary = Field(default_factory=ProvenanceIntegritySummary)
+    files: list[ProvenanceIntegrityFileSummary] = Field(default_factory=list)
+    findings: list[ProvenanceIntegrityFinding] = Field(default_factory=list)
+
+
+class ArtifactIntegrityFinding(BaseModel):
+    severity: str
+    code: str
+    file: Optional[str] = None
+    line: Optional[int] = None
+    record_id: Optional[str] = None
+    field: Optional[str] = None
+    path: Optional[str] = None
+    message: str
+
+
+class ArtifactIntegrityFileSummary(BaseModel):
+    file: str
+    exists: bool
+    record_count: int = 0
+    link_count: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+
+
+class ArtifactIntegritySummary(BaseModel):
+    checked_files: int = 0
+    checked_records: int = 0
+    checked_links: int = 0
+    checked_assets: int = 0
+    missing_assets: int = 0
+    orphan_assets: int = 0
+    sidecar_count_mismatches: int = 0
+    file_map_missing_count: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+
+
+class ArtifactIntegrityReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "output_artifact_integrity_validation"
+    status: str
+    passed: bool
+    output_dir: str
+    summary: ArtifactIntegritySummary = Field(default_factory=ArtifactIntegritySummary)
+    files: list[ArtifactIntegrityFileSummary] = Field(default_factory=list)
+    findings: list[ArtifactIntegrityFinding] = Field(default_factory=list)

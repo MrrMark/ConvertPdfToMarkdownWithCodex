@@ -35,6 +35,7 @@ class TableSpec:
 class PageSpec:
     texts: list[PositionedText] = field(default_factory=list)
     tables: list[TableSpec] = field(default_factory=list)
+    graphics: list[str] = field(default_factory=list)
     repeated_image: bool = False
 
 
@@ -120,7 +121,8 @@ def write_pdf(path: Path, pages: list[PageSpec], password: str | None = None) ->
         if spec.repeated_image and image_ref is not None:
             resources[NameObject("/XObject")] = DictionaryObject({NameObject("/Im1"): image_ref})
         page[NameObject("/Resources")] = resources
-        commands = [_text_command(item) for item in spec.texts]
+        commands = list(spec.graphics)
+        commands.extend(_text_command(item) for item in spec.texts)
         for table in spec.tables:
             commands.extend(_table_commands(table))
         if spec.repeated_image:
@@ -143,6 +145,34 @@ def build_two_column_pdf(path: Path) -> None:
     left = [PositionedText(f"Left line {idx}", 72, 780 - idx * 18) for idx in range(1, 7)]
     right = [PositionedText(f"Right line {idx}", 330, 780 - idx * 18) for idx in range(1, 7)]
     write_pdf(path, [PageSpec(texts=left + right)])
+
+
+def build_layout_stress_pdf(path: Path) -> None:
+    """Build a compact fixture with columns, sidebar text, figure/caption, footnotes, and mixed language."""
+    page_one_text = [
+        PositionedText("1 Layout Stress", 72, 800, 14),
+        PositionedText("Left column requirement shall preserve order.", 72, 760, 10),
+        PositionedText("Left column continuation references Figure 1.", 72, 742, 10),
+        PositionedText("Right column note should follow left content.", 318, 760, 10),
+        PositionedText("Right column completion text.", 318, 742, 10),
+        PositionedText("Sidebar: implementation hint", 430, 620, 8),
+        PositionedText("Figure 1: Floating state marker", 430, 666, 9),
+        PositionedText("[1] Footnote with source detail", 72, 72, 7),
+    ]
+    page_two_text = [
+        PositionedText("1.1 Mixed Language", 72, 800, 14),
+        PositionedText("Korean English mixed paragraph follows.", 72, 760, 10),
+        PositionedText("Hangul marker with English source text.", 72, 742, 10),
+        PositionedText("- mixed bullet item", 72, 706, 10),
+        PositionedText("The parser shall keep this sentence.", 72, 670, 10),
+    ]
+    write_pdf(
+        path,
+        [
+            PageSpec(texts=page_one_text, repeated_image=True),
+            PageSpec(texts=page_two_text),
+        ],
+    )
 
 
 def build_repeated_header_footer_pdf(path: Path) -> None:
@@ -216,6 +246,179 @@ def build_repeated_template_table_pdf(path: Path) -> None:
         [
             PageSpec(tables=[TableSpec([["Field", "Value"], ["Total", "100"]], 72, 730, [120, 120])]),
             PageSpec(tables=[TableSpec([["Field", "Value"], ["Total", "100"]], 72, 730, [120, 120])]),
+        ],
+    )
+
+
+def build_table_accuracy_pack_pdf(path: Path) -> None:
+    """Build table fixtures that stress complex fallback and technical row provenance."""
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[PositionedText("Table 1: Command timing fields", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["", "Latency", "Latency", "Latency"],
+                            ["Command", "Min", "Max", "Typical"],
+                            ["Read", "1", "3", "2"],
+                            ["Write", "2", "4", "3"],
+                            ["Notes: values are cycles", "", "", ""],
+                        ],
+                        72,
+                        760,
+                        [120, 80, 80, 80],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 2: Control register bits", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Bits", "Field", "Reset", "Access", "Description"],
+                            ["31:16", "RSVD", "0h", "RO", "Reserved bits"],
+                            ["15:8", "STATUS", "0h", "RO", "Current status"],
+                            ["7:0", "ENABLE", "0h", "RW", "Enable mask"],
+                        ],
+                        72,
+                        760,
+                        [72, 92, 70, 70, 180],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 3: Command opcodes", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Command", "Opcode", "Description"],
+                            ["Identify", "06h", "Identify command"],
+                            ["Sanitize", "84h", "Sanitize command"],
+                        ],
+                        72,
+                        760,
+                        [110, 80, 180],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 4: Log identifiers", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Log Identifier", "Description"],
+                            ["02h", "SMART information"],
+                        ],
+                        72,
+                        760,
+                        [130, 180],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 5: Feature identifiers", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Feature Identifier", "Value", "Description"],
+                            ["02h", "Volatile Write Cache", "Feature setting"],
+                        ],
+                        72,
+                        760,
+                        [130, 150, 180],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 6: Security methods", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Method", "ProtocolID", "Description"],
+                            ["Erase", "01h", "Security method"],
+                        ],
+                        72,
+                        760,
+                        [120, 100, 180],
+                    ),
+                ],
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 7: Continued status fields", 72, 790, 10)],
+                tables=[TableSpec([["Field", "Value"], ["alpha", "1"]], 72, 760, [120, 120])],
+            ),
+            PageSpec(
+                tables=[TableSpec([["Field", "Value"], ["beta", "2"]], 72, 760, [120, 120])],
+            ),
+        ],
+    )
+
+
+def build_diagram_suite_pdf(path: Path) -> None:
+    """Build vector-rendered diagram pages for figure crop fallback provenance."""
+    state_machine_graphics = [
+        "1 w",
+        "90 610 90 44 re S",
+        "250 610 90 44 re S",
+        "410 610 90 44 re S",
+        "180 632 m 250 632 l S",
+        "340 632 m 410 632 l S",
+        "410 610 m 340 590 l S",
+        "340 590 m 250 610 l S",
+    ]
+    state_machine_text = [
+        PositionedText("2.1 State Machine", 72, 800, 14),
+        PositionedText("Figure 1: State machine diagram READY ERROR RESET", 72, 720, 10),
+        PositionedText("IDLE", 118, 628, 10),
+        PositionedText("ACTIVE", 276, 628, 10),
+        PositionedText("ERROR", 438, 628, 10),
+        PositionedText("READY", 194, 642, 8),
+        PositionedText("FAULT", 354, 642, 8),
+        PositionedText("RESET", 322, 584, 8),
+    ]
+
+    sequence_graphics = [
+        "1 w",
+        "150 648 m 150 500 l S",
+        "400 648 m 400 500 l S",
+        "150 612 m 400 612 l S",
+        "400 568 m 150 568 l S",
+    ]
+    sequence_text = [
+        PositionedText("2.2 Sequence Flow", 72, 800, 14),
+        PositionedText("Figure 2: Sequence diagram Command Completion", 72, 720, 10),
+        PositionedText("Host", 134, 662, 10),
+        PositionedText("Controller", 372, 662, 10),
+        PositionedText("Command", 252, 624, 9),
+        PositionedText("Completion", 246, 580, 9),
+    ]
+
+    register_graphics = [
+        "1 w",
+        "88 610 150 54 re S",
+        "238 610 120 54 re S",
+        "358 610 120 54 re S",
+        "88 637 m 478 637 l S",
+    ]
+    register_text = [
+        PositionedText("2.3 Register Layout", 72, 800, 14),
+        PositionedText("Figure 3: Register layout bit field RSVD STATUS ENABLE", 72, 720, 10),
+        PositionedText("31:16", 132, 646, 9),
+        PositionedText("15:8", 280, 646, 9),
+        PositionedText("7:0", 406, 646, 9),
+        PositionedText("RSVD", 132, 620, 9),
+        PositionedText("STATUS", 272, 620, 9),
+        PositionedText("ENABLE", 394, 620, 9),
+    ]
+
+    write_pdf(
+        path,
+        [
+            PageSpec(texts=state_machine_text, graphics=state_machine_graphics),
+            PageSpec(texts=sequence_text, graphics=sequence_graphics),
+            PageSpec(texts=register_text, graphics=register_graphics),
         ],
     )
 

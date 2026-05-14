@@ -133,8 +133,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q32. Requirement Impact Review Pack" not in next_plan
     assert "Q33. Technical Cross-Reference Resolver Hardening" not in next_plan
     assert "Q34. Offline Index Contract Validator" not in next_plan
-    assert "Q35. Rendered Diagram Fixture Suite" in next_plan
-    assert "Q36. Page-Level Parallel Extractor" in next_plan
+    assert "Q35. Rendered Diagram Fixture Suite" not in next_plan
+    assert "Q36. Page-Level Parallel Extractor" not in next_plan
+    assert "Q42. Full Page Worker Table Candidate Parallelization" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
