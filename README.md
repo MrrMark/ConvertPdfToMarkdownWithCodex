@@ -861,7 +861,8 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 없습니다. 새 개선 과제가 발견되면 Next Plan에 신규 Q 항목을 먼저 추가합니다.
+- 현재 active quality backlog는 Q53 Minimal Desktop GUI Wrapper입니다.
+- Q53은 CLI를 대체하지 않고, 파일/폴더 선택과 주요 옵션 지정을 간단히 제공하는 Tkinter 기반 GUI wrapper를 목표로 합니다.
 
 ### 이후 후보
 

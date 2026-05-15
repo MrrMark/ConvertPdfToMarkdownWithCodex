@@ -23,6 +23,10 @@
 
 ## 남은 작업
 
-현재 active quality backlog는 없다.
+### Q53. Minimal Desktop GUI Wrapper
 
-새 개선 과제가 발견되면 이 섹션에 신규 Q 번호로 추가하고, 대응 개발 명세를 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에 작성한다.
+CLI에 익숙하지 않은 사용자도 PDF 파일 또는 폴더를 선택해 변환할 수 있도록, 기존 CLI/라이브러리 변환 경로 위에 얇은 desktop GUI wrapper를 추가한다.
+
+- 우선순위: P2
+- 범위: Tkinter 기반 간단 GUI, 파일/폴더 선택, 출력 폴더 선택, 핵심 옵션 선택, 진행 로그, 완료 상태 표시, docs/tests
+- 완료 조건: GUI와 CLI가 동일 `Config`/`run_conversion` 경로를 사용하고, 동일 입력/옵션에서 동일 산출물을 만든다. GUI smoke/import 테스트와 core runner 테스트가 headless CI에서 통과한다.
