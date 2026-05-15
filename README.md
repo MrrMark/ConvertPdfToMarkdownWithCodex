@@ -239,6 +239,24 @@ sudo apt-get install -y tesseract-ocr
 
 ## 7. CLI 사용 예시
 
+### 간단 GUI 실행
+
+CLI에 익숙하지 않은 사용자는 Tkinter 기반 최소 GUI로 PDF 파일 또는 폴더를 선택해 변환할 수 있습니다.
+GUI는 별도 변환 엔진이 아니라 CLI와 같은 `Config` / `run_conversion` 경로를 사용하는 간편 실행 wrapper입니다.
+
+```bash
+python3 -m pdf2md.gui
+```
+
+패키지 entry point가 설치되어 있으면 아래처럼 실행할 수도 있습니다.
+
+```bash
+pdf2md-gui
+```
+
+GUI에서는 입력 모드(단일 PDF 파일 / PDF 폴더), 입력 경로, 출력 폴더, page range, password, OCR, image/table/RAG/domain 옵션, confidential-safe mode, skip-existing 같은 주요 옵션을 선택할 수 있습니다.
+자동화, CI, 대량 반복 실행에는 여전히 CLI와 batch script 사용을 권장합니다.
+
 ### 가장 기본 실행
 
 macOS/Linux 예시:

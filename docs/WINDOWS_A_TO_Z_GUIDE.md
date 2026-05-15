@@ -33,6 +33,11 @@ PowerShell 스크립트 본체:
 - 배치 모드는 지정 폴더 바로 아래 PDF만 처리
 - 결과는 입력 폴더 내부 `output\` 아래에 생성
 
+참고:
+
+- CLI에 익숙하지 않은 사용자는 `python -m pdf2md.gui`로 최소 desktop GUI wrapper를 실행할 수 있습니다.
+- 자동화/일괄 변환의 기준 경로는 이 문서의 CLI와 배치 스크립트입니다.
+
 ---
 
 ## 2) 사전 준비
@@ -155,6 +160,22 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ## 6) 기본 실행
 
 예시 입력 파일: `sample.pdf`
+
+간단 GUI 실행:
+
+```powershell
+python -m pdf2md.gui
+```
+
+설치형 entry point가 잡혀 있으면 아래 명령도 사용할 수 있습니다.
+
+```powershell
+pdf2md-gui
+```
+
+GUI는 PDF 파일 또는 폴더, 출력 폴더, 주요 변환 옵션을 선택하는 간편 실행 wrapper입니다. 변환 자체는 CLI와 같은 core pipeline을 사용합니다.
+
+CLI 기본 실행:
 
 ```powershell
 python -m pdf2md .\sample.pdf
