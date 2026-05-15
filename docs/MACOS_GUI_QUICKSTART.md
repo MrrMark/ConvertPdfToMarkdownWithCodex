@@ -4,6 +4,8 @@
 
 자동화, CI, 반복 배치 변환은 GUI보다 `python3 -m pdf2md` CLI를 권장한다.
 
+GUI 화면별 사용법은 별도 문서 `docs/GUI_USER_GUIDE.md`에서 확인한다. GUI의 `Help` 버튼도 같은 문서를 연다.
+
 ## 1) 준비물
 
 - macOS
@@ -117,6 +119,8 @@ GUI 완료 후 Results 표에서 아래를 확인한다.
 - `Retry`: 실패 문서가 재시도 후보인지 여부
 
 원문 텍스트, 표, 이미지 내용은 GUI summary에서 요약하지 않는다. 자세한 품질 판단은 `report.json`과 `manifest.json`을 확인한다.
+
+GUI 화면에서 바로 설명이 필요하면 `Help` 버튼을 누른다.
 
 ## 8) 문제 진단
 

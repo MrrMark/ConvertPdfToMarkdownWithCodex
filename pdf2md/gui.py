@@ -22,6 +22,11 @@ from pdf2md.gui_runner import (
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
 
 
+def gui_user_guide_path() -> Path:
+    """Return the local GUI user guide path for source checkout/editable installs."""
+    return Path(__file__).resolve().parents[1] / "docs" / "GUI_USER_GUIDE.md"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pdf2md-gui",
@@ -124,6 +129,8 @@ class Pdf2MdGuiApp:
         self.cancel_button.pack(side=tk.LEFT, padx=(8, 0))
         self.open_output_button = ttk.Button(button_frame, text="Open output folder", command=self._open_output, state=tk.DISABLED)
         self.open_output_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.help_button = ttk.Button(button_frame, text="Help", command=self._open_help)
+        self.help_button.pack(side=tk.LEFT, padx=(8, 0))
 
         results = ttk.LabelFrame(frame, text="Results")
         results.grid(row=5, column=0, columnspan=3, sticky="nsew", pady=(0, 8))
@@ -355,6 +362,30 @@ class Pdf2MdGuiApp:
             message = "Could not open output folder."
             self._append_log(message)
             messagebox.showwarning("Open output folder failed", message)
+
+    def _open_help(self) -> None:
+        from tkinter import messagebox
+
+        guide_path = gui_user_guide_path()
+        if not guide_path.exists():
+            message = (
+                "GUI user guide was not found. "
+                "Open docs/GUI_USER_GUIDE.md from the project root, or reinstall from the source checkout."
+            )
+            self._append_log(message)
+            messagebox.showwarning("Help unavailable", message)
+            return
+        try:
+            opened = webbrowser.open(guide_path.resolve().as_uri())
+        except Exception as exc:  # noqa: BLE001
+            message = f"Could not open GUI user guide: {exc}"
+            self._append_log(message)
+            messagebox.showwarning("Help unavailable", message)
+            return
+        if not opened:
+            message = f"Could not open GUI user guide: {guide_path}"
+            self._append_log(message)
+            messagebox.showwarning("Help unavailable", message)
 
 
 def _write_startup_diagnostics(report: GuiDiagnosticReport) -> None:
