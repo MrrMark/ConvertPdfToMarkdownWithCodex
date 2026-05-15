@@ -4,6 +4,9 @@ import json
 from typing import Any
 
 
+HEADING_CONTEXT_KEYWORDS = ("appendix", "clause", "requirement", "vendor")
+
+
 def stable_table_id(page: int, table_index: int) -> str:
     """Return the deterministic table id used by RAG sidecars."""
     return f"page-{page:04d}-table-{table_index:04d}"
@@ -53,6 +56,82 @@ def flatten_rag_table_records(rag_tables: list[dict[str, Any]]) -> list[dict[str
     for table in normalize_rag_table_payload(rag_tables):
         records.extend(table.get("records", []))
     return records
+
+
+def _bbox_top(record: dict[str, Any]) -> float | None:
+    bbox = record.get("bbox")
+    if not isinstance(bbox, list) or len(bbox) < 2:
+        return None
+    try:
+        return float(bbox[1])
+    except (TypeError, ValueError):
+        return None
+
+
+def _heading_path(record: dict[str, Any]) -> list[str]:
+    value = record.get("heading_path")
+    return [str(item) for item in value] if isinstance(value, list) else []
+
+
+def _heading_context_is_high_risk(heading_path: list[str]) -> bool:
+    text = " ".join(heading_path).lower()
+    return any(keyword in text for keyword in HEADING_CONTEXT_KEYWORDS)
+
+
+def _nearest_heading_path(
+    *,
+    page: int,
+    table_top: float | None,
+    text_block_records: list[dict[str, Any]],
+) -> list[str]:
+    page_records = [
+        record
+        for record in text_block_records
+        if _int_value(record.get("page")) == page and _heading_path(record)
+    ]
+    if not page_records:
+        return []
+
+    if table_top is not None:
+        preceding = [
+            (top, _int_value(record.get("block_index")), record)
+            for record in page_records
+            if (top := _bbox_top(record)) is not None and top <= table_top
+        ]
+        if preceding:
+            return _heading_path(sorted(preceding, key=lambda item: (item[0], item[1]))[-1][2])
+
+    return _heading_path(sorted(page_records, key=lambda item: _int_value(item.get("block_index")))[0])
+
+
+def annotate_rag_tables_with_heading_context(
+    rag_tables: list[dict[str, Any]],
+    text_block_records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return copies of high-risk appendix/requirement tables with inherited heading context."""
+    annotated: list[dict[str, Any]] = []
+    for table in normalize_rag_table_payload(rag_tables):
+        page = _int_value(table.get("page"))
+        heading_path = _nearest_heading_path(
+            page=page,
+            table_top=_bbox_top(table),
+            text_block_records=text_block_records,
+        )
+        should_attach = _heading_context_is_high_risk(heading_path)
+        table_copy = dict(table)
+        records: list[dict[str, Any]] = []
+        if should_attach:
+            table_copy["heading_path"] = heading_path
+            table_copy["heading_context_source"] = "nearest_preceding_heading"
+        for record in table.get("records", []):
+            record_copy = dict(record)
+            if should_attach:
+                record_copy["heading_path"] = heading_path
+                record_copy["heading_context_source"] = "nearest_preceding_heading"
+            records.append(record_copy)
+        table_copy["records"] = records
+        annotated.append(table_copy)
+    return annotated
 
 
 def serialize_rag_tables_jsonl(rag_tables: list[dict[str, Any]]) -> str:

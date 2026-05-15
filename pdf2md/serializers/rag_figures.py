@@ -227,6 +227,42 @@ def _diagram_label_diagnostics(
     return sorted(dict.fromkeys(promoted_labels)), diagnostics
 
 
+def _captionless_diagnostics(
+    *,
+    caption_text: str | None,
+    heading_path: list[str],
+    nearby_text_refs: list[dict[str, Any]],
+    detected_labels: list[str],
+    label_diagnostics: dict[str, Any],
+) -> dict[str, Any] | None:
+    if caption_text:
+        return None
+
+    rejection_reasons = ["missing_caption"]
+    rejected_candidates = label_diagnostics.get("rejected_ocr_candidates")
+    if isinstance(rejected_candidates, list):
+        for candidate in rejected_candidates:
+            if isinstance(candidate, dict) and candidate.get("reason"):
+                rejection_reasons.append(str(candidate["reason"]))
+    if not heading_path:
+        rejection_reasons.append("missing_heading_path")
+    if not nearby_text_refs:
+        rejection_reasons.append("no_nearby_text_refs")
+    if label_diagnostics.get("ocr_candidate_count") and not label_diagnostics.get("promoted_ocr_candidate_count"):
+        rejection_reasons.append("no_promoted_ocr_labels")
+
+    promoted_label_count = len(detected_labels)
+    return {
+        "caption_present": False,
+        "heading_path_present": bool(heading_path),
+        "nearby_text_ref_count": len(nearby_text_refs),
+        "ocr_candidate_count": int(label_diagnostics.get("ocr_candidate_count") or 0),
+        "promoted_label_count": promoted_label_count,
+        "status": "captionless_promoted_labels" if promoted_label_count else "captionless_diagnostics_only",
+        "rejection_reasons": sorted(dict.fromkeys(rejection_reasons)),
+    }
+
+
 def _figure_kind(text: str) -> tuple[str, list[str], list[str]]:
     lowered = text.lower()
     labels = _labels_from_text(text)
@@ -299,6 +335,15 @@ def _figure_record(
     }
     if kind != "image":
         record["diagram_label_diagnostics"] = label_diagnostics
+    captionless_diagnostics = _captionless_diagnostics(
+        caption_text=asset.caption_text,
+        heading_path=heading_path,
+        nearby_text_refs=nearby_text_refs,
+        detected_labels=labels,
+        label_diagnostics=label_diagnostics,
+    )
+    if captionless_diagnostics is not None and (kind != "image" or nearby_text_refs):
+        record["captionless_diagnostics"] = captionless_diagnostics
     return record
 
 
@@ -373,6 +418,15 @@ def _excluded_figure_record(
     }
     if asset.ocr_candidates or asset.recovered_text or kind != "image":
         record["diagram_label_diagnostics"] = label_diagnostics
+    captionless_diagnostics = _captionless_diagnostics(
+        caption_text=asset.recovered_text,
+        heading_path=heading_path,
+        nearby_text_refs=[],
+        detected_labels=labels,
+        label_diagnostics=label_diagnostics,
+    )
+    if captionless_diagnostics is not None and (asset.ocr_candidates or kind != "image" or heading_path):
+        record["captionless_diagnostics"] = captionless_diagnostics
     return record
 
 

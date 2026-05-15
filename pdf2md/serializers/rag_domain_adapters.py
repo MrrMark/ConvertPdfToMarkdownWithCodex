@@ -217,6 +217,11 @@ def _page(record: dict[str, Any]) -> int:
         return 0
 
 
+def _heading_path(record: dict[str, Any]) -> list[str]:
+    value = record.get("heading_path")
+    return [str(item) for item in value] if isinstance(value, list) else []
+
+
 def build_domain_units(
     *,
     domain_adapter: DomainAdapterMode | str,
@@ -273,7 +278,7 @@ def build_domain_units(
                 "source_refs": source_refs,
                 "page_range": [page, page],
                 "bbox": technical_record.get("bbox"),
-                "heading_path": [],
+                "heading_path": _heading_path(technical_record),
                 "classification_confidence": 0.9,
                 "classification_reasons": reasons,
             }
@@ -313,7 +318,7 @@ def build_domain_units(
                 ],
                 "page_range": [page, page],
                 "bbox": table_row.get("bbox"),
-                "heading_path": [],
+                "heading_path": _heading_path(table_row),
                 "classification_confidence": 0.88,
                 "classification_reasons": reasons,
             }

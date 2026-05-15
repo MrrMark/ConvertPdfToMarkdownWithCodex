@@ -75,6 +75,11 @@ def _page(record: dict[str, Any]) -> int:
         return 0
 
 
+def _heading_path(record: dict[str, Any]) -> list[str]:
+    value = record.get("heading_path")
+    return [str(item) for item in value] if isinstance(value, list) else []
+
+
 def _unit_type(headers: list[Any], cells: dict[str, Any], row_text: str) -> tuple[str | None, list[str]]:
     hints = _header_hints(headers)
     reasons = [f"header_{hint}" for hint in sorted(hints)]
@@ -191,6 +196,9 @@ def build_technical_table_records(rag_tables: list[dict[str, Any]]) -> list[dict
             else 0.84,
             "classification_reasons": sorted(dict.fromkeys(reasons)),
         }
+        heading_path = _heading_path(row)
+        if heading_path:
+            record["heading_path"] = heading_path
         records.append(record)
     return records
 

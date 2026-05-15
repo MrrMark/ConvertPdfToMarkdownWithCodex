@@ -478,7 +478,7 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - `summary.structure_low_confidence_count`
 
 출력 schema 안정성 정책과 RAG sidecar field 계약은 `docs\OUTPUT_SCHEMA.md`에서 확인합니다.
-Machine-readable schema는 `docs\schema\manifest.schema.json`, `docs\schema\report.schema.json`, `docs\schema\batch_report.schema.json`, `docs\schema\corpus_manifest.schema.json`, `docs\schema\corpus_diff_report.schema.json`, `docs\schema\requirement_change_impact_report.schema.json`에 있으며 `python scripts\export_output_schema.py --check`로 검증합니다.
+Machine-readable schema는 `docs\schema\manifest.schema.json`, `docs\schema\report.schema.json`, `docs\schema\batch_report.schema.json`, `docs\schema\corpus_manifest.schema.json`, `docs\schema\corpus_diff_report.schema.json`, `docs\schema\requirement_change_impact_report.schema.json`, `docs\schema\local_corpus_evidence_pack.schema.json`, `docs\schema\corpus_evidence_analysis_report.schema.json`, `docs\schema\corpus_evidence_trend_report.schema.json`에 있으며 `python scripts\export_output_schema.py --check`로 검증합니다.
 - `summary.rag_table_output`
 - `summary.rag_table_record_count`
 - `summary.rag_table_file_count`
@@ -534,6 +534,8 @@ python scripts\run_rag_eval.py --output-dir .\output --eval-set .\rag_eval_queri
 python scripts\validate_ssd_rag_contract.py --output-dir .\output --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
 python scripts\run_ssd_corpus_profile.py --profile .\local_ssd_corpus_profile.json --fail-on-error
 python scripts\run_ssd_corpus_profile.py --profile .\local_ssd_corpus_profile.json --fail-on-error --evidence-pack
+python scripts\analyze_corpus_evidence_pack.py --evidence-pack .\local_corpus_evidence_pack.json
+python scripts\compare_corpus_evidence_packs.py --baseline .\old_evidence_pack.json --current .\local_corpus_evidence_pack.json --fail-on-new-signature
 python scripts\build_requirement_impact_review_pack.py --impact-report .\output\requirement_change_impact_report.json
 python scripts\run_release_gates.py --output-dir .\release_gate_output --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf\baseline\corpus_eval_report.json --benchmark-baseline-report .\benchmark_baseline\benchmark_report.json
 python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag --rag-output-dir .\output --rag-eval-set .\rag_eval_queries.json --rag-min-expected-source-coverage 0.9 --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
@@ -546,6 +548,8 @@ python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag 
 - `ssd_rag_contract_report.json`: `retrieval_chunks_rag.jsonl`이 SSD 에이전트 `RagChunk/RagCitation` 계약으로 매핑 가능한지 검사한 결과. TCG는 `HIL/TCG` first-class spec_type으로 검증합니다.
 - `ssd_corpus_profile_report.json`: local-only NVMe/PCIe/OCP/TCG profile 변환, SSD 계약 검증, 선택적 RAG eval aggregate 집계
 - `local_corpus_evidence_pack.json`: 비공개 corpus 실패 패턴을 raw path, command, filename, query text 없이 공유하기 위한 redacted signature 집계
+- `corpus_evidence_analysis_report.json`: redacted evidence pack의 category/domain/spec hotspot과 follow-up hint
+- `corpus_evidence_trend_report.json`: baseline/current evidence pack의 added/persisting/resolved signature 비교와 신규 error gate
 - `requirement_impact_review_pack.json` / `.md`: requirement change impact를 리뷰어/AI Agent가 바로 확인할 수 있게 정리한 provenance 중심 요약
 - `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, schema check, packaging smoke command/status summary
 - benchmark는 수동/릴리스 전 검증용이며 기본 테스트에 포함하지 않습니다.

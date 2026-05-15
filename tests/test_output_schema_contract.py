@@ -63,6 +63,8 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "provenance_integrity_report.schema.json",
         "artifact_integrity_report.schema.json",
         "local_corpus_evidence_pack.schema.json",
+        "corpus_evidence_analysis_report.schema.json",
+        "corpus_evidence_trend_report.schema.json",
     ]
     assert export_output_schema.check_schema_files(output_dir) == []
     manifest_schema = json.loads((output_dir / "manifest.schema.json").read_text(encoding="utf-8"))
@@ -83,6 +85,19 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     assert artifact_schema["properties"]["purpose"]["default"] == "output_artifact_integrity_validation"
     evidence_schema = json.loads((output_dir / "local_corpus_evidence_pack.schema.json").read_text(encoding="utf-8"))
     assert evidence_schema["properties"]["purpose"]["default"] == "local_technical_corpus_evidence_pack"
+    analysis_schema = json.loads(
+        (output_dir / "corpus_evidence_analysis_report.schema.json").read_text(encoding="utf-8")
+    )
+    assert analysis_schema["properties"]["purpose"]["default"] == "corpus_evidence_signature_analysis"
+    trend_schema = json.loads((output_dir / "corpus_evidence_trend_report.schema.json").read_text(encoding="utf-8"))
+    assert trend_schema["properties"]["purpose"]["default"] == "corpus_evidence_trend_comparison"
+
+
+def test_output_schema_doc_lists_every_public_schema() -> None:
+    output_schema_doc = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
+
+    for schema_filename in export_output_schema.SCHEMA_FILES:
+        assert f"docs/schema/{schema_filename}" in output_schema_doc
 
 
 def test_corpus_manifest_model_accepts_rag_file_map() -> None:

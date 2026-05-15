@@ -97,6 +97,39 @@ def test_diagram_ocr_labels_require_confidence_for_promotion() -> None:
     assert records[1]["diagram_label_diagnostics"]["rejected_ocr_candidates"][0]["reason"] == "low_confidence"
 
 
+def test_captionless_low_confidence_diagram_candidate_stays_diagnostics_only() -> None:
+    candidate = ExcludedImageAsset(
+        page=1,
+        index=1,
+        reason="diagram_crop_candidate",
+        classification="large_image",
+        ocr_candidates=[{"text": "State machine IDLE", "confidence": 0.42}],
+        bbox=[72.0, 90.0, 300.0, 180.0],
+    )
+
+    records = build_figure_records(images=[], excluded_images=[candidate], text_block_records=[])
+
+    assert records[0]["caption_text"] is None
+    assert records[0]["figure_kind"] == "image"
+    assert "IDLE" not in records[0]["detected_labels"]
+    assert records[0]["diagram_label_diagnostics"]["rejected_ocr_candidates"][0]["reason"] == "low_confidence"
+    assert records[0]["captionless_diagnostics"] == {
+        "caption_present": False,
+        "heading_path_present": False,
+        "nearby_text_ref_count": 0,
+        "ocr_candidate_count": 1,
+        "promoted_label_count": 0,
+        "status": "captionless_diagnostics_only",
+        "rejection_reasons": [
+            "low_confidence",
+            "missing_caption",
+            "missing_heading_path",
+            "no_nearby_text_refs",
+            "no_promoted_ocr_labels",
+        ],
+    }
+
+
 def test_figure_records_use_nearby_crop_text_for_diagram_labels() -> None:
     text_blocks = [
         {

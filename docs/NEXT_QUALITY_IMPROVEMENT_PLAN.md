@@ -23,6 +23,6 @@
 
 ## 남은 작업
 
-현재 남은 quality backlog는 없다.
+현재 active quality backlog는 없다.
 
-새 개선 과제가 발견되면 구현 전에 이 섹션에 신규 Q 항목으로 추가한다.
+새 개선 과제가 발견되면 이 섹션에 신규 Q 번호로 추가하고, 대응 개발 명세를 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에 작성한다.

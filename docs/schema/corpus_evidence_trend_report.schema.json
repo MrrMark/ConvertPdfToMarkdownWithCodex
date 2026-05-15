@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "CorpusEvidenceTrendSignature": {
+      "properties": {
+        "baseline_document_count": {
+          "default": 0,
+          "title": "Baseline Document Count",
+          "type": "integer"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Code"
+        },
+        "current_document_count": {
+          "default": 0,
+          "title": "Current Document Count",
+          "type": "integer"
+        },
+        "domain_adapter": {
+          "title": "Domain Adapter",
+          "type": "string"
+        },
+        "metric": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metric"
+        },
+        "severity": {
+          "title": "Severity",
+          "type": "string"
+        },
+        "signature_id": {
+          "title": "Signature Id",
+          "type": "string"
+        },
+        "ssd_agent_domain": {
+          "title": "Ssd Agent Domain",
+          "type": "string"
+        },
+        "ssd_agent_spec_type": {
+          "title": "Ssd Agent Spec Type",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "signature_id",
+        "status",
+        "severity",
+        "category",
+        "domain_adapter",
+        "ssd_agent_domain",
+        "ssd_agent_spec_type"
+      ],
+      "title": "CorpusEvidenceTrendSignature",
+      "type": "object"
+    },
+    "CorpusEvidenceTrendSummary": {
+      "properties": {
+        "added_error_signature_count": {
+          "default": 0,
+          "title": "Added Error Signature Count",
+          "type": "integer"
+        },
+        "added_signature_count": {
+          "default": 0,
+          "title": "Added Signature Count",
+          "type": "integer"
+        },
+        "baseline_signature_count": {
+          "default": 0,
+          "title": "Baseline Signature Count",
+          "type": "integer"
+        },
+        "current_signature_count": {
+          "default": 0,
+          "title": "Current Signature Count",
+          "type": "integer"
+        },
+        "persisting_signature_count": {
+          "default": 0,
+          "title": "Persisting Signature Count",
+          "type": "integer"
+        },
+        "resolved_signature_count": {
+          "default": 0,
+          "title": "Resolved Signature Count",
+          "type": "integer"
+        }
+      },
+      "title": "CorpusEvidenceTrendSummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "baseline_profile_fingerprint": {
+      "title": "Baseline Profile Fingerprint",
+      "type": "string"
+    },
+    "current_profile_fingerprint": {
+      "title": "Current Profile Fingerprint",
+      "type": "string"
+    },
+    "passed_trend_gate": {
+      "default": true,
+      "title": "Passed Trend Gate",
+      "type": "boolean"
+    },
+    "purpose": {
+      "default": "corpus_evidence_trend_comparison",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "signatures": {
+      "items": {
+        "$ref": "#/$defs/CorpusEvidenceTrendSignature"
+      },
+      "title": "Signatures",
+      "type": "array"
+    },
+    "summary": {
+      "$ref": "#/$defs/CorpusEvidenceTrendSummary"
+    }
+  },
+  "required": [
+    "baseline_profile_fingerprint",
+    "current_profile_fingerprint"
+  ],
+  "title": "CorpusEvidenceTrendReport",
+  "type": "object"
+}

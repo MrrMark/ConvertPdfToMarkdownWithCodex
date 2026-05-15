@@ -126,9 +126,11 @@ python scripts/validate_ssd_rag_contract.py --output-dir output/nvme --ssd-agent
 python scripts/validate_ssd_rag_contract.py --output-dir output/tcg --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
 python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error
 python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error --evidence-pack
+python scripts/analyze_corpus_evidence_pack.py --evidence-pack local_corpus_evidence_pack.json
+python scripts/compare_corpus_evidence_packs.py --baseline old_evidence_pack.json --current local_corpus_evidence_pack.json --fail-on-new-signature
 ```
 
-운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다.
+운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
 
 ## Azure AI Search
 
