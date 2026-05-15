@@ -8,6 +8,7 @@ import threading
 import webbrowser
 
 from pdf2md.gui_runner import (
+    GuiBatchProgress,
     GuiConversionOptions,
     GuiConversionRequest,
     GuiConversionSummary,
@@ -38,6 +39,7 @@ class Pdf2MdGuiApp:
         self.root.minsize(760, 560)
         self.queue: Queue[tuple[str, object]] = Queue()
         self.worker: threading.Thread | None = None
+        self.cancel_event = threading.Event()
         self.last_summary: GuiConversionSummary | None = None
 
         self.input_mode = tk.StringVar(value="file")
@@ -118,6 +120,8 @@ class Pdf2MdGuiApp:
         button_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         self.start_button = ttk.Button(button_frame, text="Start conversion", command=self._start_conversion)
         self.start_button.pack(side=tk.LEFT)
+        self.cancel_button = ttk.Button(button_frame, text="Cancel", command=self._request_cancel, state=tk.DISABLED)
+        self.cancel_button.pack(side=tk.LEFT, padx=(8, 0))
         self.open_output_button = ttk.Button(button_frame, text="Open output folder", command=self._open_output, state=tk.DISABLED)
         self.open_output_button.pack(side=tk.LEFT, padx=(8, 0))
 
@@ -127,20 +131,22 @@ class Pdf2MdGuiApp:
         results.rowconfigure(0, weight=1)
         self.result_tree = ttk.Treeview(
             results,
-            columns=("document", "status", "warnings", "markdown", "report"),
+            columns=("document", "status", "warnings", "retry", "markdown", "report"),
             show="headings",
             height=5,
         )
         self.result_tree.heading("document", text="Document")
         self.result_tree.heading("status", text="Status")
         self.result_tree.heading("warnings", text="Warnings")
+        self.result_tree.heading("retry", text="Retry")
         self.result_tree.heading("markdown", text="Markdown")
         self.result_tree.heading("report", text="Report")
         self.result_tree.column("document", width=150, anchor="w")
         self.result_tree.column("status", width=110, anchor="w")
         self.result_tree.column("warnings", width=90, anchor="center")
-        self.result_tree.column("markdown", width=190, anchor="w")
-        self.result_tree.column("report", width=190, anchor="w")
+        self.result_tree.column("retry", width=70, anchor="center")
+        self.result_tree.column("markdown", width=170, anchor="w")
+        self.result_tree.column("report", width=170, anchor="w")
         self.result_tree.grid(row=0, column=0, sticky="nsew")
 
         self.log_text = tk.Text(frame, height=9, wrap="word", state=tk.DISABLED)
@@ -221,7 +227,9 @@ class Pdf2MdGuiApp:
             return
         request = self._request()
         self.start_button.configure(state="disabled")
+        self.cancel_button.configure(state="normal")
         self.open_output_button.configure(state="disabled")
+        self.cancel_event.clear()
         self.last_summary = None
         self._clear_log()
         self._clear_results()
@@ -229,6 +237,7 @@ class Pdf2MdGuiApp:
         diagnostics = validate_gui_request(request)
         if diagnostics.has_errors:
             self.start_button.configure(state="normal")
+            self.cancel_button.configure(state="disabled")
             self._append_log(diagnostics.user_message())
             messagebox.showerror("Cannot start conversion", diagnostics.user_message())
             return
@@ -237,7 +246,12 @@ class Pdf2MdGuiApp:
 
         def worker() -> None:
             try:
-                summary = run_gui_conversion(request, progress=lambda message: self.queue.put(("log", message)))
+                summary = run_gui_conversion(
+                    request,
+                    progress=lambda message: self.queue.put(("log", message)),
+                    batch_progress=lambda event: self.queue.put(("batch_progress", event)),
+                    cancel_requested=self.cancel_event.is_set,
+                )
             except GuiDiagnosticError as exc:
                 self.queue.put(("diagnostic_error", exc))
             except Exception as exc:  # noqa: BLE001
@@ -256,17 +270,22 @@ class Pdf2MdGuiApp:
                 event, payload = self.queue.get_nowait()
                 if event == "log":
                     self._append_log(str(payload))
+                elif event == "batch_progress" and isinstance(payload, GuiBatchProgress):
+                    self._append_log(self._batch_progress_text(payload))
                 elif event == "diagnostic_error" and isinstance(payload, GuiDiagnosticError):
                     self.start_button.configure(state="normal")
+                    self.cancel_button.configure(state="disabled")
                     self._append_log(payload.report.user_message())
                     messagebox.showerror("Cannot start conversion", payload.report.user_message())
                 elif event == "error":
                     self.start_button.configure(state="normal")
+                    self.cancel_button.configure(state="disabled")
                     self._append_log(f"Failed: {payload}")
                     messagebox.showerror("Conversion failed", str(payload))
                 elif event == "done" and isinstance(payload, GuiConversionSummary):
                     self.last_summary = payload
                     self.start_button.configure(state="normal")
+                    self.cancel_button.configure(state="disabled")
                     self.open_output_button.configure(state="normal")
                     self._populate_results(payload)
                     self._append_log(format_gui_summary(payload))
@@ -291,6 +310,7 @@ class Pdf2MdGuiApp:
                     document.input_pdf.name,
                     document.status,
                     warning_value,
+                    "yes" if document.retry_candidate else "",
                     str(document.markdown_path or ""),
                     str(document.report_path or ""),
                 ),
@@ -299,6 +319,14 @@ class Pdf2MdGuiApp:
     def _clear_results(self) -> None:
         for item_id in self.result_tree.get_children():
             self.result_tree.delete(item_id)
+
+    def _request_cancel(self) -> None:
+        self.cancel_event.set()
+        self.cancel_button.configure(state="disabled")
+        self._append_log("Cancel requested; the current document will finish before the batch stops.")
+
+    def _batch_progress_text(self, event: GuiBatchProgress) -> str:
+        return f"Batch {event.current}/{event.total} {event.input_pdf.name}: {event.status}"
 
     def _append_log(self, message: str) -> None:
         self.log_text.configure(state="normal")

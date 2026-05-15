@@ -2,20 +2,26 @@ from __future__ import annotations
 
 import importlib
 from importlib import metadata as importlib_metadata
+import hashlib
+import json
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable, Literal, Sequence
 
 from pdf2md.config import Config, default_output_dir_for_input
 from pdf2md.models import ConversionStatus, DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode, WarningEntry
-from pdf2md.pipeline import EXIT_PARTIAL, ConversionResult, run_conversion
+from pdf2md.pipeline import EXIT_FATAL, EXIT_PARTIAL, ConversionResult, run_conversion
 
 
 ProgressCallback = Callable[[str], None]
+BatchProgressCallback = Callable[["GuiBatchProgress"], None]
+CancelCallback = Callable[[], bool]
 DiagnosticSeverity = Literal["info", "warning", "error"]
 MIN_GUI_PYTHON_VERSION = (3, 11)
+GUI_STATUS_SKIPPED = "skipped"
+GUI_STATUS_CANCELLED = "cancelled"
 
 
 @dataclass(frozen=True)
@@ -87,6 +93,14 @@ class GuiConversionRequest:
 
 
 @dataclass(frozen=True)
+class GuiBatchProgress:
+    current: int
+    total: int
+    input_pdf: Path
+    status: str
+
+
+@dataclass(frozen=True)
 class GuiDocumentSummary:
     input_pdf: Path
     output_dir: Path
@@ -99,6 +113,8 @@ class GuiDocumentSummary:
     warning_count: int = 0
     warning_codes: tuple[str, ...] = ()
     skipped: bool = False
+    retry_candidate: bool = False
+    option_fingerprint: str | None = None
     message: str | None = None
 
 
@@ -126,6 +142,14 @@ class GuiConversionSummary:
     def skipped_count(self) -> int:
         return sum(1 for document in self.documents if document.skipped)
 
+    @property
+    def cancelled_count(self) -> int:
+        return sum(1 for document in self.documents if document.status == GUI_STATUS_CANCELLED)
+
+    @property
+    def retry_candidates(self) -> tuple[GuiDocumentSummary, ...]:
+        return tuple(document for document in self.documents if document.retry_candidate)
+
 
 def warning_codes_for_display(warnings: list[WarningEntry]) -> tuple[str, ...]:
     """Return deterministic warning codes for GUI display without copying source text."""
@@ -141,6 +165,8 @@ def format_gui_summary(summary: GuiConversionSummary) -> str:
             f"partial={summary.partial_success_count}, "
             f"failed={summary.failed_count}, "
             f"skipped={summary.skipped_count}, "
+            f"cancelled={summary.cancelled_count}, "
+            f"retry_candidates={len(summary.retry_candidates)}, "
             f"output={summary.output_root}"
         )
     ]
@@ -148,9 +174,11 @@ def format_gui_summary(summary: GuiConversionSummary) -> str:
         warning_text = f", warnings={document.warning_count}" if document.warning_count else ""
         if document.warning_codes:
             warning_text += f" ({', '.join(document.warning_codes)})"
+        retry_text = ", retry_candidate=true" if document.retry_candidate else ""
         lines.append(
             f"- {document.input_pdf.name}: status={document.status}{warning_text}, "
             f"markdown={document.markdown_path}, report={document.report_path}, manifest={document.manifest_path}"
+            f"{retry_text}"
         )
     return "\n".join(lines)
 
@@ -458,6 +486,12 @@ def _coerce_options(options: GuiConversionOptions) -> dict:
     }
 
 
+def gui_options_fingerprint(options: GuiConversionOptions) -> str:
+    """Return a deterministic local-only fingerprint for GUI conversion options."""
+    payload = json.dumps(asdict(options), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
 def build_single_config(request: GuiConversionRequest) -> Config:
     """Build the same single-document Config used by the CLI path."""
     input_pdf = request.input_path
@@ -483,7 +517,7 @@ def iter_pdf_paths(input_dir: Path) -> list[Path]:
     """Return direct child PDF files in deterministic order."""
     return sorted(
         [path for path in input_dir.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"],
-        key=lambda path: path.name.lower(),
+        key=lambda path: (path.name.lower(), path.name),
     )
 
 
@@ -517,7 +551,12 @@ def _assets_dir(config: Config) -> Path:
     return config.output_dir / config.assets_dirname
 
 
-def _document_summary_from_result(config: Config, result: ConversionResult) -> GuiDocumentSummary:
+def _document_summary_from_result(
+    config: Config,
+    result: ConversionResult,
+    *,
+    option_fingerprint: str | None = None,
+) -> GuiDocumentSummary:
     return GuiDocumentSummary(
         input_pdf=config.input_pdf,
         output_dir=config.output_dir,
@@ -529,6 +568,8 @@ def _document_summary_from_result(config: Config, result: ConversionResult) -> G
         assets_dir=_assets_dir(config),
         warning_count=len(result.warnings),
         warning_codes=warning_codes_for_display(result.warnings),
+        retry_candidate=result.status == ConversionStatus.FAILED,
+        option_fingerprint=option_fingerprint,
     )
 
 
@@ -537,12 +578,24 @@ def _emit(progress: ProgressCallback | None, message: str) -> None:
         progress(message)
 
 
+def _emit_batch_progress(
+    batch_progress: BatchProgressCallback | None,
+    *,
+    current: int,
+    total: int,
+    input_pdf: Path,
+    status: str,
+) -> None:
+    if batch_progress is not None:
+        batch_progress(GuiBatchProgress(current=current, total=total, input_pdf=input_pdf, status=status))
+
+
 def _run_single(request: GuiConversionRequest, progress: ProgressCallback | None) -> GuiConversionSummary:
     config = build_single_config(request)
     _emit(progress, f"Converting {config.input_pdf}")
     result = run_conversion(config)
     _emit(progress, f"Finished {config.input_pdf.name}: {result.status.value}")
-    document = _document_summary_from_result(config, result)
+    document = _document_summary_from_result(config, result, option_fingerprint=gui_options_fingerprint(request.options))
     return GuiConversionSummary(
         input_mode="file",
         input_path=request.input_path,
@@ -552,7 +605,43 @@ def _run_single(request: GuiConversionRequest, progress: ProgressCallback | None
     )
 
 
-def _run_batch(request: GuiConversionRequest, progress: ProgressCallback | None) -> GuiConversionSummary:
+def _cancelled_document_summary(config: Config, option_fingerprint: str) -> GuiDocumentSummary:
+    return GuiDocumentSummary(
+        input_pdf=config.input_pdf,
+        output_dir=config.output_dir,
+        status=GUI_STATUS_CANCELLED,
+        exit_code=EXIT_PARTIAL,
+        markdown_path=_markdown_path(config),
+        manifest_path=_manifest_path(config),
+        report_path=_report_path(config),
+        assets_dir=_assets_dir(config),
+        option_fingerprint=option_fingerprint,
+        message="cancelled before conversion",
+    )
+
+
+def _failed_document_summary(config: Config, exc: Exception, option_fingerprint: str) -> GuiDocumentSummary:
+    return GuiDocumentSummary(
+        input_pdf=config.input_pdf,
+        output_dir=config.output_dir,
+        status=ConversionStatus.FAILED.value,
+        exit_code=EXIT_FATAL,
+        markdown_path=_markdown_path(config),
+        manifest_path=_manifest_path(config),
+        report_path=_report_path(config),
+        assets_dir=_assets_dir(config),
+        retry_candidate=True,
+        option_fingerprint=option_fingerprint,
+        message=str(exc),
+    )
+
+
+def _run_batch(
+    request: GuiConversionRequest,
+    progress: ProgressCallback | None,
+    batch_progress: BatchProgressCallback | None,
+    cancel_requested: CancelCallback | None,
+) -> GuiConversionSummary:
     input_dir = request.input_path
     if not input_dir.exists() or not input_dir.is_dir():
         raise ValueError(f"Input directory does not exist or is not a directory: {input_dir}")
@@ -567,31 +656,82 @@ def _run_batch(request: GuiConversionRequest, progress: ProgressCallback | None)
     output_root.mkdir(parents=True, exist_ok=True)
     documents: list[GuiDocumentSummary] = []
     exit_code = 0
-    for pdf_path in pdf_paths:
+    option_fingerprint = gui_options_fingerprint(request.options)
+    total = len(pdf_paths)
+    for index, pdf_path in enumerate(pdf_paths, start=1):
         config = build_batch_config(request, pdf_path, output_root)
+        if cancel_requested is not None and cancel_requested():
+            exit_code = EXIT_PARTIAL
+            for cancelled_path in pdf_paths[index - 1 :]:
+                cancelled_config = build_batch_config(request, cancelled_path, output_root)
+                _emit(progress, f"Cancelled {cancelled_path.name}: request received before conversion")
+                _emit_batch_progress(
+                    batch_progress,
+                    current=pdf_paths.index(cancelled_path) + 1,
+                    total=total,
+                    input_pdf=cancelled_path,
+                    status=GUI_STATUS_CANCELLED,
+                )
+                documents.append(_cancelled_document_summary(cancelled_config, option_fingerprint))
+            break
         if request.options.skip_existing and _has_existing_core_outputs(config):
             _emit(progress, f"Skipped {pdf_path.name}: existing core outputs")
+            _emit_batch_progress(
+                batch_progress,
+                current=index,
+                total=total,
+                input_pdf=pdf_path,
+                status=GUI_STATUS_SKIPPED,
+            )
             documents.append(
                 GuiDocumentSummary(
                     input_pdf=pdf_path,
                     output_dir=config.output_dir,
-                    status="skipped",
+                    status=GUI_STATUS_SKIPPED,
                     exit_code=0,
                     markdown_path=_markdown_path(config),
                     manifest_path=_manifest_path(config),
                     report_path=_report_path(config),
                     assets_dir=_assets_dir(config),
                     skipped=True,
+                    option_fingerprint=option_fingerprint,
                     message="existing core outputs",
                 )
             )
             continue
         _emit(progress, f"Converting {pdf_path}")
-        result = run_conversion(config)
+        _emit_batch_progress(
+            batch_progress,
+            current=index,
+            total=total,
+            input_pdf=pdf_path,
+            status="started",
+        )
+        try:
+            result = run_conversion(config)
+        except Exception as exc:  # noqa: BLE001
+            exit_code = EXIT_PARTIAL
+            _emit(progress, f"Failed {pdf_path.name}: {exc}")
+            _emit_batch_progress(
+                batch_progress,
+                current=index,
+                total=total,
+                input_pdf=pdf_path,
+                status=ConversionStatus.FAILED.value,
+            )
+            documents.append(_failed_document_summary(config, exc, option_fingerprint))
+            continue
         _emit(progress, f"Finished {pdf_path.name}: {result.status.value}")
+        _emit_batch_progress(
+            batch_progress,
+            current=index,
+            total=total,
+            input_pdf=pdf_path,
+            status=result.status.value,
+        )
         if result.exit_code != 0:
             exit_code = EXIT_PARTIAL
-        documents.append(_document_summary_from_result(config, result))
+        documents.append(_document_summary_from_result(config, result, option_fingerprint=option_fingerprint))
     return GuiConversionSummary(
         input_mode="folder",
         input_path=input_dir,
@@ -605,6 +745,8 @@ def run_gui_conversion(
     request: GuiConversionRequest,
     *,
     progress: ProgressCallback | None = None,
+    batch_progress: BatchProgressCallback | None = None,
+    cancel_requested: CancelCallback | None = None,
 ) -> GuiConversionSummary:
     """Run a GUI-initiated conversion through the same core pipeline as CLI conversions."""
     diagnostics = validate_gui_request(request)
@@ -618,5 +760,5 @@ def run_gui_conversion(
             raise ValueError(f"Input file is not a PDF: {request.input_path}")
         return _run_single(request, progress)
     if mode == "folder":
-        return _run_batch(request, progress)
+        return _run_batch(request, progress, batch_progress, cancel_requested)
     raise ValueError(f"Unsupported GUI input mode: {request.input_mode}")
