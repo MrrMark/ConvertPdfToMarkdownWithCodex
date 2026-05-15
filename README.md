@@ -645,7 +645,7 @@ pdfs/
 - `summary.structure_marker_suppressed_count`
 
 출력 schema 안정성 정책과 RAG sidecar field 계약은 [docs/OUTPUT_SCHEMA.md](docs/OUTPUT_SCHEMA.md)에 별도로 정리합니다.
-Machine-readable schema는 `docs/schema/`에 있으며, 예를 들어 `docs/schema/manifest.schema.json`과 `docs/schema/local_corpus_evidence_pack.schema.json`을 `python scripts/export_output_schema.py --check`로 검증합니다.
+Machine-readable schema는 `docs/schema/`에 있으며, 예를 들어 `docs/schema/manifest.schema.json`, `docs/schema/local_corpus_evidence_pack.schema.json`, `docs/schema/corpus_evidence_analysis_report.schema.json`, `docs/schema/corpus_evidence_trend_report.schema.json`을 `python scripts/export_output_schema.py --check`로 검증합니다.
 
 `summary.table_quality[]`에는 표별 품질 진단이 기록됩니다. 복잡 표에서는
 `header_depth`, `header_confidence`, `stub_column_count`, `footnote_row_count`,
@@ -774,9 +774,11 @@ python3 scripts/validate_ssd_rag_contract.py --output-dir output/nvme --ssd-agen
 python3 scripts/validate_ssd_rag_contract.py --output-dir output/tcg --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
 python3 scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error
 python3 scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error --evidence-pack
+python3 scripts/analyze_corpus_evidence_pack.py --evidence-pack local_corpus_evidence_pack.json
+python3 scripts/compare_corpus_evidence_packs.py --baseline old_evidence_pack.json --current local_corpus_evidence_pack.json --fail-on-new-signature
 ```
 
-Profile mapping은 `nvme -> HIL/NVMe`, `pcie -> HIL/PCIe`, `ocp -> HIL/OCP`, `tcg -> HIL/TCG`를 기준으로 합니다. TCG는 `CustomerRequirement` fallback 없이 first-class `spec_type=TCG`로 검증합니다. `tables_rag.jsonl`은 운영 profile에서 `--rag-table-output jsonl|both`로 생성하고, `domain_units_rag.jsonl`은 profile별 `--domain-adapter`를 필수로 지정해 생성합니다. Profile 문서에 `eval_set`, `rag_thresholds`, `top_k`를 넣으면 document별 `rag_eval_report.json`과 domain/spec별 aggregate metric도 `ssd_corpus_profile_report.json`에 기록됩니다. `--evidence-pack`은 비공개 corpus 실패 패턴을 raw path, command, filename, query text 없이 `local_corpus_evidence_pack.json` signature 집계로 따로 기록합니다.
+Profile mapping은 `nvme -> HIL/NVMe`, `pcie -> HIL/PCIe`, `ocp -> HIL/OCP`, `tcg -> HIL/TCG`를 기준으로 합니다. TCG는 `CustomerRequirement` fallback 없이 first-class `spec_type=TCG`로 검증합니다. `tables_rag.jsonl`은 운영 profile에서 `--rag-table-output jsonl|both`로 생성하고, `domain_units_rag.jsonl`은 profile별 `--domain-adapter`를 필수로 지정해 생성합니다. Profile 문서에 `eval_set`, `rag_thresholds`, `top_k`를 넣으면 document별 `rag_eval_report.json`과 domain/spec별 aggregate metric도 `ssd_corpus_profile_report.json`에 기록됩니다. `--evidence-pack`은 비공개 corpus 실패 패턴을 raw path, command, filename, query text 없이 `local_corpus_evidence_pack.json` signature 집계로 따로 기록합니다. Evidence pack은 `analyze_corpus_evidence_pack.py`로 hotspot/follow-up hint를 만들고, `compare_corpus_evidence_packs.py`로 baseline/current signature trend를 비교합니다.
 
 ### 구조 마커 복구 운영 포인트
 

@@ -46,6 +46,9 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "--max-duration-regression 0.2" in readme
     assert "docs/OUTPUT_SCHEMA.md" in readme
     assert "docs/schema/manifest.schema.json" in readme
+    assert "docs/schema/corpus_evidence_analysis_report.schema.json" in readme
+    assert "scripts/analyze_corpus_evidence_pack.py" in readme
+    assert "scripts/compare_corpus_evidence_packs.py" in readme
     assert "scripts/export_output_schema.py --check" in readme
     assert "python -m build" in readme
     assert "benchmark_report.json" in readme
@@ -100,6 +103,9 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "--max-duration-regression 0.2" in guide
     assert "docs\\OUTPUT_SCHEMA.md" in guide
     assert "docs\\schema\\manifest.schema.json" in guide
+    assert "docs\\schema\\corpus_evidence_analysis_report.schema.json" in guide
+    assert "scripts\\analyze_corpus_evidence_pack.py" in guide
+    assert "scripts\\compare_corpus_evidence_packs.py" in guide
     assert "scripts\\export_output_schema.py --check" in guide
     assert "python -m build" in guide
     assert "benchmark_report.json" in guide
@@ -150,6 +156,11 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q46. RAG Golden Query Expected Source Coverage" not in next_plan
     assert "Q44. Domain Technical Table Coverage Expansion" not in next_plan
     assert "Q47. Local Technical Corpus Evidence Pack" not in next_plan
+    assert "Q48. Corpus Evidence Signature Analysis Report" not in next_plan
+    assert "Q49. Appendix Clause Requirement Fixture Expansion" not in next_plan
+    assert "Q50. Captionless Diagram Diagnostics Hardening" not in next_plan
+    assert "Q51. Evidence Pack History Comparison Gate" not in next_plan
+    assert "Q52. Quality Document And Schema History Contract" not in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -158,12 +169,19 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
+    assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
+    assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" in implemented_specs
     assert "Q44. Domain Technical Table Coverage Expansion" in implemented_specs
     assert "Q47. Local Technical Corpus Evidence Pack" in implemented_specs
+    assert "Q48. Corpus Evidence Signature Analysis Report" in implemented_specs
+    assert "Q49. Appendix Clause Requirement Fixture Expansion" in implemented_specs
+    assert "Q50. Captionless Diagram Diagnostics Hardening" in implemented_specs
+    assert "Q51. Evidence Pack History Comparison Gate" in implemented_specs
+    assert "Q52. Quality Document And Schema History Contract" in implemented_specs
     assert "schema_version" in output_schema
     assert "docs/schema/manifest.schema.json" in output_schema
     assert "text_blocks_rag.jsonl" in output_schema
@@ -181,6 +199,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "requirement_change_impact_report.json" in output_schema
     assert "local_corpus_evidence_pack.json" in output_schema
     assert "docs/schema/local_corpus_evidence_pack.schema.json" in output_schema
+    assert "corpus_evidence_analysis_report.json" in output_schema
+    assert "corpus_evidence_trend_report.json" in output_schema
+    assert "docs/schema/corpus_evidence_analysis_report.schema.json" in output_schema
+    assert "docs/schema/corpus_evidence_trend_report.schema.json" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema
     assert "2026-05-15" in quality_scorecard
@@ -191,6 +213,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "94/100" in quality_scorecard
     assert "Q31. Local Corpus Profile Runner" in quality_scorecard
     assert "Q35. Rendered Diagram Fixture Suite" in quality_scorecard
+    assert "Q48-Q52" in quality_scorecard
+    assert "Q52" in quality_scorecard
 
 
 def test_windows_script_contracts_are_present() -> None:

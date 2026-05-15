@@ -1,0 +1,212 @@
+{
+  "$defs": {
+    "CorpusEvidenceAnalysisSummary": {
+      "properties": {
+        "document_count": {
+          "default": 0,
+          "title": "Document Count",
+          "type": "integer"
+        },
+        "error_signature_count": {
+          "default": 0,
+          "title": "Error Signature Count",
+          "type": "integer"
+        },
+        "failed_document_count": {
+          "default": 0,
+          "title": "Failed Document Count",
+          "type": "integer"
+        },
+        "failure_signature_count": {
+          "default": 0,
+          "title": "Failure Signature Count",
+          "type": "integer"
+        },
+        "followup_hint_count": {
+          "default": 0,
+          "title": "Followup Hint Count",
+          "type": "integer"
+        },
+        "warning_signature_count": {
+          "default": 0,
+          "title": "Warning Signature Count",
+          "type": "integer"
+        }
+      },
+      "title": "CorpusEvidenceAnalysisSummary",
+      "type": "object"
+    },
+    "CorpusEvidenceFollowupHint": {
+      "properties": {
+        "categories": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Categories",
+          "type": "array"
+        },
+        "hint_id": {
+          "title": "Hint Id",
+          "type": "string"
+        },
+        "matching_signature_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Matching Signature Ids",
+          "type": "array"
+        },
+        "priority": {
+          "title": "Priority",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hint_id",
+        "priority",
+        "reason"
+      ],
+      "title": "CorpusEvidenceFollowupHint",
+      "type": "object"
+    },
+    "CorpusEvidenceHotspot": {
+      "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "document_count": {
+          "default": 0,
+          "title": "Document Count",
+          "type": "integer"
+        },
+        "domain_adapter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Domain Adapter"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "severity_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Severity Counts",
+          "type": "object"
+        },
+        "signature_count": {
+          "default": 0,
+          "title": "Signature Count",
+          "type": "integer"
+        },
+        "signature_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Signature Ids",
+          "type": "array"
+        },
+        "ssd_agent_domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ssd Agent Domain"
+        },
+        "ssd_agent_spec_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ssd Agent Spec Type"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "CorpusEvidenceHotspot",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "category_hotspots": {
+      "items": {
+        "$ref": "#/$defs/CorpusEvidenceHotspot"
+      },
+      "title": "Category Hotspots",
+      "type": "array"
+    },
+    "domain_hotspots": {
+      "items": {
+        "$ref": "#/$defs/CorpusEvidenceHotspot"
+      },
+      "title": "Domain Hotspots",
+      "type": "array"
+    },
+    "followup_hints": {
+      "items": {
+        "$ref": "#/$defs/CorpusEvidenceFollowupHint"
+      },
+      "title": "Followup Hints",
+      "type": "array"
+    },
+    "purpose": {
+      "default": "corpus_evidence_signature_analysis",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_profile_fingerprint": {
+      "title": "Source Profile Fingerprint",
+      "type": "string"
+    },
+    "source_profile_label": {
+      "title": "Source Profile Label",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/CorpusEvidenceAnalysisSummary"
+    }
+  },
+  "required": [
+    "source_profile_label",
+    "source_profile_fingerprint"
+  ],
+  "title": "CorpusEvidenceAnalysisReport",
+  "type": "object"
+}

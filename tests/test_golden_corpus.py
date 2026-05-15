@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from fixtures.pdf_builder import (
+    build_appendix_clause_requirement_pdf,
     build_complex_table_pdf,
     build_bottom_footnote_pdf,
     build_code_block_pdf,
@@ -84,6 +85,7 @@ def test_deterministic_pdf_fixture_builder_covers_priority_corpus(tmp_path: Path
         "semantic_definitions.pdf": build_semantic_definitions_pdf,
         "semantic_cross_refs.pdf": build_semantic_cross_refs_pdf,
         "semantic_table_parameters.pdf": build_semantic_table_parameters_pdf,
+        "appendix_clause_requirements.pdf": build_appendix_clause_requirement_pdf,
         "password.pdf": build_password_pdf,
     }
 

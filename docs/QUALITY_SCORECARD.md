@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-15 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | 0 | Q48-Q52로 evidence pack analysis/trend gate, appendix clause fixture, captionless diagnostics, docs/schema history contract를 추가. active quality backlog 없음 |
 | 2026-05-15 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | 0 | Q47 local technical corpus evidence pack으로 비공개 corpus failure pattern을 redacted signature로 축적 가능. active quality backlog 없음 |
 | 2026-05-15 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | 0 | Q46 expected source coverage와 Q44 domain technical table typed coverage까지 구현되어 active quality backlog 없음 |
 | 2026-05-14 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | +3 | corpus/profile/evidence gates, offline index/provenance/artifact validators, layout/table/OCR/diagram golden packs, page-worker table candidate parallelization 구현 |
@@ -41,6 +42,34 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-15 (Q48-Q52 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴**로 보면 **97/100점** 수준을 유지한다.
+
+Q48-Q52는 Q47 evidence pack을 운영 신호로 더 잘 쓰기 위한 후속 작업이다. 단일 evidence pack 분석 report, baseline/current trend comparison gate, appendix/nested clause/vendor requirement table fixture, captionless diagram diagnostics-only 기록, 그리고 schema/docs history contract가 추가됐다.
+
+점수를 올리지 않는 이유는 이 작업들이 실제 대형 corpus 품질을 새로 입증했다기보다, 비공개 corpus에서 발견되는 실패를 더 안전하게 분류하고 장기 추적하는 운영 장치를 보강한 성격이 강하기 때문이다. 현재 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에는 active quality backlog가 없다.
+
+#### 세부 점수
+
+| 항목 | 점수 | 직전 평가 대비 | 평가 |
+|---|---:|---:|---|
+| 핵심 변환 완성도 | 18/18 | 0 | 변환 본문 경로는 유지하고 evidence 분석/비교와 focused fixture를 추가했다. |
+| 표 변환/RAG 대응 | 18/18 | 0 | appendix nested clause의 requirement table row, technical table row, customer requirement domain unit provenance를 회귀 테스트로 고정했다. |
+| 텍스트 구조 보존 | 15/16 | 0 | appendix heading과 nested clause heading carry-over가 개선됐지만 실제 장문 private corpus 증거는 계속 운영 중 축적해야 한다. |
+| 이미지/OCR 신뢰도 | 13/14 | 0 | captionless low-confidence OCR 후보가 hallucinated caption 없이 diagnostics-only로 남도록 고정했다. |
+| 성능/효율 | 11/12 | 0 | 성능 경로 변경은 없고, evidence trend gate가 장기 운영 신호를 남긴다. |
+| 테스트/결정성/CI | 12/12 | 0 | schema export list와 OUTPUT_SCHEMA 문서 목록 일치, evidence tool smoke, focused regression이 추가됐다. |
+| 운영/릴리스 준비도 | 10/10 | 0 | private corpus evidence pack을 분석하고 baseline/current signature trend로 gate할 수 있는 local-only 운영 절차가 문서화됐다. |
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다.
+
+향후 Q는 실제 private/large corpus evidence pack에서 반복되는 added/persisting error signature가 확인될 때 새 번호로 추가한다.
 
 ### 2026-05-15 (Q47 구현 후)
 

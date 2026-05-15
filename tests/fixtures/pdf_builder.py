@@ -586,6 +586,43 @@ def build_semantic_table_parameters_pdf(path: Path) -> None:
     )
 
 
+def build_appendix_clause_requirement_pdf(path: Path) -> None:
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("Appendix A Vendor Requirements", 72, 800, 16),
+                    PositionedText("1.1 Nested Recovery Clause", 72, 752, 14),
+                    PositionedText(
+                        "VEND-APP-1 The device shall preserve appendix context when recovering tables.",
+                        72,
+                        712,
+                        10,
+                    ),
+                    PositionedText("See Appendix A and Table 1 for details.", 72, 692, 10),
+                    PositionedText("Table 1: Vendor requirement matrix", 72, 648, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Requirement ID", "Requirement Description", "Status"],
+                            [
+                                "VEND-APP-2",
+                                "The exporter shall keep nested clause headings for vendor tables.",
+                                "Mandatory",
+                            ],
+                        ],
+                        72,
+                        618,
+                        [110, 300, 90],
+                    )
+                ],
+            )
+        ],
+    )
+
+
 def build_password_pdf(path: Path, password: str = "secret") -> None:
     write_pdf(path, [PageSpec(texts=[PositionedText("Encrypted fixture", 72, 760)])], password=password)
 

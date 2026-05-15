@@ -8,6 +8,8 @@ from typing import Any
 from pdf2md.models import (
     ArtifactIntegrityReport,
     BatchReport,
+    CorpusEvidenceAnalysisReport,
+    CorpusEvidenceTrendReport,
     CorpusDiffReport,
     CorpusManifest,
     IndexContractReport,
@@ -30,6 +32,8 @@ SCHEMA_FILES: dict[str, type] = {
     "provenance_integrity_report.schema.json": ProvenanceIntegrityReport,
     "artifact_integrity_report.schema.json": ArtifactIntegrityReport,
     "local_corpus_evidence_pack.schema.json": LocalCorpusEvidencePack,
+    "corpus_evidence_analysis_report.schema.json": CorpusEvidenceAnalysisReport,
+    "corpus_evidence_trend_report.schema.json": CorpusEvidenceTrendReport,
 }
 
 

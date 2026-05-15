@@ -23,10 +23,10 @@
 
 ## 현재 Active Development Specs
 
-현재 active quality backlog가 없으므로 작성할 개발 명세도 없다.
+현재 active quality backlog가 없으므로 개발 명세도 없다.
 
-새 개선 과제가 발견되면 먼저 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 신규 Q 항목을 추가하고, 같은 Q 번호의 구현 명세를 이 문서에 작성한다.
+새 Q 항목이 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 추가되면, 구현 전에 이 섹션에 대응 개발 명세를 작성한다.
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q47 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q52 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

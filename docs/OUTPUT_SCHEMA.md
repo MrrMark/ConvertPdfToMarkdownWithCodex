@@ -24,6 +24,8 @@
 - `docs/schema/provenance_integrity_report.schema.json`
 - `docs/schema/artifact_integrity_report.schema.json`
 - `docs/schema/local_corpus_evidence_pack.schema.json`
+- `docs/schema/corpus_evidence_analysis_report.schema.json`
+- `docs/schema/corpus_evidence_trend_report.schema.json`
 
 Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 
@@ -371,16 +373,21 @@ Required per JSONL record:
 - `figure_kind`
 - `diagram_candidate`
 - `detected_labels`
-- `diagram_label_diagnostics`
 - `nearby_text_refs`
 - `classification_confidence`
 - `classification_reasons`
+
+Optional diagnostics:
+
+- `diagram_label_diagnostics`
+- `captionless_diagnostics`
 
 Policy:
 
 - The sidecar records extracted image assets and excluded image candidates.
 - `figure_kind` is conservative metadata such as `image`, `diagram`, `state_machine`, `sequence_diagram`, or `register_layout`.
 - Low-confidence OCR/label candidates stay in `diagram_label_diagnostics.rejected_ocr_candidates`; only promoted candidates appear in `detected_labels`.
+- Captionless candidates may include `captionless_diagnostics` with evidence counts and rejection reasons. This is diagnostics-only metadata and does not create a generated caption or visual description.
 - No generated visual description is added by default.
 
 ## domain_units_rag.jsonl
@@ -615,6 +622,62 @@ Policy:
 - Raw `input_pdf`, `output_dir`, command arguments, profile path, source filename, and eval query text are not included.
 - Failure signatures are deterministic and group conversion, SSD contract, RAG threshold, and budget failures by domain/spec/category/code/metric.
 - The pack is intended for sharing failure patterns from private/local technical corpora without sharing source PDFs or local filesystem metadata.
+
+## corpus_evidence_analysis_report.json
+
+Local-only JSON output from `scripts/analyze_corpus_evidence_pack.py`.
+
+Required:
+
+- `schema_version`
+- `purpose`
+- `source_profile_label`
+- `source_profile_fingerprint`
+- `summary`
+- `category_hotspots`
+- `domain_hotspots`
+- `followup_hints`
+
+Policy:
+
+- `purpose` is `corpus_evidence_signature_analysis`.
+- The report consumes only redacted `local_corpus_evidence_pack.json` input.
+- Hotspots group failure signatures by category and domain/spec profile with deterministic ordering.
+- Follow-up hints are deterministic backlog signals only. They do not infer missing source text or call external RAG/indexing services.
+
+Example:
+
+```bash
+python scripts/analyze_corpus_evidence_pack.py --evidence-pack local_corpus_evidence_pack.json
+```
+
+## corpus_evidence_trend_report.json
+
+Local-only JSON output from `scripts/compare_corpus_evidence_packs.py`.
+
+Required:
+
+- `schema_version`
+- `purpose`
+- `baseline_profile_fingerprint`
+- `current_profile_fingerprint`
+- `passed_trend_gate`
+- `summary`
+- `signatures`
+
+Policy:
+
+- `purpose` is `corpus_evidence_trend_comparison`.
+- Baseline/current packs are compared by deterministic `signature_id`.
+- `signatures[].status` is one of `added`, `persisting`, or `resolved`.
+- `--fail-on-new-signature` returns non-zero when new error signatures appear.
+- The comparison uses redacted evidence packs only and does not access source PDFs, raw paths, commands, or query text.
+
+Example:
+
+```bash
+python scripts/compare_corpus_evidence_packs.py --baseline old.json --current new.json --fail-on-new-signature
+```
 
 ## requirement_impact_review_pack.json / requirement_impact_review_pack.md
 

@@ -44,6 +44,7 @@ from pdf2md.serializers.rag_requirements import (
     serialize_requirement_traceability_jsonl,
 )
 from pdf2md.serializers.rag_tables import (
+    annotate_rag_tables_with_heading_context,
     flatten_rag_table_records,
     normalize_rag_table_payload,
     serialize_rag_tables_jsonl,
@@ -801,6 +802,10 @@ def run_conversion(config: Config) -> ConversionResult:
     footnote_candidate_count = text_block_result.footnote_candidate_count
     structure_low_confidence_count = text_block_result.structure_low_confidence_count
     finish_stage("rag_text_blocks", rag_text_started)
+    contextual_rag_tables = annotate_rag_tables_with_heading_context(
+        table_result.rag_tables,
+        text_block_result.records,
+    )
 
     figure_rag_started = stage_start()
     figure_records = build_figure_records(
@@ -814,7 +819,7 @@ def run_conversion(config: Config) -> ConversionResult:
     semantic_started = stage_start()
     semantic_result = build_semantic_layer(
         text_block_records=text_block_result.records,
-        rag_tables=table_result.rag_tables,
+        rag_tables=contextual_rag_tables,
     )
     (
         semantic_unit_record_count,
@@ -837,7 +842,7 @@ def run_conversion(config: Config) -> ConversionResult:
     requirement_traceability_started = stage_start()
     requirement_traceability_records = build_requirement_traceability_records(
         requirements=semantic_result.requirements,
-        rag_tables=table_result.rag_tables,
+        rag_tables=contextual_rag_tables,
     )
     requirement_traceability_record_count, requirement_traceability_file_count = _write_requirement_traceability_output(
         config,
@@ -846,7 +851,7 @@ def run_conversion(config: Config) -> ConversionResult:
     finish_stage("rag_requirement_traceability", requirement_traceability_started)
 
     technical_tables_started = stage_start()
-    technical_table_records = build_technical_table_records(table_result.rag_tables)
+    technical_table_records = build_technical_table_records(contextual_rag_tables)
     technical_table_record_count, technical_table_file_count = _write_technical_table_output(
         config,
         technical_table_records,
@@ -858,7 +863,7 @@ def run_conversion(config: Config) -> ConversionResult:
         domain_started = stage_start()
         domain_units = build_domain_units(
             domain_adapter=domain_adapter,
-            rag_tables=table_result.rag_tables,
+            rag_tables=contextual_rag_tables,
             technical_table_records=technical_table_records,
         )
         domain_unit_record_count, domain_unit_file_count = _write_domain_unit_output(config, domain_units)
@@ -869,7 +874,7 @@ def run_conversion(config: Config) -> ConversionResult:
         text_block_records=text_block_result.records,
         semantic_units=semantic_result.semantic_units,
         requirements=semantic_result.requirements,
-        rag_tables=table_result.rag_tables,
+        rag_tables=contextual_rag_tables,
         domain_units=domain_units,
         requirement_traceability_records=requirement_traceability_records,
         technical_table_records=technical_table_records,

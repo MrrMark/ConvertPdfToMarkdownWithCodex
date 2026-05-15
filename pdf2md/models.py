@@ -645,3 +645,76 @@ class LocalCorpusEvidencePack(BaseModel):
     domains: list[LocalCorpusEvidenceDomain] = Field(default_factory=list)
     documents: list[LocalCorpusEvidenceDocument] = Field(default_factory=list)
     failure_signatures: list[LocalCorpusEvidenceSignature] = Field(default_factory=list)
+
+
+class CorpusEvidenceHotspot(BaseModel):
+    key: str
+    category: Optional[str] = None
+    domain_adapter: Optional[str] = None
+    ssd_agent_domain: Optional[str] = None
+    ssd_agent_spec_type: Optional[str] = None
+    signature_count: int = 0
+    document_count: int = 0
+    severity_counts: dict[str, int] = Field(default_factory=dict)
+    signature_ids: list[str] = Field(default_factory=list)
+
+
+class CorpusEvidenceFollowupHint(BaseModel):
+    hint_id: str
+    priority: str
+    reason: str
+    categories: list[str] = Field(default_factory=list)
+    matching_signature_ids: list[str] = Field(default_factory=list)
+
+
+class CorpusEvidenceAnalysisSummary(BaseModel):
+    document_count: int = 0
+    failed_document_count: int = 0
+    failure_signature_count: int = 0
+    error_signature_count: int = 0
+    warning_signature_count: int = 0
+    followup_hint_count: int = 0
+
+
+class CorpusEvidenceAnalysisReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "corpus_evidence_signature_analysis"
+    source_profile_label: str
+    source_profile_fingerprint: str
+    summary: CorpusEvidenceAnalysisSummary = Field(default_factory=CorpusEvidenceAnalysisSummary)
+    category_hotspots: list[CorpusEvidenceHotspot] = Field(default_factory=list)
+    domain_hotspots: list[CorpusEvidenceHotspot] = Field(default_factory=list)
+    followup_hints: list[CorpusEvidenceFollowupHint] = Field(default_factory=list)
+
+
+class CorpusEvidenceTrendSummary(BaseModel):
+    baseline_signature_count: int = 0
+    current_signature_count: int = 0
+    added_signature_count: int = 0
+    resolved_signature_count: int = 0
+    persisting_signature_count: int = 0
+    added_error_signature_count: int = 0
+
+
+class CorpusEvidenceTrendSignature(BaseModel):
+    signature_id: str
+    status: str
+    severity: str
+    category: str
+    domain_adapter: str
+    ssd_agent_domain: str
+    ssd_agent_spec_type: str
+    code: Optional[str] = None
+    metric: Optional[str] = None
+    baseline_document_count: int = 0
+    current_document_count: int = 0
+
+
+class CorpusEvidenceTrendReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "corpus_evidence_trend_comparison"
+    baseline_profile_fingerprint: str
+    current_profile_fingerprint: str
+    passed_trend_gate: bool = True
+    summary: CorpusEvidenceTrendSummary = Field(default_factory=CorpusEvidenceTrendSummary)
+    signatures: list[CorpusEvidenceTrendSignature] = Field(default_factory=list)

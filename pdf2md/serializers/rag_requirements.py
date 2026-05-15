@@ -64,6 +64,11 @@ def _page(record: dict[str, Any]) -> int:
         return 0
 
 
+def _heading_path(record: dict[str, Any]) -> list[str]:
+    value = record.get("heading_path")
+    return [str(item) for item in value] if isinstance(value, list) else []
+
+
 def _requirement_id(text: str, cells: dict[str, Any] | None = None) -> str | None:
     if cells:
         explicit = _cell(cells, "Requirement ID", "Requirement", "Req ID", "ID")
@@ -203,7 +208,7 @@ def build_requirement_traceability_records(
                 source_refs=[_source_ref_for_table_row(row)],
                 requirement_id=req_id,
                 normative_strength="unknown",
-                heading_path=[],
+                heading_path=_heading_path(row),
                 bbox=row.get("bbox") if isinstance(row.get("bbox"), list) else None,
                 reasons=["table_requirement_id", "table_description"],
             )
