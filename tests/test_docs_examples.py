@@ -149,6 +149,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q43. Quality Scorecard Refresh" not in next_plan
     assert "Q46. RAG Golden Query Expected Source Coverage" not in next_plan
     assert "Q44. Domain Technical Table Coverage Expansion" not in next_plan
+    assert "Q47. Local Technical Corpus Evidence Pack" not in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -156,11 +157,13 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "현재 active quality backlog가 없으므로" in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
+    assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" in implemented_specs
     assert "Q44. Domain Technical Table Coverage Expansion" in implemented_specs
+    assert "Q47. Local Technical Corpus Evidence Pack" in implemented_specs
     assert "schema_version" in output_schema
     assert "docs/schema/manifest.schema.json" in output_schema
     assert "text_blocks_rag.jsonl" in output_schema
@@ -176,6 +179,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "corpus_manifest.json" in output_schema
     assert "corpus_diff_report.json" in output_schema
     assert "requirement_change_impact_report.json" in output_schema
+    assert "local_corpus_evidence_pack.json" in output_schema
+    assert "docs/schema/local_corpus_evidence_pack.schema.json" in output_schema
     assert "tables_rag.jsonl" in output_schema
     assert "pdf2md --help" in output_schema
     assert "2026-05-15" in quality_scorecard

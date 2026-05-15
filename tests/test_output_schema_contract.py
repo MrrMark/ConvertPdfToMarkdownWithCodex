@@ -62,6 +62,7 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "index_contract_report.schema.json",
         "provenance_integrity_report.schema.json",
         "artifact_integrity_report.schema.json",
+        "local_corpus_evidence_pack.schema.json",
     ]
     assert export_output_schema.check_schema_files(output_dir) == []
     manifest_schema = json.loads((output_dir / "manifest.schema.json").read_text(encoding="utf-8"))
@@ -80,6 +81,8 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     assert provenance_schema["properties"]["purpose"]["default"] == "rag_provenance_integrity_validation"
     artifact_schema = json.loads((output_dir / "artifact_integrity_report.schema.json").read_text(encoding="utf-8"))
     assert artifact_schema["properties"]["purpose"]["default"] == "output_artifact_integrity_validation"
+    evidence_schema = json.loads((output_dir / "local_corpus_evidence_pack.schema.json").read_text(encoding="utf-8"))
+    assert evidence_schema["properties"]["purpose"]["default"] == "local_technical_corpus_evidence_pack"
 
 
 def test_corpus_manifest_model_accepts_rag_file_map() -> None:

@@ -125,9 +125,10 @@ Local validation:
 python scripts/validate_ssd_rag_contract.py --output-dir output/nvme --ssd-agent-domain HIL --ssd-agent-spec-type NVMe --domain-adapter nvme
 python scripts/validate_ssd_rag_contract.py --output-dir output/tcg --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
 python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error
+python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error --evidence-pack
 ```
 
-운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json` 또는 sanitized summary만 공유한다.
+운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다.
 
 ## Azure AI Search
 

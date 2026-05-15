@@ -575,3 +575,73 @@ class ArtifactIntegrityReport(BaseModel):
     summary: ArtifactIntegritySummary = Field(default_factory=ArtifactIntegritySummary)
     files: list[ArtifactIntegrityFileSummary] = Field(default_factory=list)
     findings: list[ArtifactIntegrityFinding] = Field(default_factory=list)
+
+
+class LocalCorpusEvidenceRedactionPolicy(BaseModel):
+    raw_paths_included: bool = False
+    commands_included: bool = False
+    document_names_included: bool = False
+    query_text_included: bool = False
+    source_filenames_included: bool = False
+    document_label_policy: str = "order_preserving_redacted_labels"
+
+
+class LocalCorpusEvidenceSummary(BaseModel):
+    document_count: int = 0
+    failed_document_count: int = 0
+    failure_signature_count: int = 0
+    conversion_failure_count: int = 0
+    contract_error_count: int = 0
+    contract_warning_count: int = 0
+    rag_threshold_failure_count: int = 0
+    budget_failure_count: int = 0
+
+
+class LocalCorpusEvidenceDomain(BaseModel):
+    domain_adapter: str
+    ssd_agent_domain: str
+    ssd_agent_spec_type: str
+    document_count: int = 0
+    failed_document_count: int = 0
+    signature_ids: list[str] = Field(default_factory=list)
+
+
+class LocalCorpusEvidenceDocument(BaseModel):
+    document_label: str
+    domain_adapter: str
+    ssd_agent_domain: str
+    ssd_agent_spec_type: str
+    conversion_exit_code: Optional[int] = None
+    contract_passed: Optional[bool] = None
+    rag_eval_passed: Optional[bool] = None
+    rag_eval_metrics: dict[str, float] = Field(default_factory=dict)
+    signature_ids: list[str] = Field(default_factory=list)
+
+
+class LocalCorpusEvidenceSignature(BaseModel):
+    signature_id: str
+    severity: str
+    category: str
+    domain_adapter: str
+    ssd_agent_domain: str
+    ssd_agent_spec_type: str
+    code: Optional[str] = None
+    path: Optional[str] = None
+    metric: Optional[str] = None
+    direction: Optional[str] = None
+    document_count: int = 0
+    document_labels: list[str] = Field(default_factory=list)
+    observed_values: list[Any] = Field(default_factory=list)
+    limits: list[Any] = Field(default_factory=list)
+
+
+class LocalCorpusEvidencePack(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "local_technical_corpus_evidence_pack"
+    profile_label: str
+    profile_fingerprint: str
+    redaction_policy: LocalCorpusEvidenceRedactionPolicy = Field(default_factory=LocalCorpusEvidenceRedactionPolicy)
+    summary: LocalCorpusEvidenceSummary = Field(default_factory=LocalCorpusEvidenceSummary)
+    domains: list[LocalCorpusEvidenceDomain] = Field(default_factory=list)
+    documents: list[LocalCorpusEvidenceDocument] = Field(default_factory=list)
+    failure_signatures: list[LocalCorpusEvidenceSignature] = Field(default_factory=list)

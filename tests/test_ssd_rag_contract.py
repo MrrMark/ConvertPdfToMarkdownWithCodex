@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from scripts.run_ssd_corpus_profile import run_profile
+from pdf2md.models import LocalCorpusEvidencePack
+from scripts.run_ssd_corpus_profile import build_evidence_pack, main as run_ssd_corpus_profile_main, run_profile
 from scripts.validate_ssd_rag_contract import validate_ssd_rag_contract
 
 
@@ -257,3 +258,119 @@ def test_ssd_corpus_profile_aggregates_rag_eval_metrics(tmp_path: Path, monkeypa
     assert report["rag_metrics_by_domain"]["tcg"]["hit_at_k"]["average"] == 1.0
     assert report["rag_metrics_by_spec_type"]["TCG"]["chunk_token_p95"]["max"] == 11
     assert (output_dir / "rag_eval_report.json").exists()
+
+
+def test_local_corpus_evidence_pack_redacts_paths_and_groups_failures() -> None:
+    profile_report = {
+        "schema_version": "1.0",
+        "purpose": "ssd_local_corpus_profile",
+        "profile": "/secure/customer/SecretVendor/local_profile.json",
+        "profile_name": "SecretVendorProfile",
+        "passed": False,
+        "summary": {"document_count": 1, "failed_count": 1},
+        "documents": [
+            {
+                "name": "SecretVendor-NVMe-Requirement.pdf",
+                "input_pdf": "/secure/customer/SecretVendor/SecretVendor-NVMe-Requirement.pdf",
+                "output_dir": "/private/tmp/secret-output",
+                "command": ["python", "-m", "pdf2md", "/secure/customer/SecretVendor/SecretVendor-NVMe-Requirement.pdf"],
+                "domain_adapter": "nvme",
+                "ssd_agent_domain": "HIL",
+                "ssd_agent_spec_type": "NVMe",
+                "conversion_exit_code": 0,
+                "contract_passed": False,
+                "contract_summary": {"error_count": 1, "warning_count": 1},
+                "contract_findings": [
+                    {"severity": "error", "code": "missing_sidecar", "path": "domain_units_rag"},
+                    {"severity": "warning", "code": "heading_path_not_list", "path": "retrieval_chunks_rag.jsonl[1]"},
+                ],
+                "rag_eval_passed": False,
+                "rag_eval_metrics": {"expected_source_coverage": 0.5},
+                "rag_eval_report": {
+                    "results": [{"query": "SecretVendor proprietary query"}],
+                    "gate_failures": [
+                        {
+                            "type": "threshold_failure",
+                            "metric": "expected_source_coverage",
+                            "current": 0.5,
+                            "limit": 0.9,
+                            "direction": "min",
+                        }
+                    ],
+                },
+                "budget_failures": [
+                    {"metric": "min_domain_units", "current": 0, "limit": 1, "direction": "min"}
+                ],
+            }
+        ],
+    }
+
+    first_pack = build_evidence_pack(profile_report)
+    second_pack = build_evidence_pack(profile_report)
+
+    LocalCorpusEvidencePack.model_validate(first_pack)
+    assert first_pack == second_pack
+    assert first_pack["profile_label"] == "redacted-profile"
+    assert first_pack["summary"]["failure_signature_count"] == 4
+    assert first_pack["summary"]["failed_document_count"] == 1
+    assert first_pack["documents"][0]["document_label"] == "document-000001"
+    assert set(first_pack["documents"][0]["signature_ids"]) == {
+        signature["signature_id"] for signature in first_pack["failure_signatures"]
+    }
+    assert {signature["category"] for signature in first_pack["failure_signatures"]} == {
+        "budget_failure",
+        "contract_error",
+        "contract_warning",
+        "rag_threshold",
+    }
+    serialized = json.dumps(first_pack, ensure_ascii=False, sort_keys=True)
+    assert "/secure" not in serialized
+    assert "/private/tmp" not in serialized
+    assert "SecretVendor" not in serialized
+    assert "proprietary query" not in serialized
+    assert '"command"' not in serialized
+
+
+def test_ssd_corpus_profile_cli_writes_redacted_evidence_pack(tmp_path: Path) -> None:
+    profile = tmp_path / "profile.json"
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_name": "SecretVendorProfile",
+                "documents": [
+                    {
+                        "name": "SecretVendor-NVMe",
+                        "input_pdf": "/secure/customer/SecretVendor/nvme.pdf",
+                        "output_dir": str(tmp_path / "nvme-output"),
+                        "domain_adapter": "nvme",
+                        "ssd_agent_domain": "HIL",
+                        "ssd_agent_spec_type": "NVMe",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    report_path = tmp_path / "profile_report.json"
+    evidence_path = tmp_path / "evidence_pack.json"
+
+    exit_code = run_ssd_corpus_profile_main(
+        [
+            "--profile",
+            str(profile),
+            "--dry-run",
+            "--report-path",
+            str(report_path),
+            "--evidence-pack-path",
+            str(evidence_path),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+    LocalCorpusEvidencePack.model_validate(payload)
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    assert payload["summary"]["document_count"] == 1
+    assert payload["documents"][0]["document_label"] == "document-000001"
+    assert "/secure/customer" not in serialized
+    assert "SecretVendor" not in serialized

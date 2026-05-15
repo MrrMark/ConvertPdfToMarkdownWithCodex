@@ -23,6 +23,7 @@
 - `docs/schema/index_contract_report.schema.json`
 - `docs/schema/provenance_integrity_report.schema.json`
 - `docs/schema/artifact_integrity_report.schema.json`
+- `docs/schema/local_corpus_evidence_pack.schema.json`
 
 Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 
@@ -584,6 +585,36 @@ Policy:
 - Missing referenced assets and sidecar count mismatches are errors.
 - Orphan assets and confidential-safe absolute paths are warnings.
 - The validator checks local files only and does not mutate conversion outputs.
+
+## local_corpus_evidence_pack.json
+
+Optional redacted JSON output from `scripts/run_ssd_corpus_profile.py --evidence-pack`.
+
+Required:
+
+- `schema_version`
+- `purpose`
+- `profile_label`
+- `profile_fingerprint`
+- `redaction_policy`
+- `summary`
+- `domains`
+- `documents`
+- `failure_signatures`
+
+Stable summary fields:
+
+- `document_count`, `failed_document_count`, `failure_signature_count`
+- `conversion_failure_count`, `contract_error_count`, `contract_warning_count`
+- `rag_threshold_failure_count`, `budget_failure_count`
+
+Policy:
+
+- `purpose` is `local_technical_corpus_evidence_pack`.
+- The evidence pack uses redacted document labels such as `document-000001`.
+- Raw `input_pdf`, `output_dir`, command arguments, profile path, source filename, and eval query text are not included.
+- Failure signatures are deterministic and group conversion, SSD contract, RAG threshold, and budget failures by domain/spec/category/code/metric.
+- The pack is intended for sharing failure patterns from private/local technical corpora without sharing source PDFs or local filesystem metadata.
 
 ## requirement_impact_review_pack.json / requirement_impact_review_pack.md
 
