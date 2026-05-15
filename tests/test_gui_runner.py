@@ -5,13 +5,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from pdf2md.config import Config
 from pdf2md.gui_runner import (
+    GuiDiagnosticError,
     GuiConversionOptions,
     GuiConversionRequest,
     build_batch_config,
     build_single_config,
+    check_gui_runtime,
     run_gui_conversion,
+    validate_gui_request,
 )
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
 from pdf2md.pipeline import run_conversion
@@ -69,6 +74,53 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
     assert config.dedupe_images is True
     assert config.repair_hyphenation is True
     assert config.figure_crop_fallback is True
+
+
+def test_gui_runtime_diagnostics_detects_missing_tkinter() -> None:
+    def fake_import(name: str) -> object:
+        if name == "tkinter":
+            raise ModuleNotFoundError("No module named 'tkinter'")
+        return object()
+
+    report = check_gui_runtime(
+        python_version=(3, 11, 0),
+        import_module=fake_import,
+        entry_point_names=(),
+    )
+
+    assert report.has_errors is True
+    assert [diagnostic.code for diagnostic in report.errors] == ["tkinter_unavailable"]
+    assert "Tkinter is not available" in report.user_message()
+
+
+def test_gui_runtime_diagnostics_flags_unsupported_python() -> None:
+    report = check_gui_runtime(
+        python_version=(3, 10, 9),
+        import_module=lambda name: object(),
+        entry_point_names=(),
+    )
+
+    assert report.has_errors is True
+    assert report.errors[0].code == "python_version_unsupported"
+    assert "Python 3.11 or newer" in report.user_message()
+
+
+def test_gui_request_diagnostics_reject_output_file(sample_pdf: Path, tmp_path: Path) -> None:
+    output_file = tmp_path / "not-a-directory"
+    output_file.write_text("already a file", encoding="utf-8")
+    request = GuiConversionRequest(
+        input_mode="file",
+        input_path=sample_pdf,
+        output_dir=output_file,
+    )
+
+    report = validate_gui_request(request)
+
+    assert report.has_errors is True
+    assert [diagnostic.code for diagnostic in report.errors] == ["output_not_directory"]
+    with pytest.raises(GuiDiagnosticError) as exc_info:
+        run_gui_conversion(request)
+    assert "Output path exists but is not a directory" in str(exc_info.value)
 
 
 def test_gui_single_conversion_uses_same_core_output_as_run_conversion(sample_pdf: Path, tmp_path: Path) -> None:
