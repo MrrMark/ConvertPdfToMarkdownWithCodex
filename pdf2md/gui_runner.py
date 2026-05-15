@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Callable, Literal, Sequence
 
 from pdf2md.config import Config, default_output_dir_for_input
-from pdf2md.models import ConversionStatus, DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
-from pdf2md.pipeline import EXIT_PARTIAL, run_conversion
+from pdf2md.models import ConversionStatus, DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode, WarningEntry
+from pdf2md.pipeline import EXIT_PARTIAL, ConversionResult, run_conversion
 
 
 ProgressCallback = Callable[[str], None]
@@ -92,6 +92,12 @@ class GuiDocumentSummary:
     output_dir: Path
     status: str
     exit_code: int
+    markdown_path: Path | None = None
+    manifest_path: Path | None = None
+    report_path: Path | None = None
+    assets_dir: Path | None = None
+    warning_count: int = 0
+    warning_codes: tuple[str, ...] = ()
     skipped: bool = False
     message: str | None = None
 
@@ -119,6 +125,34 @@ class GuiConversionSummary:
     @property
     def skipped_count(self) -> int:
         return sum(1 for document in self.documents if document.skipped)
+
+
+def warning_codes_for_display(warnings: list[WarningEntry]) -> tuple[str, ...]:
+    """Return deterministic warning codes for GUI display without copying source text."""
+    return tuple(sorted({warning.code for warning in warnings}))
+
+
+def format_gui_summary(summary: GuiConversionSummary) -> str:
+    """Format a compact GUI result summary using artifact paths and structured warning counts."""
+    lines = [
+        (
+            "Finished: "
+            f"success={summary.success_count}, "
+            f"partial={summary.partial_success_count}, "
+            f"failed={summary.failed_count}, "
+            f"skipped={summary.skipped_count}, "
+            f"output={summary.output_root}"
+        )
+    ]
+    for document in summary.documents:
+        warning_text = f", warnings={document.warning_count}" if document.warning_count else ""
+        if document.warning_codes:
+            warning_text += f" ({', '.join(document.warning_codes)})"
+        lines.append(
+            f"- {document.input_pdf.name}: status={document.status}{warning_text}, "
+            f"markdown={document.markdown_path}, report={document.report_path}, manifest={document.manifest_path}"
+        )
+    return "\n".join(lines)
 
 
 def _format_version(version: Sequence[int]) -> str:
@@ -467,6 +501,37 @@ def _has_existing_core_outputs(config: Config) -> bool:
     )
 
 
+def _markdown_path(config: Config) -> Path:
+    return config.output_dir / config.markdown_filename
+
+
+def _manifest_path(config: Config) -> Path:
+    return config.output_dir / config.manifest_filename
+
+
+def _report_path(config: Config) -> Path:
+    return config.output_dir / config.report_filename
+
+
+def _assets_dir(config: Config) -> Path:
+    return config.output_dir / config.assets_dirname
+
+
+def _document_summary_from_result(config: Config, result: ConversionResult) -> GuiDocumentSummary:
+    return GuiDocumentSummary(
+        input_pdf=config.input_pdf,
+        output_dir=config.output_dir,
+        status=result.status.value,
+        exit_code=result.exit_code,
+        markdown_path=result.markdown_path or _markdown_path(config),
+        manifest_path=result.manifest_path or _manifest_path(config),
+        report_path=result.report_path or _report_path(config),
+        assets_dir=_assets_dir(config),
+        warning_count=len(result.warnings),
+        warning_codes=warning_codes_for_display(result.warnings),
+    )
+
+
 def _emit(progress: ProgressCallback | None, message: str) -> None:
     if progress is not None:
         progress(message)
@@ -477,12 +542,7 @@ def _run_single(request: GuiConversionRequest, progress: ProgressCallback | None
     _emit(progress, f"Converting {config.input_pdf}")
     result = run_conversion(config)
     _emit(progress, f"Finished {config.input_pdf.name}: {result.status.value}")
-    document = GuiDocumentSummary(
-        input_pdf=config.input_pdf,
-        output_dir=config.output_dir,
-        status=result.status.value,
-        exit_code=result.exit_code,
-    )
+    document = _document_summary_from_result(config, result)
     return GuiConversionSummary(
         input_mode="file",
         input_path=request.input_path,
@@ -517,6 +577,10 @@ def _run_batch(request: GuiConversionRequest, progress: ProgressCallback | None)
                     output_dir=config.output_dir,
                     status="skipped",
                     exit_code=0,
+                    markdown_path=_markdown_path(config),
+                    manifest_path=_manifest_path(config),
+                    report_path=_report_path(config),
+                    assets_dir=_assets_dir(config),
                     skipped=True,
                     message="existing core outputs",
                 )
@@ -527,14 +591,7 @@ def _run_batch(request: GuiConversionRequest, progress: ProgressCallback | None)
         _emit(progress, f"Finished {pdf_path.name}: {result.status.value}")
         if result.exit_code != 0:
             exit_code = EXIT_PARTIAL
-        documents.append(
-            GuiDocumentSummary(
-                input_pdf=pdf_path,
-                output_dir=config.output_dir,
-                status=result.status.value,
-                exit_code=result.exit_code,
-            )
-        )
+        documents.append(_document_summary_from_result(config, result))
     return GuiConversionSummary(
         input_mode="folder",
         input_path=input_dir,

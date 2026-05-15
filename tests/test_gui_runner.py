@@ -15,11 +15,19 @@ from pdf2md.gui_runner import (
     build_batch_config,
     build_single_config,
     check_gui_runtime,
+    format_gui_summary,
     run_gui_conversion,
     validate_gui_request,
 )
-from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
-from pdf2md.pipeline import run_conversion
+from pdf2md.models import (
+    ConversionStatus,
+    DomainAdapterMode,
+    ImageMode,
+    RagTableOutputMode,
+    TableMode,
+    WarningEntry,
+)
+from pdf2md.pipeline import ConversionResult, run_conversion
 from helpers.normalize_outputs import normalize_manifest, normalize_report
 
 
@@ -147,6 +155,10 @@ def test_gui_single_conversion_uses_same_core_output_as_run_conversion(sample_pd
 
     assert summary.exit_code == direct_result.exit_code == 0
     assert summary.success_count == 1
+    assert summary.documents[0].markdown_path == gui_output / "document.md"
+    assert summary.documents[0].manifest_path == gui_output / "manifest.json"
+    assert summary.documents[0].report_path == gui_output / "report.json"
+    assert summary.documents[0].assets_dir == gui_output / "assets"
     assert (gui_output / "document.md").read_text(encoding="utf-8") == (
         direct_output / "document.md"
     ).read_text(encoding="utf-8")
@@ -192,3 +204,40 @@ def test_gui_batch_conversion_uses_cli_batch_names_and_skip_existing(sample_pdf:
     assert (output_root / "alpha" / "alpha_report.json").exists()
     assert second.skipped_count == 1
     assert second.documents[0].status == "skipped"
+    assert second.documents[0].markdown_path == output_root / "alpha" / "alpha.md"
+    assert second.documents[0].manifest_path == output_root / "alpha" / "alpha_manifest.json"
+    assert second.documents[0].report_path == output_root / "alpha" / "alpha_report.json"
+
+
+def test_gui_summary_uses_structured_warning_counts(monkeypatch: pytest.MonkeyPatch, sample_pdf: Path, tmp_path: Path) -> None:
+    def fake_run_conversion(config) -> ConversionResult:  # noqa: ANN001
+        return ConversionResult(
+            exit_code=2,
+            markdown_path=config.output_dir / config.markdown_filename,
+            manifest_path=config.output_dir / config.manifest_filename,
+            report_path=config.output_dir / config.report_filename,
+            warnings=[
+                WarningEntry(code="TABLE_FALLBACK", message="table fallback", page=2),
+                WarningEntry(code="OCR_LOW_CONFIDENCE", message="low confidence", page=1),
+                WarningEntry(code="TABLE_FALLBACK", message="table fallback duplicate", page=3),
+            ],
+            status=ConversionStatus.PARTIAL_SUCCESS,
+        )
+
+    monkeypatch.setattr("pdf2md.gui_runner.run_conversion", fake_run_conversion)
+    output_dir = tmp_path / "partial-output"
+    summary = run_gui_conversion(
+        GuiConversionRequest(
+            input_mode="file",
+            input_path=sample_pdf,
+            output_dir=output_dir,
+        )
+    )
+    document = summary.documents[0]
+
+    assert summary.partial_success_count == 1
+    assert document.warning_count == 3
+    assert document.warning_codes == ("OCR_LOW_CONFIDENCE", "TABLE_FALLBACK")
+    text = format_gui_summary(summary)
+    assert "warnings=3 (OCR_LOW_CONFIDENCE, TABLE_FALLBACK)" in text
+    assert "table fallback duplicate" not in text
