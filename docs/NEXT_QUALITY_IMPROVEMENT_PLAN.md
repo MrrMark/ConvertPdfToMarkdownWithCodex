@@ -27,15 +27,8 @@ Q53 Minimal Desktop GUI Wrapper 이후 후속 작업은 GUI가 기존 CLI 변환
 
 | Q | 우선순위 | 작업 | 목표 |
 |---|---|---|---|
-| Q56 | P1 | GUI Batch Operation Controls | 폴더 배치 변환에서 취소, 진행률, 실패 문서 재시도 후보, skip summary를 deterministic local summary로 남긴다. |
 | Q57 | P2 | Non-Developer GUI Distribution Guide | 비개발자가 설치/실행/샘플 변환/문제 진단까지 따라갈 수 있는 GUI 중심 배포 문서를 정리한다. |
 | Q58 | P2 | GUI Smoke And Contract Test Expansion | GUI wrapper가 CLI `Config`/산출물 계약을 계속 따르는지 headless smoke와 문서 계약 테스트로 고정한다. |
-
-### Q56. GUI Batch Operation Controls
-
-- 폴더 배치 변환 중 취소 요청을 안전하게 처리하고, 완료/취소/실패 상태를 문서 단위로 구분한다.
-- skip-existing 결과와 실패 문서 재시도 후보를 local-only summary로 남긴다.
-- 같은 입력과 옵션에서는 동일한 summary ordering과 상태 값이 나오도록 한다.
 
 ### Q57. Non-Developer GUI Distribution Guide
 

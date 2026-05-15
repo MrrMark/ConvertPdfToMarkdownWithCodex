@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-16 | GUI batch 운영성 | 97/100 | 0 | Q56. GUI Batch Operation Controls 구현. batch progress, document-boundary cancel, failed retry candidate, deterministic ordering/fingerprint 추가. 다음 active backlog는 Q57-Q58 |
 | 2026-05-16 | GUI 결과 검토 UX | 97/100 | 0 | Q55. GUI Conversion Result Review UX 구현. 완료 결과 표, artifact path, warning code/count summary 추가. 다음 active backlog는 Q56-Q58 |
 | 2026-05-16 | GUI runtime/install 안정성 | 97/100 | 0 | Q54. GUI Runtime And Install Diagnostics 구현. Tkinter/Python/entry point/input/output path 진단을 변환 실패와 분리. 다음 active backlog는 Q55-Q58 |
 | 2026-05-16 | GUI 후속 운영 계획 | 97/100 | 0 | Q54-Q58 active backlog 추가. GUI runtime diagnostics, result review UX, batch controls, non-developer distribution guide, GUI smoke/contract tests를 구현 전 문서 계약으로 정리 |
@@ -46,6 +47,19 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-16 (Q56 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q56은 폴더 배치 변환 운영성을 보강했다. 진행률 callback, 문서 경계 취소, 실패 문서 retry candidate, deterministic option fingerprint를 GUI runner에 추가했으며, core 변환 산출물 계약은 변경하지 않았다.
+
+#### 다음 개선 참조
+
+- Q57. Non-Developer GUI Distribution Guide
+- Q58. GUI Smoke And Contract Test Expansion
 
 ### 2026-05-16 (Q55 구현 후)
 

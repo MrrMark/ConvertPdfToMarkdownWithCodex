@@ -16,6 +16,7 @@ from pdf2md.gui_runner import (
     build_single_config,
     check_gui_runtime,
     format_gui_summary,
+    gui_options_fingerprint,
     run_gui_conversion,
     validate_gui_request,
 )
@@ -207,6 +208,107 @@ def test_gui_batch_conversion_uses_cli_batch_names_and_skip_existing(sample_pdf:
     assert second.documents[0].markdown_path == output_root / "alpha" / "alpha.md"
     assert second.documents[0].manifest_path == output_root / "alpha" / "alpha_manifest.json"
     assert second.documents[0].report_path == output_root / "alpha" / "alpha_report.json"
+    assert second.documents[0].option_fingerprint == gui_options_fingerprint(
+        GuiConversionOptions(pages="1", skip_existing=True)
+    )
+
+
+def test_gui_batch_uses_deterministic_case_stable_order(sample_pdf: Path, tmp_path: Path) -> None:
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    for name in ("Beta.pdf", "alpha.pdf", "gamma.pdf"):
+        (input_dir / name).write_bytes(sample_pdf.read_bytes())
+
+    summary = run_gui_conversion(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=input_dir,
+            output_dir=tmp_path / "batch-output",
+            options=GuiConversionOptions(pages="1"),
+        )
+    )
+
+    assert [document.input_pdf.name for document in summary.documents] == ["alpha.pdf", "Beta.pdf", "gamma.pdf"]
+
+
+def test_gui_batch_cancel_marks_remaining_documents(monkeypatch: pytest.MonkeyPatch, sample_pdf: Path, tmp_path: Path) -> None:
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    for name in ("alpha.pdf", "beta.pdf"):
+        (input_dir / name).write_bytes(sample_pdf.read_bytes())
+    completed: list[str] = []
+    progress_events: list[tuple[int, int, str, str]] = []
+
+    def fake_run_conversion(config) -> ConversionResult:  # noqa: ANN001
+        completed.append(config.input_pdf.name)
+        return ConversionResult(
+            exit_code=0,
+            markdown_path=config.output_dir / config.markdown_filename,
+            manifest_path=config.output_dir / config.manifest_filename,
+            report_path=config.output_dir / config.report_filename,
+            warnings=[],
+            status=ConversionStatus.SUCCESS,
+        )
+
+    monkeypatch.setattr("pdf2md.gui_runner.run_conversion", fake_run_conversion)
+    summary = run_gui_conversion(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=input_dir,
+            output_dir=tmp_path / "batch-output",
+            options=GuiConversionOptions(pages="1"),
+        ),
+        batch_progress=lambda event: progress_events.append(
+            (event.current, event.total, event.input_pdf.name, event.status)
+        ),
+        cancel_requested=lambda: bool(completed),
+    )
+
+    assert completed == ["alpha.pdf"]
+    assert summary.success_count == 1
+    assert summary.cancelled_count == 1
+    assert summary.exit_code == 2
+    assert [document.status for document in summary.documents] == ["success", "cancelled"]
+    assert progress_events[-1] == (2, 2, "beta.pdf", "cancelled")
+
+
+def test_gui_batch_failure_becomes_retry_candidate(monkeypatch: pytest.MonkeyPatch, sample_pdf: Path, tmp_path: Path) -> None:
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    for name in ("alpha.pdf", "beta.pdf"):
+        (input_dir / name).write_bytes(sample_pdf.read_bytes())
+
+    def fake_run_conversion(config) -> ConversionResult:  # noqa: ANN001
+        if config.input_pdf.name == "beta.pdf":
+            raise RuntimeError("backend failed")
+        return ConversionResult(
+            exit_code=0,
+            markdown_path=config.output_dir / config.markdown_filename,
+            manifest_path=config.output_dir / config.manifest_filename,
+            report_path=config.output_dir / config.report_filename,
+            warnings=[],
+            status=ConversionStatus.SUCCESS,
+        )
+
+    monkeypatch.setattr("pdf2md.gui_runner.run_conversion", fake_run_conversion)
+    summary = run_gui_conversion(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=input_dir,
+            output_dir=tmp_path / "batch-output",
+            options=GuiConversionOptions(pages="1"),
+        )
+    )
+
+    assert summary.success_count == 1
+    assert summary.failed_count == 1
+    assert summary.exit_code == 2
+    assert len(summary.retry_candidates) == 1
+    retry = summary.retry_candidates[0]
+    assert retry.input_pdf.name == "beta.pdf"
+    assert retry.retry_candidate is True
+    assert retry.option_fingerprint == gui_options_fingerprint(GuiConversionOptions(pages="1"))
+    assert "retry_candidates=1" in format_gui_summary(summary)
 
 
 def test_gui_summary_uses_structured_warning_counts(monkeypatch: pytest.MonkeyPatch, sample_pdf: Path, tmp_path: Path) -> None:
