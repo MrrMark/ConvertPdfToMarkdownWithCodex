@@ -1,0 +1,156 @@
+# macOS GUI 빠른 시작 가이드
+
+이 문서는 CLI가 익숙하지 않은 사용자가 macOS에서 `pdf2md` GUI를 실행해 PDF 파일 또는 폴더를 변환하는 최소 절차를 정리한다.
+
+자동화, CI, 반복 배치 변환은 GUI보다 `python3 -m pdf2md` CLI를 권장한다.
+
+## 1) 준비물
+
+- macOS
+- Python 3.11 이상
+- PDF 파일 또는 PDF가 들어 있는 폴더
+- OCR을 사용할 경우 Tesseract
+
+Python 버전 확인:
+
+```bash
+python3 --version
+```
+
+권장 출력 예시:
+
+```text
+Python 3.11.x
+```
+
+Homebrew를 사용하는 경우:
+
+```bash
+brew install python@3.11
+```
+
+OCR을 사용할 경우:
+
+```bash
+brew install tesseract
+tesseract --version
+```
+
+## 2) 프로젝트 폴더 준비
+
+Git을 사용할 수 있으면:
+
+```bash
+git clone https://github.com/MrrMark/ConvertPdfToMarkdownWithCodex.git
+cd ConvertPdfToMarkdownWithCodex
+```
+
+Git을 쓰지 않는 경우에는 소스 ZIP을 받은 뒤 압축을 풀고 해당 폴더로 이동한다.
+
+## 3) 가상환경 만들기
+
+```bash
+python3.11 -m venv .venv311
+source .venv311/bin/activate
+python -m pip install -U pip
+python -m pip install -e .[dev]
+```
+
+`python3.11` 명령이 없다면 `python3 -m venv .venv311`을 사용하되, `python3 --version`이 3.11 이상인지 먼저 확인한다.
+
+## 4) GUI 실행
+
+module 실행:
+
+```bash
+python -m pdf2md.gui
+```
+
+entry point 실행:
+
+```bash
+pdf2md-gui
+```
+
+`pdf2md-gui`가 잡히지 않으면 같은 가상환경에서 아래를 다시 실행한다.
+
+```bash
+python -m pip install -e .[dev]
+```
+
+GUI 도움말 smoke:
+
+```bash
+python -m pdf2md.gui --help
+```
+
+이 명령은 창을 띄우지 않고 도움말만 출력해야 한다.
+
+## 5) 단일 PDF 변환
+
+1. `PDF file`을 선택한다.
+2. `Browse`로 PDF 파일을 선택한다.
+3. 필요하면 `Output folder`를 선택한다.
+4. `Start conversion`을 누른다.
+5. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report` 경로를 확인한다.
+
+출력 폴더를 지정하지 않으면 입력 PDF 옆에 `<pdf_stem>_output` 폴더가 생성된다.
+
+## 6) 폴더 배치 변환
+
+1. `PDF folder`를 선택한다.
+2. PDF가 들어 있는 폴더를 선택한다.
+3. 필요하면 `Skip existing`을 켠다.
+4. `Start conversion`을 누른다.
+5. 진행 중 중단하려면 `Cancel`을 누른다.
+
+취소는 문서 경계에서 처리된다. 이미 완료된 문서의 산출물은 삭제하지 않고, 아직 시작하지 않은 문서는 `cancelled` 상태로 표시된다.
+
+## 7) 결과 확인
+
+GUI 완료 후 Results 표에서 아래를 확인한다.
+
+- `Status`: `success`, `partial_success`, `failed`, `skipped`, `cancelled`
+- `Warnings`: warning count와 warning code
+- `Markdown`: 생성된 Markdown 경로
+- `Report`: `report.json` 경로
+- `Retry`: 실패 문서가 재시도 후보인지 여부
+
+원문 텍스트, 표, 이미지 내용은 GUI summary에서 요약하지 않는다. 자세한 품질 판단은 `report.json`과 `manifest.json`을 확인한다.
+
+## 8) 문제 진단
+
+### Python 버전 오류
+
+- `python --version` 또는 `python3 --version`이 3.11 이상인지 확인한다.
+- 가상환경을 다시 활성화한다.
+
+```bash
+source .venv311/bin/activate
+```
+
+### Tkinter 오류
+
+- Python 설치본에 Tcl/Tk 지원이 빠졌을 수 있다.
+- Homebrew 또는 python.org Python을 다시 설치한 뒤 가상환경을 다시 만든다.
+
+### `pdf2md-gui` 명령이 안 잡힘
+
+```bash
+source .venv311/bin/activate
+python -m pip install -e .[dev]
+python -m pdf2md.gui
+```
+
+### output folder 권한 오류
+
+- Desktop, Documents, Downloads 같은 사용자 쓰기 가능 폴더를 선택한다.
+- 이미 같은 이름의 파일이 output folder 경로에 있으면 폴더로 바꾸거나 다른 경로를 선택한다.
+
+### OCR warning
+
+```bash
+tesseract --version
+```
+
+Tesseract가 없으면 OCR warning이 발생할 수 있다. OCR이 필요 없으면 `Force OCR`을 끈 상태로 실행한다.
