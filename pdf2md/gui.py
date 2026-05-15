@@ -14,6 +14,7 @@ from pdf2md.gui_runner import (
     GuiDiagnosticError,
     GuiDiagnosticReport,
     check_gui_runtime,
+    format_gui_summary,
     run_gui_conversion,
     validate_gui_request,
 )
@@ -120,9 +121,32 @@ class Pdf2MdGuiApp:
         self.open_output_button = ttk.Button(button_frame, text="Open output folder", command=self._open_output, state=tk.DISABLED)
         self.open_output_button.pack(side=tk.LEFT, padx=(8, 0))
 
-        self.log_text = tk.Text(frame, height=14, wrap="word", state=tk.DISABLED)
-        self.log_text.grid(row=5, column=0, columnspan=3, sticky="nsew")
+        results = ttk.LabelFrame(frame, text="Results")
+        results.grid(row=5, column=0, columnspan=3, sticky="nsew", pady=(0, 8))
+        results.columnconfigure(0, weight=1)
+        results.rowconfigure(0, weight=1)
+        self.result_tree = ttk.Treeview(
+            results,
+            columns=("document", "status", "warnings", "markdown", "report"),
+            show="headings",
+            height=5,
+        )
+        self.result_tree.heading("document", text="Document")
+        self.result_tree.heading("status", text="Status")
+        self.result_tree.heading("warnings", text="Warnings")
+        self.result_tree.heading("markdown", text="Markdown")
+        self.result_tree.heading("report", text="Report")
+        self.result_tree.column("document", width=150, anchor="w")
+        self.result_tree.column("status", width=110, anchor="w")
+        self.result_tree.column("warnings", width=90, anchor="center")
+        self.result_tree.column("markdown", width=190, anchor="w")
+        self.result_tree.column("report", width=190, anchor="w")
+        self.result_tree.grid(row=0, column=0, sticky="nsew")
+
+        self.log_text = tk.Text(frame, height=9, wrap="word", state=tk.DISABLED)
+        self.log_text.grid(row=6, column=0, columnspan=3, sticky="nsew")
         frame.rowconfigure(5, weight=1)
+        frame.rowconfigure(6, weight=1)
 
     def _add_labeled_entry(self, parent, label: str, variable, row: int, col: int, show: str | None = None) -> None:  # noqa: ANN001
         from tkinter import ttk
@@ -200,6 +224,7 @@ class Pdf2MdGuiApp:
         self.open_output_button.configure(state="disabled")
         self.last_summary = None
         self._clear_log()
+        self._clear_results()
         self._append_log("Starting conversion")
         diagnostics = validate_gui_request(request)
         if diagnostics.has_errors:
@@ -243,21 +268,37 @@ class Pdf2MdGuiApp:
                     self.last_summary = payload
                     self.start_button.configure(state="normal")
                     self.open_output_button.configure(state="normal")
-                    self._append_log(self._summary_text(payload))
+                    self._populate_results(payload)
+                    self._append_log(format_gui_summary(payload))
                     messagebox.showinfo("Conversion finished", self._summary_text(payload))
         except Empty:
             pass
         self.root.after(100, self._poll_queue)
 
     def _summary_text(self, summary: GuiConversionSummary) -> str:
-        return (
-            "Finished: "
-            f"success={summary.success_count}, "
-            f"partial={summary.partial_success_count}, "
-            f"failed={summary.failed_count}, "
-            f"skipped={summary.skipped_count}, "
-            f"output={summary.output_root}"
-        )
+        return format_gui_summary(summary)
+
+    def _populate_results(self, summary: GuiConversionSummary) -> None:
+        self._clear_results()
+        for document in summary.documents:
+            warning_value = str(document.warning_count)
+            if document.warning_codes:
+                warning_value = f"{document.warning_count}: {', '.join(document.warning_codes)}"
+            self.result_tree.insert(
+                "",
+                "end",
+                values=(
+                    document.input_pdf.name,
+                    document.status,
+                    warning_value,
+                    str(document.markdown_path or ""),
+                    str(document.report_path or ""),
+                ),
+            )
+
+    def _clear_results(self) -> None:
+        for item_id in self.result_tree.get_children():
+            self.result_tree.delete(item_id)
 
     def _append_log(self, message: str) -> None:
         self.log_text.configure(state="normal")
@@ -271,9 +312,21 @@ class Pdf2MdGuiApp:
         self.log_text.configure(state="disabled")
 
     def _open_output(self) -> None:
+        from tkinter import messagebox
+
         if self.last_summary is None:
             return
-        webbrowser.open(self.last_summary.output_root.resolve().as_uri())
+        try:
+            opened = webbrowser.open(self.last_summary.output_root.resolve().as_uri())
+        except Exception as exc:  # noqa: BLE001
+            message = f"Could not open output folder: {exc}"
+            self._append_log(message)
+            messagebox.showwarning("Open output folder failed", message)
+            return
+        if not opened:
+            message = "Could not open output folder."
+            self._append_log(message)
+            messagebox.showwarning("Open output folder failed", message)
 
 
 def _write_startup_diagnostics(report: GuiDiagnosticReport) -> None:

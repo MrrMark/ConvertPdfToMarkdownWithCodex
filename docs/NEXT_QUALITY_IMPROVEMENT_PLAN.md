@@ -27,16 +27,9 @@ Q53 Minimal Desktop GUI Wrapper 이후 후속 작업은 GUI가 기존 CLI 변환
 
 | Q | 우선순위 | 작업 | 목표 |
 |---|---|---|---|
-| Q55 | P1 | GUI Conversion Result Review UX | GUI 완료 화면에서 `report.json`, `manifest.json`, partial success warning, 산출물 경로를 요약해 품질 확인 진입 비용을 낮춘다. |
 | Q56 | P1 | GUI Batch Operation Controls | 폴더 배치 변환에서 취소, 진행률, 실패 문서 재시도 후보, skip summary를 deterministic local summary로 남긴다. |
 | Q57 | P2 | Non-Developer GUI Distribution Guide | 비개발자가 설치/실행/샘플 변환/문제 진단까지 따라갈 수 있는 GUI 중심 배포 문서를 정리한다. |
 | Q58 | P2 | GUI Smoke And Contract Test Expansion | GUI wrapper가 CLI `Config`/산출물 계약을 계속 따르는지 headless smoke와 문서 계약 테스트로 고정한다. |
-
-### Q55. GUI Conversion Result Review UX
-
-- 단일/배치 변환 완료 후 success, partial_success, failed, skipped counts와 핵심 warning을 화면에서 확인할 수 있게 한다.
-- `report.json`/`manifest.json` 위치, output folder, 생성된 Markdown 경로를 명확히 보여준다.
-- 원문 텍스트, 표, 이미지 산출물 자체를 요약/재서술하지 않고 report에 기록된 구조화 정보만 표시한다.
 
 ### Q56. GUI Batch Operation Controls
 
