@@ -35,8 +35,8 @@ PowerShell 스크립트 본체:
 
 참고:
 
-- Q53에서 CLI에 익숙하지 않은 사용자를 위한 최소 desktop GUI wrapper를 개발할 계획입니다.
-- 구현 전까지 Windows 자동화/일괄 변환의 기준 경로는 이 문서의 CLI와 배치 스크립트입니다.
+- CLI에 익숙하지 않은 사용자는 `python -m pdf2md.gui`로 최소 desktop GUI wrapper를 실행할 수 있습니다.
+- 자동화/일괄 변환의 기준 경로는 이 문서의 CLI와 배치 스크립트입니다.
 
 ---
 
@@ -160,6 +160,22 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ## 6) 기본 실행
 
 예시 입력 파일: `sample.pdf`
+
+간단 GUI 실행:
+
+```powershell
+python -m pdf2md.gui
+```
+
+설치형 entry point가 잡혀 있으면 아래 명령도 사용할 수 있습니다.
+
+```powershell
+pdf2md-gui
+```
+
+GUI는 PDF 파일 또는 폴더, 출력 폴더, 주요 변환 옵션을 선택하는 간편 실행 wrapper입니다. 변환 자체는 CLI와 같은 core pipeline을 사용합니다.
+
+CLI 기본 실행:
 
 ```powershell
 python -m pdf2md .\sample.pdf
