@@ -192,8 +192,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q55. GUI Conversion Result Review UX" not in next_plan
     assert "Q56. GUI Batch Operation Controls" not in next_plan
     assert "Q57. Non-Developer GUI Distribution Guide" not in next_plan
-    assert "Q58. GUI Smoke And Contract Test Expansion" in next_plan
-    assert "현재 active quality backlog는 없다." not in next_plan
+    assert "Q58. GUI Smoke And Contract Test Expansion" not in next_plan
+    assert "현재 active quality backlog는 없다." in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -202,15 +202,15 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q55. GUI Conversion Result Review UX" not in development_specs
     assert "Q56. GUI Batch Operation Controls" not in development_specs
     assert "Q57. Non-Developer GUI Distribution Guide" not in development_specs
-    assert "Q58. GUI Smoke And Contract Test Expansion" in development_specs
-    assert "현재 active quality backlog가 없으므로" not in development_specs
+    assert "Q58. GUI Smoke And Contract Test Expansion" not in development_specs
+    assert "현재 active quality backlog가 없으므로" in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q57" in development_specs
+    assert "완료된 Q34-Q58" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -227,6 +227,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q55. GUI Conversion Result Review UX" in implemented_specs
     assert "Q56. GUI Batch Operation Controls" in implemented_specs
     assert "Q57. Non-Developer GUI Distribution Guide" in implemented_specs
+    assert "Q58. GUI Smoke And Contract Test Expansion" in implemented_specs
     assert "docs/MACOS_GUI_QUICKSTART.md" in implemented_specs
     assert "python -m pdf2md.gui" in implemented_specs
     assert "check_gui_runtime()" in implemented_specs
@@ -263,10 +264,12 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q56. GUI Batch Operation Controls" in quality_scorecard
     assert "Q57. Non-Developer GUI Distribution Guide" in quality_scorecard
     assert "Q58. GUI Smoke And Contract Test Expansion" in quality_scorecard
+    assert "GUI contract test 확장" in quality_scorecard
     assert "다음 active backlog는 Q55-Q58" in quality_scorecard
     assert "다음 active backlog는 Q56-Q58" in quality_scorecard
     assert "다음 active backlog는 Q57-Q58" in quality_scorecard
     assert "다음 active backlog는 Q58" in quality_scorecard
+    assert "active quality backlog 없음" in quality_scorecard
     assert "active quality backlog는 없다" in quality_scorecard
     assert "97/100" in quality_scorecard
     assert "Q46. RAG Golden Query Expected Source Coverage" in quality_scorecard
