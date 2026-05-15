@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -30,6 +31,18 @@ except ModuleNotFoundError:  # pragma: no cover - allows `python scripts/run_ssd
 
 
 REPORT_FILENAME = "ssd_corpus_profile_report.json"
+EVIDENCE_PACK_FILENAME = "local_corpus_evidence_pack.json"
+EVIDENCE_SCHEMA_VERSION = "1.0"
+EVIDENCE_PURPOSE = "local_technical_corpus_evidence_pack"
+SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
+
+
+def _stable_json(payload: Any) -> str:
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _short_hash(payload: Any) -> str:
+    return hashlib.sha256(_stable_json(payload).encode("utf-8")).hexdigest()[:16]
 
 
 def _load_profile(path: Path) -> dict[str, Any]:
@@ -123,6 +136,27 @@ def _numeric_metrics(report: dict[str, Any] | None) -> dict[str, float]:
     return {str(key): float(value) for key, value in metrics.items() if isinstance(value, (int, float))}
 
 
+def _contract_findings(contract_report: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if contract_report is None:
+        return []
+    findings: list[dict[str, Any]] = []
+    for severity, key in (("error", "errors"), ("warning", "warnings")):
+        raw_findings = contract_report.get(key)
+        if not isinstance(raw_findings, list):
+            continue
+        for finding in raw_findings:
+            if not isinstance(finding, dict):
+                continue
+            findings.append(
+                {
+                    "severity": severity,
+                    "code": str(finding.get("code") or "unknown_contract_issue"),
+                    "path": str(finding.get("path") or ""),
+                }
+            )
+    return findings
+
+
 def _rag_thresholds(item: dict[str, Any]) -> tuple[str | None, dict[str, float]]:
     profile_path = item.get("calibration_profile")
     profile_name, thresholds = _profile_thresholds(Path(profile_path) if profile_path else None)
@@ -185,6 +219,301 @@ def _aggregate_metric_groups(results: list[dict[str, Any]], field: str) -> dict[
     return aggregate
 
 
+def _evidence_doc_label(index: int) -> str:
+    return f"document-{index:06d}"
+
+
+def _signature_candidates(document: dict[str, Any]) -> list[dict[str, Any]]:
+    domain_adapter = str(document.get("domain_adapter") or "unknown")
+    ssd_agent_domain = str(document.get("ssd_agent_domain") or "unknown")
+    ssd_agent_spec_type = str(document.get("ssd_agent_spec_type") or "unknown")
+    common = {
+        "domain_adapter": domain_adapter,
+        "ssd_agent_domain": ssd_agent_domain,
+        "ssd_agent_spec_type": ssd_agent_spec_type,
+    }
+    candidates: list[dict[str, Any]] = []
+
+    exit_code = document.get("conversion_exit_code")
+    if isinstance(exit_code, int) and exit_code not in {0, 2}:
+        candidates.append(
+            {
+                **common,
+                "severity": "error",
+                "category": "conversion_exit_code",
+                "code": "conversion_failed",
+                "metric": "conversion_exit_code",
+                "current": exit_code,
+            }
+        )
+
+    contract_findings = document.get("contract_findings")
+    if isinstance(contract_findings, list) and contract_findings:
+        for finding in contract_findings:
+            if not isinstance(finding, dict):
+                continue
+            severity = str(finding.get("severity") or "error")
+            candidates.append(
+                {
+                    **common,
+                    "severity": severity,
+                    "category": "contract_warning" if severity == "warning" else "contract_error",
+                    "code": str(finding.get("code") or "unknown_contract_issue"),
+                    "path": str(finding.get("path") or ""),
+                }
+            )
+    elif document.get("contract_passed") is False:
+        contract_summary = document.get("contract_summary") if isinstance(document.get("contract_summary"), dict) else {}
+        error_count = int(contract_summary.get("error_count") or 0)
+        warning_count = int(contract_summary.get("warning_count") or 0)
+        if error_count:
+            candidates.append(
+                {
+                    **common,
+                    "severity": "error",
+                    "category": "contract_error",
+                    "code": "contract_error_count",
+                    "metric": "error_count",
+                    "current": error_count,
+                }
+            )
+        if warning_count:
+            candidates.append(
+                {
+                    **common,
+                    "severity": "warning",
+                    "category": "contract_warning",
+                    "code": "contract_warning_count",
+                    "metric": "warning_count",
+                    "current": warning_count,
+                }
+            )
+
+    rag_eval_report = document.get("rag_eval_report")
+    gate_failures = rag_eval_report.get("gate_failures") if isinstance(rag_eval_report, dict) else []
+    if isinstance(gate_failures, list):
+        for failure in gate_failures:
+            if not isinstance(failure, dict):
+                continue
+            candidates.append(
+                {
+                    **common,
+                    "severity": "error",
+                    "category": "rag_threshold",
+                    "code": str(failure.get("type") or "rag_threshold_failure"),
+                    "metric": str(failure.get("metric") or ""),
+                    "direction": str(failure.get("direction") or ""),
+                    "current": failure.get("current"),
+                    "limit": failure.get("limit"),
+                }
+            )
+    elif document.get("rag_eval_passed") is False:
+        candidates.append(
+            {
+                **common,
+                "severity": "error",
+                "category": "rag_threshold",
+                "code": "rag_eval_failed",
+            }
+        )
+
+    budget_failures = document.get("budget_failures")
+    if isinstance(budget_failures, list):
+        for failure in budget_failures:
+            if not isinstance(failure, dict):
+                continue
+            candidates.append(
+                {
+                    **common,
+                    "severity": "error",
+                    "category": "budget_failure",
+                    "code": "budget_failure",
+                    "metric": str(failure.get("metric") or ""),
+                    "direction": str(failure.get("direction") or ""),
+                    "current": failure.get("current"),
+                    "limit": failure.get("limit"),
+                }
+            )
+    return candidates
+
+
+def _signature_key(candidate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "category": candidate.get("category"),
+        "severity": candidate.get("severity"),
+        "domain_adapter": candidate.get("domain_adapter"),
+        "ssd_agent_domain": candidate.get("ssd_agent_domain"),
+        "ssd_agent_spec_type": candidate.get("ssd_agent_spec_type"),
+        "code": candidate.get("code"),
+        "path": candidate.get("path"),
+        "metric": candidate.get("metric"),
+        "direction": candidate.get("direction"),
+    }
+
+
+def _append_unique(target: list[Any], value: Any) -> None:
+    if value not in target:
+        target.append(value)
+
+
+def build_evidence_pack(profile_report: dict[str, Any], *, profile_label: str = "redacted-profile") -> dict[str, Any]:
+    """Build a redacted, deterministic evidence pack from a local SSD corpus profile report."""
+    documents = profile_report.get("documents")
+    if not isinstance(documents, list):
+        documents = []
+
+    signature_map: dict[str, dict[str, Any]] = {}
+    evidence_documents: list[dict[str, Any]] = []
+    domain_map: dict[tuple[str, str, str], dict[str, Any]] = {}
+    total_contract_errors = 0
+    total_contract_warnings = 0
+    total_rag_threshold_failures = 0
+    total_budget_failures = 0
+    total_conversion_failures = 0
+
+    for index, document in enumerate(documents, start=1):
+        if not isinstance(document, dict):
+            continue
+        document_label = _evidence_doc_label(index)
+        domain_adapter = str(document.get("domain_adapter") or "unknown")
+        ssd_agent_domain = str(document.get("ssd_agent_domain") or "unknown")
+        ssd_agent_spec_type = str(document.get("ssd_agent_spec_type") or "unknown")
+        domain_key = (domain_adapter, ssd_agent_domain, ssd_agent_spec_type)
+        domain_entry = domain_map.setdefault(
+            domain_key,
+            {
+                "domain_adapter": domain_adapter,
+                "ssd_agent_domain": ssd_agent_domain,
+                "ssd_agent_spec_type": ssd_agent_spec_type,
+                "document_count": 0,
+                "failed_document_count": 0,
+                "signature_ids": [],
+            },
+        )
+        domain_entry["document_count"] += 1
+
+        candidates = _signature_candidates(document)
+        signature_ids: list[str] = []
+        for candidate in candidates:
+            signature_id = f"sig-{_short_hash(_signature_key(candidate))}"
+            signature_ids.append(signature_id)
+            signature = signature_map.setdefault(
+                signature_id,
+                {
+                    "signature_id": signature_id,
+                    "severity": str(candidate.get("severity") or "error"),
+                    "category": str(candidate.get("category") or "unknown"),
+                    "domain_adapter": domain_adapter,
+                    "ssd_agent_domain": ssd_agent_domain,
+                    "ssd_agent_spec_type": ssd_agent_spec_type,
+                    "code": candidate.get("code"),
+                    "path": candidate.get("path"),
+                    "metric": candidate.get("metric"),
+                    "direction": candidate.get("direction"),
+                    "document_count": 0,
+                    "document_labels": [],
+                    "observed_values": [],
+                    "limits": [],
+                },
+            )
+            _append_unique(signature["document_labels"], document_label)
+            signature["document_count"] = len(signature["document_labels"])
+            if "current" in candidate:
+                _append_unique(signature["observed_values"], candidate.get("current"))
+            if "limit" in candidate:
+                _append_unique(signature["limits"], candidate.get("limit"))
+            _append_unique(domain_entry["signature_ids"], signature_id)
+
+        if signature_ids:
+            domain_entry["failed_document_count"] += 1
+        total_conversion_failures += sum(1 for item in candidates if item.get("category") == "conversion_exit_code")
+        total_contract_errors += sum(1 for item in candidates if item.get("category") == "contract_error")
+        total_contract_warnings += sum(1 for item in candidates if item.get("category") == "contract_warning")
+        total_rag_threshold_failures += sum(1 for item in candidates if item.get("category") == "rag_threshold")
+        total_budget_failures += sum(1 for item in candidates if item.get("category") == "budget_failure")
+
+        evidence_documents.append(
+            {
+                "document_label": document_label,
+                "domain_adapter": domain_adapter,
+                "ssd_agent_domain": ssd_agent_domain,
+                "ssd_agent_spec_type": ssd_agent_spec_type,
+                "conversion_exit_code": document.get("conversion_exit_code"),
+                "contract_passed": document.get("contract_passed"),
+                "rag_eval_passed": document.get("rag_eval_passed"),
+                "rag_eval_metrics": document.get("rag_eval_metrics") or {},
+                "signature_ids": sorted(dict.fromkeys(signature_ids)),
+            }
+        )
+
+    failure_signatures = sorted(
+        signature_map.values(),
+        key=lambda item: (
+            SEVERITY_ORDER.get(str(item.get("severity")), 9),
+            str(item.get("category") or ""),
+            str(item.get("domain_adapter") or ""),
+            str(item.get("ssd_agent_spec_type") or ""),
+            str(item.get("code") or ""),
+            str(item.get("metric") or ""),
+            str(item.get("signature_id") or ""),
+        ),
+    )
+    for signature in failure_signatures:
+        signature["document_labels"] = sorted(signature["document_labels"])
+        signature["observed_values"] = sorted(signature["observed_values"], key=lambda value: str(value))
+        signature["limits"] = sorted(signature["limits"], key=lambda value: str(value))
+
+    domains = sorted(
+        domain_map.values(),
+        key=lambda item: (
+            str(item.get("domain_adapter") or ""),
+            str(item.get("ssd_agent_domain") or ""),
+            str(item.get("ssd_agent_spec_type") or ""),
+        ),
+    )
+    for domain in domains:
+        domain["signature_ids"] = sorted(domain["signature_ids"])
+
+    failed_document_count = sum(1 for item in evidence_documents if item["signature_ids"])
+    summary = {
+        "document_count": len(evidence_documents),
+        "failed_document_count": failed_document_count,
+        "failure_signature_count": len(failure_signatures),
+        "conversion_failure_count": total_conversion_failures,
+        "contract_error_count": total_contract_errors,
+        "contract_warning_count": total_contract_warnings,
+        "rag_threshold_failure_count": total_rag_threshold_failures,
+        "budget_failure_count": total_budget_failures,
+    }
+    redaction_policy = {
+        "raw_paths_included": False,
+        "commands_included": False,
+        "document_names_included": False,
+        "query_text_included": False,
+        "source_filenames_included": False,
+        "document_label_policy": "order_preserving_redacted_labels",
+    }
+    fingerprint_payload = {
+        "profile_label": profile_label,
+        "summary": summary,
+        "domains": domains,
+        "documents": evidence_documents,
+        "failure_signatures": failure_signatures,
+        "redaction_policy": redaction_policy,
+    }
+    return {
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
+        "purpose": EVIDENCE_PURPOSE,
+        "profile_label": profile_label,
+        "profile_fingerprint": _short_hash(fingerprint_payload),
+        "redaction_policy": redaction_policy,
+        "summary": summary,
+        "domains": domains,
+        "documents": evidence_documents,
+        "failure_signatures": failure_signatures,
+    }
+
+
 def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
     """Run local SSD corpus conversion and contract validation from a JSON profile."""
     profile = _load_profile(profile_path)
@@ -202,6 +531,7 @@ def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
         ssd_agent_spec_type = _expected_spec_type(item)
         conversion_exit_code: int | None = None
         contract_report: dict[str, Any] | None = None
+        contract_findings: list[dict[str, Any]] = []
         rag_eval_report: dict[str, Any] | None = None
         budget_failures: list[dict[str, Any]] = []
         if not dry_run:
@@ -222,6 +552,7 @@ def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
                     json.dumps(contract_report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
                     encoding="utf-8",
                 )
+                contract_findings = _contract_findings(contract_report)
                 budget_failures = _budget_failures(item, contract_report)
                 rag_eval_report = _run_rag_eval_for_document(item)
         results.append(
@@ -237,6 +568,7 @@ def run_profile(profile_path: Path, *, dry_run: bool = False) -> dict[str, Any]:
                 "conversion_exit_code": conversion_exit_code,
                 "contract_passed": None if contract_report is None else bool(contract_report.get("passed")),
                 "contract_summary": None if contract_report is None else contract_report.get("summary"),
+                "contract_findings": contract_findings,
                 "rag_eval_passed": None
                 if rag_eval_report is None
                 else bool(rag_eval_report.get("passed_calibration_gate", True)),
@@ -279,16 +611,30 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--report-path", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--fail-on-error", action="store_true")
+    parser.add_argument("--evidence-pack", action="store_true", help="Write a redacted local corpus evidence pack.")
+    parser.add_argument("--evidence-pack-path", type=Path, default=None)
+    parser.add_argument("--evidence-profile-label", default="redacted-profile")
     args = parser.parse_args(argv)
 
     report = run_profile(args.profile, dry_run=args.dry_run)
     report_path = args.report_path or Path(REPORT_FILENAME)
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    evidence_pack_path = args.evidence_pack_path
+    if evidence_pack_path is None and args.evidence_pack:
+        evidence_pack_path = report_path.with_name(EVIDENCE_PACK_FILENAME)
+    if evidence_pack_path is not None:
+        evidence_pack = build_evidence_pack(report, profile_label=args.evidence_profile_label)
+        evidence_pack_path.write_text(
+            json.dumps(evidence_pack, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     print(
         "SSD corpus profile: "
         f"passed={report['passed']} documents={report['summary']['document_count']} "
         f"failed={report['summary']['failed_count']} report={report_path}"
     )
+    if evidence_pack_path is not None:
+        print(f"Local corpus evidence pack: report={evidence_pack_path}")
     if args.fail_on_error and not report["passed"]:
         return 1
     return 0

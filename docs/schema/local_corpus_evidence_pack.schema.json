@@ -1,0 +1,365 @@
+{
+  "$defs": {
+    "LocalCorpusEvidenceDocument": {
+      "properties": {
+        "contract_passed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contract Passed"
+        },
+        "conversion_exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Conversion Exit Code"
+        },
+        "document_label": {
+          "title": "Document Label",
+          "type": "string"
+        },
+        "domain_adapter": {
+          "title": "Domain Adapter",
+          "type": "string"
+        },
+        "rag_eval_metrics": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Rag Eval Metrics",
+          "type": "object"
+        },
+        "rag_eval_passed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rag Eval Passed"
+        },
+        "signature_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Signature Ids",
+          "type": "array"
+        },
+        "ssd_agent_domain": {
+          "title": "Ssd Agent Domain",
+          "type": "string"
+        },
+        "ssd_agent_spec_type": {
+          "title": "Ssd Agent Spec Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_label",
+        "domain_adapter",
+        "ssd_agent_domain",
+        "ssd_agent_spec_type"
+      ],
+      "title": "LocalCorpusEvidenceDocument",
+      "type": "object"
+    },
+    "LocalCorpusEvidenceDomain": {
+      "properties": {
+        "document_count": {
+          "default": 0,
+          "title": "Document Count",
+          "type": "integer"
+        },
+        "domain_adapter": {
+          "title": "Domain Adapter",
+          "type": "string"
+        },
+        "failed_document_count": {
+          "default": 0,
+          "title": "Failed Document Count",
+          "type": "integer"
+        },
+        "signature_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Signature Ids",
+          "type": "array"
+        },
+        "ssd_agent_domain": {
+          "title": "Ssd Agent Domain",
+          "type": "string"
+        },
+        "ssd_agent_spec_type": {
+          "title": "Ssd Agent Spec Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain_adapter",
+        "ssd_agent_domain",
+        "ssd_agent_spec_type"
+      ],
+      "title": "LocalCorpusEvidenceDomain",
+      "type": "object"
+    },
+    "LocalCorpusEvidenceRedactionPolicy": {
+      "properties": {
+        "commands_included": {
+          "default": false,
+          "title": "Commands Included",
+          "type": "boolean"
+        },
+        "document_label_policy": {
+          "default": "order_preserving_redacted_labels",
+          "title": "Document Label Policy",
+          "type": "string"
+        },
+        "document_names_included": {
+          "default": false,
+          "title": "Document Names Included",
+          "type": "boolean"
+        },
+        "query_text_included": {
+          "default": false,
+          "title": "Query Text Included",
+          "type": "boolean"
+        },
+        "raw_paths_included": {
+          "default": false,
+          "title": "Raw Paths Included",
+          "type": "boolean"
+        },
+        "source_filenames_included": {
+          "default": false,
+          "title": "Source Filenames Included",
+          "type": "boolean"
+        }
+      },
+      "title": "LocalCorpusEvidenceRedactionPolicy",
+      "type": "object"
+    },
+    "LocalCorpusEvidenceSignature": {
+      "properties": {
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Code"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Direction"
+        },
+        "document_count": {
+          "default": 0,
+          "title": "Document Count",
+          "type": "integer"
+        },
+        "document_labels": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Document Labels",
+          "type": "array"
+        },
+        "domain_adapter": {
+          "title": "Domain Adapter",
+          "type": "string"
+        },
+        "limits": {
+          "items": {},
+          "title": "Limits",
+          "type": "array"
+        },
+        "metric": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metric"
+        },
+        "observed_values": {
+          "items": {},
+          "title": "Observed Values",
+          "type": "array"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "severity": {
+          "title": "Severity",
+          "type": "string"
+        },
+        "signature_id": {
+          "title": "Signature Id",
+          "type": "string"
+        },
+        "ssd_agent_domain": {
+          "title": "Ssd Agent Domain",
+          "type": "string"
+        },
+        "ssd_agent_spec_type": {
+          "title": "Ssd Agent Spec Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "signature_id",
+        "severity",
+        "category",
+        "domain_adapter",
+        "ssd_agent_domain",
+        "ssd_agent_spec_type"
+      ],
+      "title": "LocalCorpusEvidenceSignature",
+      "type": "object"
+    },
+    "LocalCorpusEvidenceSummary": {
+      "properties": {
+        "budget_failure_count": {
+          "default": 0,
+          "title": "Budget Failure Count",
+          "type": "integer"
+        },
+        "contract_error_count": {
+          "default": 0,
+          "title": "Contract Error Count",
+          "type": "integer"
+        },
+        "contract_warning_count": {
+          "default": 0,
+          "title": "Contract Warning Count",
+          "type": "integer"
+        },
+        "conversion_failure_count": {
+          "default": 0,
+          "title": "Conversion Failure Count",
+          "type": "integer"
+        },
+        "document_count": {
+          "default": 0,
+          "title": "Document Count",
+          "type": "integer"
+        },
+        "failed_document_count": {
+          "default": 0,
+          "title": "Failed Document Count",
+          "type": "integer"
+        },
+        "failure_signature_count": {
+          "default": 0,
+          "title": "Failure Signature Count",
+          "type": "integer"
+        },
+        "rag_threshold_failure_count": {
+          "default": 0,
+          "title": "Rag Threshold Failure Count",
+          "type": "integer"
+        }
+      },
+      "title": "LocalCorpusEvidenceSummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "documents": {
+      "items": {
+        "$ref": "#/$defs/LocalCorpusEvidenceDocument"
+      },
+      "title": "Documents",
+      "type": "array"
+    },
+    "domains": {
+      "items": {
+        "$ref": "#/$defs/LocalCorpusEvidenceDomain"
+      },
+      "title": "Domains",
+      "type": "array"
+    },
+    "failure_signatures": {
+      "items": {
+        "$ref": "#/$defs/LocalCorpusEvidenceSignature"
+      },
+      "title": "Failure Signatures",
+      "type": "array"
+    },
+    "profile_fingerprint": {
+      "title": "Profile Fingerprint",
+      "type": "string"
+    },
+    "profile_label": {
+      "title": "Profile Label",
+      "type": "string"
+    },
+    "purpose": {
+      "default": "local_technical_corpus_evidence_pack",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "redaction_policy": {
+      "$ref": "#/$defs/LocalCorpusEvidenceRedactionPolicy"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/LocalCorpusEvidenceSummary"
+    }
+  },
+  "required": [
+    "profile_label",
+    "profile_fingerprint"
+  ],
+  "title": "LocalCorpusEvidencePack",
+  "type": "object"
+}

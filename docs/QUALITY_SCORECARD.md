@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-15 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | 0 | Q47 local technical corpus evidence pack으로 비공개 corpus failure pattern을 redacted signature로 축적 가능. active quality backlog 없음 |
 | 2026-05-15 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | 0 | Q46 expected source coverage와 Q44 domain technical table typed coverage까지 구현되어 active quality backlog 없음 |
 | 2026-05-14 | Storage/PCIe/Security Spec RAG 운영툴 | 97/100 | +3 | corpus/profile/evidence gates, offline index/provenance/artifact validators, layout/table/OCR/diagram golden packs, page-worker table candidate parallelization 구현 |
 | 2026-05-13 | Storage/PCIe/Security Spec RAG 운영툴 | 94/100 | +2 | RAG calibration gate, requirement change impact report, domain deep fixtures, indexer recipes, diagram label diagnostics 구현 |
@@ -40,6 +41,34 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-15 (Q47 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴**로 보면 **97/100점** 수준을 유지한다.
+
+Q47로 `run_ssd_corpus_profile.py`가 `local_corpus_evidence_pack.json`을 opt-in 생성할 수 있게 됐다. 이 산출물은 비공개/대형 technical corpus의 conversion, SSD RAG contract, RAG threshold, budget failure를 raw path, command, document name, query text 없이 deterministic signature로 공유하기 위한 것이다.
+
+점수를 올리지 않는 이유는 Q47이 실제 대형 corpus evidence 자체를 repo에 추가한 것이 아니라, 해당 evidence를 안전하게 축적하고 공유하는 운영 경로를 만든 작업이기 때문이다. 텍스트 구조, caption 없는 diagram, 성능 대형 corpus 리스크는 기존 97/100 평가와 동일하게 보수적으로 유지한다. 현재 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에는 active quality backlog가 없다.
+
+#### 세부 점수
+
+| 항목 | 점수 | 직전 평가 대비 | 평가 |
+|---|---:|---:|---|
+| 핵심 변환 완성도 | 18/18 | 0 | 기존 변환 경로는 변경하지 않고 local corpus profile 후처리 산출물을 opt-in 추가했다. |
+| 표 변환/RAG 대응 | 18/18 | 0 | SSD contract와 RAG threshold failure가 evidence signature로 집계되어 table/domain failure pattern 추적이 쉬워졌다. |
+| 텍스트 구조 보존 | 15/16 | 0 | 긴 clause/appendix carry-over 자체를 새로 확장하지는 않았고, 해당 실패가 발견되면 signature로 관리할 수 있다. |
+| 이미지/OCR 신뢰도 | 13/14 | 0 | caption 없는 diagram/OCR label 의미 해석은 여전히 보수적 opt-in 영역이다. |
+| 성능/효율 | 11/12 | 0 | 성능 threshold failure를 evidence signature로 보존하지만 새 병렬화나 benchmark 기준 변경은 없다. |
+| 테스트/결정성/CI | 12/12 | 0 | evidence pack fingerprint/signature id, schema export, redaction 테스트가 결정적 출력 계약을 방어한다. |
+| 운영/릴리스 준비도 | 10/10 | 0 | private corpus failure pattern을 raw artifact 없이 공유하는 운영 경로와 public schema가 추가됐다. |
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다.
+
+Q47 evidence pack에서 반복 signature가 쌓이면, 해당 signature를 근거로 appendix/nested clause fixture, captionless diagram diagnostics, vendor requirement table coverage 같은 새 Q 항목을 추가한다.
 
 ### 2026-05-15 (Q46/Q44 구현 후)
 

@@ -11,6 +11,7 @@ from pdf2md.models import (
     CorpusDiffReport,
     CorpusManifest,
     IndexContractReport,
+    LocalCorpusEvidencePack,
     Manifest,
     ProvenanceIntegrityReport,
     Report,
@@ -28,6 +29,7 @@ SCHEMA_FILES: dict[str, type] = {
     "index_contract_report.schema.json": IndexContractReport,
     "provenance_integrity_report.schema.json": ProvenanceIntegrityReport,
     "artifact_integrity_report.schema.json": ArtifactIntegrityReport,
+    "local_corpus_evidence_pack.schema.json": LocalCorpusEvidencePack,
 }
 
 
