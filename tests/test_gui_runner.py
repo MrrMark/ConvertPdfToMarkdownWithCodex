@@ -51,6 +51,7 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
         output_dir=tmp_path / "gui-out",
         options=GuiConversionOptions(
             pages="1",
+            password="secret",
             image_mode=ImageMode.PLACEHOLDER.value,
             table_mode=TableMode.HTML.value,
             rag_table_output=RagTableOutputMode.BOTH.value,
@@ -63,6 +64,10 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
             dedupe_images=True,
             repair_hyphenation=True,
             figure_crop_fallback=True,
+            page_workers=3,
+            debug=True,
+            verbose=True,
+            skip_existing=True,
         ),
     )
 
@@ -71,6 +76,7 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
     assert config.input_pdf == sample_pdf
     assert config.output_dir == tmp_path / "gui-out"
     assert config.pages == "1"
+    assert config.password == "secret"
     assert config.image_mode == ImageMode.PLACEHOLDER.value
     assert config.table_mode == TableMode.HTML.value
     assert config.rag_table_output == RagTableOutputMode.BOTH.value
@@ -83,6 +89,62 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
     assert config.dedupe_images is True
     assert config.repair_hyphenation is True
     assert config.figure_crop_fallback is True
+    assert config.page_workers == 3
+    assert config.debug is True
+    assert config.verbose is True
+    assert config.skip_existing is True
+
+
+def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_path: Path) -> None:
+    request = GuiConversionRequest(
+        input_mode="folder",
+        input_path=tmp_path,
+        output_dir=tmp_path / "batch-output",
+        options=GuiConversionOptions(
+            pages="2-3",
+            password="secret",
+            image_mode=ImageMode.EMBEDDED.value,
+            table_mode=TableMode.GFM_ONLY.value,
+            rag_table_output=RagTableOutputMode.JSONL.value,
+            domain_adapter=DomainAdapterMode.TCG.value,
+            confidential_safe_mode=True,
+            force_ocr=True,
+            ocr_lang="kor+eng",
+            keep_page_markers=True,
+            remove_header_footer=True,
+            dedupe_images=True,
+            repair_hyphenation=True,
+            figure_crop_fallback=True,
+            page_workers=4,
+            debug=True,
+            verbose=True,
+            skip_existing=True,
+        ),
+    )
+
+    config = build_batch_config(request, sample_pdf, tmp_path / "batch-output")
+
+    assert config.pages == "2-3"
+    assert config.password == "secret"
+    assert config.image_mode == ImageMode.EMBEDDED.value
+    assert config.table_mode == TableMode.GFM_ONLY.value
+    assert config.rag_table_output == RagTableOutputMode.JSONL.value
+    assert config.domain_adapter == DomainAdapterMode.TCG.value
+    assert config.confidential_safe_mode is True
+    assert config.force_ocr is True
+    assert config.ocr_lang == "kor+eng"
+    assert config.keep_page_markers is True
+    assert config.remove_header_footer is True
+    assert config.dedupe_images is True
+    assert config.repair_hyphenation is True
+    assert config.figure_crop_fallback is True
+    assert config.page_workers == 4
+    assert config.debug is True
+    assert config.verbose is True
+    assert config.skip_existing is True
+    assert config.markdown_filename == f"{sample_pdf.stem}.md"
+    assert config.manifest_filename == f"{sample_pdf.stem}_manifest.json"
+    assert config.report_filename == f"{sample_pdf.stem}_report.json"
 
 
 def test_gui_runtime_diagnostics_detects_missing_tkinter() -> None:
@@ -114,6 +176,19 @@ def test_gui_runtime_diagnostics_flags_unsupported_python() -> None:
     assert "Python 3.11 or newer" in report.user_message()
 
 
+def test_gui_runtime_missing_entry_point_is_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("pdf2md.gui_runner._console_script_names", lambda: set())
+    report = check_gui_runtime(
+        python_version=(3, 11, 0),
+        import_module=lambda name: object(),
+        entry_point_names=("pdf2md-gui",),
+    )
+
+    assert report.has_errors is False
+    assert [diagnostic.code for diagnostic in report.warnings] == ["entry_point_missing"]
+    assert "python -m pdf2md.gui" in report.user_message()
+
+
 def test_gui_request_diagnostics_reject_output_file(sample_pdf: Path, tmp_path: Path) -> None:
     output_file = tmp_path / "not-a-directory"
     output_file.write_text("already a file", encoding="utf-8")
@@ -130,6 +205,29 @@ def test_gui_request_diagnostics_reject_output_file(sample_pdf: Path, tmp_path: 
     with pytest.raises(GuiDiagnosticError) as exc_info:
         run_gui_conversion(request)
     assert "Output path exists but is not a directory" in str(exc_info.value)
+
+
+def test_gui_request_diagnostics_reject_duplicate_batch_stems(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    monkeypatch.setattr(
+        "pdf2md.gui_runner.iter_pdf_paths",
+        lambda path: [path / "Spec.pdf", path / "spec.PDF"],
+    )
+
+    report = validate_gui_request(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=input_dir,
+            output_dir=tmp_path / "batch-output",
+        )
+    )
+
+    assert report.has_errors is True
+    assert [diagnostic.code for diagnostic in report.errors] == ["duplicate_pdf_stems"]
 
 
 def test_gui_single_conversion_uses_same_core_output_as_run_conversion(sample_pdf: Path, tmp_path: Path) -> None:
@@ -309,6 +407,16 @@ def test_gui_batch_failure_becomes_retry_candidate(monkeypatch: pytest.MonkeyPat
     assert retry.retry_candidate is True
     assert retry.option_fingerprint == gui_options_fingerprint(GuiConversionOptions(pages="1"))
     assert "retry_candidates=1" in format_gui_summary(summary)
+
+
+def test_gui_option_fingerprint_is_deterministic_and_option_sensitive() -> None:
+    baseline = gui_options_fingerprint(GuiConversionOptions(pages="1", skip_existing=True))
+    same = gui_options_fingerprint(GuiConversionOptions(pages="1", skip_existing=True))
+    changed = gui_options_fingerprint(GuiConversionOptions(pages="2", skip_existing=True))
+
+    assert baseline == same
+    assert baseline != changed
+    assert len(baseline) == 16
 
 
 def test_gui_summary_uses_structured_warning_counts(monkeypatch: pytest.MonkeyPatch, sample_pdf: Path, tmp_path: Path) -> None:

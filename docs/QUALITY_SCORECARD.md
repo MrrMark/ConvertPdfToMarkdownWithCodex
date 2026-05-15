@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-16 | GUI contract test 확장 | 97/100 | 0 | Q58. GUI Smoke And Contract Test Expansion 구현. option mapping, diagnostics, batch naming/order/cancel/retry/fingerprint 계약을 headless tests로 고정. active quality backlog 없음 |
 | 2026-05-16 | GUI 비개발자 문서 | 97/100 | 0 | Q57. Non-Developer GUI Distribution Guide 구현. macOS GUI quickstart 추가, README/Windows GUI 실행/진단 절차 보강. 다음 active backlog는 Q58 |
 | 2026-05-16 | GUI batch 운영성 | 97/100 | 0 | Q56. GUI Batch Operation Controls 구현. batch progress, document-boundary cancel, failed retry candidate, deterministic ordering/fingerprint 추가. 다음 active backlog는 Q57-Q58 |
 | 2026-05-16 | GUI 결과 검토 UX | 97/100 | 0 | Q55. GUI Conversion Result Review UX 구현. 완료 결과 표, artifact path, warning code/count summary 추가. 다음 active backlog는 Q56-Q58 |
@@ -48,6 +49,18 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-16 (Q58 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q58은 Q54-Q57로 늘어난 GUI wrapper의 runtime diagnostics, result summary, batch controls, distribution guide 계약을 headless tests로 고정했다. 변환 품질 점수는 유지하며, 현재 active quality backlog는 없다.
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다.
 
 ### 2026-05-16 (Q57 구현 후)
 
