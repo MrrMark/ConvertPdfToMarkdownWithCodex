@@ -56,10 +56,12 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
     assert "docs/MACOS_GUI_QUICKSTART.md" in readme
+    assert "docs/GUI_USER_GUIDE.md" in readme
     assert "python3 -m pdf2md.gui" in readme
     assert "pdf2md-gui" in readme
     assert "python3 -m pdf2md.gui --help" in readme
     assert "문서 경계 취소" in readme
+    assert "GUI 화면의 `Help` 버튼" in readme
     assert "pdf/v10" not in readme
     assert "프로젝트 scaffold 생성" not in readme
     assert "metadata.py" not in readme
@@ -121,6 +123,8 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "python -m pdf2md.gui --help" in guide
     assert "pdf2md-gui" in guide
     assert "desktop GUI wrapper" in guide
+    assert "docs\\GUI_USER_GUIDE.md" in guide
+    assert "GUI의 `Help` 버튼" in guide
     assert "`Cancel`을 누르면 현재 문서가 끝난 뒤" in guide
     assert "GUI에서 output folder 오류" in guide
     assert "- Git\n  - `git clone`, `git pull` 같은 저장소 동기화 흐름에서만 필요" in guide
@@ -134,11 +138,31 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     assert "python -m pdf2md.gui" in guide
     assert "pdf2md-gui" in guide
     assert "python -m pdf2md.gui --help" in guide
+    assert "docs/GUI_USER_GUIDE.md" in guide
+    assert "`Help` 버튼" in guide
     assert "Cancel" in guide
     assert "`success`, `partial_success`, `failed`, `skipped`, `cancelled`" in guide
     assert "Retry" in guide
     assert "원문 텍스트, 표, 이미지 내용은 GUI summary에서 요약하지 않는다" in guide
     assert "tesseract --version" in guide
+
+
+def test_gui_user_guide_is_separate_from_cli_docs() -> None:
+    guide = Path("docs/GUI_USER_GUIDE.md").read_text(encoding="utf-8")
+    assert "GUI 사용자 가이드" in guide
+    assert "CLI가 익숙하지 않은 사용자" in guide
+    assert "python -m pdf2md.gui" in guide
+    assert "pdf2md-gui" in guide
+    assert "Help" in guide
+    assert "`PDF file`" in guide
+    assert "`PDF folder`" in guide
+    assert "`Output folder`" in guide
+    assert "`Status`" in guide
+    assert "`Warnings`" in guide
+    assert "`Retry`" in guide
+    assert "`cancelled`" in guide
+    assert "원문 텍스트, 표, 이미지 내용을 요약하거나 재서술하지 않는다" in guide
+    assert "자동화, CI, 반복 스크립트 실행은 GUI보다 CLI를 권장" in guide
 
 
 def test_ci_and_next_plan_contracts_are_present() -> None:
@@ -193,6 +217,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q56. GUI Batch Operation Controls" not in next_plan
     assert "Q57. Non-Developer GUI Distribution Guide" not in next_plan
     assert "Q58. GUI Smoke And Contract Test Expansion" not in next_plan
+    assert "Q59. GUI User Guide And Help Entry" not in next_plan
     assert "현재 active quality backlog는 없다." in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
@@ -203,6 +228,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q56. GUI Batch Operation Controls" not in development_specs
     assert "Q57. Non-Developer GUI Distribution Guide" not in development_specs
     assert "Q58. GUI Smoke And Contract Test Expansion" not in development_specs
+    assert "Q59. GUI User Guide And Help Entry" not in development_specs
     assert "현재 active quality backlog가 없으므로" in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
@@ -210,7 +236,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q58" in development_specs
+    assert "완료된 Q34-Q59" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -228,7 +254,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q56. GUI Batch Operation Controls" in implemented_specs
     assert "Q57. Non-Developer GUI Distribution Guide" in implemented_specs
     assert "Q58. GUI Smoke And Contract Test Expansion" in implemented_specs
+    assert "Q59. GUI User Guide And Help Entry" in implemented_specs
     assert "docs/MACOS_GUI_QUICKSTART.md" in implemented_specs
+    assert "docs/GUI_USER_GUIDE.md" in implemented_specs
     assert "python -m pdf2md.gui" in implemented_specs
     assert "check_gui_runtime()" in implemented_specs
     assert "format_gui_summary()" in implemented_specs
@@ -264,6 +292,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q56. GUI Batch Operation Controls" in quality_scorecard
     assert "Q57. Non-Developer GUI Distribution Guide" in quality_scorecard
     assert "Q58. GUI Smoke And Contract Test Expansion" in quality_scorecard
+    assert "Q59. GUI User Guide And Help Entry" in quality_scorecard
     assert "GUI contract test 확장" in quality_scorecard
     assert "다음 active backlog는 Q55-Q58" in quality_scorecard
     assert "다음 active backlog는 Q56-Q58" in quality_scorecard

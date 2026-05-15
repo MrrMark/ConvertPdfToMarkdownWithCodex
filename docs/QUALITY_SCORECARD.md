@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-16 | GUI 전용 사용자 도움말 | 97/100 | 0 | Q59. GUI User Guide And Help Entry 구현. CLI 문서와 분리된 GUI_USER_GUIDE와 GUI Help 버튼 추가. active quality backlog 없음 |
 | 2026-05-16 | GUI contract test 확장 | 97/100 | 0 | Q58. GUI Smoke And Contract Test Expansion 구현. option mapping, diagnostics, batch naming/order/cancel/retry/fingerprint 계약을 headless tests로 고정. active quality backlog 없음 |
 | 2026-05-16 | GUI 비개발자 문서 | 97/100 | 0 | Q57. Non-Developer GUI Distribution Guide 구현. macOS GUI quickstart 추가, README/Windows GUI 실행/진단 절차 보강. 다음 active backlog는 Q58 |
 | 2026-05-16 | GUI batch 운영성 | 97/100 | 0 | Q56. GUI Batch Operation Controls 구현. batch progress, document-boundary cancel, failed retry candidate, deterministic ordering/fingerprint 추가. 다음 active backlog는 Q57-Q58 |
@@ -49,6 +50,18 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-16 (Q59 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q59는 변환 품질 자체가 아니라 비개발자 GUI 사용자의 접근성을 높이는 문서/도움말 보강이다. CLI 중심 README/OS별 quickstart와 별도로 `docs/GUI_USER_GUIDE.md`를 추가했고, GUI 화면의 `Help` 버튼에서 로컬 사용자 가이드를 열 수 있게 했다.
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다.
 
 ### 2026-05-16 (Q58 구현 후)
 
