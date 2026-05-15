@@ -235,6 +235,12 @@ sudo apt-get install -y tesseract-ocr
 - ZIP 배포본 기준 원클릭 환경 구성: `scripts\setup_windows_env.ps1`, `scripts\setup_windows_env.bat`
 - ZIP 배포본 기준 폴더 배치 변환: `scripts\run_batch_folder_windows.ps1`, `scripts\run_batch_folder_windows.bat`
 
+### macOS GUI 빠른 시작 가이드
+
+- macOS에서 CLI가 익숙하지 않은 사용자는 [docs/MACOS_GUI_QUICKSTART.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/MACOS_GUI_QUICKSTART.md)를 먼저 따라가면 됩니다.
+- Homebrew Python 3.11+ 또는 python.org Python 3.11+ 환경에서 `.venv`를 만들고 `python -m pdf2md.gui`로 실행합니다.
+- 자동화, CI, 반복 배치 작업은 GUI보다 `python3 -m pdf2md`와 batch script를 권장합니다.
+
 ---
 
 ## 7. CLI 사용 예시
@@ -255,7 +261,16 @@ pdf2md-gui
 ```
 
 GUI에서는 입력 모드(단일 PDF 파일 / PDF 폴더), 입력 경로, 출력 폴더, page range, password, OCR, image/table/RAG/domain 옵션, confidential-safe mode, skip-existing 같은 주요 옵션을 선택할 수 있습니다.
+완료 후에는 문서별 status, warning count/code, Markdown/report/manifest 경로를 확인할 수 있고, 폴더 배치 변환은 문서 경계 취소와 실패 문서 retry candidate 표시를 지원합니다.
 자동화, CI, 대량 반복 실행에는 여전히 CLI와 batch script 사용을 권장합니다.
+
+GUI 실행 전 문제가 나면 아래를 먼저 확인하세요.
+
+- `python3 --version`이 `Python 3.11+`인지 확인
+- `python3 -m pip install -e .[dev]`로 editable install 수행
+- `python3 -m pdf2md.gui --help`가 창 없이 도움말을 출력하는지 확인
+- Tkinter 오류가 나면 Python 설치본에 Tcl/Tk 지원이 포함되어 있는지 확인
+- output folder 권한 오류가 나면 쓰기 가능한 사용자 폴더를 선택
 
 ### 가장 기본 실행
 

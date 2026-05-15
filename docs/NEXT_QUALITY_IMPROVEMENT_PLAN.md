@@ -27,14 +27,7 @@ Q53 Minimal Desktop GUI Wrapper 이후 후속 작업은 GUI가 기존 CLI 변환
 
 | Q | 우선순위 | 작업 | 목표 |
 |---|---|---|---|
-| Q57 | P2 | Non-Developer GUI Distribution Guide | 비개발자가 설치/실행/샘플 변환/문제 진단까지 따라갈 수 있는 GUI 중심 배포 문서를 정리한다. |
 | Q58 | P2 | GUI Smoke And Contract Test Expansion | GUI wrapper가 CLI `Config`/산출물 계약을 계속 따르는지 headless smoke와 문서 계약 테스트로 고정한다. |
-
-### Q57. Non-Developer GUI Distribution Guide
-
-- Windows/macOS 사용자가 CLI 지식 없이 GUI를 실행하는 절차를 문서화한다.
-- 설치형 배포가 아니라도 venv, editable install, `pdf2md-gui`, `python -m pdf2md.gui` 흐름을 명확히 안내한다.
-- OCR runtime, Python/Tkinter, 파일 권한, output folder 문제의 초기 점검 절차를 포함한다.
 
 ### Q58. GUI Smoke And Contract Test Expansion
 

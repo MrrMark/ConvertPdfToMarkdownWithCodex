@@ -175,6 +175,17 @@ pdf2md-gui
 
 GUI는 PDF 파일 또는 폴더, 출력 폴더, 주요 변환 옵션을 선택하는 간편 실행 wrapper입니다. 변환 자체는 CLI와 같은 core pipeline을 사용합니다.
 
+GUI 사용 순서:
+
+1. `PDF file` 또는 `PDF folder`를 선택합니다.
+2. `Browse`로 입력 파일/폴더를 선택합니다.
+3. 필요하면 `Output folder`를 선택합니다.
+4. OCR이 필요하면 `Force OCR`과 `OCR lang`을 설정합니다.
+5. `Start conversion`을 누릅니다.
+6. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`, `Retry`를 확인합니다.
+
+폴더 배치 변환 중 `Cancel`을 누르면 현재 문서가 끝난 뒤 남은 문서는 `cancelled`로 표시됩니다. 실패 문서는 `Retry` 열에 재시도 후보로 표시됩니다.
+
 CLI 기본 실행:
 
 ```powershell
@@ -673,6 +684,24 @@ pip install -e .[dev]
 
 - 회사 보안 정책으로 스크립트 실행이 제한될 수 있습니다.
 - PowerShell 정책 또는 보안 솔루션 정책을 확인하세요.
+
+### H. GUI가 실행되지 않음
+
+- `python --version`이 `Python 3.11` 이상인지 확인하세요.
+- 가상환경을 활성화한 뒤 `python -m pdf2md.gui --help`를 먼저 실행하세요.
+- `pdf2md-gui` 명령이 안 잡히면 아래를 다시 실행하세요.
+
+```powershell
+.\.venv314\Scripts\Activate.ps1
+python -m pip install -e .[dev]
+python -m pdf2md.gui
+```
+
+### I. GUI에서 output folder 오류가 남
+
+- 쓰기 가능한 사용자 폴더를 선택하세요.
+- output path에 같은 이름의 파일이 있으면 폴더로 바꾸거나 다른 경로를 선택하세요.
+- 회사 보안 정책이 Documents/Desktop 접근을 제한하면 별도 작업 폴더를 만들어 사용하세요.
 
 ---
 
