@@ -27,17 +27,10 @@ Q53 Minimal Desktop GUI Wrapper 이후 후속 작업은 GUI가 기존 CLI 변환
 
 | Q | 우선순위 | 작업 | 목표 |
 |---|---|---|---|
-| Q54 | P1 | GUI Runtime And Install Diagnostics | Tkinter/runtime/entry point/경로 권한 문제를 변환 실패와 구분해 사용자가 조치 가능한 메시지로 확인하게 한다. |
 | Q55 | P1 | GUI Conversion Result Review UX | GUI 완료 화면에서 `report.json`, `manifest.json`, partial success warning, 산출물 경로를 요약해 품질 확인 진입 비용을 낮춘다. |
 | Q56 | P1 | GUI Batch Operation Controls | 폴더 배치 변환에서 취소, 진행률, 실패 문서 재시도 후보, skip summary를 deterministic local summary로 남긴다. |
 | Q57 | P2 | Non-Developer GUI Distribution Guide | 비개발자가 설치/실행/샘플 변환/문제 진단까지 따라갈 수 있는 GUI 중심 배포 문서를 정리한다. |
 | Q58 | P2 | GUI Smoke And Contract Test Expansion | GUI wrapper가 CLI `Config`/산출물 계약을 계속 따르는지 headless smoke와 문서 계약 테스트로 고정한다. |
-
-### Q54. GUI Runtime And Install Diagnostics
-
-- Tkinter import/launch 실패, Python 버전 불일치, entry point 누락, output path 권한 문제를 변환 실패와 분리해 진단한다.
-- GUI 실행 전 사전 점검 결과를 structured diagnostic object 또는 log summary로 제공한다.
-- CLI 자동화 경로에는 영향을 주지 않고, `python -m pdf2md.gui --help`는 계속 창을 띄우지 않아야 한다.
 
 ### Q55. GUI Conversion Result Review UX
 

@@ -3,10 +3,20 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 from queue import Empty, Queue
+import sys
 import threading
 import webbrowser
 
-from pdf2md.gui_runner import GuiConversionOptions, GuiConversionRequest, GuiConversionSummary, run_gui_conversion
+from pdf2md.gui_runner import (
+    GuiConversionOptions,
+    GuiConversionRequest,
+    GuiConversionSummary,
+    GuiDiagnosticError,
+    GuiDiagnosticReport,
+    check_gui_runtime,
+    run_gui_conversion,
+    validate_gui_request,
+)
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
 
 
@@ -191,10 +201,20 @@ class Pdf2MdGuiApp:
         self.last_summary = None
         self._clear_log()
         self._append_log("Starting conversion")
+        diagnostics = validate_gui_request(request)
+        if diagnostics.has_errors:
+            self.start_button.configure(state="normal")
+            self._append_log(diagnostics.user_message())
+            messagebox.showerror("Cannot start conversion", diagnostics.user_message())
+            return
+        if diagnostics.warnings:
+            self._append_log(diagnostics.user_message())
 
         def worker() -> None:
             try:
                 summary = run_gui_conversion(request, progress=lambda message: self.queue.put(("log", message)))
+            except GuiDiagnosticError as exc:
+                self.queue.put(("diagnostic_error", exc))
             except Exception as exc:  # noqa: BLE001
                 self.queue.put(("error", exc))
             else:
@@ -211,6 +231,10 @@ class Pdf2MdGuiApp:
                 event, payload = self.queue.get_nowait()
                 if event == "log":
                     self._append_log(str(payload))
+                elif event == "diagnostic_error" and isinstance(payload, GuiDiagnosticError):
+                    self.start_button.configure(state="normal")
+                    self._append_log(payload.report.user_message())
+                    messagebox.showerror("Cannot start conversion", payload.report.user_message())
                 elif event == "error":
                     self.start_button.configure(state="normal")
                     self._append_log(f"Failed: {payload}")
@@ -252,11 +276,23 @@ class Pdf2MdGuiApp:
         webbrowser.open(self.last_summary.output_root.resolve().as_uri())
 
 
-def launch_gui() -> int:
-    import tkinter as tk
+def _write_startup_diagnostics(report: GuiDiagnosticReport) -> None:
+    message = report.user_message()
+    if message:
+        sys.stderr.write(message + "\n")
 
+
+def launch_gui() -> int:
+    runtime_report = check_gui_runtime()
+    if runtime_report.has_errors:
+        _write_startup_diagnostics(runtime_report)
+        return 1
+
+    import tkinter as tk
     root = tk.Tk()
-    Pdf2MdGuiApp(root)
+    app = Pdf2MdGuiApp(root)
+    if runtime_report.warnings:
+        app._append_log(runtime_report.user_message())
     root.mainloop()
     return 0
 
