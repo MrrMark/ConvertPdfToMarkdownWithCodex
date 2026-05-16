@@ -23,119 +23,84 @@
 
 ## 현재 Active Development Specs
 
-### P1 / Q61. GUI Localization, Presets, And Progress Percent
+### P1 / Q62. GUI Smoke Evidence And Layout Guardrails
 
 #### 배경
 
-Q60 구현 후 실제 GUI 확인에서 세 가지 사용성 요구가 추가로 확인됐다.
+Q61로 GUI 기본 한글 UI, English 선택, 목적 기반 preset, progress percent 표시가 구현됐다. 이 변화는 사용자 눈에 바로 보이는 기능이므로 다음 단계에서는 실제 로컬 실행 흐름을 반복 가능한 smoke evidence로 남기고, 긴 한글/영문 label과 preset 상태가 화면/상태 계층에서 누락되지 않도록 guardrail을 세운다.
 
-첫째, GUI 기본 사용자는 한국어 사용자가 많으므로 기본 UI는 한글이어야 하고, 필요한 경우 English로 전환할 수 있어야 한다. 둘째, 현재 GUI는 세부 옵션을 처음부터 노출해 비개발자가 어떤 조합을 골라야 하는지 부담이 크다. 셋째, Q60의 progressbar는 시각적 상태를 보여주지만 batch 변환에서는 숫자 percent도 함께 보여주는 편이 진행 상황 파악에 유리하다.
-
-이 작업도 core 변환 엔진 개선이 아니라 GUI orchestration과 표시 계층 개선이다. PDF 원문, report/manifest schema, warning code, RAG sidecar 계약은 그대로 유지한다.
+이 작업은 GUI 배포 전 confidence를 높이는 운영성 개선이다. core 변환 엔진, Markdown/manifest/report 산출물, public schema, warning code는 그대로 유지한다.
 
 #### 목표
 
-- GUI 언어를 기본 `한국어`, 선택 `English`로 제공한다.
-- 목적 기반 preset을 추가해 첫 화면에서 `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` 중 고르게 한다.
-- preset은 내부적으로 기존 `GuiConversionOptions`로만 매핑하며 CLI option 의미를 새로 만들지 않는다.
-- batch 변환 진행 상태에 `current/total`과 percent text를 함께 표시한다.
-- single conversion은 실제 page-level progress가 없으므로 indeterminate 표시를 유지하고, 완료 시에만 `100%`로 표시한다.
+- Q61 GUI 기능을 검증하는 local-only smoke evidence runner를 제공한다.
+- GUI runtime, module help, preset별 runner smoke, manual 확인 항목을 하나의 evidence JSON으로 기록한다.
+- evidence에는 원문 PDF 텍스트, 표 내용, 이미지 내용, warning message를 저장하지 않는다.
+- 한글/영문 label catalog와 GUI text tracking, preset lock/unlock 상태를 headless test로 방어한다.
+- 실제 Tk window 검증은 로컬 수동 smoke로 유지하고, CI에서는 창 없이 실행 가능한 검증만 수행한다.
 
 #### 구현 범위
 
-- `pdf2md/gui_i18n.py` 또는 동등한 순수 helper
-  - `GuiLanguage` literal: `ko`, `en`
-  - `GuiTextKey` 또는 string key 기반 catalog
-  - `translate(language, key, **values)` helper
-  - 누락 key는 English fallback 또는 key fallback으로 GUI 시작 실패를 막는다.
-  - Korean catalog를 기본으로 유지한다.
-- `pdf2md/gui_presets.py` 또는 동등한 순수 helper
-  - `GuiOptionPreset`: `preserve`, `rag_optimized`, `custom`
-  - `preset_display_name(language, preset)`
-  - `options_for_preset(preset, current_options)` 또는 `apply_preset_to_options()`
-  - `preserve`는 원본 보존 우선:
-    - `image_mode=referenced`
-    - `table_mode=auto`
-    - `rag_table_output=none`
-    - `domain_adapter=none`
-    - `force_ocr=False`
-    - header/footer removal, hyphenation repair, figure crop fallback 같은 heuristic flag는 기본 off
-  - `rag_optimized`는 RAG sidecar/provenance 중심:
-    - `rag_table_output=both`
-    - `keep_page_markers=True`
-    - `repair_hyphenation=True`
-    - `remove_header_footer=True`
-    - `image_mode=referenced`
-    - `table_mode=auto`
-    - `force_ocr=False`
-    - `confidential_safe_mode`는 사용자가 켜는 opt-in으로 유지
-  - `custom`은 현재 UI 값을 보존하고 flag 영역을 직접 편집 가능하게 한다.
-  - `pages`, `password`, `ocr_lang`, `input/output`은 preset 적용으로 덮어쓰지 않는다.
-- `pdf2md/gui_state.py`
-  - 최근 경로 state에 selected language와 selected preset을 추가한다.
-  - 이전 Q60 state 파일도 깨지지 않게 schema migration 또는 tolerant load를 제공한다.
-  - 저장 state에는 여전히 원문 텍스트, table/image content, warning message를 넣지 않는다.
-- `pdf2md/gui.py`
-  - language selector 추가
-  - preset selector 추가
-  - 기본 시작 언어는 `ko`, 기본 preset은 `preserve`
-  - `custom`이 아닌 preset에서는 세부 flag 영역을 비활성화하거나 읽기 전용으로 표시한다.
-  - preset 변경 시 UI 변수와 `GuiConversionOptions`가 동기화된다.
-  - progress label은 batch에서 `2/10 (20%)` 형식으로 표시한다.
-  - single conversion은 `처리 중...` / `Converting...`과 indeterminate bar를 유지하고 완료 시 `100%`로 표시한다.
+- `scripts/run_gui_smoke_evidence.py` 또는 동등한 script
+  - `--output-dir`, `--state-path`, `--json-only` 같은 local smoke 실행 옵션을 제공한다.
+  - `check_gui_runtime()` 결과를 포함한다.
+  - `python -m pdf2md.gui --help`가 창 없이 성공하는지 확인한다.
+  - synthetic/sample fixture를 이용해 single conversion과 folder batch conversion을 runner 경로로 실행한다.
+  - `preserve`, `rag_optimized`, `custom` preset을 최소 한 번 이상 `GuiConversionOptions`로 적용해 runner smoke에 반영한다.
+  - evidence JSON에는 absolute path 대신 redacted label 또는 relative label을 저장한다.
+  - 실패 시 non-zero exit code와 조치 가능한 summary를 출력한다.
+- GUI guardrail helper/test
+  - `pdf2md/gui_i18n.py` catalog key coverage를 검증한다.
+  - GUI에서 추적해야 하는 label/button/heading key 목록을 helper로 노출하거나 테스트 가능하게 정리한다.
+  - preset 선택 시 editable/readonly 대상이 기대와 일치하는지 headless 수준에서 검증한다.
+  - Q61 state schema v2가 smoke 전용 isolated state path에서 오염 없이 작동하는지 확인한다.
+- 문서
+  - README, GUI user guide, macOS quickstart, Windows guide에 smoke evidence runner와 수동 확인 절차를 추가한다.
+  - evidence에 포함 가능한 정보와 포함 금지 정보를 명확히 한다.
+  - 실제 GUI window 수동 smoke와 CI/headless smoke의 차이를 설명한다.
 
 #### 테스트 범위
 
-- `tests/test_gui_i18n.py`
-  - 한국어 기본 catalog 주요 key 존재
-  - English catalog 주요 key 존재
-  - format placeholder 치환
-  - missing key fallback
-- `tests/test_gui_presets.py`
-  - `preserve` preset mapping이 보수적 원본 유지 정책과 일치
-  - `rag_optimized` preset mapping이 RAG sidecar/provenance 옵션을 켬
-  - `rag_optimized`가 `force_ocr`를 강제로 켜지 않음
-  - `custom`은 현재 options를 보존
-  - `pages`, `password`, `ocr_lang`이 preset 적용으로 바뀌지 않음
-- `tests/test_gui_state.py`
-  - language/preset 저장과 복구
-  - Q60 schema 또는 누락 field fallback
-  - corrupt JSON fallback 유지
-- `tests/test_gui_runner.py` 또는 GUI helper test
-  - batch progress percent text
-  - single conversion 완료 시 100% 표시 helper
+- `tests/test_gui_smoke_evidence.py`
+  - evidence writer가 원문 텍스트/표/이미지/warning message를 저장하지 않음
+  - redaction helper가 workspace/home absolute path를 제거
+  - success/failure summary와 exit code contract
+- `tests/test_gui_i18n.py`, `tests/test_gui_presets.py`, `tests/test_gui_state.py`
+  - catalog key coverage 확장
+  - preset lock/unlock 및 state isolation contract
+- `tests/test_gui_runner.py`
+  - smoke runner가 사용하는 single/batch conversion path가 CLI `Config` 계약과 일치
 - `tests/test_docs_examples.py`
-  - GUI guide/README/macOS/Windows 문서가 language selector, preset, percent 표시 정책을 설명하는지 고정
+  - smoke evidence runner, 수동 GUI checklist, redaction policy 문서 고정
 
-#### UX 정책
+#### Smoke 정책
 
-- `기본 모드(원본 유지)`는 가장 보수적인 기본값이다.
-- `RAG 등록용(최적화)`은 Markdown 원문을 바꾸는 기능이 아니라 sidecar/provenance와 RAG 친화 옵션을 켜는 preset이다.
-- `Optimize Options(유저 선택)`은 기존 advanced mode에 가깝다.
-- 사용자가 preset을 바꿔도 input/output, pages, password는 유지한다.
-- language 전환은 GUI 표시 문구만 바꾸며 변환 output에는 영향을 주지 않는다.
-- percent는 실제 document-level progress만 표현한다. page-level progress가 없으면 단일 PDF 처리 중 percent를 추정하지 않는다.
+- smoke evidence는 local-only artifact다. repository에 fixture raw output이나 사용자 PDF 내용을 커밋하지 않는다.
+- evidence에는 command 결과, runtime availability, sanitized artifact labels, status counts만 남긴다.
+- 실제 GUI window 확인은 사람이 수행하는 checklist로 남긴다. CI에서 OS-level click automation을 요구하지 않는다.
+- runner smoke는 GUI orchestration이 CLI conversion contract를 깨지 않는지 확인하는 보조 검증이다.
 
 #### 로컬 GUI smoke checklist
 
-1. GUI를 실행하면 기본 한글 UI로 표시되는지 확인한다.
-2. language selector를 English로 바꾸면 주요 label/button/status가 English로 바뀌는지 확인한다.
-3. `기본 모드(원본 유지)`에서 advanced flags가 보수적 기본값인지 확인한다.
-4. `RAG 등록용(최적화)`을 선택하면 RAG tables/page marker/hyphenation/header-footer 관련 UI가 preset에 맞게 바뀌는지 확인한다.
-5. `Optimize Options(유저 선택)`에서 세부 옵션을 직접 바꿀 수 있는지 확인한다.
-6. 폴더 배치 변환에서 `current/total (percent%)` 표시가 progressbar와 일치하는지 확인한다.
-7. 단일 PDF 변환 중에는 indeterminate 상태이고 완료 후 `100%`가 되는지 확인한다.
-8. GUI를 재시작했을 때 language/preset 선택이 local-only state에서 복구되는지 확인한다.
+1. smoke evidence runner를 isolated output/state path로 실행한다.
+2. `python -m pdf2md.gui --help` 결과가 evidence에 기록됐는지 확인한다.
+3. GUI를 실제로 실행해 기본 한국어 UI를 확인한다.
+4. language selector를 English로 바꿨을 때 주요 label/button/status가 바뀌는지 확인한다.
+5. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`에서 세부 옵션 잠금/해제가 맞는지 확인한다.
+6. 단일 PDF 변환 완료 시 `100%`가 표시되는지 확인한다.
+7. 폴더 배치 변환에서 `current/total (percent%)` 표시가 progressbar와 일치하는지 확인한다.
+8. GUI 재시작 후 language/preset/recent path가 복구되고, `Clear recent` 후 경로가 사라지는지 확인한다.
+9. evidence JSON에 raw PDF text/table/image/warning message가 없는지 확인한다.
 
 #### 비범위
 
-- PDF 원문 내용 번역 또는 localization
-- schema key, warning code, report/manifest field명 번역
-- core pipeline page-level progress callback
-- OCR language 자동 선택 또는 문서 언어 감지
-- user behavior analytics
+- OS-level 자동 클릭 또는 screenshot visual regression을 CI 필수로 만드는 것
+- Computer Use 기반 자동 GUI 클릭을 release gate로 편입
 - native installer/package 생성
+- core pipeline page-level progress callback
+- PDF/Markdown preview/editor
+- OCR language 자동 선택 또는 LLM 기반 preset 추천
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q60 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q61 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

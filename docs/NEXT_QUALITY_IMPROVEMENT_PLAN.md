@@ -23,50 +23,49 @@
 
 ## 남은 작업
 
-### P1 / Q61. GUI Localization, Presets, And Progress Percent
+### P1 / Q62. GUI Smoke Evidence And Layout Guardrails
 
-Q60으로 GUI 실행 흐름, 결과 파일 열기, 최근 경로 저장, 진행 상태 표시가 보강된 뒤 실제 사용 중 추가 UX 요구가 확인됐다. 다음 단계는 GUI를 비개발자 친화적인 기본 한글 UI로 전환할 수 있게 하고, 처음부터 세부 옵션을 모두 고르게 하지 않도록 변환 목적별 preset을 제공하며, 신뢰 가능한 범위에서 진행률을 숫자 percent로 함께 표시하는 것이다.
+Q61로 기본 한글 UI, English 선택, 목적 기반 preset, batch percent 표시가 들어갔다. 다음 단계는 이 GUI 변화가 실제 로컬 환경에서 반복 확인 가능하도록 smoke evidence 절차를 만들고, 긴 한글/영문 label과 preset 상태가 화면에서 깨지지 않도록 레이아웃/상태 guardrail을 보강하는 것이다.
 
 #### 목표
 
-- GUI 표시 언어를 기본 `한국어`, 선택 `English`로 지원한다.
-- 변환 옵션을 처음부터 개별 flag 중심으로 노출하지 않고 `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset으로 안내한다.
-- 폴더 배치 변환 진행률은 progressbar와 함께 `current/total`, percent를 표시한다.
-- 단일 PDF 변환은 page-level progress callback이 생기기 전까지 가짜 percent를 만들지 않고 indeterminate 상태와 완료 `100%`만 표시한다.
-- 언어/preset/progress UI는 CLI `Config`, core `run_conversion`, output schema 계약을 변경하지 않는다.
+- Q61 GUI 기능을 로컬에서 재현 가능한 smoke checklist와 evidence 파일로 검증한다.
+- smoke evidence에는 Python/Tkinter runtime, GUI help smoke, preset별 runner smoke, manual GUI 확인 항목을 기록하되 PDF 원문/표/이미지 내용은 저장하지 않는다.
+- 한글/영문 label, preset selector, option lock/unlock 상태가 누락 없이 UI에 연결되는지 headless guardrail로 고정한다.
+- 실제 Tk window 또는 OS UI automation이 없는 CI에서도 의미 있는 검증을 유지하고, 수동 GUI smoke는 로컬 전용 절차로 분리한다.
+- core `run_conversion`, CLI option 의미, output schema 계약은 변경하지 않는다.
 
 #### 우선 구현 후보
 
-1. GUI localization helper
-   - `ko`, `en` 문자열 catalog를 둔다.
-   - GUI label/button/status/messagebox/log 중 UI 안내 문구를 catalog로 치환한다.
-   - warning code, report/manifest key, 원문 PDF 텍스트, table/image content는 번역하지 않는다.
-   - 선택 언어는 local-only GUI state에 저장하고 시작 시 복구한다.
-2. Preset selector
-   - 기본값은 `기본 모드(원본 유지)`다.
-   - `RAG 등록용(최적화)`는 RAG sidecar/provenance 중심 옵션을 켜되 원문을 요약/재서술하지 않는다.
-   - `Optimize Options(유저 선택)`을 선택했을 때만 세부 flag 영역을 직접 편집 가능하게 한다.
-   - `pages`, `password`, `input/output`, `OCR lang`은 preset과 별개로 항상 접근 가능하게 둔다.
-3. Progress percent display
-   - batch progress는 `2/10 (20%)`처럼 표시한다.
-   - skipped/cancelled/failed도 document-level event 기준으로 percent를 갱신한다.
-   - single conversion은 `처리 중...` 또는 `Converting...`과 indeterminate bar를 유지하고 완료 시 `100%`로 바꾼다.
+1. Local GUI smoke evidence runner
+   - `scripts/run_gui_smoke_evidence.py` 또는 동등한 local-only script를 추가한다.
+   - `check_gui_runtime()`, `python -m pdf2md.gui --help`, single/batch `run_gui_conversion()` smoke를 한 번에 수행한다.
+   - evidence JSON에는 pass/fail, runtime diagnostics, command 결과, preset/language 상태, 산출물 존재 여부만 남긴다.
+   - workspace/home 경로와 원문 PDF 내용은 redaction 또는 상대 label로 처리한다.
+2. GUI layout/state guardrails
+   - i18n catalog key coverage와 English fallback을 강화한다.
+   - GUI에서 text tracking 대상 label/button/heading이 누락되지 않도록 headless test 가능한 helper를 둔다.
+   - preset별 option lock/unlock 상태와 `pages/password/OCR lang` 보존 정책을 GUI state 수준에서 검증한다.
+   - 실제 Tk window 검증이 가능한 환경에서는 optional manual smoke를 실행하고, 불가능하면 명시적으로 skip 사유를 남긴다.
+3. Manual smoke checklist refinement
+   - macOS/Windows/GUI guide에 Q61 이후 확인 항목을 통합한다.
+   - 한국어 기본 UI, English 전환, preset lock/unlock, batch percent, single 완료 `100%`, local-only state 복구/clear를 체크리스트로 고정한다.
+   - evidence 파일을 공유할 때 포함하면 안 되는 정보와 포함해도 되는 정보를 구분한다.
 
 #### 완료 기준
 
-- localization catalog와 fallback 동작이 unit test로 고정된다.
-- preset이 `GuiConversionOptions`로 변환되는 mapping이 headless test로 고정된다.
-- 기본 모드가 보수적 원본 유지 정책을 깨지 않는다는 test가 있다.
-- RAG 등록용 preset이 RAG sidecar/provenance 옵션을 켜되 `force_ocr` 같은 공격적 옵션을 기본 강제하지 않는다.
-- batch progress percent text가 deterministic helper test로 검증된다.
-- README, `docs/GUI_USER_GUIDE.md`, `docs/MACOS_GUI_QUICKSTART.md`, `docs/WINDOWS_A_TO_Z_GUIDE.md`가 언어 선택, preset 의미, percent 표시 한계를 설명한다.
+- local smoke evidence runner가 CI/headless friendly mode에서 테스트된다.
+- evidence JSON이 원문 텍스트, 표, 이미지 내용, warning message를 저장하지 않는다는 test가 있다.
+- language/preset/progress/status UI guardrail test가 Q61 regression을 방어한다.
+- README, `docs/GUI_USER_GUIDE.md`, `docs/MACOS_GUI_QUICKSTART.md`, `docs/WINDOWS_A_TO_Z_GUIDE.md`가 smoke evidence 생성과 수동 확인 절차를 설명한다.
+- 실패 시 조치 가능한 메시지와 exit code를 제공한다.
 - 새 public JSON output schema는 만들지 않는다.
 
 #### 비범위
 
-- PDF 원문 텍스트, 표, 이미지 내용 번역
-- report/manifest schema key 또는 warning code localization
+- OS-level 자동 클릭, screenshot visual regression, Computer Use 기반 CI 자동화
+- native installer, code signing, notarization, auto-update
 - core pipeline page-level progress callback 구현
-- OCR 언어 자동 감지
-- LLM 기반 preset 추천
-- native app packaging 또는 installer
+- PDF/Markdown preview 또는 editor
+- OCR 언어 자동 감지 또는 LLM 기반 preset 추천
+- public output schema 추가

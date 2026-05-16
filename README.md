@@ -903,7 +903,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q61 GUI Localization, Presets, And Progress Percent입니다. 한글/영어 UI, 목적 기반 옵션 preset, 신뢰 가능한 progress percent 표시를 우선 검증합니다.
+- 현재 active quality backlog는 Q62 GUI Smoke Evidence And Layout Guardrails입니다. Q61 GUI 언어/preset/progress 기능의 로컬 smoke evidence, 수동 checklist, layout/state guardrail을 우선 검증합니다.
 
 ### 이후 후보
 
