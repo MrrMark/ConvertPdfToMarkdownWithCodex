@@ -918,7 +918,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q62 GUI Smoke Evidence And Layout Guardrails입니다. Q61 GUI 언어/preset/progress 기능의 로컬 smoke evidence, 수동 checklist, layout/state guardrail을 우선 검증합니다.
+- 현재 active quality backlog는 Q64-Q67 GUI 완성도/호환성 개선입니다. 우선 Q64 Responsive GUI Layout And Accessibility Guardrails로 작은 화면, display scaling, 긴 label에서 GUI 접근성과 레이아웃 안정성을 높입니다.
 
 ### 이후 후보
 
