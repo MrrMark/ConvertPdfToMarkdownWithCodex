@@ -220,6 +220,14 @@ python scripts\run_gui_smoke_evidence.py --output-dir "$env:TEMP\pdf2md-gui-smok
 
 `gui_smoke_evidence.json`은 local-only artifact이며 pass/fail, command return code, runtime diagnostic code/message/action, preset/language 상태, warning code/count, 산출물 존재 여부만 저장합니다. 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않습니다. 실제 GUI window에서 한국어/English 전환, preset lock/unlock, batch percent, 단일 완료 `100%`, `Clear recent`는 수동 smoke checklist로 확인합니다.
 
+문제 보고용 공유 자료가 필요하면 sanitized support bundle을 생성합니다.
+
+```powershell
+python scripts\create_gui_support_bundle.py --output-dir "$env:TEMP\pdf2md-gui-support" --smoke-evidence "$env:TEMP\pdf2md-gui-smoke\gui_smoke_evidence.json"
+```
+
+`gui_support_bundle.json`과 `gui_support_bundle.md`에는 status count, warning code/count, sanitized artifact label, environment/runtime code만 포함합니다. 원문 PDF/Markdown 내용, 표/이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않습니다.
+
 Windows 비개발자 기본 배포 경로는 ZIP/source checkout + `.venv314` setup script + `python -m pdf2md.gui`입니다. PyInstaller/native bundle은 Tkinter, PyMuPDF, Tesseract 포함/진단과 code signing smoke가 정리되기 전까지 공식 기본 배포 경로로 보지 않습니다.
 
 CLI 기본 실행:

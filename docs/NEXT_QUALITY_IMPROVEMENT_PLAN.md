@@ -23,22 +23,6 @@
 
 ## 남은 작업
 
-### P2 / Q66. Sanitized GUI Support Bundle
-
-GUI 사용자가 문제를 보고할 때 현재 GUI log/summary에는 local path가 들어갈 수 있다. 지원용 공유 artifact는 원문 PDF 내용, 표/이미지 내용, warning message, absolute path를 제거한 sanitized bundle이어야 한다.
-
-#### 목표
-
-- GUI summary, smoke evidence, runtime diagnostics를 기반으로 support bundle JSON/Markdown을 생성하는 helper 또는 script를 추가한다.
-- bundle에는 status count, warning code/count, sanitized artifact labels, environment/runtime code만 포함한다.
-- 원문 텍스트, 표 내용, 이미지 내용, warning message, home/workspace absolute path는 저장하지 않는다.
-
-#### 완료 기준
-
-- redaction helper와 support bundle writer 테스트가 추가된다.
-- GUI guide에 support bundle 공유 정책이 문서화된다.
-- public output schema가 아닌 local support artifact로 명확히 구분된다.
-
 ### P2 / Q67. GUI Expert Options And Profile Import/Export
 
 GUI에는 아직 `page_workers`, `debug`, `verbose` 같은 expert option 입력이 없다. 반복 작업자는 preset을 넘어서 실행 profile을 저장/불러오고 싶어 한다.

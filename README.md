@@ -298,6 +298,14 @@ python3 scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --s
 
 `gui_smoke_evidence.json`은 local-only artifact입니다. pass/fail, command return code, runtime diagnostic code/message/action, preset/language 상태, warning code/count, 산출물 존재 여부만 저장하고 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않습니다. 실제 Tk window에서의 한국어/English 전환, preset lock/unlock, progress percent, `Clear recent` 확인은 문서화된 수동 smoke checklist로 별도 수행합니다.
 
+문제 보고용 공유 자료가 필요하면 sanitized support bundle을 생성합니다.
+
+```bash
+python3 scripts/create_gui_support_bundle.py --output-dir /tmp/pdf2md-gui-support --smoke-evidence /tmp/pdf2md-gui-smoke/gui_smoke_evidence.json
+```
+
+`gui_support_bundle.json`과 `gui_support_bundle.md`는 local-only 지원 artifact입니다. status count, warning code/count, sanitized artifact label, environment/runtime code만 저장하고 원문 PDF/Markdown 내용, 표/이미지 내용, 변환 warning message, home/workspace absolute path는 저장하지 않습니다.
+
 ### 가장 기본 실행
 
 macOS/Linux 예시:
@@ -920,7 +928,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q66-Q67 GUI 완성도/호환성 개선입니다. 우선 Q66 Sanitized GUI Support Bundle로 공유 가능한 지원 artifact를 정리합니다.
+- 현재 active quality backlog는 Q67 GUI 완성도/호환성 개선입니다. Q67 GUI Expert Options And Profile Import/Export로 반복 작업용 expert option과 local profile을 정리합니다.
 
 ### 이후 후보
 

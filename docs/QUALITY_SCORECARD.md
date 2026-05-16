@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI support bundle | 97/100 | 0 | Q66. Sanitized GUI Support Bundle 구현. GUI summary, runtime doctor, smoke evidence를 raw text/message/path 없이 status count, warning code/count, sanitized artifact label, runtime code 중심 JSON/Markdown support artifact로 생성. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q67 |
 | 2026-05-17 | GUI runtime doctor | 97/100 | 0 | Q65. GUI Runtime Doctor And Packaging Compatibility Smoke 구현. Tcl/Tk patchlevel, display/window advisory, optional OCR/Tesseract, Pillow/pypdfium2, help document, package mode 진단과 `--doctor` 명령 추가. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q66-Q67 |
 | 2026-05-17 | GUI responsive layout | 97/100 | 0 | Q64. Responsive GUI Layout And Accessibility Guardrails 구현. GUI body scroll, smaller minimum size, wrapping metadata, responsive option/action layout, result horizontal scrollbar 추가. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q65-Q67 |
 | 2026-05-17 | GUI 호환성 후속 명세 | 97/100 | 0 | Q62. GUI Smoke Evidence And Layout Guardrails 구현/merge 완료. Q63으로 stale active backlog를 정리하고 Q64-Q67 responsive layout, runtime doctor, sanitized support bundle, expert options/profile 명세를 추가. 변환 품질과 public schema 계약은 유지 |
@@ -56,6 +57,18 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q66 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q66은 변환 엔진이 아니라 GUI 지원/공유 artifact 계층을 보강했다. `gui_support_bundle.json`과 Markdown bundle은 status count, warning code/count, sanitized artifact labels, environment/runtime code만 저장하며 원문 PDF 텍스트, 표/이미지 내용, 변환 warning message, home/workspace absolute path는 저장하지 않는다.
+
+#### 다음 개선 참조
+
+- Q67. GUI Expert Options And Profile Import/Export
 
 ### 2026-05-17 (Q65 구현 후)
 

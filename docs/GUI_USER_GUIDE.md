@@ -235,7 +235,22 @@ python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --st
 
 evidence에는 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path를 저장하지 않는다. 실제 Tk window에서 한국어 기본 UI, English 전환, preset lock/unlock, batch percent, 단일 완료 `100%`, local-only state 복구/clear는 macOS/Windows checklist에 따라 사람이 확인한다.
 
-## 11) 배포 방식 메모
+## 11) Support bundle
+
+문제 보고를 위해 공유 가능한 자료가 필요하면 sanitized support bundle을 만든다.
+
+```bash
+python scripts/create_gui_support_bundle.py --output-dir /tmp/pdf2md-gui-support --smoke-evidence /tmp/pdf2md-gui-smoke/gui_smoke_evidence.json
+```
+
+생성 파일:
+
+- `gui_support_bundle.json`
+- `gui_support_bundle.md`
+
+support bundle은 public output schema가 아니라 local-only 지원 artifact다. 포함 대상은 status count, warning code/count, sanitized artifact label, environment/runtime code, smoke failed check code다. 원문 PDF 텍스트, Markdown 본문, 표 내용, 이미지 내용, 변환 warning message, home/workspace absolute path는 저장하지 않는다.
+
+## 12) 배포 방식 메모
 
 현재 비개발자 기본 경로는 source/ZIP + venv setup + `python -m pdf2md.gui` 실행이다.
 
