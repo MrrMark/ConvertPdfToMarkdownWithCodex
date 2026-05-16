@@ -63,6 +63,12 @@ python -m pdf2md.gui --help
 - `Repair hyphenation`: 명확한 줄바꿈 hyphenation을 복구한다.
 - `Figure crop fallback`: caption이 있는 figure에 embedded image가 없을 때 page crop fallback을 시도한다.
 
+### Progress
+
+- 단일 PDF 변환은 처리 중임을 나타내는 indeterminate progress로 표시된다.
+- 폴더 배치 변환은 현재 문서 index/total 기준 progress로 표시된다.
+- page-level 진행률 callback이 없으므로 실제 page 처리율처럼 보이는 임의 진행률은 표시하지 않는다.
+
 ## 3) 단일 PDF 변환
 
 1. `PDF file`을 선택한다.
@@ -97,6 +103,8 @@ GUI 완료 후 Results 표에서 문서별 결과를 확인한다.
 
 상세 품질 판단은 `report.json`과 `manifest.json`에서 확인한다. GUI summary는 원문 텍스트, 표, 이미지 내용을 요약하거나 재서술하지 않는다.
 
+결과 행을 선택하면 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 해당 산출물을 바로 열 수 있다. 경로가 없거나 OS가 열 수 없는 경우에는 변환 실패가 아니라 GUI warning/log로만 표시된다.
+
 ## 6) Status 의미
 
 - `success`: 변환이 정상 완료됐다.
@@ -109,10 +117,24 @@ GUI 완료 후 Results 표에서 문서별 결과를 확인한다.
 
 - `Start conversion`: 현재 입력과 옵션으로 변환을 시작한다.
 - `Cancel`: 배치 변환 중 현재 문서가 끝난 뒤 남은 문서를 취소한다.
-- `Open output folder`: 마지막 변환 결과의 output folder를 연다.
+- `Open Markdown`: 선택한 결과 행의 Markdown 파일을 연다.
+- `Open Report`: 선택한 결과 행의 `report.json`을 연다.
+- `Open Manifest`: 선택한 결과 행의 `manifest.json`을 연다.
+- `Open Assets`: 선택한 결과 행의 assets 폴더를 연다.
+- `Open output folder`: 선택한 결과 행의 output folder를 열고, 선택된 행이 없으면 마지막 변환의 output root를 연다.
 - `Help`: 이 GUI 사용자 가이드를 연다.
+- `Clear recent`: 저장된 최근 입력/출력 경로를 지운다.
 
-## 8) 문제 진단
+## 8) 최근 경로 저장
+
+GUI는 반복 사용성을 위해 최근 입력 PDF, 입력 폴더, output folder를 local-only JSON state로 저장한다.
+
+- 저장 대상은 경로 목록뿐이다.
+- 원문 텍스트, 표 내용, 이미지 내용, warning message는 저장하지 않는다.
+- 시작 시 아직 존재하는 최근 경로만 보수적으로 입력칸에 복구한다.
+- 공유 PC나 민감한 경로가 노출될 수 있는 환경에서는 `Clear recent`를 누른다.
+
+## 9) 문제 진단
 
 ### GUI가 열리지 않음
 
@@ -155,3 +177,9 @@ OCR이 필요 없으면 `Force OCR`을 끄고 다시 실행한다.
 - 복잡하거나 애매한 표는 HTML fallback이 우선된다.
 - 이미지는 기본적으로 referenced mode로 별도 파일에 저장된다.
 - 자세한 fallback 이유는 `report.json`의 warning과 summary를 확인한다.
+
+## 10) 배포 방식 메모
+
+현재 비개발자 기본 경로는 source/ZIP + venv setup + `python -m pdf2md.gui` 실행이다.
+
+PyInstaller/native bundle은 Tkinter, PyMuPDF, Tesseract, code signing/notarization smoke가 운영체제별로 정리되기 전까지 공식 기본 배포 경로로 보지 않는다.

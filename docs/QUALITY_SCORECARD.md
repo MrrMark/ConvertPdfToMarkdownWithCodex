@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-16 | GUI 실사용 UX 및 배포 계획 | 97/100 | 0 | Q60. GUI Practical UX And Distribution Hardening active backlog/spec 추가. 실제 변환 품질과 schema 계약은 유지하고, 로컬 GUI smoke, 결과 파일 열기, 최근 경로 저장, 비개발자 배포 방식 결정을 구현 전 계약으로 정리 |
 | 2026-05-16 | GUI 전용 사용자 도움말 | 97/100 | 0 | Q59. GUI User Guide And Help Entry 구현. CLI 문서와 분리된 GUI_USER_GUIDE와 GUI Help 버튼 추가. active quality backlog 없음 |
 | 2026-05-16 | GUI contract test 확장 | 97/100 | 0 | Q58. GUI Smoke And Contract Test Expansion 구현. option mapping, diagnostics, batch naming/order/cancel/retry/fingerprint 계약을 headless tests로 고정. active quality backlog 없음 |
 | 2026-05-16 | GUI 비개발자 문서 | 97/100 | 0 | Q57. Non-Developer GUI Distribution Guide 구현. macOS GUI quickstart 추가, README/Windows GUI 실행/진단 절차 보강. 다음 active backlog는 Q58 |
@@ -50,6 +51,20 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-16 (Q60 계획 수립)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+이번 변경은 구현 완료 평가가 아니라 Q59 이후 GUI 고도화 후보를 active backlog와 개발 명세로 정리한 것이다. 변환 엔진, Markdown/manifest/report 산출물, public schema 계약은 바뀌지 않았으므로 점수는 유지한다.
+
+Q60은 실제 GUI local smoke, 진행 상태 가시성, 선택 결과 파일 열기, 최근 경로 저장, ZIP/source + venv script와 PyInstaller 후보 비교를 다룬다. PyInstaller/native bundle은 feasibility smoke와 배포 리스크가 정리되기 전까지 공식 기본 경로로 승격하지 않는다.
+
+#### 다음 개선 참조
+
+- Q60. GUI Practical UX And Distribution Hardening
 
 ### 2026-05-16 (Q59 구현 후)
 
