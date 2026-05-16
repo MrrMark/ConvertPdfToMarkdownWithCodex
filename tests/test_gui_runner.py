@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -16,7 +17,9 @@ from pdf2md.gui_runner import (
     build_batch_config,
     build_single_config,
     check_gui_runtime,
+    format_gui_diagnostic_report,
     format_gui_summary,
+    gui_diagnostic_report_to_dict,
     gui_options_fingerprint,
     run_gui_conversion,
     validate_gui_request,
@@ -196,6 +199,152 @@ def test_gui_runtime_missing_entry_point_is_warning(monkeypatch: pytest.MonkeyPa
     assert report.has_errors is False
     assert [diagnostic.code for diagnostic in report.warnings] == ["entry_point_missing"]
     assert "python -m pdf2md.gui" in report.user_message()
+
+
+def test_gui_runtime_doctor_reports_patchlevel_window_backends_and_help(tmp_path: Path) -> None:
+    help_path = tmp_path / "GUI_USER_GUIDE.md"
+    help_path.write_text("# help", encoding="utf-8")
+    tesseract_path = tmp_path / "tesseract"
+
+    class FakeTcl:
+        def eval(self, expression: str) -> str:
+            assert expression == "info patchlevel"
+            return "8.6.14"
+
+    class FakeRoot:
+        def __init__(self) -> None:
+            self.destroyed = False
+
+        def withdraw(self) -> None:
+            pass
+
+        def update_idletasks(self) -> None:
+            pass
+
+        def destroy(self) -> None:
+            self.destroyed = True
+
+    tkinter_module = SimpleNamespace(Tcl=FakeTcl, Tk=FakeRoot)
+
+    def fake_import(name: str) -> object:
+        if name == "tkinter":
+            return tkinter_module
+        if name in {"pdf2md.gui", "PIL", "pypdfium2", "pytesseract"}:
+            return object()
+        raise ModuleNotFoundError(name)
+
+    report = check_gui_runtime(
+        python_version=(3, 11, 2),
+        import_module=fake_import,
+        entry_point_names=(),
+        check_window=True,
+        help_path=help_path,
+        discover_tesseract=lambda: tesseract_path,
+        platform_name="Linux",
+        environ={"DISPLAY": ":99"},
+    )
+
+    codes = {diagnostic.code for diagnostic in report.diagnostics}
+    assert report.has_errors is False
+    assert {
+        "tcl_tk_patchlevel_available",
+        "display_environment_present",
+        "tk_window_available",
+        "pillow_available",
+        "pypdfium2_available",
+        "pytesseract_available",
+        "tesseract_available",
+        "help_document_available",
+    }.issubset(codes)
+    assert all(diagnostic.action for diagnostic in report.diagnostics)
+    payload = gui_diagnostic_report_to_dict(report)
+    assert payload["kind"] == "gui_runtime_doctor"
+    assert payload["passed"] is True
+    assert payload["diagnostics"][0]["action"]
+    assert "GUI runtime doctor" in format_gui_diagnostic_report(report)
+
+
+def test_gui_runtime_doctor_missing_optional_backends_are_nonfatal(tmp_path: Path) -> None:
+    help_path = tmp_path / "GUI_USER_GUIDE.md"
+    help_path.write_text("# help", encoding="utf-8")
+    tkinter_module = SimpleNamespace(Tcl=lambda: SimpleNamespace(eval=lambda expression: "8.6.13"))
+
+    def fake_import(name: str) -> object:
+        if name == "tkinter":
+            return tkinter_module
+        if name == "pdf2md.gui":
+            return object()
+        if name in {"PIL", "pypdfium2", "pytesseract"}:
+            raise ModuleNotFoundError(name)
+        return object()
+
+    report = check_gui_runtime(
+        python_version=(3, 11, 0),
+        import_module=fake_import,
+        entry_point_names=(),
+        check_window=True,
+        help_path=help_path,
+        discover_tesseract=lambda: None,
+        platform_name="Linux",
+        environ={},
+    )
+
+    severity_by_code = {diagnostic.code: diagnostic.severity for diagnostic in report.diagnostics}
+    assert report.has_errors is False
+    assert severity_by_code["display_environment_missing"] == "advisory"
+    assert severity_by_code["tk_window_check_advisory"] == "advisory"
+    assert severity_by_code["pillow_unavailable"] == "warning"
+    assert severity_by_code["pypdfium2_unavailable"] == "warning"
+    assert severity_by_code["pytesseract_unavailable"] == "advisory"
+    assert severity_by_code["tesseract_unavailable"] == "advisory"
+
+
+def test_gui_runtime_doctor_missing_help_path_is_actionable_warning(tmp_path: Path) -> None:
+    missing_help = tmp_path / "missing" / "GUI_USER_GUIDE.md"
+    report = check_gui_runtime(
+        python_version=(3, 11, 0),
+        import_module=lambda name: object(),
+        entry_point_names=(),
+        help_path=missing_help,
+        discover_tesseract=lambda: None,
+    )
+
+    help_diagnostic = next(diagnostic for diagnostic in report.diagnostics if diagnostic.code == "help_document_missing")
+    assert help_diagnostic.severity == "warning"
+    assert help_diagnostic.path == missing_help
+    assert "Restore docs/GUI_USER_GUIDE.md" in str(help_diagnostic.action)
+
+
+def test_gui_runtime_doctor_window_unavailable_is_advisory(tmp_path: Path) -> None:
+    help_path = tmp_path / "GUI_USER_GUIDE.md"
+    help_path.write_text("# help", encoding="utf-8")
+
+    def unavailable_tk() -> object:
+        raise RuntimeError("no display")
+
+    tkinter_module = SimpleNamespace(Tcl=lambda: SimpleNamespace(eval=lambda expression: "8.6.13"), Tk=unavailable_tk)
+
+    def fake_import(name: str) -> object:
+        if name == "tkinter":
+            return tkinter_module
+        if name in {"pdf2md.gui", "PIL", "pypdfium2", "pytesseract"}:
+            return object()
+        return object()
+
+    report = check_gui_runtime(
+        python_version=(3, 11, 0),
+        import_module=fake_import,
+        entry_point_names=(),
+        check_window=True,
+        help_path=help_path,
+        discover_tesseract=lambda: None,
+        platform_name="Linux",
+        environ={"DISPLAY": ":99"},
+    )
+
+    window_diagnostic = next(diagnostic for diagnostic in report.diagnostics if diagnostic.code == "tk_window_unavailable")
+    assert window_diagnostic.severity == "advisory"
+    assert report.has_errors is False
 
 
 def test_gui_request_diagnostics_reject_output_file(sample_pdf: Path, tmp_path: Path) -> None:

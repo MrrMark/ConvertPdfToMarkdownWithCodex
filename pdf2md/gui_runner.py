@@ -5,10 +5,12 @@ from importlib import metadata as importlib_metadata
 import hashlib
 import json
 import os
+import platform
+import shutil
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Callable, Literal, Sequence
+from typing import Any, Callable, Literal, Mapping, Sequence
 
 from pdf2md.config import Config, default_output_dir_for_input
 from pdf2md.models import ConversionStatus, DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode, WarningEntry
@@ -18,7 +20,7 @@ from pdf2md.pipeline import EXIT_FATAL, EXIT_PARTIAL, ConversionResult, run_conv
 ProgressCallback = Callable[[str], None]
 BatchProgressCallback = Callable[["GuiBatchProgress"], None]
 CancelCallback = Callable[[], bool]
-DiagnosticSeverity = Literal["info", "warning", "error"]
+DiagnosticSeverity = Literal["info", "advisory", "warning", "error"]
 MIN_GUI_PYTHON_VERSION = (3, 11)
 GUI_STATUS_SKIPPED = "skipped"
 GUI_STATUS_CANCELLED = "cancelled"
@@ -30,6 +32,7 @@ class GuiDiagnostic:
     severity: DiagnosticSeverity
     message: str
     path: Path | None = None
+    action: str | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +48,10 @@ class GuiDiagnosticReport:
         return [diagnostic for diagnostic in self.diagnostics if diagnostic.severity == "warning"]
 
     @property
+    def advisories(self) -> list[GuiDiagnostic]:
+        return [diagnostic for diagnostic in self.diagnostics if diagnostic.severity == "advisory"]
+
+    @property
     def has_errors(self) -> bool:
         return bool(self.errors)
 
@@ -52,7 +59,8 @@ class GuiDiagnosticReport:
         lines = []
         for diagnostic in self.errors or self.warnings:
             path_text = f" ({diagnostic.path})" if diagnostic.path is not None else ""
-            lines.append(f"- {diagnostic.message}{path_text}")
+            action_text = f" Action: {diagnostic.action}" if diagnostic.action else ""
+            lines.append(f"- {diagnostic.message}{path_text}{action_text}")
         return "\n".join(lines)
 
 
@@ -197,15 +205,196 @@ def _console_script_names() -> set[str]:
     return {entry_point.name for entry_point in entry_points.get("console_scripts", [])}
 
 
+def _default_gui_help_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "docs" / "GUI_USER_GUIDE.md"
+
+
+def _discover_tesseract() -> Path | None:
+    executable = shutil.which("tesseract")
+    if executable:
+        return Path(executable)
+    homebrew_tesseract = Path("/opt/homebrew/bin/tesseract")
+    if homebrew_tesseract.exists():
+        return homebrew_tesseract
+    return None
+
+
+def _tk_patchlevel_diagnostic(tkinter_module: object) -> GuiDiagnostic | None:
+    tcl_factory = getattr(tkinter_module, "Tcl", None)
+    if not callable(tcl_factory):
+        return None
+    try:
+        patchlevel = str(tcl_factory().eval("info patchlevel"))
+    except Exception as exc:  # noqa: BLE001
+        return GuiDiagnostic(
+            code="tcl_tk_patchlevel_unavailable",
+            severity="warning",
+            message=f"Tcl/Tk patchlevel could not be inspected. Details: {exc}",
+            action="Verify the Python installation includes a working Tcl/Tk runtime.",
+        )
+    return GuiDiagnostic(
+        code="tcl_tk_patchlevel_available",
+        severity="info",
+        message=f"Tcl/Tk patchlevel is available: {patchlevel}.",
+        action="No action required.",
+    )
+
+
+def _display_environment_diagnostic(
+    *,
+    platform_name: str,
+    environ: Mapping[str, str],
+) -> tuple[GuiDiagnostic, bool]:
+    if platform_name == "Linux":
+        if environ.get("DISPLAY") or environ.get("WAYLAND_DISPLAY"):
+            return (
+                GuiDiagnostic(
+                    code="display_environment_present",
+                    severity="info",
+                    message="Linux display environment variables are present.",
+                    action="No action required.",
+                ),
+                False,
+            )
+        return (
+            GuiDiagnostic(
+                code="display_environment_missing",
+                severity="advisory",
+                message="No Linux DISPLAY or WAYLAND_DISPLAY value was found; Tk window launch is likely unavailable.",
+                action="Run the GUI from a desktop session, or keep using CLI/headless smoke checks in CI.",
+            ),
+            True,
+        )
+    if platform_name in {"Darwin", "Windows"}:
+        return (
+            GuiDiagnostic(
+                code="display_environment_platform_default",
+                severity="info",
+                message=f"{platform_name} desktop display availability is checked by the optional Tk window probe.",
+                action="Run the doctor from the same desktop session used to launch the GUI.",
+            ),
+            False,
+        )
+    return (
+        GuiDiagnostic(
+            code="display_environment_unknown",
+            severity="advisory",
+            message=f"Display environment checks are not specialized for platform: {platform_name or 'unknown'}.",
+            action="Run the GUI doctor locally and confirm the Tk window can open on this platform.",
+        ),
+        False,
+    )
+
+
+def _tk_window_diagnostic(
+    *,
+    tkinter_module: object,
+) -> GuiDiagnostic:
+    tk_factory = getattr(tkinter_module, "Tk", None)
+    if not callable(tk_factory):
+        return GuiDiagnostic(
+            code="tk_window_probe_unavailable",
+            severity="advisory",
+            message="Tkinter is importable, but no Tk window factory was found for a window availability probe.",
+            action="Run python -m pdf2md.gui from a desktop session to confirm launch behavior.",
+        )
+    root = None
+    try:
+        root = tk_factory()
+        if hasattr(root, "withdraw"):
+            root.withdraw()
+        if hasattr(root, "update_idletasks"):
+            root.update_idletasks()
+    except Exception as exc:  # noqa: BLE001
+        return GuiDiagnostic(
+            code="tk_window_unavailable",
+            severity="advisory",
+            message=f"Tkinter imported, but a Tk window could not be created. Details: {exc}",
+            action="Use a desktop session with display access, or keep GUI window checks out of CI.",
+        )
+    finally:
+        if root is not None and hasattr(root, "destroy"):
+            try:
+                root.destroy()
+            except Exception:  # noqa: BLE001
+                pass
+    return GuiDiagnostic(
+        code="tk_window_available",
+        severity="info",
+        message="Tkinter can create and destroy a window in this session.",
+        action="No action required.",
+    )
+
+
+def _optional_module_diagnostic(
+    *,
+    module_name: str,
+    display_name: str,
+    success_code: str,
+    missing_code: str,
+    importer: Callable[[str], object],
+    missing_severity: DiagnosticSeverity,
+    missing_action: str,
+) -> GuiDiagnostic:
+    try:
+        importer(module_name)
+    except Exception as exc:  # noqa: BLE001
+        return GuiDiagnostic(
+            code=missing_code,
+            severity=missing_severity,
+            message=f"{display_name} is not importable. Details: {exc}",
+            action=missing_action,
+        )
+    return GuiDiagnostic(
+        code=success_code,
+        severity="info",
+        message=f"{display_name} is importable.",
+        action="No action required.",
+    )
+
+
+def _package_distribution_diagnostic() -> GuiDiagnostic:
+    try:
+        distribution = importlib_metadata.distribution("pdf2md")
+    except Exception as exc:  # noqa: BLE001
+        return GuiDiagnostic(
+            code="package_distribution_missing",
+            severity="advisory",
+            message=f"Installed package metadata for pdf2md was not found. Details: {exc}",
+            action="This is expected in some source checkout runs; use pip install -e .[dev] for editable packaging smoke.",
+        )
+    mode = "installed"
+    direct_url = distribution.read_text("direct_url.json")
+    if direct_url and '"editable": true' in direct_url:
+        mode = "editable"
+    location = Path(str(distribution.locate_file("")))
+    return GuiDiagnostic(
+        code="package_distribution_available",
+        severity="info",
+        message=f"pdf2md package metadata is available: version={distribution.version}, mode={mode}.",
+        path=location,
+        action="Compare this mode with the intended source checkout, editable install, or wheel smoke path.",
+    )
+
+
 def check_gui_runtime(
     *,
     python_version: Sequence[int] | None = None,
     import_module: Callable[[str], object] | None = None,
     entry_point_names: Sequence[str] = ("pdf2md-gui",),
+    check_window: bool = False,
+    help_path: Path | None = None,
+    discover_tesseract: Callable[[], Path | None] | None = None,
+    platform_name: str | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> GuiDiagnosticReport:
-    """Check GUI runtime prerequisites without launching a desktop window."""
+    """Check GUI runtime prerequisites, optionally probing Tk window creation."""
     version = python_version or sys.version_info
     importer = import_module or importlib.import_module
+    display_platform = platform_name if platform_name is not None else platform.system()
+    display_environ = environ if environ is not None else os.environ
+    tesseract_discovery = discover_tesseract or _discover_tesseract
+    resolved_help_path = help_path if help_path is not None else _default_gui_help_path()
     diagnostics: list[GuiDiagnostic] = []
     if tuple(version[:2]) < MIN_GUI_PYTHON_VERSION:
         diagnostics.append(
@@ -216,6 +405,7 @@ def check_gui_runtime(
                     "Python 3.11 or newer is required for the supported GUI path; "
                     f"current interpreter is {_format_version(version)}."
                 ),
+                action="Install Python 3.11 or newer and recreate the virtual environment.",
             )
         )
     else:
@@ -224,11 +414,13 @@ def check_gui_runtime(
                 code="python_version_supported",
                 severity="info",
                 message=f"Python runtime is supported: {_format_version(version)}.",
+                action="No action required.",
             )
         )
 
+    tkinter_module: object | None = None
     try:
-        importer("tkinter")
+        tkinter_module = importer("tkinter")
     except Exception as exc:  # noqa: BLE001
         diagnostics.append(
             GuiDiagnostic(
@@ -238,6 +430,7 @@ def check_gui_runtime(
                     "Tkinter is not available. Install a Python build with Tcl/Tk support "
                     f"before launching the GUI. Details: {exc}"
                 ),
+                action="Install a Python distribution that includes Tcl/Tk, then rerun the GUI doctor.",
             )
         )
     else:
@@ -246,8 +439,30 @@ def check_gui_runtime(
                 code="tkinter_available",
                 severity="info",
                 message="Tkinter runtime is available.",
+                action="No action required.",
             )
         )
+        patchlevel_diagnostic = _tk_patchlevel_diagnostic(tkinter_module)
+        if patchlevel_diagnostic is not None:
+            diagnostics.append(patchlevel_diagnostic)
+
+    display_diagnostic, skip_window_probe = _display_environment_diagnostic(
+        platform_name=display_platform,
+        environ=display_environ,
+    )
+    diagnostics.append(display_diagnostic)
+    if tkinter_module is not None:
+        if check_window and not skip_window_probe:
+            diagnostics.append(_tk_window_diagnostic(tkinter_module=tkinter_module))
+        else:
+            diagnostics.append(
+                GuiDiagnostic(
+                    code="tk_window_check_advisory",
+                    severity="advisory",
+                    message="Tk window creation was not attempted during this headless-safe runtime check.",
+                    action="Run python -m pdf2md.gui --doctor from a desktop session for an optional window probe.",
+                )
+            )
 
     try:
         importer("pdf2md.gui")
@@ -257,6 +472,7 @@ def check_gui_runtime(
                 code="gui_module_unavailable",
                 severity="error",
                 message=f"The pdf2md.gui module cannot be imported. Reinstall the package. Details: {exc}",
+                action="Reinstall the package from the source checkout or wheel and rerun python -m pdf2md.gui --help.",
             )
         )
     else:
@@ -265,6 +481,84 @@ def check_gui_runtime(
                 code="gui_module_available",
                 severity="info",
                 message="pdf2md.gui module is importable.",
+                action="No action required.",
+            )
+        )
+
+    diagnostics.append(_package_distribution_diagnostic())
+
+    diagnostics.append(
+        _optional_module_diagnostic(
+            module_name="PIL",
+            display_name="Pillow",
+            success_code="pillow_available",
+            missing_code="pillow_unavailable",
+            importer=importer,
+            missing_severity="warning",
+            missing_action="Install project dependencies with pip install -e .[dev] or from the wheel metadata.",
+        )
+    )
+    diagnostics.append(
+        _optional_module_diagnostic(
+            module_name="pypdfium2",
+            display_name="pypdfium2",
+            success_code="pypdfium2_available",
+            missing_code="pypdfium2_unavailable",
+            importer=importer,
+            missing_severity="warning",
+            missing_action="Install pypdfium2 before using OCR page rendering paths.",
+        )
+    )
+    diagnostics.append(
+        _optional_module_diagnostic(
+            module_name="pytesseract",
+            display_name="pytesseract",
+            success_code="pytesseract_available",
+            missing_code="pytesseract_unavailable",
+            importer=importer,
+            missing_severity="advisory",
+            missing_action="Install pytesseract if OCR will be used from the GUI.",
+        )
+    )
+    tesseract_path = tesseract_discovery()
+    if tesseract_path is None:
+        diagnostics.append(
+            GuiDiagnostic(
+                code="tesseract_unavailable",
+                severity="advisory",
+                message="The tesseract executable was not found on PATH.",
+                action="Install Tesseract and language data before using OCR options.",
+            )
+        )
+    else:
+        diagnostics.append(
+            GuiDiagnostic(
+                code="tesseract_available",
+                severity="info",
+                message="The tesseract executable is available.",
+                path=tesseract_path,
+                action="Run tesseract --list-langs if OCR language data needs to be verified.",
+            )
+        )
+
+    if resolved_help_path.exists():
+        diagnostics.append(
+            GuiDiagnostic(
+                code="help_document_available",
+                severity="info",
+                message="The local GUI help document is available.",
+                path=resolved_help_path,
+                action="No action required.",
+            )
+        )
+    else:
+        diagnostics.append(
+            GuiDiagnostic(
+                code="help_document_missing",
+                severity="warning",
+                message="The local GUI help document was not found.",
+                path=resolved_help_path,
+                action="Restore docs/GUI_USER_GUIDE.md or reinstall from a complete source/wheel package.",
             )
         )
 
@@ -280,6 +574,7 @@ def check_gui_runtime(
                         "Could not inspect installed console scripts. "
                         f"`python -m pdf2md.gui` remains available. Details: {exc}"
                     ),
+                    action="Use python -m pdf2md.gui, or reinstall the package if console scripts are required.",
                 )
             )
         else:
@@ -290,6 +585,7 @@ def check_gui_runtime(
                             code="entry_point_available",
                             severity="info",
                             message=f"Console script is installed: {script_name}.",
+                            action="No action required.",
                         )
                     )
                 else:
@@ -301,9 +597,51 @@ def check_gui_runtime(
                                 f"Console script `{script_name}` is not installed in this environment. "
                                 "Run `python -m pdf2md.gui` or install the package with `pip install -e .`."
                             ),
+                            action="Install the package in editable or wheel mode if the console script is required.",
                         )
                     )
     return GuiDiagnosticReport(diagnostics)
+
+
+def gui_diagnostic_report_to_dict(report: GuiDiagnosticReport) -> dict[str, Any]:
+    """Return a deterministic local-only dictionary for GUI runtime diagnostics."""
+    return {
+        "kind": "gui_runtime_doctor",
+        "passed": not report.has_errors,
+        "error_count": len(report.errors),
+        "warning_count": len(report.warnings),
+        "advisory_count": len(report.advisories),
+        "diagnostics": [
+            {
+                "code": diagnostic.code,
+                "severity": diagnostic.severity,
+                "message": diagnostic.message,
+                "action": diagnostic.action,
+                "path": str(diagnostic.path) if diagnostic.path is not None else None,
+            }
+            for diagnostic in report.diagnostics
+        ],
+    }
+
+
+def format_gui_diagnostic_report(report: GuiDiagnosticReport) -> str:
+    """Render GUI runtime doctor diagnostics for local terminal use."""
+    payload = gui_diagnostic_report_to_dict(report)
+    lines = [
+        "GUI runtime doctor",
+        (
+            f"- Status: {'passed' if payload['passed'] else 'failed'} "
+            f"(errors={payload['error_count']}, warnings={payload['warning_count']}, "
+            f"advisories={payload['advisory_count']})"
+        ),
+    ]
+    for diagnostic in report.diagnostics:
+        lines.append(f"- [{diagnostic.severity}] {diagnostic.code}: {diagnostic.message}")
+        if diagnostic.path is not None:
+            lines.append(f"  Path: {diagnostic.path}")
+        if diagnostic.action:
+            lines.append(f"  Action: {diagnostic.action}")
+    return "\n".join(lines)
 
 
 def _path_is_readable(path: Path) -> bool:

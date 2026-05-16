@@ -243,13 +243,17 @@ def _runtime_evidence(report, *, output_dir: Path, roots: Iterable[Path]) -> dic
             "severity": diagnostic.severity,
             "message": redact_text(diagnostic.message, roots),
         }
+        if diagnostic.action:
+            item["action"] = redact_text(diagnostic.action, roots)
         if diagnostic.path is not None:
             item["path"] = redact_path_label(diagnostic.path, output_dir=output_dir)
         diagnostics.append(item)
     return {
+        "kind": "gui_runtime_doctor",
         "passed": not report.has_errors,
         "error_count": len(report.errors),
         "warning_count": len(report.warnings),
+        "advisory_count": len(getattr(report, "advisories", [])),
         "diagnostics": diagnostics,
     }
 

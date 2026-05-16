@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI runtime doctor | 97/100 | 0 | Q65. GUI Runtime Doctor And Packaging Compatibility Smoke 구현. Tcl/Tk patchlevel, display/window advisory, optional OCR/Tesseract, Pillow/pypdfium2, help document, package mode 진단과 `--doctor` 명령 추가. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q66-Q67 |
 | 2026-05-17 | GUI responsive layout | 97/100 | 0 | Q64. Responsive GUI Layout And Accessibility Guardrails 구현. GUI body scroll, smaller minimum size, wrapping metadata, responsive option/action layout, result horizontal scrollbar 추가. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q65-Q67 |
 | 2026-05-17 | GUI 호환성 후속 명세 | 97/100 | 0 | Q62. GUI Smoke Evidence And Layout Guardrails 구현/merge 완료. Q63으로 stale active backlog를 정리하고 Q64-Q67 responsive layout, runtime doctor, sanitized support bundle, expert options/profile 명세를 추가. 변환 품질과 public schema 계약은 유지 |
 | 2026-05-16 | GUI smoke evidence 계획 | 97/100 | 0 | Q61. GUI Localization, Presets, And Progress Percent 구현/merge 완료. 다음 active backlog/spec로 Q62. GUI Smoke Evidence And Layout Guardrails 추가. 변환 품질과 schema 계약은 유지하고, Q61 GUI 기능의 로컬 smoke evidence와 layout/state guardrail을 다음 검증 과제로 정리 |
@@ -55,6 +56,19 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q65 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q65는 변환 엔진이 아니라 GUI 배포/실행 진단 계층을 확장했다. `python -m pdf2md.gui --doctor`로 Tcl/Tk patchlevel, display/window availability, optional OCR/Tesseract, Pillow/pypdfium2 import, help document, package distribution mode를 code/severity/message/action 형태로 확인할 수 있다. Tk window-only 항목은 CI/headless 환경에서 실패가 아니라 advisory로 기록된다.
+
+#### 다음 개선 참조
+
+- Q66. Sanitized GUI Support Bundle
+- Q67. GUI Expert Options And Profile Import/Export
 
 ### 2026-05-17 (Q64 구현 후)
 
