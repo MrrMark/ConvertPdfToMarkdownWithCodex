@@ -23,84 +23,167 @@
 
 ## 현재 Active Development Specs
 
-### P1 / Q62. GUI Smoke Evidence And Layout Guardrails
+### P1 / Q64. Responsive GUI Layout And Accessibility Guardrails
 
 #### 배경
 
-Q61로 GUI 기본 한글 UI, English 선택, 목적 기반 preset, progress percent 표시가 구현됐다. 이 변화는 사용자 눈에 바로 보이는 기능이므로 다음 단계에서는 실제 로컬 실행 흐름을 반복 가능한 smoke evidence로 남기고, 긴 한글/영문 label과 preset 상태가 화면/상태 계층에서 누락되지 않도록 guardrail을 세운다.
-
-이 작업은 GUI 배포 전 confidence를 높이는 운영성 개선이다. core 변환 엔진, Markdown/manifest/report 산출물, public schema, warning code는 그대로 유지한다.
+Q62로 GUI smoke evidence와 headless guardrail은 확보됐지만 실제 Tk window는 아직 고정 폭/높이와 긴 label에 민감하다. 작은 노트북 화면, Windows display scaling, 한국어/영문 긴 문구에서 control 접근성과 시각적 안정성을 더 높인다.
 
 #### 목표
 
-- Q61 GUI 기능을 검증하는 local-only smoke evidence runner를 제공한다.
-- GUI runtime, module help, preset별 runner smoke, manual 확인 항목을 하나의 evidence JSON으로 기록한다.
-- evidence에는 원문 PDF 텍스트, 표 내용, 이미지 내용, warning message를 저장하지 않는다.
-- 한글/영문 label catalog와 GUI text tracking, preset lock/unlock 상태를 headless test로 방어한다.
-- 실제 Tk window 검증은 로컬 수동 smoke로 유지하고, CI에서는 창 없이 실행 가능한 검증만 수행한다.
+- GUI main area를 scrollable/responsive 구조로 바꿔 작은 화면에서도 input/options/results/log에 접근 가능하게 한다.
+- preset selector, command button, result action button이 긴 label에서 잘리지 않도록 wrapping 또는 grid 재배치를 적용한다.
+- GUI text tracking key와 layout metadata를 연결해 누락을 headless test로 방어한다.
+- core `run_conversion`, CLI option 의미, output schema 계약은 변경하지 않는다.
 
 #### 구현 범위
 
-- `scripts/run_gui_smoke_evidence.py` 또는 동등한 script
-  - `--output-dir`, `--state-path`, `--json-only` 같은 local smoke 실행 옵션을 제공한다.
-  - `check_gui_runtime()` 결과를 포함한다.
-  - `python -m pdf2md.gui --help`가 창 없이 성공하는지 확인한다.
-  - synthetic/sample fixture를 이용해 single conversion과 folder batch conversion을 runner 경로로 실행한다.
-  - `preserve`, `rag_optimized`, `custom` preset을 최소 한 번 이상 `GuiConversionOptions`로 적용해 runner smoke에 반영한다.
-  - evidence JSON에는 absolute path 대신 redacted label 또는 relative label을 저장한다.
-  - 실패 시 non-zero exit code와 조치 가능한 summary를 출력한다.
-- GUI guardrail helper/test
-  - `pdf2md/gui_i18n.py` catalog key coverage를 검증한다.
-  - GUI에서 추적해야 하는 label/button/heading key 목록을 helper로 노출하거나 테스트 가능하게 정리한다.
-  - preset 선택 시 editable/readonly 대상이 기대와 일치하는지 headless 수준에서 검증한다.
-  - Q61 state schema v2가 smoke 전용 isolated state path에서 오염 없이 작동하는지 확인한다.
+- `pdf2md/gui.py`
+  - scrollable container 또는 equivalent layout helper 도입
+  - top-level window minimum size와 grid weight 재검토
+  - preset/action/result action 영역을 wrapping-friendly layout으로 조정
+  - status/progress label의 긴 text가 progressbar를 밀어내지 않도록 안정화
+- GUI layout helper
+  - 주요 section/control key, grouping, responsive policy를 테스트 가능한 구조로 노출
+  - label/button text key가 `GUI_TEXT_TRACKING_KEYS`와 어긋나지 않도록 guardrail 추가
 - 문서
-  - README, GUI user guide, macOS quickstart, Windows guide에 smoke evidence runner와 수동 확인 절차를 추가한다.
-  - evidence에 포함 가능한 정보와 포함 금지 정보를 명확히 한다.
-  - 실제 GUI window 수동 smoke와 CI/headless smoke의 차이를 설명한다.
+  - README, GUI guide, macOS/Windows guide에 small screen/scaling 확인 항목 추가
 
 #### 테스트 범위
 
-- `tests/test_gui_smoke_evidence.py`
-  - evidence writer가 원문 텍스트/표/이미지/warning message를 저장하지 않음
-  - redaction helper가 workspace/home absolute path를 제거
-  - success/failure summary와 exit code contract
-- `tests/test_gui_i18n.py`, `tests/test_gui_presets.py`, `tests/test_gui_state.py`
-  - catalog key coverage 확장
-  - preset lock/unlock 및 state isolation contract
-- `tests/test_gui_runner.py`
-  - smoke runner가 사용하는 single/batch conversion path가 CLI `Config` 계약과 일치
-- `tests/test_docs_examples.py`
-  - smoke evidence runner, 수동 GUI checklist, redaction policy 문서 고정
-
-#### Smoke 정책
-
-- smoke evidence는 local-only artifact다. repository에 fixture raw output이나 사용자 PDF 내용을 커밋하지 않는다.
-- evidence에는 command 결과, runtime availability, sanitized artifact labels, status counts만 남긴다.
-- 실제 GUI window 확인은 사람이 수행하는 checklist로 남긴다. CI에서 OS-level click automation을 요구하지 않는다.
-- runner smoke는 GUI orchestration이 CLI conversion contract를 깨지 않는지 확인하는 보조 검증이다.
-
-#### 로컬 GUI smoke checklist
-
-1. smoke evidence runner를 isolated output/state path로 실행한다.
-2. `python -m pdf2md.gui --help` 결과가 evidence에 기록됐는지 확인한다.
-3. GUI를 실제로 실행해 기본 한국어 UI를 확인한다.
-4. language selector를 English로 바꿨을 때 주요 label/button/status가 바뀌는지 확인한다.
-5. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`에서 세부 옵션 잠금/해제가 맞는지 확인한다.
-6. 단일 PDF 변환 완료 시 `100%`가 표시되는지 확인한다.
-7. 폴더 배치 변환에서 `current/total (percent%)` 표시가 progressbar와 일치하는지 확인한다.
-8. GUI 재시작 후 language/preset/recent path가 복구되고, `Clear recent` 후 경로가 사라지는지 확인한다.
-9. evidence JSON에 raw PDF text/table/image/warning message가 없는지 확인한다.
+- `tests/test_gui_layout.py`
+  - layout metadata가 language/preset/input/options/results/action key를 포함하는지 확인
+  - minimum size와 scrollable policy가 headless contract로 고정되는지 확인
+  - 긴 Korean/English label이 wrapping 대상 control로 분류되는지 확인
+- 기존 `tests/test_gui_i18n.py`, `tests/test_docs_examples.py` 갱신
 
 #### 비범위
 
-- OS-level 자동 클릭 또는 screenshot visual regression을 CI 필수로 만드는 것
-- Computer Use 기반 자동 GUI 클릭을 release gate로 편입
-- native installer/package 생성
-- core pipeline page-level progress callback
+- screenshot visual regression을 CI 필수로 편입
+- OS-level click automation
 - PDF/Markdown preview/editor
-- OCR language 자동 선택 또는 LLM 기반 preset 추천
+- native installer/package 생성
+
+### P1 / Q65. GUI Runtime Doctor And Packaging Compatibility Smoke
+
+#### 배경
+
+현재 `check_gui_runtime()`은 Python version, Tkinter import, GUI module import, console script 확인에 집중한다. GUI 배포 호환성을 높이려면 Tcl/Tk 세부 정보, display/window 가능 여부, OCR/이미지 backend, help 문서 위치까지 구조화해 점검해야 한다.
+
+#### 목표
+
+- GUI runtime doctor가 Python/Tkinter뿐 아니라 Tcl/Tk patchlevel, display availability, optional OCR/Tesseract, Pillow/pypdfium2 import, help document path를 구조화해 보고한다.
+- `scripts/run_gui_smoke_evidence.py`가 doctor 결과를 sanitized evidence에 포함한다.
+- wheel/editable/source checkout에서 다른 진단 결과가 actionable하게 표시된다.
+- 새 public JSON output schema는 만들지 않는다.
+
+#### 구현 범위
+
+- `pdf2md/gui_runner.py` 또는 새 helper module
+  - `check_gui_runtime()`를 확장하거나 `check_gui_runtime_doctor()` 추가
+  - `GuiDiagnostic`에 action/hint 성격의 정보를 추가할지 검토하되 backward compatibility 유지
+  - window-only check는 CI에서 실패가 아니라 advisory/skip으로 기록
+- `scripts/run_gui_smoke_evidence.py`
+  - doctor 항목을 evidence에 포함
+  - absolute path와 raw error payload를 redaction
+- 문서
+  - GUI guide, macOS quickstart, Windows guide에 doctor 결과 해석 방법 추가
+
+#### 테스트 범위
+
+- `tests/test_gui_runner.py`
+  - missing Tkinter, missing optional backend, missing help path, display unavailable advisory 검증
+- `tests/test_gui_smoke_evidence.py`
+  - doctor evidence redaction과 pass/fail/advisory summary 검증
+- `tests/test_docs_examples.py`
+
+#### 비범위
+
+- native bundle 생성
+- code signing/notarization
+- 실제 GUI screenshot regression
+- Tesseract 자동 설치
+
+### P2 / Q66. Sanitized GUI Support Bundle
+
+#### 배경
+
+GUI 사용자가 문제를 보고할 때 GUI log/summary나 evidence를 공유할 수 있다. support용 artifact는 원문 PDF 텍스트, 표/이미지 내용, warning message, local absolute path를 제거해야 한다.
+
+#### 목표
+
+- GUI summary, smoke evidence, runtime diagnostics를 기반으로 sanitized support bundle JSON/Markdown을 생성한다.
+- bundle에는 status count, warning code/count, sanitized artifact labels, environment/runtime code만 포함한다.
+- 원문 텍스트, 표 내용, 이미지 내용, warning message, home/workspace absolute path는 저장하지 않는다.
+- public output schema가 아닌 local support artifact로 명확히 구분한다.
+
+#### 구현 범위
+
+- `pdf2md/gui_support.py` 또는 equivalent helper
+  - redaction helper, support bundle model, writer 추가
+  - `GuiConversionSummary`에서 sanitized support payload 생성
+- optional script 또는 GUI-accessible helper
+  - CLI/script smoke로 support bundle 생성 검증
+  - GUI 버튼 노출은 필요성이 확인되면 후속으로 분리 가능
+- 문서
+  - GUI guide에 support bundle 공유 정책과 포함/금지 정보 명시
+
+#### 테스트 범위
+
+- `tests/test_gui_support.py`
+  - absolute path redaction
+  - raw warning message 미저장
+  - artifact labels/count/code 중심 payload
+- `tests/test_docs_examples.py`
+
+#### 비범위
+
+- public JSON schema 추가
+- 원문 PDF/Markdown 첨부
+- GitHub issue 자동 생성 또는 업로드
+
+### P2 / Q67. GUI Expert Options And Profile Import/Export
+
+#### 배경
+
+`GuiConversionOptions`에는 `page_workers`, `debug`, `verbose`가 있지만 실제 GUI에는 노출되지 않는다. 반복 작업자는 preset보다 세밀한 실행 profile을 저장/불러오고 싶을 수 있다.
+
+#### 목표
+
+- GUI에 접이식 Expert options 영역을 추가해 `page_workers`, `debug`, `verbose` 등 기존 option 필드를 노출한다.
+- local-only profile export/import를 제공하되 input/output path, password, PDF 원문 내용은 기본 저장하지 않는다.
+- invalid profile은 구조화된 GUI diagnostic으로 표시한다.
+- imported profile은 CLI `Config` option 의미와 일치한다.
+
+#### 구현 범위
+
+- `pdf2md/gui.py`
+  - Expert options section 추가
+  - page workers numeric input guardrail
+  - debug/verbose checkbox 추가
+- `pdf2md/gui_profiles.py` 또는 equivalent helper
+  - profile schema version, load/save, validation, redaction policy
+  - password/path 저장 금지 또는 explicit opt-in 제외
+- 문서
+  - GUI guide에 expert options와 local profile 정책 설명
+
+#### 테스트 범위
+
+- `tests/test_gui_profiles.py`
+  - valid/invalid profile load
+  - path/password/raw content 미저장
+  - options mapping과 default compatibility
+- `tests/test_gui_runner.py`
+  - exposed expert options가 `Config`로 전달되는지 확인
+- `tests/test_docs_examples.py`
+
+#### 비범위
+
+- cloud profile sync
+- password 저장
+- profile 기반 자동 preset 추천
+- OCR language 자동 감지 또는 LLM 기반 preset 추천
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q61 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q63 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

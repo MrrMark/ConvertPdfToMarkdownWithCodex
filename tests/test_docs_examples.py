@@ -55,7 +55,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "Q62 GUI Smoke Evidence And Layout Guardrails" in readme
+    assert "Q64-Q67 GUI 완성도/호환성 개선" in readme
+    assert "Q64 Responsive GUI Layout And Accessibility Guardrails" in readme
     assert "docs/MACOS_GUI_QUICKSTART.md" in readme
     assert "docs/GUI_USER_GUIDE.md" in readme
     assert "python3 -m pdf2md.gui" in readme
@@ -261,9 +262,13 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q59. GUI User Guide And Help Entry" not in next_plan
     assert "Q60. GUI Practical UX And Distribution Hardening" not in next_plan
     assert "### P1 / Q61. GUI Localization, Presets, And Progress Percent" not in next_plan
-    assert "Q62. GUI Smoke Evidence And Layout Guardrails" in next_plan
-    assert "smoke evidence" in next_plan
-    assert "layout/state guardrail" in next_plan
+    assert "Q62. GUI Smoke Evidence And Layout Guardrails" not in next_plan
+    assert "Q64. Responsive GUI Layout And Accessibility Guardrails" in next_plan
+    assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in next_plan
+    assert "Q66. Sanitized GUI Support Bundle" in next_plan
+    assert "Q67. GUI Expert Options And Profile Import/Export" in next_plan
+    assert "display scaling" in next_plan
+    assert "support bundle" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -276,16 +281,21 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q59. GUI User Guide And Help Entry" not in development_specs
     assert "Q60. GUI Practical UX And Distribution Hardening" not in development_specs
     assert "### P1 / Q61. GUI Localization, Presets, And Progress Percent" not in development_specs
-    assert "Q62. GUI Smoke Evidence And Layout Guardrails" in development_specs
-    assert "`scripts/run_gui_smoke_evidence.py`" in development_specs
-    assert "redaction helper" in development_specs
+    assert "Q62. GUI Smoke Evidence And Layout Guardrails" not in development_specs
+    assert "Q64. Responsive GUI Layout And Accessibility Guardrails" in development_specs
+    assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in development_specs
+    assert "Q66. Sanitized GUI Support Bundle" in development_specs
+    assert "Q67. GUI Expert Options And Profile Import/Export" in development_specs
+    assert "tests/test_gui_layout.py" in development_specs
+    assert "tests/test_gui_support.py" in development_specs
+    assert "tests/test_gui_profiles.py" in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q61" in development_specs
+    assert "완료된 Q34-Q63" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -306,6 +316,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q59. GUI User Guide And Help Entry" in implemented_specs
     assert "Q60. GUI Practical UX And Distribution Hardening" in implemented_specs
     assert "Q61. GUI Localization, Presets, And Progress Percent" in implemented_specs
+    assert "Q62. GUI Smoke Evidence And Layout Guardrails" in implemented_specs
+    assert "Q63. GUI Backlog Rollover And Forward Specs" in implemented_specs
+    assert "PR #40" in implemented_specs
+    assert "scripts/run_gui_smoke_evidence.py" in implemented_specs
     assert "pdf2md/gui_state.py" in implemented_specs
     assert "PR #37" in implemented_specs
     assert "PR #38" in implemented_specs
@@ -354,6 +368,11 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q61. GUI Localization, Presets, And Progress Percent" in quality_scorecard
     assert "GUI 언어/프리셋/진행률 계획" in quality_scorecard
     assert "Q62. GUI Smoke Evidence And Layout Guardrails" in quality_scorecard
+    assert "Q64. Responsive GUI Layout And Accessibility Guardrails" in quality_scorecard
+    assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in quality_scorecard
+    assert "Q66. Sanitized GUI Support Bundle" in quality_scorecard
+    assert "Q67. GUI Expert Options And Profile Import/Export" in quality_scorecard
+    assert "GUI 호환성 후속 명세" in quality_scorecard
     assert "GUI smoke evidence 계획" in quality_scorecard
     assert "GUI contract test 확장" in quality_scorecard
     assert "다음 active backlog는 Q55-Q58" in quality_scorecard

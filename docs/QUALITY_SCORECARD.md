@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI 호환성 후속 명세 | 97/100 | 0 | Q62. GUI Smoke Evidence And Layout Guardrails 구현/merge 완료. Q63으로 stale active backlog를 정리하고 Q64-Q67 responsive layout, runtime doctor, sanitized support bundle, expert options/profile 명세를 추가. 변환 품질과 public schema 계약은 유지 |
 | 2026-05-16 | GUI smoke evidence 계획 | 97/100 | 0 | Q61. GUI Localization, Presets, And Progress Percent 구현/merge 완료. 다음 active backlog/spec로 Q62. GUI Smoke Evidence And Layout Guardrails 추가. 변환 품질과 schema 계약은 유지하고, Q61 GUI 기능의 로컬 smoke evidence와 layout/state guardrail을 다음 검증 과제로 정리 |
 | 2026-05-16 | GUI 언어/프리셋/진행률 계획 | 97/100 | 0 | Q61. GUI Localization, Presets, And Progress Percent active backlog/spec 추가. 변환 품질과 schema 계약은 유지하고, 한글 기본 UI, English 선택, 목적 기반 preset, 신뢰 가능한 batch percent 표시를 구현 전 계약으로 정리 |
 | 2026-05-16 | GUI 실사용 UX 및 배포 계획 | 97/100 | 0 | Q60. GUI Practical UX And Distribution Hardening active backlog/spec 추가. 실제 변환 품질과 schema 계약은 유지하고, 로컬 GUI smoke, 결과 파일 열기, 최근 경로 저장, 비개발자 배포 방식 결정을 구현 전 계약으로 정리 |
@@ -53,6 +54,23 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q62 구현 후, Q63-Q67 명세 수립)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q62는 GUI smoke evidence runner와 headless guardrail을 구현해 PR #40으로 merge됐다. smoke evidence는 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path를 저장하지 않는 local-only artifact로 정리됐다.
+
+Q63은 구현 기능 추가보다 문서/계획 정합성을 맞추는 작업이다. 완료된 Q62를 implemented archive로 옮기고, 다음 GUI 완성도/호환성 개선 과제를 Q64-Q67로 분리한다. 변환 엔진, Markdown/manifest/report 산출물, public schema 계약은 바뀌지 않는다.
+
+#### 다음 개선 참조
+
+- Q64. Responsive GUI Layout And Accessibility Guardrails
+- Q65. GUI Runtime Doctor And Packaging Compatibility Smoke
+- Q66. Sanitized GUI Support Bundle
+- Q67. GUI Expert Options And Profile Import/Export
 
 ### 2026-05-16 (Q61 구현 후, Q62 계획 수립)
 
