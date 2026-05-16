@@ -12,12 +12,23 @@ from pdf2md.gui_runner import (
     GuiConversionOptions,
     GuiConversionRequest,
     GuiConversionSummary,
+    GuiDocumentSummary,
     GuiDiagnosticError,
     GuiDiagnosticReport,
     check_gui_runtime,
     format_gui_summary,
     run_gui_conversion,
     validate_gui_request,
+)
+from pdf2md.gui_state import (
+    GuiRecentState,
+    GuiStateStore,
+    RecentPathKind,
+    ResultOpenTarget,
+    first_existing_path,
+    gui_batch_progress_snapshot,
+    gui_document_open_target,
+    remember_gui_path,
 )
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
 
@@ -46,10 +57,15 @@ class Pdf2MdGuiApp:
         self.worker: threading.Thread | None = None
         self.cancel_event = threading.Event()
         self.last_summary: GuiConversionSummary | None = None
+        self.result_documents: dict[str, GuiDocumentSummary] = {}
+        self.state_store = GuiStateStore()
+        self.recent_state = self.state_store.load()
 
         self.input_mode = tk.StringVar(value="file")
         self.input_path = tk.StringVar()
         self.output_dir = tk.StringVar()
+        self.status_text = tk.StringVar(value="Ready")
+        self.progress_value = tk.DoubleVar(value=0.0)
         self.pages = tk.StringVar()
         self.password = tk.StringVar()
         self.image_mode = tk.StringVar(value=ImageMode.REFERENCED.value)
@@ -66,6 +82,7 @@ class Pdf2MdGuiApp:
         self.repair_hyphenation = tk.BooleanVar(value=False)
         self.figure_crop_fallback = tk.BooleanVar(value=False)
 
+        self._restore_recent_paths()
         self._build_ui()
         self.root.after(100, self._poll_queue)
 
@@ -131,9 +148,23 @@ class Pdf2MdGuiApp:
         self.open_output_button.pack(side=tk.LEFT, padx=(8, 0))
         self.help_button = ttk.Button(button_frame, text="Help", command=self._open_help)
         self.help_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.clear_recent_button = ttk.Button(button_frame, text="Clear recent", command=self._clear_recent)
+        self.clear_recent_button.pack(side=tk.LEFT, padx=(8, 0))
+
+        progress_frame = ttk.Frame(frame)
+        progress_frame.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        progress_frame.columnconfigure(1, weight=1)
+        ttk.Label(progress_frame, textvariable=self.status_text).grid(row=0, column=0, sticky="w", padx=(0, 8))
+        self.progress_bar = ttk.Progressbar(
+            progress_frame,
+            mode="determinate",
+            maximum=100,
+            variable=self.progress_value,
+        )
+        self.progress_bar.grid(row=0, column=1, sticky="ew")
 
         results = ttk.LabelFrame(frame, text="Results")
-        results.grid(row=5, column=0, columnspan=3, sticky="nsew", pady=(0, 8))
+        results.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(0, 8))
         results.columnconfigure(0, weight=1)
         results.rowconfigure(0, weight=1)
         self.result_tree = ttk.Treeview(
@@ -155,11 +186,43 @@ class Pdf2MdGuiApp:
         self.result_tree.column("markdown", width=170, anchor="w")
         self.result_tree.column("report", width=170, anchor="w")
         self.result_tree.grid(row=0, column=0, sticky="nsew")
+        self.result_tree.bind("<<TreeviewSelect>>", lambda event: self._update_result_action_buttons())
+
+        result_actions = ttk.Frame(results)
+        result_actions.grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        self.open_markdown_button = ttk.Button(
+            result_actions,
+            text="Open Markdown",
+            command=lambda: self._open_selected_result("markdown"),
+            state=tk.DISABLED,
+        )
+        self.open_markdown_button.pack(side=tk.LEFT)
+        self.open_report_button = ttk.Button(
+            result_actions,
+            text="Open Report",
+            command=lambda: self._open_selected_result("report"),
+            state=tk.DISABLED,
+        )
+        self.open_report_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.open_manifest_button = ttk.Button(
+            result_actions,
+            text="Open Manifest",
+            command=lambda: self._open_selected_result("manifest"),
+            state=tk.DISABLED,
+        )
+        self.open_manifest_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.open_assets_button = ttk.Button(
+            result_actions,
+            text="Open Assets",
+            command=lambda: self._open_selected_result("assets"),
+            state=tk.DISABLED,
+        )
+        self.open_assets_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.log_text = tk.Text(frame, height=9, wrap="word", state=tk.DISABLED)
-        self.log_text.grid(row=6, column=0, columnspan=3, sticky="nsew")
-        frame.rowconfigure(5, weight=1)
+        self.log_text.grid(row=7, column=0, columnspan=3, sticky="nsew")
         frame.rowconfigure(6, weight=1)
+        frame.rowconfigure(7, weight=1)
 
     def _add_labeled_entry(self, parent, label: str, variable, row: int, col: int, show: str | None = None) -> None:  # noqa: ANN001
         from tkinter import ttk
@@ -179,6 +242,34 @@ class Pdf2MdGuiApp:
             pady=3,
         )
 
+    def _restore_recent_paths(self) -> None:
+        recent_file = first_existing_path(self.recent_state.recent_input_files)
+        recent_folder = first_existing_path(self.recent_state.recent_input_folders)
+        if recent_file is not None:
+            self.input_mode.set("file")
+            self.input_path.set(str(recent_file))
+        elif recent_folder is not None:
+            self.input_mode.set("folder")
+            self.input_path.set(str(recent_folder))
+        recent_output = first_existing_path(self.recent_state.recent_output_dirs)
+        if recent_output is not None:
+            self.output_dir.set(str(recent_output))
+
+    def _remember_recent_path(self, kind: RecentPathKind, path: Path) -> None:
+        try:
+            self.recent_state = remember_gui_path(self.recent_state, kind, path, max_items=self.state_store.max_items)
+            self.state_store.save(self.recent_state)
+        except Exception as exc:  # noqa: BLE001
+            self._append_log(f"Could not save recent GUI path: {exc}")
+
+    def _remember_request_paths(self, request: GuiConversionRequest) -> None:
+        if request.input_mode.lower() == "folder":
+            self._remember_recent_path("input_folder", request.input_path)
+        else:
+            self._remember_recent_path("input_file", request.input_path)
+        if request.output_dir is not None:
+            self._remember_recent_path("output_dir", request.output_dir)
+
     def _browse_input(self) -> None:
         from tkinter import filedialog
 
@@ -188,6 +279,10 @@ class Pdf2MdGuiApp:
             selected = filedialog.askopenfilename(title="Select PDF file", filetypes=[("PDF files", "*.pdf")])
         if selected:
             self.input_path.set(selected)
+            if self.input_mode.get() == "folder":
+                self._remember_recent_path("input_folder", Path(selected))
+            else:
+                self._remember_recent_path("input_file", Path(selected))
 
     def _browse_output(self) -> None:
         from tkinter import filedialog
@@ -195,6 +290,7 @@ class Pdf2MdGuiApp:
         selected = filedialog.askdirectory(title="Select output folder")
         if selected:
             self.output_dir.set(selected)
+            self._remember_recent_path("output_dir", Path(selected))
 
     def _options(self) -> GuiConversionOptions:
         return GuiConversionOptions(
@@ -240,16 +336,21 @@ class Pdf2MdGuiApp:
         self.last_summary = None
         self._clear_log()
         self._clear_results()
+        self.status_text.set("Validating request")
+        self.progress_value.set(0)
         self._append_log("Starting conversion")
         diagnostics = validate_gui_request(request)
         if diagnostics.has_errors:
             self.start_button.configure(state="normal")
             self.cancel_button.configure(state="disabled")
+            self._reset_progress("Cannot start conversion")
             self._append_log(diagnostics.user_message())
             messagebox.showerror("Cannot start conversion", diagnostics.user_message())
             return
         if diagnostics.warnings:
             self._append_log(diagnostics.user_message())
+        self._remember_request_paths(request)
+        self._begin_progress(request)
 
         def worker() -> None:
             try:
@@ -277,16 +378,19 @@ class Pdf2MdGuiApp:
                 event, payload = self.queue.get_nowait()
                 if event == "log":
                     self._append_log(str(payload))
+                    self.status_text.set(str(payload))
                 elif event == "batch_progress" and isinstance(payload, GuiBatchProgress):
-                    self._append_log(self._batch_progress_text(payload))
+                    self._handle_batch_progress(payload)
                 elif event == "diagnostic_error" and isinstance(payload, GuiDiagnosticError):
                     self.start_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
+                    self._finish_progress("Cannot start conversion", value=0)
                     self._append_log(payload.report.user_message())
                     messagebox.showerror("Cannot start conversion", payload.report.user_message())
                 elif event == "error":
                     self.start_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
+                    self._finish_progress("Conversion failed", value=0)
                     self._append_log(f"Failed: {payload}")
                     messagebox.showerror("Conversion failed", str(payload))
                 elif event == "done" and isinstance(payload, GuiConversionSummary):
@@ -294,6 +398,9 @@ class Pdf2MdGuiApp:
                     self.start_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
                     self.open_output_button.configure(state="normal")
+                    self._remember_recent_path("output_dir", payload.output_root)
+                    status_text = "Conversion finished" if payload.exit_code == 0 else "Conversion finished with warnings or failures"
+                    self._finish_progress(status_text, value=100)
                     self._populate_results(payload)
                     self._append_log(format_gui_summary(payload))
                     messagebox.showinfo("Conversion finished", self._summary_text(payload))
@@ -306,11 +413,12 @@ class Pdf2MdGuiApp:
 
     def _populate_results(self, summary: GuiConversionSummary) -> None:
         self._clear_results()
+        first_item_id: str | None = None
         for document in summary.documents:
             warning_value = str(document.warning_count)
             if document.warning_codes:
                 warning_value = f"{document.warning_count}: {', '.join(document.warning_codes)}"
-            self.result_tree.insert(
+            item_id = self.result_tree.insert(
                 "",
                 "end",
                 values=(
@@ -322,18 +430,62 @@ class Pdf2MdGuiApp:
                     str(document.report_path or ""),
                 ),
             )
+            self.result_documents[item_id] = document
+            if first_item_id is None:
+                first_item_id = item_id
+        if first_item_id is not None:
+            self.result_tree.selection_set(first_item_id)
+            self.result_tree.focus(first_item_id)
+        self._update_result_action_buttons()
 
     def _clear_results(self) -> None:
         for item_id in self.result_tree.get_children():
             self.result_tree.delete(item_id)
+        self.result_documents.clear()
+        self._update_result_action_buttons()
 
     def _request_cancel(self) -> None:
         self.cancel_event.set()
         self.cancel_button.configure(state="disabled")
+        self.status_text.set("Cancel requested")
         self._append_log("Cancel requested; the current document will finish before the batch stops.")
 
     def _batch_progress_text(self, event: GuiBatchProgress) -> str:
         return f"Batch {event.current}/{event.total} {event.input_pdf.name}: {event.status}"
+
+    def _begin_progress(self, request: GuiConversionRequest) -> None:
+        self.progress_bar.stop()
+        if request.input_mode.lower() == "folder":
+            self.progress_bar.configure(mode="determinate", maximum=100)
+            self.progress_value.set(0)
+            self.status_text.set("Batch conversion starting")
+        else:
+            self.progress_bar.configure(mode="indeterminate", maximum=100)
+            self.progress_value.set(0)
+            self.status_text.set("Conversion starting")
+            self.progress_bar.start(10)
+
+    def _handle_batch_progress(self, event: GuiBatchProgress) -> None:
+        snapshot = gui_batch_progress_snapshot(
+            current=event.current,
+            total=event.total,
+            input_pdf=event.input_pdf,
+            status=event.status,
+        )
+        self.progress_bar.stop()
+        self.progress_bar.configure(mode="determinate", maximum=100)
+        self.progress_value.set(snapshot.percent)
+        self.status_text.set(snapshot.label)
+        self._append_log(snapshot.label)
+
+    def _finish_progress(self, message: str, *, value: int) -> None:
+        self.progress_bar.stop()
+        self.progress_bar.configure(mode="determinate", maximum=100)
+        self.progress_value.set(value)
+        self.status_text.set(message)
+
+    def _reset_progress(self, message: str = "Ready") -> None:
+        self._finish_progress(message, value=0)
 
     def _append_log(self, message: str) -> None:
         self.log_text.configure(state="normal")
@@ -346,22 +498,78 @@ class Pdf2MdGuiApp:
         self.log_text.delete("1.0", "end")
         self.log_text.configure(state="disabled")
 
-    def _open_output(self) -> None:
-        from tkinter import messagebox
+    def _selected_document(self) -> GuiDocumentSummary | None:
+        selection = self.result_tree.selection()
+        if not selection:
+            return None
+        return self.result_documents.get(selection[0])
 
+    def _update_result_action_buttons(self) -> None:
+        if not hasattr(self, "open_markdown_button"):
+            return
+        document = self._selected_document()
+        button_targets = (
+            (self.open_markdown_button, "markdown"),
+            (self.open_report_button, "report"),
+            (self.open_manifest_button, "manifest"),
+            (self.open_assets_button, "assets"),
+        )
+        for button, target in button_targets:
+            path = gui_document_open_target(document, target) if document is not None else None
+            button.configure(state="normal" if path is not None else "disabled")
+
+    def _open_selected_result(self, target: ResultOpenTarget) -> None:
+        document = self._selected_document()
+        path = gui_document_open_target(document, target) if document is not None else None
+        self._open_path(path, f"Open {target} failed")
+
+    def _open_output(self) -> None:
         if self.last_summary is None:
             return
-        try:
-            opened = webbrowser.open(self.last_summary.output_root.resolve().as_uri())
-        except Exception as exc:  # noqa: BLE001
-            message = f"Could not open output folder: {exc}"
+        document = self._selected_document()
+        path = gui_document_open_target(document, "output_dir") if document is not None else self.last_summary.output_root
+        self._open_path(path, "Open output folder failed")
+
+    def _open_path(self, path: Path | None, failure_title: str) -> None:
+        from tkinter import messagebox
+
+        if path is None:
+            message = "No result path is available for the selected document."
             self._append_log(message)
-            messagebox.showwarning("Open output folder failed", message)
+            messagebox.showwarning(failure_title, message)
+            return
+        if not path.exists():
+            message = f"Result path does not exist: {path}"
+            self._append_log(message)
+            messagebox.showwarning(failure_title, message)
+            return
+        try:
+            opened = webbrowser.open(path.resolve().as_uri())
+        except Exception as exc:  # noqa: BLE001
+            message = f"Could not open result path: {exc}"
+            self._append_log(message)
+            messagebox.showwarning(failure_title, message)
             return
         if not opened:
-            message = "Could not open output folder."
+            message = f"Could not open result path: {path}"
             self._append_log(message)
-            messagebox.showwarning("Open output folder failed", message)
+            messagebox.showwarning(failure_title, message)
+
+    def _clear_recent(self) -> None:
+        from tkinter import messagebox
+
+        try:
+            self.recent_state = self.state_store.clear()
+        except Exception as exc:  # noqa: BLE001
+            self.recent_state = GuiRecentState()
+            message = f"Could not clear recent GUI paths: {exc}"
+            self._append_log(message)
+            messagebox.showwarning("Clear recent failed", message)
+            return
+        self.input_path.set("")
+        self.output_dir.set("")
+        self._append_log("Recent GUI paths cleared.")
+        self.status_text.set("Recent paths cleared")
 
     def _open_help(self) -> None:
         from tkinter import messagebox

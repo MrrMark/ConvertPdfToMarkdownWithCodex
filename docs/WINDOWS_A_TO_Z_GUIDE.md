@@ -184,10 +184,16 @@ GUI 사용 순서:
 3. 필요하면 `Output folder`를 선택합니다.
 4. OCR이 필요하면 `Force OCR`과 `OCR lang`을 설정합니다.
 5. `Start conversion`을 누릅니다.
-6. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`, `Retry`를 확인합니다.
-7. 화면 설명이 필요하면 `Help` 버튼을 누릅니다.
+6. 실행 중 progress가 단일 변환 처리 중 상태 또는 폴더 배치 문서 index/total로 표시되는지 확인합니다.
+7. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`, `Retry`를 확인합니다.
+8. 선택한 결과 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 엽니다.
+9. 화면 설명이 필요하면 `Help` 버튼을 누릅니다.
 
 폴더 배치 변환 중 `Cancel`을 누르면 현재 문서가 끝난 뒤 남은 문서는 `cancelled`로 표시됩니다. 실패 문서는 `Retry` 열에 재시도 후보로 표시됩니다.
+
+GUI는 최근 입력 파일/폴더와 output folder를 local-only state로 저장합니다. 원문 텍스트, 표, 이미지 내용, warning message는 저장하지 않으며, 공유 PC에서는 `Clear recent`로 최근 경로를 지울 수 있습니다.
+
+Windows 비개발자 기본 배포 경로는 ZIP/source checkout + `.venv314` setup script + `python -m pdf2md.gui`입니다. PyInstaller/native bundle은 Tkinter, PyMuPDF, Tesseract 포함/진단과 code signing smoke가 정리되기 전까지 공식 기본 배포 경로로 보지 않습니다.
 
 CLI 기본 실행:
 
@@ -705,6 +711,11 @@ python -m pdf2md.gui
 - 쓰기 가능한 사용자 폴더를 선택하세요.
 - output path에 같은 이름의 파일이 있으면 폴더로 바꾸거나 다른 경로를 선택하세요.
 - 회사 보안 정책이 Documents/Desktop 접근을 제한하면 별도 작업 폴더를 만들어 사용하세요.
+
+### J. GUI 최근 경로를 지우고 싶음
+
+- 공유 PC나 민감한 경로가 보이는 환경에서는 GUI의 `Clear recent` 버튼을 누르세요.
+- 최근 경로 state에는 입력/출력 경로만 저장되고 원문 텍스트, 표, 이미지 내용, warning message는 저장되지 않습니다.
 
 ---
 

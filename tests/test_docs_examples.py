@@ -55,12 +55,16 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
+    assert "Q60 GUI Practical UX And Distribution Hardening" in readme
     assert "docs/MACOS_GUI_QUICKSTART.md" in readme
     assert "docs/GUI_USER_GUIDE.md" in readme
     assert "python3 -m pdf2md.gui" in readme
     assert "pdf2md-gui" in readme
     assert "python3 -m pdf2md.gui --help" in readme
     assert "문서 경계 취소" in readme
+    assert "Open Markdown" in readme
+    assert "Clear recent" in readme
+    assert "PyInstaller/native bundle" in readme
     assert "GUI 화면의 `Help` 버튼" in readme
     assert "pdf/v10" not in readme
     assert "프로젝트 scaffold 생성" not in readme
@@ -126,6 +130,10 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "docs\\GUI_USER_GUIDE.md" in guide
     assert "GUI의 `Help` 버튼" in guide
     assert "`Cancel`을 누르면 현재 문서가 끝난 뒤" in guide
+    assert "`Open Manifest`" in guide
+    assert "`Clear recent`" in guide
+    assert "ZIP/source checkout" in guide
+    assert "PyInstaller/native bundle" in guide
     assert "GUI에서 output folder 오류" in guide
     assert "- Git\n  - `git clone`, `git pull` 같은 저장소 동기화 흐름에서만 필요" in guide
 
@@ -141,6 +149,11 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     assert "docs/GUI_USER_GUIDE.md" in guide
     assert "`Help` 버튼" in guide
     assert "Cancel" in guide
+    assert "Open Markdown" in guide
+    assert "Clear recent" in guide
+    assert "local-only state" in guide
+    assert "로컬 GUI smoke checklist" in guide
+    assert "PyInstaller/native bundle" in guide
     assert "`success`, `partial_success`, `failed`, `skipped`, `cancelled`" in guide
     assert "Retry" in guide
     assert "원문 텍스트, 표, 이미지 내용은 GUI summary에서 요약하지 않는다" in guide
@@ -161,6 +174,10 @@ def test_gui_user_guide_is_separate_from_cli_docs() -> None:
     assert "`Warnings`" in guide
     assert "`Retry`" in guide
     assert "`cancelled`" in guide
+    assert "`Open Manifest`" in guide
+    assert "`Clear recent`" in guide
+    assert "local-only JSON state" in guide
+    assert "page-level 진행률 callback" in guide
     assert "원문 텍스트, 표, 이미지 내용을 요약하거나 재서술하지 않는다" in guide
     assert "자동화, CI, 반복 스크립트 실행은 GUI보다 CLI를 권장" in guide
 
@@ -218,7 +235,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q57. Non-Developer GUI Distribution Guide" not in next_plan
     assert "Q58. GUI Smoke And Contract Test Expansion" not in next_plan
     assert "Q59. GUI User Guide And Help Entry" not in next_plan
-    assert "현재 active quality backlog는 없다." in next_plan
+    assert "Q60. GUI Practical UX And Distribution Hardening" in next_plan
+    assert "최근 입력/출력 경로를 local-only 상태로 저장" in next_plan
+    assert "PyInstaller/native bundle은 별도 feasibility smoke" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -229,7 +248,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q57. Non-Developer GUI Distribution Guide" not in development_specs
     assert "Q58. GUI Smoke And Contract Test Expansion" not in development_specs
     assert "Q59. GUI User Guide And Help Entry" not in development_specs
-    assert "현재 active quality backlog가 없으므로" in development_specs
+    assert "Q60. GUI Practical UX And Distribution Hardening" in development_specs
+    assert "recent state 저장/로드" in development_specs
+    assert "로컬 GUI smoke checklist" in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
@@ -293,6 +314,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q57. Non-Developer GUI Distribution Guide" in quality_scorecard
     assert "Q58. GUI Smoke And Contract Test Expansion" in quality_scorecard
     assert "Q59. GUI User Guide And Help Entry" in quality_scorecard
+    assert "Q60. GUI Practical UX And Distribution Hardening" in quality_scorecard
+    assert "GUI 실사용 UX 및 배포 계획" in quality_scorecard
     assert "GUI contract test 확장" in quality_scorecard
     assert "다음 active backlog는 Q55-Q58" in quality_scorecard
     assert "다음 active backlog는 Q56-Q58" in quality_scorecard

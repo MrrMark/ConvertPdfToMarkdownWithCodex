@@ -122,7 +122,26 @@ GUI 완료 후 Results 표에서 아래를 확인한다.
 
 GUI 화면에서 바로 설명이 필요하면 `Help` 버튼을 누른다.
 
-## 8) 문제 진단
+선택한 Results 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 바로 열 수 있다. GUI는 최근 입력 파일/폴더와 output folder를 local-only state로 저장하며, `Clear recent`로 지울 수 있다.
+
+## 8) 로컬 GUI smoke checklist
+
+1. `python -m pdf2md.gui --help`가 창 없이 종료되는지 확인한다.
+2. `python -m pdf2md.gui`로 GUI 창을 연다.
+3. 단일 PDF를 변환하고 Results 표에서 Markdown/report/manifest 경로를 확인한다.
+4. 선택한 결과 행의 Markdown/report/manifest/assets 또는 output folder가 열리는지 확인한다.
+5. 폴더 배치 변환에서 문서 index/total progress가 움직이는지 확인한다.
+6. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
+7. GUI를 닫고 다시 열었을 때 최근 경로가 복구되는지 확인한다.
+8. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.
+
+## 9) 배포 방식 판단
+
+현재 macOS 비개발자 기본 경로는 source/ZIP + venv setup + `python -m pdf2md.gui` 실행이다.
+
+PyInstaller/native bundle은 Tkinter, PyMuPDF, Tesseract 포함/진단, code signing/notarization smoke가 정리되기 전까지 공식 기본 배포 경로로 보지 않는다.
+
+## 10) 문제 진단
 
 ### Python 버전 오류
 
