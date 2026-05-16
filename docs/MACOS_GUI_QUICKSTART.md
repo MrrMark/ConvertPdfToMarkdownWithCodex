@@ -142,6 +142,14 @@ python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --st
 
 `--json-only`를 붙이면 자동화 로그에 sanitized JSON만 출력한다. evidence에는 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path가 들어가면 안 된다.
 
+문제 보고용 공유 자료가 필요하면 evidence를 기반으로 sanitized support bundle을 만든다.
+
+```bash
+python scripts/create_gui_support_bundle.py --output-dir /tmp/pdf2md-gui-support --smoke-evidence /tmp/pdf2md-gui-smoke/gui_smoke_evidence.json
+```
+
+`gui_support_bundle.json`과 `gui_support_bundle.md`에는 status count, warning code/count, sanitized artifact label, environment/runtime code만 포함한다. 원문 PDF/Markdown 내용, 표/이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않는다.
+
 수동 Tk window 확인:
 
 1. `python -m pdf2md.gui --help`가 창 없이 종료되는지 확인한다.
