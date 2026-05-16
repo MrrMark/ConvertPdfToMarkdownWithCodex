@@ -55,8 +55,10 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "Q67 GUI 완성도/호환성 개선" in readme
-    assert "Q67 GUI Expert Options And Profile Import/Export" in readme
+    assert "현재 active quality backlog는 없습니다" in readme
+    assert "완료된 Q34-Q67" in readme
+    assert "Expert options" in readme
+    assert "Import profile / Export profile" in readme
     assert "horizontal scrollbar" in readme
     assert "docs/MACOS_GUI_QUICKSTART.md" in readme
     assert "docs/GUI_USER_GUIDE.md" in readme
@@ -139,6 +141,7 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "python -m pdf2md.gui --help" in guide
     assert "python -m pdf2md.gui --doctor" in guide
     assert "source checkout/editable/wheel packaging mode" in guide
+    assert "Import profile / Export profile" in guide
     assert "scripts\\run_gui_smoke_evidence.py" in guide
     assert "scripts\\create_gui_support_bundle.py" in guide
     assert "gui_support_bundle.json" in guide
@@ -171,6 +174,8 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     assert "python -m pdf2md.gui --help" in guide
     assert "python -m pdf2md.gui --doctor" in guide
     assert "tcl_tk_patchlevel_available" in guide
+    assert "Expert options" in guide
+    assert "Export profile" in guide
     assert "scripts/run_gui_smoke_evidence.py" in guide
     assert "scripts/create_gui_support_bundle.py" in guide
     assert "gui_support_bundle.json" in guide
@@ -202,6 +207,8 @@ def test_gui_user_guide_is_separate_from_cli_docs() -> None:
     assert "pdf2md-gui" in guide
     assert "python -m pdf2md.gui --doctor" in guide
     assert "--doctor-format json" in guide
+    assert "Expert options" in guide
+    assert "invalid profile" in guide
     assert "scripts/run_gui_smoke_evidence.py" in guide
     assert "scripts/create_gui_support_bundle.py" in guide
     assert "gui_support_bundle.json" in guide
@@ -287,13 +294,14 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q64. Responsive GUI Layout And Accessibility Guardrails" not in next_plan
     assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" not in next_plan
     assert "Q66. Sanitized GUI Support Bundle" not in next_plan
-    assert "Q67. GUI Expert Options And Profile Import/Export" in next_plan
+    assert "Q67. GUI Expert Options And Profile Import/Export" not in next_plan
     assert "Tcl/Tk patchlevel" not in next_plan
     assert "support bundle" not in next_plan
-    assert "현재 남은 작업 없음." not in next_plan
+    assert "현재 남은 작업 없음." in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "현재 Active Development Specs" in development_specs
+    assert "현재 active 개발 명세 없음." in development_specs
     assert "Q54. GUI Runtime And Install Diagnostics" not in development_specs
     assert "Q55. GUI Conversion Result Review UX" not in development_specs
     assert "Q56. GUI Batch Operation Controls" not in development_specs
@@ -306,15 +314,15 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q64. Responsive GUI Layout And Accessibility Guardrails" not in development_specs
     assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" not in development_specs
     assert "Q66. Sanitized GUI Support Bundle" not in development_specs
-    assert "Q67. GUI Expert Options And Profile Import/Export" in development_specs
-    assert "tests/test_gui_profiles.py" in development_specs
+    assert "Q67. GUI Expert Options And Profile Import/Export" not in development_specs
+    assert "tests/test_gui_profiles.py" not in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q66" in development_specs
+    assert "완료된 Q34-Q67" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -340,9 +348,13 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q64. Responsive GUI Layout And Accessibility Guardrails" in implemented_specs
     assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in implemented_specs
     assert "Q66. Sanitized GUI Support Bundle" in implemented_specs
+    assert "Q67. GUI Expert Options And Profile Import/Export" in implemented_specs
     assert "python -m pdf2md.gui --doctor" in implemented_specs
     assert "scripts/create_gui_support_bundle.py" in implemented_specs
     assert "build_gui_support_bundle()" in implemented_specs
+    assert "pdf2md/gui_profiles.py" in implemented_specs
+    assert "tests/test_gui_profiles.py" in implemented_specs
+    assert "gui_profile_payload()" in implemented_specs
     assert "gui_diagnostic_report_to_dict()" in implemented_specs
     assert "format_gui_diagnostic_report()" in implemented_specs
     assert "PR #40" in implemented_specs
@@ -405,6 +417,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "다음 active backlog는 Q66-Q67" in quality_scorecard
     assert "GUI support bundle" in quality_scorecard
     assert "다음 active backlog는 Q67" in quality_scorecard
+    assert "GUI expert options/profile" in quality_scorecard
     assert "GUI 호환성 후속 명세" in quality_scorecard
     assert "GUI smoke evidence 계획" in quality_scorecard
     assert "GUI contract test 확장" in quality_scorecard

@@ -89,6 +89,21 @@ python -m pdf2md.gui --doctor --doctor-format json
 - `Repair hyphenation`: 명확한 줄바꿈 hyphenation을 복구한다.
 - `Figure crop fallback`: caption이 있는 figure에 embedded image가 없을 때 page crop fallback을 시도한다.
 
+### Expert options
+
+- `Page workers`: 페이지 단위 병렬 처리 worker 수다. 1 이상의 정수만 허용한다.
+- `Debug artifacts`: 디버그 산출물을 함께 생성한다.
+- `Verbose logs`: 더 자세한 실행 로그를 사용한다.
+- Expert options는 `Optimize Options(유저 선택)` preset에서 편집 가능하다.
+
+### Profiles
+
+- `Export profile`: 현재 변환 option을 local-only profile JSON으로 저장한다.
+- `Import profile`: 저장된 profile JSON을 불러와 option을 적용한다.
+- profile은 password, input/output path, 원문 PDF 텍스트, Markdown 본문, 표 내용, 이미지 내용을 저장하지 않는다.
+- profile import는 현재 화면의 password처럼 profile에 저장하지 않는 값을 유지하면서 option만 바꾼다.
+- invalid profile은 구조화된 GUI diagnostic으로 표시된다.
+
 ### Progress
 
 - 단일 PDF 변환은 처리 중임을 나타내는 indeterminate progress로 표시된다.

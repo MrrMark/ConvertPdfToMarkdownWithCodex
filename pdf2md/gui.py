@@ -14,6 +14,7 @@ from pdf2md.gui_runner import (
     GuiConversionRequest,
     GuiConversionSummary,
     GuiDocumentSummary,
+    GuiDiagnostic,
     GuiDiagnosticError,
     GuiDiagnosticReport,
     check_gui_runtime,
@@ -23,6 +24,7 @@ from pdf2md.gui_runner import (
     run_gui_conversion,
     validate_gui_request,
 )
+from pdf2md.gui_profiles import load_gui_profile, write_gui_profile
 from pdf2md.gui_i18n import GuiLanguage, translate
 from pdf2md.gui_layout import (
     GUI_CONTROL_WRAP_LENGTH,
@@ -118,6 +120,9 @@ class Pdf2MdGuiApp:
         self.dedupe_images = tk.BooleanVar(value=False)
         self.repair_hyphenation = tk.BooleanVar(value=False)
         self.figure_crop_fallback = tk.BooleanVar(value=False)
+        self.page_workers = tk.StringVar(value="1")
+        self.debug = tk.BooleanVar(value=False)
+        self.verbose = tk.BooleanVar(value=False)
 
         self._restore_recent_paths()
         self._build_ui()
@@ -278,8 +283,32 @@ class Pdf2MdGuiApp:
             checkbox.grid(row=idx // 2, column=idx % 2, sticky="w", pady=1)
             self.advanced_option_widgets.append(checkbox)
 
+        expert = ttk.LabelFrame(frame, text=self._t("expert_options"))
+        self._track_text("expert_options", expert)
+        expert.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        for col in range(2):
+            expert.columnconfigure(col, weight=1)
+        page_workers_entry = self._add_labeled_entry(expert, "page_workers", self.page_workers, 0, 0)
+        self.advanced_option_widgets.append(page_workers_entry)
+        debug_checkbox = self._track_text("debug", ttk.Checkbutton(expert, text=self._t("debug"), variable=self.debug))
+        debug_checkbox.grid(row=1, column=0, sticky="w", pady=1)
+        self.advanced_option_widgets.append(debug_checkbox)
+        verbose_checkbox = self._track_text("verbose", ttk.Checkbutton(expert, text=self._t("verbose"), variable=self.verbose))
+        verbose_checkbox.grid(row=1, column=1, sticky="w", pady=1)
+        self.advanced_option_widgets.append(verbose_checkbox)
+        self.import_profile_button = self._track_text(
+            "import_profile",
+            ttk.Button(expert, text=self._t("import_profile"), command=self._import_profile),
+        )
+        self.import_profile_button.grid(row=2, column=0, sticky="ew", padx=(0, 6), pady=(4, 2))
+        self.export_profile_button = self._track_text(
+            "export_profile",
+            ttk.Button(expert, text=self._t("export_profile"), command=self._export_profile),
+        )
+        self.export_profile_button.grid(row=2, column=1, sticky="ew", pady=(4, 2))
+
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        button_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         for col in range(3):
             button_frame.columnconfigure(col, weight=1)
         self.start_button = self._track_text(
@@ -311,7 +340,7 @@ class Pdf2MdGuiApp:
         self.clear_recent_button.grid(row=1, column=1, columnspan=2, sticky="ew", pady=2)
 
         progress_frame = ttk.Frame(frame)
-        progress_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        progress_frame.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         progress_frame.columnconfigure(0, weight=1)
         self.status_label = ttk.Label(progress_frame, textvariable=self.status_text)
         self._configure_wrap(self.status_label, GUI_STATUS_WRAP_LENGTH)
@@ -326,7 +355,7 @@ class Pdf2MdGuiApp:
 
         results = ttk.LabelFrame(frame, text=self._t("results"))
         self._track_text("results", results)
-        results.grid(row=8, column=0, columnspan=3, sticky="nsew", pady=(0, 8))
+        results.grid(row=9, column=0, columnspan=3, sticky="nsew", pady=(0, 8))
         results.columnconfigure(0, weight=1)
         results.rowconfigure(0, weight=1)
         self.result_tree = ttk.Treeview(
@@ -395,9 +424,9 @@ class Pdf2MdGuiApp:
         self.open_assets_button.grid(row=1, column=1, sticky="ew", pady=2)
 
         self.log_text = tk.Text(frame, height=9, wrap="word", state=tk.DISABLED)
-        self.log_text.grid(row=9, column=0, columnspan=3, sticky="nsew")
-        frame.rowconfigure(8, weight=1)
+        self.log_text.grid(row=10, column=0, columnspan=3, sticky="nsew")
         frame.rowconfigure(9, weight=1)
+        frame.rowconfigure(10, weight=1)
 
     def _resize_scroll_window(self, event) -> None:  # noqa: ANN001
         if self.scroll_canvas is None or self.scroll_window_id is None:
@@ -424,7 +453,7 @@ class Pdf2MdGuiApp:
         widget.bind("<Button-4>", _on_mousewheel)
         widget.bind("<Button-5>", _on_mousewheel)
 
-    def _add_labeled_entry(self, parent, label_key: str, variable, row: int, col: int, show: str | None = None) -> None:  # noqa: ANN001
+    def _add_labeled_entry(self, parent, label_key: str, variable, row: int, col: int, show: str | None = None):  # noqa: ANN001
         from tkinter import ttk
 
         self._track_text(label_key, ttk.Label(parent, text=self._t(label_key))).grid(
@@ -434,7 +463,9 @@ class Pdf2MdGuiApp:
             padx=(0, 4),
             pady=3,
         )
-        ttk.Entry(parent, textvariable=variable, show=show).grid(row=row, column=col + 1, sticky="ew", padx=(0, 8), pady=3)
+        entry = ttk.Entry(parent, textvariable=variable, show=show)
+        entry.grid(row=row, column=col + 1, sticky="ew", padx=(0, 8), pady=3)
+        return entry
 
     def _add_labeled_combo(self, parent, label_key: str, variable, values: list[str], row: int, col: int) -> None:  # noqa: ANN001
         from tkinter import ttk
@@ -490,7 +521,7 @@ class Pdf2MdGuiApp:
             self._append_log(self._t("save_recent_failed", error=exc))
 
     def _apply_selected_preset(self, *, save: bool) -> None:
-        options = apply_preset_to_options(self.option_preset.get(), self._options())
+        options = apply_preset_to_options(self.option_preset.get(), self._options(strict_page_workers=False))
         self._set_option_vars(options)
         self._set_advanced_options_state()
         if save:
@@ -512,6 +543,9 @@ class Pdf2MdGuiApp:
         self.dedupe_images.set(options.dedupe_images)
         self.repair_hyphenation.set(options.repair_hyphenation)
         self.figure_crop_fallback.set(options.figure_crop_fallback)
+        self.page_workers.set(str(options.page_workers))
+        self.debug.set(options.debug)
+        self.verbose.set(options.verbose)
 
     def _set_advanced_options_state(self) -> None:
         editable = preset_allows_custom_options(self.option_preset.get())
@@ -572,7 +606,35 @@ class Pdf2MdGuiApp:
             self.output_dir.set(selected)
             self._remember_recent_path("output_dir", Path(selected))
 
-    def _options(self) -> GuiConversionOptions:
+    def _page_workers_value(self, *, strict: bool) -> int:
+        raw_value = self.page_workers.get().strip()
+        try:
+            value = int(raw_value)
+        except ValueError:
+            if not strict:
+                return 1
+            raise self._page_workers_error() from None
+        if value < 1:
+            if not strict:
+                return 1
+            raise self._page_workers_error()
+        return value
+
+    def _page_workers_error(self) -> GuiDiagnosticError:
+        return GuiDiagnosticError(
+            GuiDiagnosticReport(
+                [
+                    GuiDiagnostic(
+                        code="page_workers_invalid",
+                        severity="error",
+                        message=self._t("page_workers_invalid"),
+                        action="Use an integer greater than or equal to 1.",
+                    )
+                ]
+            )
+        )
+
+    def _options(self, *, strict_page_workers: bool = True) -> GuiConversionOptions:
         return GuiConversionOptions(
             pages=self.pages.get().strip() or None,
             password=self.password.get() or None,
@@ -588,6 +650,9 @@ class Pdf2MdGuiApp:
             dedupe_images=self.dedupe_images.get(),
             repair_hyphenation=self.repair_hyphenation.get(),
             figure_crop_fallback=self.figure_crop_fallback.get(),
+            page_workers=self._page_workers_value(strict=strict_page_workers),
+            debug=self.debug.get(),
+            verbose=self.verbose.get(),
             skip_existing=self.skip_existing.get(),
         )
 
@@ -600,6 +665,60 @@ class Pdf2MdGuiApp:
             options=self._options(),
         )
 
+    def _profile_filetypes(self) -> list[tuple[str, str]]:
+        return [(self._t("profile_files"), "*.json"), ("JSON", "*.json"), ("All files", "*.*")]
+
+    def _import_profile(self) -> None:
+        from tkinter import filedialog, messagebox
+
+        selected = filedialog.askopenfilename(title=self._t("select_profile_file"), filetypes=self._profile_filetypes())
+        if not selected:
+            return
+        try:
+            options = load_gui_profile(Path(selected), base_options=self._options(strict_page_workers=False))
+        except GuiDiagnosticError as exc:
+            message = exc.report.user_message()
+            self._append_log(message)
+            messagebox.showerror(self._t("profile_error"), message)
+            return
+        except Exception as exc:  # noqa: BLE001
+            message = str(exc)
+            self._append_log(message)
+            messagebox.showerror(self._t("profile_error"), message)
+            return
+        self.option_preset.set("custom")
+        self._set_option_vars(options)
+        self._set_advanced_options_state()
+        self._save_gui_preferences(option_preset="custom")
+        self._append_log(self._t("profile_imported"))
+        self._set_status("profile_imported")
+
+    def _export_profile(self) -> None:
+        from tkinter import filedialog, messagebox
+
+        selected = filedialog.asksaveasfilename(
+            title=self._t("save_profile_file"),
+            defaultextension=".json",
+            initialfile="pdf2md-gui-profile.json",
+            filetypes=self._profile_filetypes(),
+        )
+        if not selected:
+            return
+        try:
+            path = write_gui_profile(Path(selected), self._options())
+        except GuiDiagnosticError as exc:
+            message = exc.report.user_message()
+            self._append_log(message)
+            messagebox.showerror(self._t("profile_error"), message)
+            return
+        except Exception as exc:  # noqa: BLE001
+            message = str(exc)
+            self._append_log(message)
+            messagebox.showerror(self._t("profile_error"), message)
+            return
+        self._append_log(self._t("profile_exported", path=path))
+        self._set_status("profile_exported", path=path)
+
     def _start_conversion(self) -> None:
         from tkinter import messagebox
 
@@ -608,7 +727,13 @@ class Pdf2MdGuiApp:
         if not self.input_path.get().strip():
             messagebox.showerror(self._t("missing_input_title"), self._t("missing_input_message"))
             return
-        request = self._request()
+        try:
+            request = self._request()
+        except GuiDiagnosticError as exc:
+            message = exc.report.user_message()
+            self._append_log(message)
+            messagebox.showerror(self._t("cannot_start_conversion"), message)
+            return
         self.start_button.configure(state="disabled")
         self.cancel_button.configure(state="normal")
         self.open_output_button.configure(state="disabled")

@@ -23,18 +23,4 @@
 
 ## 남은 작업
 
-### P2 / Q67. GUI Expert Options And Profile Import/Export
-
-GUI에는 아직 `page_workers`, `debug`, `verbose` 같은 expert option 입력이 없다. 반복 작업자는 preset을 넘어서 실행 profile을 저장/불러오고 싶어 한다.
-
-#### 목표
-
-- GUI에 접이식 Expert options 영역을 추가해 `page_workers`, `debug`, `verbose` 등 기존 `GuiConversionOptions` 필드를 노출한다.
-- local-only profile export/import를 제공하되 input/output path, password, PDF 원문 내용은 기본 저장하지 않는다.
-- imported profile은 `Config` 계약과 동일한 option 의미를 유지한다.
-
-#### 완료 기준
-
-- profile JSON은 local-only artifact이며 public output schema로 취급하지 않는다.
-- invalid profile은 구조화된 GUI diagnostic으로 표시된다.
-- tests가 option mapping, redaction, backward-compatible default를 검증한다.
+현재 남은 작업 없음.

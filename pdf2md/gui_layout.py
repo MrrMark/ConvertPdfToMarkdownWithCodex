@@ -54,6 +54,11 @@ GUI_LAYOUT_SECTIONS: tuple[GuiLayoutSection, ...] = (
         wraps_text=True,
     ),
     GuiLayoutSection(
+        key="expert_options",
+        text_keys=("expert_options", "page_workers", "debug", "verbose", "import_profile", "export_profile"),
+        wraps_text=True,
+    ),
+    GuiLayoutSection(
         key="commands",
         text_keys=("start_conversion", "cancel", "open_output_folder", "help", "clear_recent"),
         wraps_text=True,
