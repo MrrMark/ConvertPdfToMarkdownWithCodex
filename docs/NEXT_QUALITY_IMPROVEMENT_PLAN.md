@@ -23,49 +23,50 @@
 
 ## 남은 작업
 
-### P1 / Q60. GUI Practical UX And Distribution Hardening
+### P1 / Q61. GUI Localization, Presets, And Progress Percent
 
-Q53-Q59로 최소 GUI wrapper, runtime diagnostics, 결과 검토 표, batch controls, 비개발자 문서, Help 진입점, headless contract test가 들어갔다. 다음 단계는 실제 로컬 GUI 사용 흐름에서 남는 마찰을 줄이고, 비개발자 배포 방식을 보수적으로 결정할 수 있는 실행/검증 계획을 확정하는 것이다.
+Q60으로 GUI 실행 흐름, 결과 파일 열기, 최근 경로 저장, 진행 상태 표시가 보강된 뒤 실제 사용 중 추가 UX 요구가 확인됐다. 다음 단계는 GUI를 비개발자 친화적인 기본 한글 UI로 전환할 수 있게 하고, 처음부터 세부 옵션을 모두 고르게 하지 않도록 변환 목적별 preset을 제공하며, 신뢰 가능한 범위에서 진행률을 숫자 percent로 함께 표시하는 것이다.
 
 #### 목표
 
-- 실제 GUI를 로컬에서 실행해 단일 PDF와 폴더 배치 변환 흐름을 점검한다.
-- 사용자가 변환 완료 후 결과 파일을 더 쉽게 확인할 수 있게 한다.
-- 최근 입력/출력 경로를 local-only 상태로 저장해 반복 사용성을 높인다.
-- ZIP + venv script, 기존 setup script, PyInstaller/native bundle 후보를 비교하고, 현재 릴리스에 적합한 배포 경로를 문서화한다.
-- GUI 편의 기능이 CLI `Config` / `run_conversion` / output schema 계약을 바꾸지 않도록 테스트로 고정한다.
+- GUI 표시 언어를 기본 `한국어`, 선택 `English`로 지원한다.
+- 변환 옵션을 처음부터 개별 flag 중심으로 노출하지 않고 `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset으로 안내한다.
+- 폴더 배치 변환 진행률은 progressbar와 함께 `current/total`, percent를 표시한다.
+- 단일 PDF 변환은 page-level progress callback이 생기기 전까지 가짜 percent를 만들지 않고 indeterminate 상태와 완료 `100%`만 표시한다.
+- 언어/preset/progress UI는 CLI `Config`, core `run_conversion`, output schema 계약을 변경하지 않는다.
 
 #### 우선 구현 후보
 
-1. GUI 진행 상태 개선
-   - 단일 변환은 indeterminate progress와 현재 status label을 표시한다.
-   - 폴더 배치 변환은 현재 문서 index/total 기반 progressbar를 표시한다.
-   - core pipeline이 page-level progress를 제공하지 않는 동안 page 단위 진행률처럼 보이는 값은 만들지 않는다.
-2. 결과 파일 열기 개선
-   - 선택한 결과 행의 Markdown, `report.json`, `manifest.json`, assets/output folder를 열 수 있게 한다.
-   - 열기 실패는 변환 실패로 바꾸지 않고 GUI warning/log로만 남긴다.
-3. 최근 경로 저장
-   - 최근 input file/folder와 output folder를 local-only JSON 상태로 저장한다.
-   - raw PDF 내용, 원문 텍스트, 표, 이미지, warning message는 저장하지 않는다.
-   - 경로 노출을 사용자가 정리할 수 있도록 clear recent 동작을 제공한다.
-4. 비개발자 배포 방식 결정
-   - 단기 기본 배포는 source/ZIP + venv setup script + `python -m pdf2md.gui` 경로를 우선한다.
-   - PyInstaller/native bundle은 별도 feasibility smoke를 통과하기 전까지 공식 기본 경로로 승격하지 않는다.
-   - macOS/Windows guide에는 선택지별 장단점과 추천 경로를 명시한다.
+1. GUI localization helper
+   - `ko`, `en` 문자열 catalog를 둔다.
+   - GUI label/button/status/messagebox/log 중 UI 안내 문구를 catalog로 치환한다.
+   - warning code, report/manifest key, 원문 PDF 텍스트, table/image content는 번역하지 않는다.
+   - 선택 언어는 local-only GUI state에 저장하고 시작 시 복구한다.
+2. Preset selector
+   - 기본값은 `기본 모드(원본 유지)`다.
+   - `RAG 등록용(최적화)`는 RAG sidecar/provenance 중심 옵션을 켜되 원문을 요약/재서술하지 않는다.
+   - `Optimize Options(유저 선택)`을 선택했을 때만 세부 flag 영역을 직접 편집 가능하게 한다.
+   - `pages`, `password`, `input/output`, `OCR lang`은 preset과 별개로 항상 접근 가능하게 둔다.
+3. Progress percent display
+   - batch progress는 `2/10 (20%)`처럼 표시한다.
+   - skipped/cancelled/failed도 document-level event 기준으로 percent를 갱신한다.
+   - single conversion은 `처리 중...` 또는 `Converting...`과 indeterminate bar를 유지하고 완료 시 `100%`로 바꾼다.
 
 #### 완료 기준
 
-- GUI local smoke checklist가 문서화되고, 가능한 범위에서 실제 로컬 실행 결과가 반영된다.
-- 최근 경로 저장/복구/손상 파일 fallback/clear recent 동작이 unit test로 고정된다.
-- 결과 파일 열기 target 결정과 open failure handling이 테스트 가능한 helper 또는 GUI method 수준에서 검증된다.
-- GUI progress 상태가 batch progress callback과 일관되며 headless test에서 깨지지 않는다.
-- README, `docs/GUI_USER_GUIDE.md`, `docs/MACOS_GUI_QUICKSTART.md`, `docs/WINDOWS_A_TO_Z_GUIDE.md`가 Q60 UX와 배포 결정을 설명한다.
+- localization catalog와 fallback 동작이 unit test로 고정된다.
+- preset이 `GuiConversionOptions`로 변환되는 mapping이 headless test로 고정된다.
+- 기본 모드가 보수적 원본 유지 정책을 깨지 않는다는 test가 있다.
+- RAG 등록용 preset이 RAG sidecar/provenance 옵션을 켜되 `force_ocr` 같은 공격적 옵션을 기본 강제하지 않는다.
+- batch progress percent text가 deterministic helper test로 검증된다.
+- README, `docs/GUI_USER_GUIDE.md`, `docs/MACOS_GUI_QUICKSTART.md`, `docs/WINDOWS_A_TO_Z_GUIDE.md`가 언어 선택, preset 의미, percent 표시 한계를 설명한다.
 - 새 public JSON output schema는 만들지 않는다.
 
 #### 비범위
 
-- 변환 엔진 변경
-- PDF/Markdown 미리보기 또는 편집기
-- 실행 중인 단일 PDF 변환의 강제 kill/cancel
-- native installer, code signing, notarization, auto-update
-- 외부 RAG/indexing 서비스 호출
+- PDF 원문 텍스트, 표, 이미지 내용 번역
+- report/manifest schema key 또는 warning code localization
+- core pipeline page-level progress callback 구현
+- OCR 언어 자동 감지
+- LLM 기반 preset 추천
+- native app packaging 또는 installer

@@ -261,11 +261,13 @@ python3 -m pdf2md.gui
 pdf2md-gui
 ```
 
+GUI 기본 언어는 한국어이며, 화면 상단에서 `English`로 바꿀 수 있습니다.
+옵션은 처음부터 세부 flag를 고르는 대신 `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset 중 하나를 먼저 선택합니다. `pages`, `password`, `OCR lang`, 입력/출력 경로는 preset이 바뀌어도 유지됩니다.
 GUI에서는 입력 모드(단일 PDF 파일 / PDF 폴더), 입력 경로, 출력 폴더, page range, password, OCR, image/table/RAG/domain 옵션, confidential-safe mode, skip-existing 같은 주요 옵션을 선택할 수 있습니다.
-실행 중에는 단일 변환 indeterminate progress 또는 폴더 배치 문서 index/total progress를 표시합니다. page-level 진행률 callback이 없는 동안 임의 page 진행률은 표시하지 않습니다.
+실행 중에는 단일 변환 indeterminate progress 또는 폴더 배치 문서 index/total progress와 percent text를 표시합니다. 단일 PDF는 page-level 진행률 callback이 없는 동안 임의 percent를 표시하지 않고, 완료 시에만 `100%`를 표시합니다.
 완료 후에는 문서별 status, warning count/code, Markdown/report/manifest 경로를 확인할 수 있고, 선택한 결과 행의 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 바로 열 수 있습니다.
 폴더 배치 변환은 문서 경계 취소와 실패 문서 retry candidate 표시를 지원합니다.
-GUI는 최근 입력 파일/폴더와 output folder를 local-only state로 저장하지만, 원문 텍스트, 표, 이미지 내용, warning message는 저장하지 않습니다. 필요하면 `Clear recent`로 최근 경로를 지울 수 있습니다.
+GUI는 최근 입력 파일/폴더, output folder, 선택 언어, 선택 preset을 local-only state로 저장하지만, 원문 텍스트, 표, 이미지 내용, warning message는 저장하지 않습니다. 필요하면 `Clear recent`로 최근 경로를 지울 수 있습니다.
 GUI 화면의 `Help` 버튼은 [docs/GUI_USER_GUIDE.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/GUI_USER_GUIDE.md)를 엽니다.
 자동화, CI, 대량 반복 실행에는 여전히 CLI와 batch script 사용을 권장합니다.
 
@@ -901,7 +903,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q60 GUI Practical UX And Distribution Hardening입니다. GUI 실사용 흐름, 결과 파일 열기, 최근 경로 저장, 비개발자 배포 방식 결정을 우선 검증합니다.
+- 현재 active quality backlog는 Q61 GUI Localization, Presets, And Progress Percent입니다. 한글/영어 UI, 목적 기반 옵션 preset, 신뢰 가능한 progress percent 표시를 우선 검증합니다.
 
 ### 이후 후보
 

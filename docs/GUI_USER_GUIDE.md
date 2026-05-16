@@ -29,6 +29,20 @@ python -m pdf2md.gui --help
 
 ## 2) 화면 구성
 
+### Language
+
+- 기본 언어는 한국어다.
+- `English`를 선택하면 주요 label, button, status 문구가 영어로 바뀐다.
+- 언어 선택은 local-only JSON state에 저장되며 변환 산출물에는 영향을 주지 않는다.
+
+### Preset
+
+- `기본 모드(원본 유지)`: 원문 보존을 우선하는 보수적 기본값이다.
+- `RAG 등록용(최적화)`: Markdown 원문을 임의로 바꾸지 않고 RAG table sidecar, page marker, header/footer 보정, hyphenation 보정 같은 RAG 친화 옵션을 켠다.
+- `Optimize Options(유저 선택)`: image/table/RAG/domain과 상세 flag를 직접 고른다.
+- `Pages`, `Password`, `OCR lang`, 입력/출력 경로는 preset을 바꿔도 유지된다.
+- `custom`이 아닌 preset에서는 세부 변환 옵션이 읽기 전용으로 표시된다.
+
 ### Input
 
 - `PDF file`: PDF 파일 하나를 변환한다.
@@ -66,15 +80,16 @@ python -m pdf2md.gui --help
 ### Progress
 
 - 단일 PDF 변환은 처리 중임을 나타내는 indeterminate progress로 표시된다.
-- 폴더 배치 변환은 현재 문서 index/total 기준 progress로 표시된다.
+- 폴더 배치 변환은 현재 문서 index/total과 percent text를 함께 표시한다. 예: `2/10 (20%)`
 - page-level 진행률 callback이 없으므로 실제 page 처리율처럼 보이는 임의 진행률은 표시하지 않는다.
+- 단일 PDF는 완료 시에만 `100%`가 표시된다.
 
 ## 3) 단일 PDF 변환
 
 1. `PDF file`을 선택한다.
 2. `Browse`로 PDF 파일을 선택한다.
 3. 필요하면 `Output folder`를 선택한다.
-4. 필요한 option과 flag를 설정한다.
+4. 목적에 맞는 preset을 선택하고, 필요하면 `Optimize Options(유저 선택)`에서 option과 flag를 조정한다.
 5. `Start conversion`을 누른다.
 6. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`를 확인한다.
 
@@ -82,7 +97,7 @@ python -m pdf2md.gui --help
 
 1. `PDF folder`를 선택한다.
 2. PDF 파일들이 들어 있는 폴더를 선택한다.
-3. 이미 변환된 문서를 건너뛰려면 `Skip existing`을 켠다.
+3. 이미 변환된 문서를 건너뛰려면 `Optimize Options(유저 선택)`에서 `Skip existing`을 켠다.
 4. `Start conversion`을 누른다.
 5. 중간에 멈추려면 `Cancel`을 누른다.
 
