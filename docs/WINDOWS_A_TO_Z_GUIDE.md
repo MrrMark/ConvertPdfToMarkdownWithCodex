@@ -191,6 +191,8 @@ GUI 사용 순서:
 10. 선택한 결과 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 엽니다.
 11. 화면 설명이 필요하면 `Help` 버튼을 누릅니다.
 
+작은 화면이나 Windows display scaling 환경에서는 GUI 본문을 세로 스크롤해 input/options/results/log 영역에 접근할 수 있습니다. Results 표의 긴 Markdown/report 경로는 horizontal scrollbar로 확인합니다.
+
 폴더 배치 변환 중 `Cancel`을 누르면 현재 문서가 끝난 뒤 남은 문서는 `cancelled`로 표시됩니다. 실패 문서는 `Retry` 열에 재시도 후보로 표시됩니다.
 
 GUI는 최근 입력 파일/폴더, output folder, 선택 언어, 선택 preset을 local-only state로 저장합니다. 원문 텍스트, 표, 이미지 내용, warning message는 저장하지 않으며, 공유 PC에서는 `Clear recent`로 최근 경로를 지울 수 있습니다.

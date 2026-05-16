@@ -21,6 +21,12 @@ from pdf2md.gui_runner import (
     validate_gui_request,
 )
 from pdf2md.gui_i18n import GuiLanguage, translate
+from pdf2md.gui_layout import (
+    GUI_CONTROL_WRAP_LENGTH,
+    GUI_STATUS_WRAP_LENGTH,
+    GUI_WINDOW_MIN_SIZE,
+    gui_wrapping_text_keys,
+)
 from pdf2md.gui_presets import (
     GuiOptionPreset,
     apply_preset_to_options,
@@ -59,7 +65,7 @@ class Pdf2MdGuiApp:
 
         self.root = root
         self.root.title("pdf2md")
-        self.root.minsize(820, 680)
+        self.root.minsize(*GUI_WINDOW_MIN_SIZE)
         self.queue: Queue[tuple[str, object]] = Queue()
         self.worker: threading.Thread | None = None
         self.cancel_event = threading.Event()
@@ -70,6 +76,9 @@ class Pdf2MdGuiApp:
         self.localized_widgets: dict[str, list[object]] = {}
         self.localized_headings: dict[str, str] = {}
         self.advanced_option_widgets: list[object] = []
+        self.wrapping_text_keys = set(gui_wrapping_text_keys())
+        self.scroll_canvas = None
+        self.scroll_window_id: int | None = None
 
         self.language = tk.StringVar(value=self.recent_state.language)
         self.option_preset = tk.StringVar(value=self.recent_state.option_preset)
@@ -107,11 +116,21 @@ class Pdf2MdGuiApp:
 
     def _track_text(self, key: str, widget: object) -> object:
         self.localized_widgets.setdefault(key, []).append(widget)
+        if key in self.wrapping_text_keys:
+            self._configure_wrap(widget, GUI_CONTROL_WRAP_LENGTH)
         return widget
 
     def _configure_text(self, widget: object, text: str) -> None:
         if hasattr(widget, "configure"):
             widget.configure(text=text)
+
+    def _configure_wrap(self, widget: object, wraplength: int) -> None:
+        if not hasattr(widget, "configure"):
+            return
+        try:
+            widget.configure(wraplength=wraplength)
+        except Exception:  # noqa: BLE001
+            return
 
     def _refresh_texts(self) -> None:
         self.root.title(self._t("app_title"))
@@ -128,10 +147,25 @@ class Pdf2MdGuiApp:
         import tkinter as tk
         from tkinter import ttk
 
-        frame = ttk.Frame(self.root, padding=12)
-        frame.grid(row=0, column=0, sticky="nsew")
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
+        outer = ttk.Frame(self.root)
+        outer.grid(row=0, column=0, sticky="nsew")
+        outer.columnconfigure(0, weight=1)
+        outer.rowconfigure(0, weight=1)
+
+        canvas = tk.Canvas(outer, borderwidth=0, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(outer, orient=tk.VERTICAL, command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        frame = ttk.Frame(canvas, padding=12)
+        self.scroll_canvas = canvas
+        self.scroll_window_id = canvas.create_window((0, 0), window=frame, anchor="nw")
+        frame.bind("<Configure>", lambda event: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", self._resize_scroll_window)
+        self._bind_mousewheel(canvas)
+
         frame.columnconfigure(1, weight=1)
 
         settings_frame = ttk.LabelFrame(frame, text=self._t("language"))
@@ -150,8 +184,7 @@ class Pdf2MdGuiApp:
         preset_frame = ttk.LabelFrame(frame, text=self._t("preset"))
         self._track_text("preset", preset_frame)
         preset_frame.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(0, 8))
-        for col in range(3):
-            preset_frame.columnconfigure(col, weight=1)
+        preset_frame.columnconfigure(0, weight=1)
         self._track_text(
             "preset_preserve",
             ttk.Radiobutton(
@@ -161,7 +194,7 @@ class Pdf2MdGuiApp:
                 value="preserve",
                 command=self._change_preset,
             ),
-        ).grid(row=0, column=0, sticky="w")
+        ).grid(row=0, column=0, sticky="w", pady=1)
         self._track_text(
             "preset_rag_optimized",
             ttk.Radiobutton(
@@ -171,7 +204,7 @@ class Pdf2MdGuiApp:
                 value="rag_optimized",
                 command=self._change_preset,
             ),
-        ).grid(row=0, column=1, sticky="w")
+        ).grid(row=1, column=0, sticky="w", pady=1)
         self._track_text(
             "preset_custom",
             ttk.Radiobutton(
@@ -181,7 +214,7 @@ class Pdf2MdGuiApp:
                 value="custom",
                 command=self._change_preset,
             ),
-        ).grid(row=0, column=2, sticky="w")
+        ).grid(row=2, column=0, sticky="w", pady=1)
 
         mode_frame = ttk.LabelFrame(frame, text=self._t("input"))
         self._track_text("input", mode_frame)
@@ -199,21 +232,19 @@ class Pdf2MdGuiApp:
         options = ttk.LabelFrame(frame, text=self._t("options"))
         self._track_text("options", options)
         options.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(4, 8))
-        for col in range(4):
-            options.columnconfigure(col, weight=1)
-
+        options.columnconfigure(1, weight=1)
         self._add_labeled_entry(options, "pages", self.pages, 0, 0)
-        self._add_labeled_entry(options, "password", self.password, 0, 2, show="*")
-        self._add_labeled_entry(options, "ocr_lang", self.ocr_lang, 1, 0)
-        self._add_labeled_combo(options, "image", self.image_mode, [mode.value for mode in ImageMode], 1, 2)
-        self._add_labeled_combo(options, "table", self.table_mode, [mode.value for mode in TableMode], 2, 0)
-        self._add_labeled_combo(options, "rag_tables", self.rag_table_output, [mode.value for mode in RagTableOutputMode], 2, 2)
-        self._add_labeled_combo(options, "domain", self.domain_adapter, [mode.value for mode in DomainAdapterMode], 3, 0)
+        self._add_labeled_entry(options, "password", self.password, 1, 0, show="*")
+        self._add_labeled_entry(options, "ocr_lang", self.ocr_lang, 2, 0)
+        self._add_labeled_combo(options, "image", self.image_mode, [mode.value for mode in ImageMode], 3, 0)
+        self._add_labeled_combo(options, "table", self.table_mode, [mode.value for mode in TableMode], 4, 0)
+        self._add_labeled_combo(options, "rag_tables", self.rag_table_output, [mode.value for mode in RagTableOutputMode], 5, 0)
+        self._add_labeled_combo(options, "domain", self.domain_adapter, [mode.value for mode in DomainAdapterMode], 6, 0)
 
         flags = ttk.LabelFrame(frame, text=self._t("flags"))
         self._track_text("flags", flags)
         flags.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(0, 8))
-        for col in range(3):
+        for col in range(2):
             flags.columnconfigure(col, weight=1)
         checkboxes = [
             ("skip_existing", self.skip_existing),
@@ -230,21 +261,23 @@ class Pdf2MdGuiApp:
                 label_key,
                 ttk.Checkbutton(flags, text=self._t(label_key), variable=variable),
             )
-            checkbox.grid(row=idx // 3, column=idx % 3, sticky="w")
+            checkbox.grid(row=idx // 2, column=idx % 2, sticky="w", pady=1)
             self.advanced_option_widgets.append(checkbox)
 
         button_frame = ttk.Frame(frame)
         button_frame.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        for col in range(3):
+            button_frame.columnconfigure(col, weight=1)
         self.start_button = self._track_text(
             "start_conversion",
             ttk.Button(button_frame, text=self._t("start_conversion"), command=self._start_conversion),
         )
-        self.start_button.pack(side=tk.LEFT)
+        self.start_button.grid(row=0, column=0, sticky="ew", padx=(0, 6), pady=2)
         self.cancel_button = self._track_text(
             "cancel",
             ttk.Button(button_frame, text=self._t("cancel"), command=self._request_cancel, state=tk.DISABLED),
         )
-        self.cancel_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.cancel_button.grid(row=0, column=1, sticky="ew", padx=(0, 6), pady=2)
         self.open_output_button = self._track_text(
             "open_output_folder",
             ttk.Button(
@@ -254,26 +287,28 @@ class Pdf2MdGuiApp:
                 state=tk.DISABLED,
             ),
         )
-        self.open_output_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.open_output_button.grid(row=0, column=2, sticky="ew", pady=2)
         self.help_button = self._track_text("help", ttk.Button(button_frame, text=self._t("help"), command=self._open_help))
-        self.help_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.help_button.grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=2)
         self.clear_recent_button = self._track_text(
             "clear_recent",
             ttk.Button(button_frame, text=self._t("clear_recent"), command=self._clear_recent),
         )
-        self.clear_recent_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.clear_recent_button.grid(row=1, column=1, columnspan=2, sticky="ew", pady=2)
 
         progress_frame = ttk.Frame(frame)
         progress_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(0, 8))
-        progress_frame.columnconfigure(1, weight=1)
-        ttk.Label(progress_frame, textvariable=self.status_text).grid(row=0, column=0, sticky="w", padx=(0, 8))
+        progress_frame.columnconfigure(0, weight=1)
+        self.status_label = ttk.Label(progress_frame, textvariable=self.status_text)
+        self._configure_wrap(self.status_label, GUI_STATUS_WRAP_LENGTH)
+        self.status_label.grid(row=0, column=0, sticky="ew", pady=(0, 4))
         self.progress_bar = ttk.Progressbar(
             progress_frame,
             mode="determinate",
             maximum=100,
             variable=self.progress_value,
         )
-        self.progress_bar.grid(row=0, column=1, sticky="ew")
+        self.progress_bar.grid(row=1, column=0, sticky="ew")
 
         results = ttk.LabelFrame(frame, text=self._t("results"))
         self._track_text("results", results)
@@ -303,10 +338,15 @@ class Pdf2MdGuiApp:
         self.result_tree.column("markdown", width=170, anchor="w")
         self.result_tree.column("report", width=170, anchor="w")
         self.result_tree.grid(row=0, column=0, sticky="nsew")
+        result_x_scroll = ttk.Scrollbar(results, orient=tk.HORIZONTAL, command=self.result_tree.xview)
+        self.result_tree.configure(xscrollcommand=result_x_scroll.set)
+        result_x_scroll.grid(row=1, column=0, sticky="ew")
         self.result_tree.bind("<<TreeviewSelect>>", lambda event: self._update_result_action_buttons())
 
         result_actions = ttk.Frame(results)
-        result_actions.grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        result_actions.grid(row=2, column=0, sticky="ew", pady=(6, 0))
+        for col in range(2):
+            result_actions.columnconfigure(col, weight=1)
         self.open_markdown_button = ttk.Button(
             result_actions,
             text=self._t("open_markdown"),
@@ -314,7 +354,7 @@ class Pdf2MdGuiApp:
             state=tk.DISABLED,
         )
         self._track_text("open_markdown", self.open_markdown_button)
-        self.open_markdown_button.pack(side=tk.LEFT)
+        self.open_markdown_button.grid(row=0, column=0, sticky="ew", padx=(0, 6), pady=2)
         self.open_report_button = ttk.Button(
             result_actions,
             text=self._t("open_report"),
@@ -322,7 +362,7 @@ class Pdf2MdGuiApp:
             state=tk.DISABLED,
         )
         self._track_text("open_report", self.open_report_button)
-        self.open_report_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.open_report_button.grid(row=0, column=1, sticky="ew", pady=2)
         self.open_manifest_button = ttk.Button(
             result_actions,
             text=self._t("open_manifest"),
@@ -330,7 +370,7 @@ class Pdf2MdGuiApp:
             state=tk.DISABLED,
         )
         self._track_text("open_manifest", self.open_manifest_button)
-        self.open_manifest_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.open_manifest_button.grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=2)
         self.open_assets_button = ttk.Button(
             result_actions,
             text=self._t("open_assets"),
@@ -338,12 +378,37 @@ class Pdf2MdGuiApp:
             state=tk.DISABLED,
         )
         self._track_text("open_assets", self.open_assets_button)
-        self.open_assets_button.pack(side=tk.LEFT, padx=(8, 0))
+        self.open_assets_button.grid(row=1, column=1, sticky="ew", pady=2)
 
         self.log_text = tk.Text(frame, height=9, wrap="word", state=tk.DISABLED)
         self.log_text.grid(row=9, column=0, columnspan=3, sticky="nsew")
         frame.rowconfigure(8, weight=1)
         frame.rowconfigure(9, weight=1)
+
+    def _resize_scroll_window(self, event) -> None:  # noqa: ANN001
+        if self.scroll_canvas is None or self.scroll_window_id is None:
+            return
+        self.scroll_canvas.itemconfigure(self.scroll_window_id, width=event.width)
+
+    def _bind_mousewheel(self, widget: object) -> None:
+        if not hasattr(widget, "bind"):
+            return
+
+        def _on_mousewheel(event) -> None:  # noqa: ANN001
+            if self.scroll_canvas is None:
+                return
+            delta = getattr(event, "delta", 0)
+            if delta:
+                self.scroll_canvas.yview_scroll(int(-1 * (delta / 120)), "units")
+                return
+            if getattr(event, "num", None) == 4:
+                self.scroll_canvas.yview_scroll(-1, "units")
+            elif getattr(event, "num", None) == 5:
+                self.scroll_canvas.yview_scroll(1, "units")
+
+        widget.bind("<MouseWheel>", _on_mousewheel)
+        widget.bind("<Button-4>", _on_mousewheel)
+        widget.bind("<Button-5>", _on_mousewheel)
 
     def _add_labeled_entry(self, parent, label_key: str, variable, row: int, col: int, show: str | None = None) -> None:  # noqa: ANN001
         from tkinter import ttk

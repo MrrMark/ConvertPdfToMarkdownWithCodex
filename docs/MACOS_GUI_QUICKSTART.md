@@ -142,11 +142,13 @@ python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --st
 4. 선택한 결과 행의 Markdown/report/manifest/assets 또는 output folder가 열리는지 확인한다.
 5. 기본 한국어 UI에서 `English`로 바꿨을 때 주요 label/button/status가 영어로 바뀌는지 확인한다.
 6. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset 변경 시 세부 옵션 잠금/해제가 맞는지 확인한다.
-7. 폴더 배치 변환에서 문서 index/total과 percent text가 함께 움직이는지 확인한다.
-8. 단일 PDF 변환은 처리 중 percent를 추정하지 않고 완료 시 `100%`만 표시하는지 확인한다.
-9. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
-10. GUI를 닫고 다시 열었을 때 최근 경로, 언어, preset이 복구되는지 확인한다.
-11. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.
+7. 창 높이를 줄였을 때 세로 스크롤로 input/options/results/log 영역에 접근할 수 있는지 확인한다.
+8. Results 표의 긴 Markdown/report 경로를 horizontal scrollbar로 확인할 수 있는지 확인한다.
+9. 폴더 배치 변환에서 문서 index/total과 percent text가 함께 움직이는지 확인한다.
+10. 단일 PDF 변환은 처리 중 percent를 추정하지 않고 완료 시 `100%`만 표시하는지 확인한다.
+11. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
+12. GUI를 닫고 다시 열었을 때 최근 경로, 언어, preset이 복구되는지 확인한다.
+13. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.
 
 ## 9) 배포 방식 판단
 
