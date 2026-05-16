@@ -281,6 +281,21 @@ GUI 실행 전 문제가 나면 아래를 먼저 확인하세요.
 - Tkinter 오류가 나면 Python 설치본에 Tcl/Tk 지원이 포함되어 있는지 확인
 - output folder 권한 오류가 나면 쓰기 가능한 사용자 폴더를 선택
 
+GUI 변경을 PR 또는 릴리스 전에 확인할 때는 headless smoke evidence runner를 사용할 수 있습니다.
+이 runner는 Tk 창을 띄우지 않고 runtime diagnostics, `python -m pdf2md.gui --help`, preset별 single/batch runner smoke, isolated GUI state round-trip, 수동 GUI checklist 상태를 `gui_smoke_evidence.json`에 기록합니다.
+
+```bash
+python3 scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --state-path /tmp/pdf2md-gui-smoke/gui_state.json
+```
+
+CI 로그나 자동화에서 JSON만 보고 싶으면:
+
+```bash
+python3 scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --state-path /tmp/pdf2md-gui-smoke/gui_state.json --json-only
+```
+
+`gui_smoke_evidence.json`은 local-only artifact입니다. pass/fail, command return code, runtime diagnostic code/message, preset/language 상태, warning code/count, 산출물 존재 여부만 저장하고 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않습니다. 실제 Tk window에서의 한국어/English 전환, preset lock/unlock, progress percent, `Clear recent` 확인은 문서화된 수동 smoke checklist로 별도 수행합니다.
+
 ### 가장 기본 실행
 
 macOS/Linux 예시:

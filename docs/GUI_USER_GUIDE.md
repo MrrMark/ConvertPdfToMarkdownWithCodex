@@ -193,7 +193,25 @@ OCR이 필요 없으면 `Force OCR`을 끄고 다시 실행한다.
 - 이미지는 기본적으로 referenced mode로 별도 파일에 저장된다.
 - 자세한 fallback 이유는 `report.json`의 warning과 summary를 확인한다.
 
-## 10) 배포 방식 메모
+## 10) Smoke evidence
+
+GUI 변경을 반복 확인할 때는 Tk window를 띄우지 않는 local-only smoke evidence runner를 먼저 실행한다.
+
+```bash
+python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --state-path /tmp/pdf2md-gui-smoke/gui_state.json
+```
+
+자동화 로그에는 JSON만 출력할 수 있다.
+
+```bash
+python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --state-path /tmp/pdf2md-gui-smoke/gui_state.json --json-only
+```
+
+생성되는 `gui_smoke_evidence.json`은 public output schema가 아니라 로컬 검증 artifact다. 포함 대상은 Python/Tkinter runtime diagnostics, `python -m pdf2md.gui --help` 결과, preset별 runner smoke status, isolated GUI state round-trip, 산출물 존재 여부, 수동 checklist 상태다.
+
+evidence에는 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path를 저장하지 않는다. 실제 Tk window에서 한국어 기본 UI, English 전환, preset lock/unlock, batch percent, 단일 완료 `100%`, local-only state 복구/clear는 macOS/Windows checklist에 따라 사람이 확인한다.
+
+## 11) 배포 방식 메모
 
 현재 비개발자 기본 경로는 source/ZIP + venv setup + `python -m pdf2md.gui` 실행이다.
 

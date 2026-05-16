@@ -189,6 +189,93 @@ _CATALOGS: dict[GuiLanguage, dict[str, str]] = {
     "en": _EN_MESSAGES,
 }
 
+GUI_TEXT_TRACKING_KEYS: tuple[str, ...] = (
+    "app_title",
+    "language",
+    "language_ko",
+    "language_en",
+    "preset",
+    "preset_preserve",
+    "preset_rag_optimized",
+    "preset_custom",
+    "input",
+    "pdf_file",
+    "pdf_folder",
+    "browse",
+    "select_pdf_folder",
+    "select_pdf_file",
+    "select_output_folder",
+    "pdf_files",
+    "output_folder",
+    "options",
+    "pages",
+    "password",
+    "ocr_lang",
+    "image",
+    "table",
+    "rag_tables",
+    "domain",
+    "flags",
+    "skip_existing",
+    "confidential_safe",
+    "force_ocr",
+    "page_markers",
+    "remove_header_footer",
+    "dedupe_images",
+    "repair_hyphenation",
+    "figure_crop_fallback",
+    "start_conversion",
+    "cancel",
+    "open_output_folder",
+    "help",
+    "clear_recent",
+    "ready",
+    "results",
+    "document",
+    "status",
+    "warnings",
+    "retry",
+    "markdown",
+    "report",
+    "open_markdown",
+    "open_report",
+    "open_manifest",
+    "open_assets",
+    "missing_input_title",
+    "missing_input_message",
+    "starting_conversion",
+    "validating_request",
+    "cannot_start_conversion",
+    "conversion_starting",
+    "batch_conversion_starting",
+    "conversion_finished",
+    "conversion_finished_percent",
+    "conversion_finished_with_warnings",
+    "conversion_finished_with_warnings_percent",
+    "conversion_failed",
+    "failed_prefix",
+    "cancel_requested",
+    "cancel_requested_detail",
+    "recent_paths_cleared",
+    "recent_paths_cleared_status",
+    "clear_recent_failed",
+    "save_recent_failed",
+    "open_target_failed",
+    "open_output_failed",
+    "no_result_path",
+    "result_path_missing",
+    "result_path_open_error",
+    "result_path_open_false",
+    "help_unavailable",
+    "help_missing",
+    "help_open_error",
+    "help_open_false",
+    "batch_progress",
+    "single_processing",
+    "single_complete_percent",
+    "yes",
+)
+
 
 def normalize_language(value: str | None) -> GuiLanguage:
     """Return a supported GUI language, defaulting to Korean."""
@@ -204,3 +291,18 @@ def translate(language: GuiLanguage | str, key: str, **values: object) -> str:
     if not values:
         return template
     return template.format(**values)
+
+
+def catalog_keys(language: GuiLanguage | str) -> tuple[str, ...]:
+    """Return the sorted GUI i18n catalog keys for a supported language."""
+    normalized = normalize_language(str(language))
+    return tuple(sorted(_CATALOGS[normalized]))
+
+
+def missing_catalog_keys(keys: tuple[str, ...] = GUI_TEXT_TRACKING_KEYS) -> dict[GuiLanguage, tuple[str, ...]]:
+    """Return missing GUI i18n keys per language for headless coverage tests."""
+    expected = set(keys)
+    return {
+        language: tuple(sorted(expected - set(catalog)))
+        for language, catalog in _CATALOGS.items()
+    }

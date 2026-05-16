@@ -11,6 +11,21 @@ from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, Tabl
 GuiOptionPreset = Literal["preserve", "rag_optimized", "custom"]
 DEFAULT_GUI_OPTION_PRESET: GuiOptionPreset = "preserve"
 SUPPORTED_GUI_OPTION_PRESETS: tuple[GuiOptionPreset, ...] = ("preserve", "rag_optimized", "custom")
+GUI_ALWAYS_EDITABLE_OPTION_FIELDS: tuple[str, ...] = ("pages", "password", "ocr_lang")
+GUI_PRESET_LOCKED_OPTION_FIELDS: tuple[str, ...] = (
+    "image_mode",
+    "table_mode",
+    "rag_table_output",
+    "domain_adapter",
+    "confidential_safe_mode",
+    "force_ocr",
+    "keep_page_markers",
+    "remove_header_footer",
+    "dedupe_images",
+    "repair_hyphenation",
+    "figure_crop_fallback",
+    "skip_existing",
+)
 
 
 def normalize_preset(value: str | None) -> GuiOptionPreset:
@@ -64,3 +79,11 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
 def preset_allows_custom_options(preset: GuiOptionPreset | str) -> bool:
     """Return whether detailed conversion options should be user-editable."""
     return normalize_preset(str(preset)) == "custom"
+
+
+def preset_editable_fields(preset: GuiOptionPreset | str) -> dict[str, bool]:
+    """Return the headless editable/locked contract for GUI option controls."""
+    advanced_editable = preset_allows_custom_options(preset)
+    editable = {field: True for field in GUI_ALWAYS_EDITABLE_OPTION_FIELDS}
+    editable.update({field: advanced_editable for field in GUI_PRESET_LOCKED_OPTION_FIELDS})
+    return editable

@@ -61,6 +61,10 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "python3 -m pdf2md.gui" in readme
     assert "pdf2md-gui" in readme
     assert "python3 -m pdf2md.gui --help" in readme
+    assert "scripts/run_gui_smoke_evidence.py" in readme
+    assert "gui_smoke_evidence.json" in readme
+    assert "--json-only" in readme
+    assert "변환 warning message" in readme
     assert "문서 경계 취소" in readme
     assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`" in readme
     assert "percent text" in readme
@@ -127,6 +131,10 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "docs\\QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in guide
     assert "python -m pdf2md.gui" in guide
     assert "python -m pdf2md.gui --help" in guide
+    assert "scripts\\run_gui_smoke_evidence.py" in guide
+    assert "gui_smoke_evidence.json" in guide
+    assert "--json-only" in guide
+    assert "변환 warning message" in guide
     assert "pdf2md-gui" in guide
     assert "desktop GUI wrapper" in guide
     assert "docs\\GUI_USER_GUIDE.md" in guide
@@ -150,6 +158,10 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     assert "python -m pdf2md.gui" in guide
     assert "pdf2md-gui" in guide
     assert "python -m pdf2md.gui --help" in guide
+    assert "scripts/run_gui_smoke_evidence.py" in guide
+    assert "gui_smoke_evidence.json" in guide
+    assert "--json-only" in guide
+    assert "workspace/home absolute path" in guide
     assert "docs/GUI_USER_GUIDE.md" in guide
     assert "`Help` 버튼" in guide
     assert "`English`로 바꿨을 때" in guide
@@ -172,6 +184,9 @@ def test_gui_user_guide_is_separate_from_cli_docs() -> None:
     assert "CLI가 익숙하지 않은 사용자" in guide
     assert "python -m pdf2md.gui" in guide
     assert "pdf2md-gui" in guide
+    assert "scripts/run_gui_smoke_evidence.py" in guide
+    assert "gui_smoke_evidence.json" in guide
+    assert "원문 PDF 텍스트, 표 내용, 이미지 내용" in guide
     assert "Help" in guide
     assert "`PDF file`" in guide
     assert "`PDF folder`" in guide
