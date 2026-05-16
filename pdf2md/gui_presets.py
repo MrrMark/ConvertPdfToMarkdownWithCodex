@@ -24,6 +24,9 @@ GUI_PRESET_LOCKED_OPTION_FIELDS: tuple[str, ...] = (
     "dedupe_images",
     "repair_hyphenation",
     "figure_crop_fallback",
+    "page_workers",
+    "debug",
+    "verbose",
     "skip_existing",
 )
 

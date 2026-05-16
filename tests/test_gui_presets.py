@@ -86,8 +86,14 @@ def test_preset_editable_fields_lock_advanced_options_headlessly() -> None:
         assert fields["ocr_lang"] is True
 
     assert preserve_fields["image_mode"] is False
+    assert preserve_fields["page_workers"] is False
+    assert preserve_fields["debug"] is False
+    assert preserve_fields["verbose"] is False
     assert preserve_fields["skip_existing"] is False
     assert rag_fields["rag_table_output"] is False
     assert rag_fields["remove_header_footer"] is False
     assert custom_fields["image_mode"] is True
+    assert custom_fields["page_workers"] is True
+    assert custom_fields["debug"] is True
+    assert custom_fields["verbose"] is True
     assert custom_fields["skip_existing"] is True

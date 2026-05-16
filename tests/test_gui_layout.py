@@ -21,6 +21,7 @@ def test_gui_layout_metadata_covers_core_visible_sections() -> None:
         "input",
         "options",
         "flags",
+        "expert_options",
         "commands",
         "progress",
         "results",
@@ -33,7 +34,7 @@ def test_gui_layout_text_keys_are_known_i18n_keys() -> None:
     layout_keys = set(gui_layout_text_keys())
 
     assert layout_keys <= set(GUI_TEXT_TRACKING_KEYS)
-    assert {"preset_preserve", "preset_rag_optimized", "open_output_folder", "open_assets"} <= layout_keys
+    assert {"preset_preserve", "preset_rag_optimized", "expert_options", "page_workers", "open_output_folder", "open_assets"} <= layout_keys
 
 
 def test_gui_layout_wraps_long_localized_controls() -> None:
@@ -47,6 +48,8 @@ def test_gui_layout_wraps_long_localized_controls() -> None:
         "preset_custom",
         "open_output_folder",
         "clear_recent",
+        "import_profile",
+        "export_profile",
         "batch_progress",
     } <= wrapping_keys
 
@@ -56,4 +59,4 @@ def test_gui_layout_uses_smaller_scrollable_window_contract() -> None:
 
     assert width <= 760
     assert height <= 560
-    assert {"options", "results", "result_actions"}.issubset(set(gui_scrollable_section_keys()))
+    assert {"options", "expert_options", "results", "result_actions"}.issubset(set(gui_scrollable_section_keys()))

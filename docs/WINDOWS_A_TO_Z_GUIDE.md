@@ -191,6 +191,8 @@ GUI 사용 순서:
 10. 선택한 결과 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 엽니다.
 11. 화면 설명이 필요하면 `Help` 버튼을 누릅니다.
 
+`Optimize Options(유저 선택)`에서는 Expert options로 `Page workers`, `Debug artifacts`, `Verbose logs`를 조정할 수 있습니다. Import profile / Export profile은 local-only JSON으로 반복 실행 option을 저장/불러오기 위한 기능입니다. profile에는 password, input/output path, 원문 PDF/Markdown 내용, 표/이미지 내용을 저장하지 않습니다.
+
 작은 화면이나 Windows display scaling 환경에서는 GUI 본문을 세로 스크롤해 input/options/results/log 영역에 접근할 수 있습니다. Results 표의 긴 Markdown/report 경로는 horizontal scrollbar로 확인합니다.
 
 폴더 배치 변환 중 `Cancel`을 누르면 현재 문서가 끝난 뒤 남은 문서는 `cancelled`로 표시됩니다. 실패 문서는 `Retry` 열에 재시도 후보로 표시됩니다.

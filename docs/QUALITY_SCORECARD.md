@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI expert options/profile | 97/100 | 0 | Q67. GUI Expert Options And Profile Import/Export 구현. GUI에 page_workers/debug/verbose expert options와 local-only profile import/export를 추가하고, password/path/raw content 미저장 profile validation을 고정. 변환 품질과 public schema 계약은 유지하며 active quality backlog는 없다 |
 | 2026-05-17 | GUI support bundle | 97/100 | 0 | Q66. Sanitized GUI Support Bundle 구현. GUI summary, runtime doctor, smoke evidence를 raw text/message/path 없이 status count, warning code/count, sanitized artifact label, runtime code 중심 JSON/Markdown support artifact로 생성. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q67 |
 | 2026-05-17 | GUI runtime doctor | 97/100 | 0 | Q65. GUI Runtime Doctor And Packaging Compatibility Smoke 구현. Tcl/Tk patchlevel, display/window advisory, optional OCR/Tesseract, Pillow/pypdfium2, help document, package mode 진단과 `--doctor` 명령 추가. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q66-Q67 |
 | 2026-05-17 | GUI responsive layout | 97/100 | 0 | Q64. Responsive GUI Layout And Accessibility Guardrails 구현. GUI body scroll, smaller minimum size, wrapping metadata, responsive option/action layout, result horizontal scrollbar 추가. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q65-Q67 |
@@ -57,6 +58,18 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q67 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q67은 GUI 반복 작업자의 실행 옵션 접근성을 보강했다. `page_workers`, `debug`, `verbose`를 Expert options로 노출하고, local-only profile import/export를 추가했다. profile은 password, input/output path, 원문 PDF/Markdown/table/image content를 저장하지 않으며 public schema 계약은 바뀌지 않는다.
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다.
 
 ### 2026-05-17 (Q66 구현 후)
 

@@ -23,48 +23,8 @@
 
 ## 현재 Active Development Specs
 
-### P2 / Q67. GUI Expert Options And Profile Import/Export
-
-#### 배경
-
-`GuiConversionOptions`에는 `page_workers`, `debug`, `verbose`가 있지만 실제 GUI에는 노출되지 않는다. 반복 작업자는 preset보다 세밀한 실행 profile을 저장/불러오고 싶을 수 있다.
-
-#### 목표
-
-- GUI에 접이식 Expert options 영역을 추가해 `page_workers`, `debug`, `verbose` 등 기존 option 필드를 노출한다.
-- local-only profile export/import를 제공하되 input/output path, password, PDF 원문 내용은 기본 저장하지 않는다.
-- invalid profile은 구조화된 GUI diagnostic으로 표시한다.
-- imported profile은 CLI `Config` option 의미와 일치한다.
-
-#### 구현 범위
-
-- `pdf2md/gui.py`
-  - Expert options section 추가
-  - page workers numeric input guardrail
-  - debug/verbose checkbox 추가
-- `pdf2md/gui_profiles.py` 또는 equivalent helper
-  - profile schema version, load/save, validation, redaction policy
-  - password/path 저장 금지 또는 explicit opt-in 제외
-- 문서
-  - GUI guide에 expert options와 local profile 정책 설명
-
-#### 테스트 범위
-
-- `tests/test_gui_profiles.py`
-  - valid/invalid profile load
-  - path/password/raw content 미저장
-  - options mapping과 default compatibility
-- `tests/test_gui_runner.py`
-  - exposed expert options가 `Config`로 전달되는지 확인
-- `tests/test_docs_examples.py`
-
-#### 비범위
-
-- cloud profile sync
-- password 저장
-- profile 기반 자동 preset 추천
-- OCR language 자동 감지 또는 LLM 기반 preset 추천
+현재 active 개발 명세 없음.
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q66 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q67 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
