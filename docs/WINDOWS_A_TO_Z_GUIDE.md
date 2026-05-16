@@ -195,6 +195,20 @@ GUI 사용 순서:
 
 GUI는 최근 입력 파일/폴더, output folder, 선택 언어, 선택 preset을 local-only state로 저장합니다. 원문 텍스트, 표, 이미지 내용, warning message는 저장하지 않으며, 공유 PC에서는 `Clear recent`로 최근 경로를 지울 수 있습니다.
 
+GUI 변경을 검증할 때는 먼저 headless smoke evidence runner를 실행할 수 있습니다. 이 명령은 Tk window를 띄우지 않고 Python/Tkinter runtime diagnostics, `python -m pdf2md.gui --help`, preset별 single/batch runner smoke, isolated state round-trip, 수동 checklist 상태를 `gui_smoke_evidence.json`에 기록합니다.
+
+```powershell
+python scripts\run_gui_smoke_evidence.py --output-dir "$env:TEMP\pdf2md-gui-smoke" --state-path "$env:TEMP\pdf2md-gui-smoke\gui_state.json"
+```
+
+자동화 로그에는 JSON만 출력할 수 있습니다.
+
+```powershell
+python scripts\run_gui_smoke_evidence.py --output-dir "$env:TEMP\pdf2md-gui-smoke" --state-path "$env:TEMP\pdf2md-gui-smoke\gui_state.json" --json-only
+```
+
+`gui_smoke_evidence.json`은 local-only artifact이며 pass/fail, command return code, runtime diagnostic code/message, preset/language 상태, warning code/count, 산출물 존재 여부만 저장합니다. 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않습니다. 실제 GUI window에서 한국어/English 전환, preset lock/unlock, batch percent, 단일 완료 `100%`, `Clear recent`는 수동 smoke checklist로 확인합니다.
+
 Windows 비개발자 기본 배포 경로는 ZIP/source checkout + `.venv314` setup script + `python -m pdf2md.gui`입니다. PyInstaller/native bundle은 Tkinter, PyMuPDF, Tesseract 포함/진단과 code signing smoke가 정리되기 전까지 공식 기본 배포 경로로 보지 않습니다.
 
 CLI 기본 실행:

@@ -126,6 +126,16 @@ GUI 화면에서 바로 설명이 필요하면 `Help` 버튼을 누른다.
 
 ## 8) 로컬 GUI smoke checklist
 
+먼저 headless evidence runner를 실행해 `gui_smoke_evidence.json`을 만든다. 이 단계는 Tk window를 열지 않고 runtime diagnostics, GUI help smoke, preset별 runner smoke, isolated state round-trip을 확인한다.
+
+```bash
+python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --state-path /tmp/pdf2md-gui-smoke/gui_state.json
+```
+
+`--json-only`를 붙이면 자동화 로그에 sanitized JSON만 출력한다. evidence에는 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path가 들어가면 안 된다.
+
+수동 Tk window 확인:
+
 1. `python -m pdf2md.gui --help`가 창 없이 종료되는지 확인한다.
 2. `python -m pdf2md.gui`로 GUI 창을 연다.
 3. 단일 PDF를 변환하고 Results 표에서 Markdown/report/manifest 경로를 확인한다.

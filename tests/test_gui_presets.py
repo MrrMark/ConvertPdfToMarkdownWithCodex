@@ -5,6 +5,7 @@ from pdf2md.gui_presets import (
     normalize_preset,
     preset_allows_custom_options,
     preset_display_name,
+    preset_editable_fields,
 )
 from pdf2md.gui_runner import GuiConversionOptions
 from pdf2md.models import ImageMode, RagTableOutputMode, TableMode
@@ -72,3 +73,21 @@ def test_custom_preset_preserves_current_options() -> None:
     assert apply_preset_to_options("custom", current) == current
     assert preset_allows_custom_options("custom") is True
     assert preset_allows_custom_options("preserve") is False
+
+
+def test_preset_editable_fields_lock_advanced_options_headlessly() -> None:
+    preserve_fields = preset_editable_fields("preserve")
+    rag_fields = preset_editable_fields("rag_optimized")
+    custom_fields = preset_editable_fields("custom")
+
+    for fields in (preserve_fields, rag_fields, custom_fields):
+        assert fields["pages"] is True
+        assert fields["password"] is True
+        assert fields["ocr_lang"] is True
+
+    assert preserve_fields["image_mode"] is False
+    assert preserve_fields["skip_existing"] is False
+    assert rag_fields["rag_table_output"] is False
+    assert rag_fields["remove_header_footer"] is False
+    assert custom_fields["image_mode"] is True
+    assert custom_fields["skip_existing"] is True
