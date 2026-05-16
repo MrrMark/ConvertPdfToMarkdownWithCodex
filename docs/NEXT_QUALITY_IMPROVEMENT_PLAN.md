@@ -23,24 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q64. Responsive GUI Layout And Accessibility Guardrails
-
-Q62로 headless smoke evidence는 확보됐다. 다음 단계는 실제 Tk window가 작은 화면, Windows display scaling, 긴 한국어/영문 label에서도 깨지지 않도록 레이아웃을 더 유연하게 만들고 접근성 기본값을 보강하는 것이다.
-
-#### 목표
-
-- GUI main area를 scrollable/responsive 구조로 바꿔 작은 화면에서도 주요 control에 접근할 수 있게 한다.
-- preset, action button, result action 영역이 긴 label에서 잘리지 않도록 wrapping 또는 grid 재배치를 적용한다.
-- headless 수준에서 layout metadata, text tracking, minimum size contract를 검증한다.
-- core conversion, output schema, warning code는 변경하지 않는다.
-
-#### 완료 기준
-
-- 한국어/영문 label과 주요 button/action key가 layout metadata에 연결된다.
-- 작은 window height에서도 scrollable container로 options/results/log 영역에 접근 가능하다.
-- `tests/test_gui_layout.py` 또는 동등한 headless guardrail이 추가된다.
-- README, GUI guide, macOS/Windows guide에 responsive layout 확인 항목이 반영된다.
-
 ### P1 / Q65. GUI Runtime Doctor And Packaging Compatibility Smoke
 
 현재 runtime check는 Python/Tkinter/module/entry point 중심이다. 배포 호환성을 높이려면 GUI 실행 전후에 필요한 runtime과 packaging 환경을 더 구체적으로 진단해야 한다.

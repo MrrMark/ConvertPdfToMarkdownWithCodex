@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI responsive layout | 97/100 | 0 | Q64. Responsive GUI Layout And Accessibility Guardrails 구현. GUI body scroll, smaller minimum size, wrapping metadata, responsive option/action layout, result horizontal scrollbar 추가. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q65-Q67 |
 | 2026-05-17 | GUI 호환성 후속 명세 | 97/100 | 0 | Q62. GUI Smoke Evidence And Layout Guardrails 구현/merge 완료. Q63으로 stale active backlog를 정리하고 Q64-Q67 responsive layout, runtime doctor, sanitized support bundle, expert options/profile 명세를 추가. 변환 품질과 public schema 계약은 유지 |
 | 2026-05-16 | GUI smoke evidence 계획 | 97/100 | 0 | Q61. GUI Localization, Presets, And Progress Percent 구현/merge 완료. 다음 active backlog/spec로 Q62. GUI Smoke Evidence And Layout Guardrails 추가. 변환 품질과 schema 계약은 유지하고, Q61 GUI 기능의 로컬 smoke evidence와 layout/state guardrail을 다음 검증 과제로 정리 |
 | 2026-05-16 | GUI 언어/프리셋/진행률 계획 | 97/100 | 0 | Q61. GUI Localization, Presets, And Progress Percent active backlog/spec 추가. 변환 품질과 schema 계약은 유지하고, 한글 기본 UI, English 선택, 목적 기반 preset, 신뢰 가능한 batch percent 표시를 구현 전 계약으로 정리 |
@@ -54,6 +55,20 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q64 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q64는 변환 엔진이 아니라 GUI 표시 계층을 개선했다. 작은 화면과 display scaling 환경에서 main GUI body를 세로 스크롤로 접근할 수 있게 하고, preset/options/action/results 영역의 레이아웃을 더 안정적으로 조정했다. Markdown/manifest/report 산출물과 public schema 계약은 바뀌지 않는다.
+
+#### 다음 개선 참조
+
+- Q65. GUI Runtime Doctor And Packaging Compatibility Smoke
+- Q66. Sanitized GUI Support Bundle
+- Q67. GUI Expert Options And Profile Import/Export
 
 ### 2026-05-17 (Q62 구현 후, Q63-Q67 명세 수립)
 

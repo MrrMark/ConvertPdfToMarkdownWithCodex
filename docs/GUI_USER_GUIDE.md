@@ -84,6 +84,12 @@ python -m pdf2md.gui --help
 - page-level 진행률 callback이 없으므로 실제 page 처리율처럼 보이는 임의 진행률은 표시하지 않는다.
 - 단일 PDF는 완료 시에만 `100%`가 표시된다.
 
+### Layout
+
+- GUI 본문은 작은 화면에서도 세로 스크롤로 주요 입력, 옵션, 결과, 로그 영역에 접근할 수 있다.
+- 긴 한국어/영문 preset과 action label은 줄바꿈 가능한 배치로 표시된다.
+- Results 표의 긴 Markdown/report 경로는 horizontal scrollbar로 확인할 수 있다.
+
 ## 3) 단일 PDF 변환
 
 1. `PDF file`을 선택한다.
