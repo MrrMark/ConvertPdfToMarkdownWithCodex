@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 from queue import Empty, Queue
 import sys
@@ -16,7 +17,9 @@ from pdf2md.gui_runner import (
     GuiDiagnosticError,
     GuiDiagnosticReport,
     check_gui_runtime,
+    format_gui_diagnostic_report,
     format_gui_summary,
+    gui_diagnostic_report_to_dict,
     run_gui_conversion,
     validate_gui_request,
 )
@@ -55,6 +58,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pdf2md-gui",
         description="Launch the minimal desktop GUI wrapper for pdf2md.",
+    )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run the headless-safe GUI runtime doctor and exit without launching the GUI.",
+    )
+    parser.add_argument(
+        "--doctor-format",
+        choices=("text", "json"),
+        default="text",
+        help="Output format for --doctor. Default: text.",
     )
     return parser
 
@@ -922,7 +936,14 @@ def launch_gui() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    build_parser().parse_args(argv)
+    args = build_parser().parse_args(argv)
+    if args.doctor:
+        report = check_gui_runtime(check_window=True)
+        if args.doctor_format == "json":
+            print(json.dumps(gui_diagnostic_report_to_dict(report), indent=2, sort_keys=True))
+        else:
+            print(format_gui_diagnostic_report(report))
+        return 0 if not report.has_errors else 1
     return launch_gui()
 
 

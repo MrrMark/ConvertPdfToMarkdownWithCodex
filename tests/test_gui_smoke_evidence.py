@@ -67,11 +67,19 @@ def test_gui_smoke_evidence_stores_only_sanitized_counts_and_labels(
                     code="python_version_supported",
                     severity="info",
                     message="Python runtime is supported.",
+                    action="No action required.",
                 ),
                 GuiDiagnostic(
                     code="tkinter_available",
                     severity="info",
                     message="Tkinter runtime is available.",
+                    action="No action required.",
+                ),
+                GuiDiagnostic(
+                    code="tk_window_check_advisory",
+                    severity="advisory",
+                    message="Tk window creation was not attempted.",
+                    action="Run python -m pdf2md.gui --doctor from a desktop session.",
                 ),
             ]
         ),
@@ -83,6 +91,9 @@ def test_gui_smoke_evidence_stores_only_sanitized_counts_and_labels(
     serialized = json.dumps(evidence, ensure_ascii=False, sort_keys=True)
 
     assert evidence["status"] == "passed"
+    assert evidence["runtime"]["kind"] == "gui_runtime_doctor"
+    assert evidence["runtime"]["advisory_count"] == 1
+    assert all("action" in diagnostic for diagnostic in evidence["runtime"]["diagnostics"])
     assert evidence["summary"]["redaction_findings"] == []
     assert str(tmp_path) not in serialized
     assert smoke.SINGLE_FIXTURE_TEXT not in serialized

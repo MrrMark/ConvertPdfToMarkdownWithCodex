@@ -23,23 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q65. GUI Runtime Doctor And Packaging Compatibility Smoke
-
-현재 runtime check는 Python/Tkinter/module/entry point 중심이다. 배포 호환성을 높이려면 GUI 실행 전후에 필요한 runtime과 packaging 환경을 더 구체적으로 진단해야 한다.
-
-#### 목표
-
-- `check_gui_runtime()` 또는 별도 doctor helper가 Tcl/Tk patchlevel, display/window availability, optional OCR/Tesseract, Pillow/pypdfium2 import, help document path를 구조화해 보고한다.
-- `scripts/run_gui_smoke_evidence.py`가 doctor 결과를 sanitized evidence에 포함한다.
-- packaging smoke checklist에 wheel/editable/source checkout 차이를 기록한다.
-- 새 public output schema는 만들지 않는다.
-
-#### 완료 기준
-
-- runtime doctor 결과가 code/severity/message/action 형태로 테스트된다.
-- Tk window를 띄울 수 없는 CI에서도 headless 가능한 항목은 검증하고 window-only 항목은 명시적으로 advisory 처리한다.
-- macOS/Windows guide에 doctor 명령과 해석 방법이 추가된다.
-
 ### P2 / Q66. Sanitized GUI Support Bundle
 
 GUI 사용자가 문제를 보고할 때 현재 GUI log/summary에는 local path가 들어갈 수 있다. 지원용 공유 artifact는 원문 PDF 내용, 표/이미지 내용, warning message, absolute path를 제거한 sanitized bundle이어야 한다.

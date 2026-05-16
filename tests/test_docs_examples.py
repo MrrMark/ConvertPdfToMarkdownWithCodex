@@ -55,17 +55,19 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "Q65-Q67 GUI 완성도/호환성 개선" in readme
-    assert "Q65 GUI Runtime Doctor And Packaging Compatibility Smoke" in readme
+    assert "Q66-Q67 GUI 완성도/호환성 개선" in readme
+    assert "Q66 Sanitized GUI Support Bundle" in readme
     assert "horizontal scrollbar" in readme
     assert "docs/MACOS_GUI_QUICKSTART.md" in readme
     assert "docs/GUI_USER_GUIDE.md" in readme
     assert "python3 -m pdf2md.gui" in readme
     assert "pdf2md-gui" in readme
     assert "python3 -m pdf2md.gui --help" in readme
+    assert "python3 -m pdf2md.gui --doctor" in readme
     assert "scripts/run_gui_smoke_evidence.py" in readme
     assert "gui_smoke_evidence.json" in readme
     assert "--json-only" in readme
+    assert "runtime diagnostic code/message/action" in readme
     assert "변환 warning message" in readme
     assert "문서 경계 취소" in readme
     assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`" in readme
@@ -133,9 +135,12 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "docs\\QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in guide
     assert "python -m pdf2md.gui" in guide
     assert "python -m pdf2md.gui --help" in guide
+    assert "python -m pdf2md.gui --doctor" in guide
+    assert "source checkout/editable/wheel packaging mode" in guide
     assert "scripts\\run_gui_smoke_evidence.py" in guide
     assert "gui_smoke_evidence.json" in guide
     assert "--json-only" in guide
+    assert "runtime diagnostic code/message/action" in guide
     assert "변환 warning message" in guide
     assert "pdf2md-gui" in guide
     assert "desktop GUI wrapper" in guide
@@ -160,9 +165,12 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     assert "python -m pdf2md.gui" in guide
     assert "pdf2md-gui" in guide
     assert "python -m pdf2md.gui --help" in guide
+    assert "python -m pdf2md.gui --doctor" in guide
+    assert "tcl_tk_patchlevel_available" in guide
     assert "scripts/run_gui_smoke_evidence.py" in guide
     assert "gui_smoke_evidence.json" in guide
     assert "--json-only" in guide
+    assert "GUI runtime doctor diagnostics" in guide
     assert "workspace/home absolute path" in guide
     assert "docs/GUI_USER_GUIDE.md" in guide
     assert "`Help` 버튼" in guide
@@ -186,9 +194,12 @@ def test_gui_user_guide_is_separate_from_cli_docs() -> None:
     assert "CLI가 익숙하지 않은 사용자" in guide
     assert "python -m pdf2md.gui" in guide
     assert "pdf2md-gui" in guide
+    assert "python -m pdf2md.gui --doctor" in guide
+    assert "--doctor-format json" in guide
     assert "scripts/run_gui_smoke_evidence.py" in guide
     assert "gui_smoke_evidence.json" in guide
     assert "원문 PDF 텍스트, 표 내용, 이미지 내용" in guide
+    assert "GUI runtime doctor diagnostics" in guide
     assert "horizontal scrollbar" in guide
     assert "Help" in guide
     assert "`PDF file`" in guide
@@ -266,10 +277,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "### P1 / Q61. GUI Localization, Presets, And Progress Percent" not in next_plan
     assert "Q62. GUI Smoke Evidence And Layout Guardrails" not in next_plan
     assert "Q64. Responsive GUI Layout And Accessibility Guardrails" not in next_plan
-    assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in next_plan
+    assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" not in next_plan
     assert "Q66. Sanitized GUI Support Bundle" in next_plan
     assert "Q67. GUI Expert Options And Profile Import/Export" in next_plan
-    assert "Tcl/Tk patchlevel" in next_plan
+    assert "Tcl/Tk patchlevel" not in next_plan
     assert "support bundle" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
@@ -285,7 +296,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "### P1 / Q61. GUI Localization, Presets, And Progress Percent" not in development_specs
     assert "Q62. GUI Smoke Evidence And Layout Guardrails" not in development_specs
     assert "Q64. Responsive GUI Layout And Accessibility Guardrails" not in development_specs
-    assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in development_specs
+    assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" not in development_specs
     assert "Q66. Sanitized GUI Support Bundle" in development_specs
     assert "Q67. GUI Expert Options And Profile Import/Export" in development_specs
     assert "tests/test_gui_support.py" in development_specs
@@ -296,7 +307,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q64" in development_specs
+    assert "완료된 Q34-Q65" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -320,6 +331,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q62. GUI Smoke Evidence And Layout Guardrails" in implemented_specs
     assert "Q63. GUI Backlog Rollover And Forward Specs" in implemented_specs
     assert "Q64. Responsive GUI Layout And Accessibility Guardrails" in implemented_specs
+    assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in implemented_specs
+    assert "python -m pdf2md.gui --doctor" in implemented_specs
+    assert "gui_diagnostic_report_to_dict()" in implemented_specs
+    assert "format_gui_diagnostic_report()" in implemented_specs
     assert "PR #40" in implemented_specs
     assert "scripts/run_gui_smoke_evidence.py" in implemented_specs
     assert "pdf2md/gui_layout.py" in implemented_specs
@@ -376,6 +391,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in quality_scorecard
     assert "Q66. Sanitized GUI Support Bundle" in quality_scorecard
     assert "Q67. GUI Expert Options And Profile Import/Export" in quality_scorecard
+    assert "GUI runtime doctor" in quality_scorecard
+    assert "다음 active backlog는 Q66-Q67" in quality_scorecard
     assert "GUI 호환성 후속 명세" in quality_scorecard
     assert "GUI smoke evidence 계획" in quality_scorecard
     assert "GUI contract test 확장" in quality_scorecard

@@ -22,6 +22,18 @@ pdf2md-gui
 python -m pdf2md.gui --help
 ```
 
+runtime doctor는 아래 명령으로 확인한다. 이 명령은 Tcl/Tk patchlevel, display/window advisory, OCR/Tesseract, Pillow/pypdfium2, help document, source/editable/wheel packaging mode를 구조화된 진단으로 출력한다.
+
+```bash
+python -m pdf2md.gui --doctor
+```
+
+자동화에서 읽기 쉬운 JSON이 필요하면:
+
+```bash
+python -m pdf2md.gui --doctor --doctor-format json
+```
+
 운영체제별 설치/실행 준비는 다음 문서를 참고한다.
 
 - macOS: `docs/MACOS_GUI_QUICKSTART.md`
@@ -167,6 +179,12 @@ GUI는 반복 사용성을 위해 최근 입력 PDF, 입력 폴더, output folde
 python -m pdf2md.gui --help
 ```
 
+- 아래 doctor 명령의 `error`는 먼저 조치하고, `advisory`는 OCR 또는 desktop window probe처럼 선택 기능/환경 의존 항목으로 해석한다.
+
+```bash
+python -m pdf2md.gui --doctor
+```
+
 ### `pdf2md-gui` 명령이 안 잡힘
 
 가상환경을 활성화한 뒤 editable install을 다시 실행한다.
@@ -213,7 +231,7 @@ python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --st
 python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --state-path /tmp/pdf2md-gui-smoke/gui_state.json --json-only
 ```
 
-생성되는 `gui_smoke_evidence.json`은 public output schema가 아니라 로컬 검증 artifact다. 포함 대상은 Python/Tkinter runtime diagnostics, `python -m pdf2md.gui --help` 결과, preset별 runner smoke status, isolated GUI state round-trip, 산출물 존재 여부, 수동 checklist 상태다.
+생성되는 `gui_smoke_evidence.json`은 public output schema가 아니라 로컬 검증 artifact다. 포함 대상은 GUI runtime doctor diagnostics, `python -m pdf2md.gui --help` 결과, preset별 runner smoke status, isolated GUI state round-trip, 산출물 존재 여부, 수동 checklist 상태다.
 
 evidence에는 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path를 저장하지 않는다. 실제 Tk window에서 한국어 기본 UI, English 전환, preset lock/unlock, batch percent, 단일 완료 `100%`, local-only state 복구/clear는 macOS/Windows checklist에 따라 사람이 확인한다.
 

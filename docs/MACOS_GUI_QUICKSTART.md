@@ -88,6 +88,14 @@ python -m pdf2md.gui --help
 
 이 명령은 창을 띄우지 않고 도움말만 출력해야 한다.
 
+GUI runtime doctor:
+
+```bash
+python -m pdf2md.gui --doctor
+```
+
+doctor는 Tcl/Tk patchlevel, display/window advisory, OCR/Tesseract, Pillow/pypdfium2, help document, source checkout/editable/wheel packaging mode를 `code`, `severity`, `message`, `action` 형태로 출력한다. `error`는 먼저 조치하고, `advisory`는 OCR 미사용 또는 CI/headless window probe처럼 선택 기능/환경 의존 항목으로 해석한다.
+
 ## 5) 단일 PDF 변환
 
 1. `PDF file`을 선택한다.
@@ -126,7 +134,7 @@ GUI 화면에서 바로 설명이 필요하면 `Help` 버튼을 누른다.
 
 ## 8) 로컬 GUI smoke checklist
 
-먼저 headless evidence runner를 실행해 `gui_smoke_evidence.json`을 만든다. 이 단계는 Tk window를 열지 않고 runtime diagnostics, GUI help smoke, preset별 runner smoke, isolated state round-trip을 확인한다.
+먼저 headless evidence runner를 실행해 `gui_smoke_evidence.json`을 만든다. 이 단계는 Tk window를 열지 않고 GUI runtime doctor diagnostics, GUI help smoke, preset별 runner smoke, isolated state round-trip을 확인한다.
 
 ```bash
 python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --state-path /tmp/pdf2md-gui-smoke/gui_state.json
@@ -137,18 +145,20 @@ python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --st
 수동 Tk window 확인:
 
 1. `python -m pdf2md.gui --help`가 창 없이 종료되는지 확인한다.
-2. `python -m pdf2md.gui`로 GUI 창을 연다.
-3. 단일 PDF를 변환하고 Results 표에서 Markdown/report/manifest 경로를 확인한다.
-4. 선택한 결과 행의 Markdown/report/manifest/assets 또는 output folder가 열리는지 확인한다.
-5. 기본 한국어 UI에서 `English`로 바꿨을 때 주요 label/button/status가 영어로 바뀌는지 확인한다.
-6. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset 변경 시 세부 옵션 잠금/해제가 맞는지 확인한다.
-7. 창 높이를 줄였을 때 세로 스크롤로 input/options/results/log 영역에 접근할 수 있는지 확인한다.
-8. Results 표의 긴 Markdown/report 경로를 horizontal scrollbar로 확인할 수 있는지 확인한다.
-9. 폴더 배치 변환에서 문서 index/total과 percent text가 함께 움직이는지 확인한다.
-10. 단일 PDF 변환은 처리 중 percent를 추정하지 않고 완료 시 `100%`만 표시하는지 확인한다.
-11. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
-12. GUI를 닫고 다시 열었을 때 최근 경로, 언어, preset이 복구되는지 확인한다.
-13. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.
+2. `python -m pdf2md.gui --doctor`에서 `error`가 없는지 확인한다.
+3. source checkout, editable install, wheel smoke 중 현재 packaging mode와 entry point diagnostic이 의도와 맞는지 확인한다.
+4. `python -m pdf2md.gui`로 GUI 창을 연다.
+5. 단일 PDF를 변환하고 Results 표에서 Markdown/report/manifest 경로를 확인한다.
+6. 선택한 결과 행의 Markdown/report/manifest/assets 또는 output folder가 열리는지 확인한다.
+7. 기본 한국어 UI에서 `English`로 바꿨을 때 주요 label/button/status가 영어로 바뀌는지 확인한다.
+8. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset 변경 시 세부 옵션 잠금/해제가 맞는지 확인한다.
+9. 창 높이를 줄였을 때 세로 스크롤로 input/options/results/log 영역에 접근할 수 있는지 확인한다.
+10. Results 표의 긴 Markdown/report 경로를 horizontal scrollbar로 확인할 수 있는지 확인한다.
+11. 폴더 배치 변환에서 문서 index/total과 percent text가 함께 움직이는지 확인한다.
+12. 단일 PDF 변환은 처리 중 percent를 추정하지 않고 완료 시 `100%`만 표시하는지 확인한다.
+13. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
+14. GUI를 닫고 다시 열었을 때 최근 경로, 언어, preset이 복구되는지 확인한다.
+15. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.
 
 ## 9) 배포 방식 판단
 
@@ -170,6 +180,7 @@ source .venv311/bin/activate
 ### Tkinter 오류
 
 - Python 설치본에 Tcl/Tk 지원이 빠졌을 수 있다.
+- `python -m pdf2md.gui --doctor`에서 `tcl_tk_patchlevel_available`, `display_environment_*`, `tk_window_*` diagnostic을 확인한다.
 - Homebrew 또는 python.org Python을 다시 설치한 뒤 가상환경을 다시 만든다.
 
 ### `pdf2md-gui` 명령이 안 잡힘
