@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-16 | GUI smoke evidence 계획 | 97/100 | 0 | Q61. GUI Localization, Presets, And Progress Percent 구현/merge 완료. 다음 active backlog/spec로 Q62. GUI Smoke Evidence And Layout Guardrails 추가. 변환 품질과 schema 계약은 유지하고, Q61 GUI 기능의 로컬 smoke evidence와 layout/state guardrail을 다음 검증 과제로 정리 |
 | 2026-05-16 | GUI 언어/프리셋/진행률 계획 | 97/100 | 0 | Q61. GUI Localization, Presets, And Progress Percent active backlog/spec 추가. 변환 품질과 schema 계약은 유지하고, 한글 기본 UI, English 선택, 목적 기반 preset, 신뢰 가능한 batch percent 표시를 구현 전 계약으로 정리 |
 | 2026-05-16 | GUI 실사용 UX 및 배포 계획 | 97/100 | 0 | Q60. GUI Practical UX And Distribution Hardening active backlog/spec 추가. 실제 변환 품질과 schema 계약은 유지하고, 로컬 GUI smoke, 결과 파일 열기, 최근 경로 저장, 비개발자 배포 방식 결정을 구현 전 계약으로 정리 |
 | 2026-05-16 | GUI 전용 사용자 도움말 | 97/100 | 0 | Q59. GUI User Guide And Help Entry 구현. CLI 문서와 분리된 GUI_USER_GUIDE와 GUI Help 버튼 추가. active quality backlog 없음 |
@@ -52,6 +53,20 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-16 (Q61 구현 후, Q62 계획 수립)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q61은 GUI 표시 계층 개선이며, 기본 한국어 UI, English 선택, 목적 기반 preset, batch percent 표시가 구현되어 PR #38로 merge됐다. 변환 엔진, Markdown/manifest/report 산출물, public schema 계약은 바뀌지 않았으므로 점수는 유지한다.
+
+다음 단계 Q62는 새 변환 기능을 추가하기보다 Q61 GUI 기능이 실제 로컬 환경에서 반복 확인 가능하도록 smoke evidence runner와 수동 checklist, layout/state guardrail을 보강하는 작업이다. evidence에는 원문 PDF 텍스트, 표, 이미지 내용, warning message를 저장하지 않는 정책을 유지한다.
+
+#### 다음 개선 참조
+
+- Q62. GUI Smoke Evidence And Layout Guardrails
 
 ### 2026-05-16 (Q61 계획 수립)
 

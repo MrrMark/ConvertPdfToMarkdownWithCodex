@@ -55,7 +55,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "Q61 GUI Localization, Presets, And Progress Percent" in readme
+    assert "Q62 GUI Smoke Evidence And Layout Guardrails" in readme
     assert "docs/MACOS_GUI_QUICKSTART.md" in readme
     assert "docs/GUI_USER_GUIDE.md" in readme
     assert "python3 -m pdf2md.gui" in readme
@@ -245,9 +245,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q58. GUI Smoke And Contract Test Expansion" not in next_plan
     assert "Q59. GUI User Guide And Help Entry" not in next_plan
     assert "Q60. GUI Practical UX And Distribution Hardening" not in next_plan
-    assert "Q61. GUI Localization, Presets, And Progress Percent" in next_plan
-    assert "기본 `한국어`, 선택 `English`" in next_plan
-    assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`" in next_plan
+    assert "### P1 / Q61. GUI Localization, Presets, And Progress Percent" not in next_plan
+    assert "Q62. GUI Smoke Evidence And Layout Guardrails" in next_plan
+    assert "smoke evidence" in next_plan
+    assert "layout/state guardrail" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -259,16 +260,17 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q58. GUI Smoke And Contract Test Expansion" not in development_specs
     assert "Q59. GUI User Guide And Help Entry" not in development_specs
     assert "Q60. GUI Practical UX And Distribution Hardening" not in development_specs
-    assert "Q61. GUI Localization, Presets, And Progress Percent" in development_specs
-    assert "`GuiOptionPreset`: `preserve`, `rag_optimized`, `custom`" in development_specs
-    assert "batch progress percent text" in development_specs
+    assert "### P1 / Q61. GUI Localization, Presets, And Progress Percent" not in development_specs
+    assert "Q62. GUI Smoke Evidence And Layout Guardrails" in development_specs
+    assert "`scripts/run_gui_smoke_evidence.py`" in development_specs
+    assert "redaction helper" in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q60" in development_specs
+    assert "완료된 Q34-Q61" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -288,8 +290,12 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q58. GUI Smoke And Contract Test Expansion" in implemented_specs
     assert "Q59. GUI User Guide And Help Entry" in implemented_specs
     assert "Q60. GUI Practical UX And Distribution Hardening" in implemented_specs
+    assert "Q61. GUI Localization, Presets, And Progress Percent" in implemented_specs
     assert "pdf2md/gui_state.py" in implemented_specs
     assert "PR #37" in implemented_specs
+    assert "PR #38" in implemented_specs
+    assert "pdf2md/gui_i18n.py" in implemented_specs
+    assert "pdf2md/gui_presets.py" in implemented_specs
     assert "docs/MACOS_GUI_QUICKSTART.md" in implemented_specs
     assert "docs/GUI_USER_GUIDE.md" in implemented_specs
     assert "python -m pdf2md.gui" in implemented_specs
@@ -332,6 +338,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "GUI 실사용 UX 및 배포 계획" in quality_scorecard
     assert "Q61. GUI Localization, Presets, And Progress Percent" in quality_scorecard
     assert "GUI 언어/프리셋/진행률 계획" in quality_scorecard
+    assert "Q62. GUI Smoke Evidence And Layout Guardrails" in quality_scorecard
+    assert "GUI smoke evidence 계획" in quality_scorecard
     assert "GUI contract test 확장" in quality_scorecard
     assert "다음 active backlog는 Q55-Q58" in quality_scorecard
     assert "다음 active backlog는 Q56-Q58" in quality_scorecard
