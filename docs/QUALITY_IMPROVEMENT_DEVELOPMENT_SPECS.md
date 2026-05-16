@@ -23,98 +23,119 @@
 
 ## 현재 Active Development Specs
 
-### P1 / Q60. GUI Practical UX And Distribution Hardening
+### P1 / Q61. GUI Localization, Presets, And Progress Percent
 
 #### 배경
 
-Q53-Q59까지의 GUI 작업은 최소 Tkinter wrapper, runtime/install diagnostics, 완료 결과 표, batch cancel/retry summary, 비개발자 가이드, Help 버튼, headless contract test를 제공했다. 현재 GUI는 core 변환 품질과 output schema를 바꾸지 않는 얇은 wrapper라는 원칙을 잘 지키고 있다.
+Q60 구현 후 실제 GUI 확인에서 세 가지 사용성 요구가 추가로 확인됐다.
 
-다음 고도화는 변환 엔진 확장이 아니라 실사용 마찰 제거다. 실제 로컬 GUI 실행에서 반복될 가능성이 높은 문제는 진행 상태 가시성, 변환 결과 파일 접근, 반복 사용 시 경로 재입력, 그리고 비개발자 배포 경로 선택이다.
+첫째, GUI 기본 사용자는 한국어 사용자가 많으므로 기본 UI는 한글이어야 하고, 필요한 경우 English로 전환할 수 있어야 한다. 둘째, 현재 GUI는 세부 옵션을 처음부터 노출해 비개발자가 어떤 조합을 골라야 하는지 부담이 크다. 셋째, Q60의 progressbar는 시각적 상태를 보여주지만 batch 변환에서는 숫자 percent도 함께 보여주는 편이 진행 상황 파악에 유리하다.
+
+이 작업도 core 변환 엔진 개선이 아니라 GUI orchestration과 표시 계층 개선이다. PDF 원문, report/manifest schema, warning code, RAG sidecar 계약은 그대로 유지한다.
 
 #### 목표
 
-- 실제 GUI local smoke 흐름을 점검하고 문서화한다.
-- 진행률/상태 표시를 현재 runner callback 수준에 맞게 개선한다.
-- 완료 결과 행에서 Markdown, report, manifest, assets/output folder를 바로 열 수 있게 한다.
-- 최근 입력/출력 경로를 local-only 상태로 저장/복구한다.
-- ZIP + venv script, setup script, PyInstaller/native bundle 후보를 비교해 현재 권장 배포 방식을 명확히 한다.
-- GUI 편의 기능이 CLI 산출물 계약과 public schema를 변경하지 않도록 테스트를 추가한다.
+- GUI 언어를 기본 `한국어`, 선택 `English`로 제공한다.
+- 목적 기반 preset을 추가해 첫 화면에서 `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` 중 고르게 한다.
+- preset은 내부적으로 기존 `GuiConversionOptions`로만 매핑하며 CLI option 의미를 새로 만들지 않는다.
+- batch 변환 진행 상태에 `current/total`과 percent text를 함께 표시한다.
+- single conversion은 실제 page-level progress가 없으므로 indeterminate 표시를 유지하고, 완료 시에만 `100%`로 표시한다.
 
 #### 구현 범위
 
-- `pdf2md/gui_state.py` 또는 동등한 순수 helper
-  - 최근 input file, input folder, output folder를 저장하는 local-only state helper를 추가한다.
-  - 기본 저장 위치는 사용자 홈 아래의 앱 전용 경로를 사용하고, 테스트에서는 path injection으로 임시 디렉터리를 사용한다.
-  - 저장 항목은 경로와 timestamp/order 정도로 제한한다.
-  - 손상된 JSON, 누락된 파일, 이전 schema version은 GUI 시작 실패가 아니라 empty state fallback으로 처리한다.
-  - clear recent 동작을 제공한다.
+- `pdf2md/gui_i18n.py` 또는 동등한 순수 helper
+  - `GuiLanguage` literal: `ko`, `en`
+  - `GuiTextKey` 또는 string key 기반 catalog
+  - `translate(language, key, **values)` helper
+  - 누락 key는 English fallback 또는 key fallback으로 GUI 시작 실패를 막는다.
+  - Korean catalog를 기본으로 유지한다.
+- `pdf2md/gui_presets.py` 또는 동등한 순수 helper
+  - `GuiOptionPreset`: `preserve`, `rag_optimized`, `custom`
+  - `preset_display_name(language, preset)`
+  - `options_for_preset(preset, current_options)` 또는 `apply_preset_to_options()`
+  - `preserve`는 원본 보존 우선:
+    - `image_mode=referenced`
+    - `table_mode=auto`
+    - `rag_table_output=none`
+    - `domain_adapter=none`
+    - `force_ocr=False`
+    - header/footer removal, hyphenation repair, figure crop fallback 같은 heuristic flag는 기본 off
+  - `rag_optimized`는 RAG sidecar/provenance 중심:
+    - `rag_table_output=both`
+    - `keep_page_markers=True`
+    - `repair_hyphenation=True`
+    - `remove_header_footer=True`
+    - `image_mode=referenced`
+    - `table_mode=auto`
+    - `force_ocr=False`
+    - `confidential_safe_mode`는 사용자가 켜는 opt-in으로 유지
+  - `custom`은 현재 UI 값을 보존하고 flag 영역을 직접 편집 가능하게 한다.
+  - `pages`, `password`, `ocr_lang`, `input/output`은 preset 적용으로 덮어쓰지 않는다.
+- `pdf2md/gui_state.py`
+  - 최근 경로 state에 selected language와 selected preset을 추가한다.
+  - 이전 Q60 state 파일도 깨지지 않게 schema migration 또는 tolerant load를 제공한다.
+  - 저장 state에는 여전히 원문 텍스트, table/image content, warning message를 넣지 않는다.
 - `pdf2md/gui.py`
-  - status label과 progressbar를 추가한다.
-  - 단일 변환은 indeterminate progress로 표시한다.
-  - 폴더 배치 변환은 `GuiBatchProgress.current / total`을 기준으로 determinate progress를 표시한다.
-  - 결과 표 선택 행 기준으로 Markdown, report, manifest, assets/output folder 열기 버튼 또는 메뉴를 제공한다.
-  - 파일 열기 실패는 messagebox/log warning으로만 표시하고 conversion summary/status는 변경하지 않는다.
-  - GUI 시작 시 최근 경로를 input/output field에 보수적으로 복구하고, Browse/Start 성공 시 최근 경로를 갱신한다.
-- `pdf2md/gui_runner.py`
-  - 가능한 한 기존 `GuiBatchProgress`, `GuiConversionSummary`, `GuiDocumentSummary` 계약을 유지한다.
-  - 새 GUI 표시가 필요하면 source text나 table/image content가 아닌 path/status 중심 metadata만 추가한다.
-  - page-level progress callback이 없는 상태에서 임의 page progress를 만들지 않는다.
-- 배포/문서
-  - `docs/GUI_USER_GUIDE.md`: 최근 경로, 결과 파일 열기, progress 의미, clear recent, troubleshooting을 추가한다.
-  - `docs/MACOS_GUI_QUICKSTART.md`: source/ZIP + venv 실행을 기본 추천 경로로 유지하고, macOS GUI 실행 smoke checklist를 추가한다.
-  - `docs/WINDOWS_A_TO_Z_GUIDE.md`: 기존 setup script 기반 GUI 실행 흐름과 ZIP 배포 기준을 보강한다.
-  - `README.md`: GUI 고도화 요약과 배포 방식 결정 기준을 짧게 반영한다.
-  - PyInstaller/native bundle은 feasibility note와 수동 smoke 체크리스트까지 포함하되, 실제 공식 배포 산출물 생성은 Q60의 필수 완료 조건으로 두지 않는다.
+  - language selector 추가
+  - preset selector 추가
+  - 기본 시작 언어는 `ko`, 기본 preset은 `preserve`
+  - `custom`이 아닌 preset에서는 세부 flag 영역을 비활성화하거나 읽기 전용으로 표시한다.
+  - preset 변경 시 UI 변수와 `GuiConversionOptions`가 동기화된다.
+  - progress label은 batch에서 `2/10 (20%)` 형식으로 표시한다.
+  - single conversion은 `처리 중...` / `Converting...`과 indeterminate bar를 유지하고 완료 시 `100%`로 표시한다.
 
 #### 테스트 범위
 
-- `tests/test_gui_runner.py` 또는 신규 `tests/test_gui_state.py`
-  - recent state 저장/로드가 deterministic하게 동작한다.
-  - 최대 recent 개수 제한, 중복 경로 갱신, missing/corrupt JSON fallback, clear recent를 검증한다.
-  - recent state에는 원문 텍스트, 표/이미지 내용, warning message가 저장되지 않는다.
-- GUI helper tests
-  - 선택된 result row에서 Markdown/report/manifest/assets open target을 올바르게 결정한다.
-  - open failure가 conversion status를 바꾸지 않는 warning 경로인지 검증한다.
-  - batch progress event가 progress state current/total/status에 반영되는지 검증한다.
-- 문서 테스트
-  - README, macOS guide, Windows guide, GUI user guide가 Q60 UX와 배포 정책 문구를 포함하는지 고정한다.
-- 기존 회귀
-  - `python -m pytest tests/test_gui_runner.py`
-  - `python -m pytest tests/test_docs_examples.py`
-  - 가능하면 전체 `python -m pytest`
-  - `python -m pdf2md.gui --help`
+- `tests/test_gui_i18n.py`
+  - 한국어 기본 catalog 주요 key 존재
+  - English catalog 주요 key 존재
+  - format placeholder 치환
+  - missing key fallback
+- `tests/test_gui_presets.py`
+  - `preserve` preset mapping이 보수적 원본 유지 정책과 일치
+  - `rag_optimized` preset mapping이 RAG sidecar/provenance 옵션을 켬
+  - `rag_optimized`가 `force_ocr`를 강제로 켜지 않음
+  - `custom`은 현재 options를 보존
+  - `pages`, `password`, `ocr_lang`이 preset 적용으로 바뀌지 않음
+- `tests/test_gui_state.py`
+  - language/preset 저장과 복구
+  - Q60 schema 또는 누락 field fallback
+  - corrupt JSON fallback 유지
+- `tests/test_gui_runner.py` 또는 GUI helper test
+  - batch progress percent text
+  - single conversion 완료 시 100% 표시 helper
+- `tests/test_docs_examples.py`
+  - GUI guide/README/macOS/Windows 문서가 language selector, preset, percent 표시 정책을 설명하는지 고정
+
+#### UX 정책
+
+- `기본 모드(원본 유지)`는 가장 보수적인 기본값이다.
+- `RAG 등록용(최적화)`은 Markdown 원문을 바꾸는 기능이 아니라 sidecar/provenance와 RAG 친화 옵션을 켜는 preset이다.
+- `Optimize Options(유저 선택)`은 기존 advanced mode에 가깝다.
+- 사용자가 preset을 바꿔도 input/output, pages, password는 유지한다.
+- language 전환은 GUI 표시 문구만 바꾸며 변환 output에는 영향을 주지 않는다.
+- percent는 실제 document-level progress만 표현한다. page-level progress가 없으면 단일 PDF 처리 중 percent를 추정하지 않는다.
 
 #### 로컬 GUI smoke checklist
 
-1. `python -m pdf2md.gui --help`가 창 없이 종료되는지 확인한다.
-2. `python -m pdf2md.gui`로 실제 창을 연다.
-3. 단일 PDF fixture를 선택하고 기본 output folder로 변환한다.
-4. Results 표에서 Markdown/report/manifest 경로가 표시되는지 확인한다.
-5. 선택 행 기준 Markdown/report/manifest/assets 또는 output folder 열기가 동작하는지 확인한다.
-6. 폴더 배치 변환에서 progressbar가 문서 index/total 기준으로 움직이는지 확인한다.
-7. Cancel은 현재 문서 완료 후 남은 문서를 `cancelled`로 표시하는지 확인한다.
-8. 앱을 닫고 다시 열었을 때 최근 입력/출력 경로가 복구되는지 확인한다.
-9. Clear recent 후 재실행하면 경로가 복구되지 않는지 확인한다.
-
-#### 배포 판단
-
-- Q60 기준 기본 추천 경로는 ZIP/source checkout + venv setup + `python -m pdf2md.gui`다.
-- Windows는 기존 `scripts/setup_windows_env.ps1` / `.bat` 흐름을 우선한다.
-- macOS는 Homebrew 또는 python.org Python 3.11+ + venv 흐름을 우선한다.
-- PyInstaller/native bundle은 다음 조건을 만족할 때만 별도 Q로 승격한다.
-  - PyMuPDF/Tkinter/Tesseract 의존성 포함 또는 외부 설치 진단이 명확하다.
-  - macOS/Windows 각각에서 GUI launch와 sample conversion smoke가 통과한다.
-  - code signing/notarization/보안 경고 대응 범위가 문서화된다.
+1. GUI를 실행하면 기본 한글 UI로 표시되는지 확인한다.
+2. language selector를 English로 바꾸면 주요 label/button/status가 English로 바뀌는지 확인한다.
+3. `기본 모드(원본 유지)`에서 advanced flags가 보수적 기본값인지 확인한다.
+4. `RAG 등록용(최적화)`을 선택하면 RAG tables/page marker/hyphenation/header-footer 관련 UI가 preset에 맞게 바뀌는지 확인한다.
+5. `Optimize Options(유저 선택)`에서 세부 옵션을 직접 바꿀 수 있는지 확인한다.
+6. 폴더 배치 변환에서 `current/total (percent%)` 표시가 progressbar와 일치하는지 확인한다.
+7. 단일 PDF 변환 중에는 indeterminate 상태이고 완료 후 `100%`가 되는지 확인한다.
+8. GUI를 재시작했을 때 language/preset 선택이 local-only state에서 복구되는지 확인한다.
 
 #### 비범위
 
-- core `run_conversion` 내부 구조 변경
-- PDF preview, Markdown preview, report editor
-- page-level progress를 가장한 임의 진행률
-- native installer, code signing, notarization, auto-update
-- PyInstaller 산출물을 공식 릴리스 artifact로 만드는 작업
-- 새 public JSON output schema
+- PDF 원문 내용 번역 또는 localization
+- schema key, warning code, report/manifest field명 번역
+- core pipeline page-level progress callback
+- OCR language 자동 선택 또는 문서 언어 감지
+- user behavior analytics
+- native installer/package 생성
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q59 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q60 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

@@ -12,6 +12,7 @@ from pdf2md.gui_state import (
     gui_batch_progress_snapshot,
     gui_document_open_target,
     load_gui_recent_state,
+    remember_gui_preferences,
     remember_gui_path,
     save_gui_recent_state,
 )
@@ -42,7 +43,11 @@ def test_gui_recent_state_round_trips_with_dedupe_and_limit(tmp_path: Path) -> N
         "recent_input_files",
         "recent_input_folders",
         "recent_output_dirs",
+        "language",
+        "option_preset",
     }
+    assert payload["language"] == "ko"
+    assert payload["option_preset"] == "preserve"
     assert "warning message" not in state_path.read_text(encoding="utf-8")
     assert "table fallback" not in state_path.read_text(encoding="utf-8")
 
@@ -55,6 +60,39 @@ def test_gui_recent_state_falls_back_on_missing_corrupt_or_unknown_schema(tmp_pa
     assert load_gui_recent_state(state_path).is_empty()
     state_path.write_text(json.dumps({"schema_version": 999, "recent_input_files": ["a.pdf"]}), encoding="utf-8")
     assert load_gui_recent_state(state_path).is_empty()
+
+
+def test_gui_recent_state_loads_q60_schema_with_preference_defaults(tmp_path: Path) -> None:
+    state_path = tmp_path / "gui_state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "recent_input_files": [str(tmp_path / "input.pdf")],
+                "recent_input_folders": [],
+                "recent_output_dirs": [str(tmp_path / "out")],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    state = load_gui_recent_state(state_path)
+
+    assert state.recent_input_files == (tmp_path / "input.pdf",)
+    assert state.recent_output_dirs == (tmp_path / "out",)
+    assert state.language == "ko"
+    assert state.option_preset == "preserve"
+
+
+def test_gui_recent_state_round_trips_language_and_preset(tmp_path: Path) -> None:
+    state_path = tmp_path / "gui_state.json"
+    state = remember_gui_preferences(GuiRecentState(), language="en", option_preset="rag_optimized")
+
+    save_gui_recent_state(state, state_path)
+    loaded = load_gui_recent_state(state_path)
+
+    assert loaded.language == "en"
+    assert loaded.option_preset == "rag_optimized"
 
 
 def test_gui_state_store_clear_removes_recent_paths(tmp_path: Path) -> None:
@@ -110,7 +148,7 @@ def test_gui_batch_progress_snapshot_is_document_level_and_clamped(tmp_path: Pat
     assert snapshot.current == 2
     assert snapshot.total == 5
     assert snapshot.percent == 40
-    assert snapshot.label == "Batch 2/5 beta.pdf: success"
+    assert snapshot.label == "Batch 2/5 (40%) beta.pdf: success"
 
     overflow = gui_batch_progress_snapshot(
         current=9,

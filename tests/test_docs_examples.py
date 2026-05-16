@@ -55,13 +55,15 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "Q60 GUI Practical UX And Distribution Hardening" in readme
+    assert "Q61 GUI Localization, Presets, And Progress Percent" in readme
     assert "docs/MACOS_GUI_QUICKSTART.md" in readme
     assert "docs/GUI_USER_GUIDE.md" in readme
     assert "python3 -m pdf2md.gui" in readme
     assert "pdf2md-gui" in readme
     assert "python3 -m pdf2md.gui --help" in readme
     assert "문서 경계 취소" in readme
+    assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`" in readme
+    assert "percent text" in readme
     assert "Open Markdown" in readme
     assert "Clear recent" in readme
     assert "PyInstaller/native bundle" in readme
@@ -129,6 +131,8 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "desktop GUI wrapper" in guide
     assert "docs\\GUI_USER_GUIDE.md" in guide
     assert "GUI의 `Help` 버튼" in guide
+    assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`" in guide
+    assert "percent text" in guide
     assert "`Cancel`을 누르면 현재 문서가 끝난 뒤" in guide
     assert "`Open Manifest`" in guide
     assert "`Clear recent`" in guide
@@ -148,6 +152,8 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     assert "python -m pdf2md.gui --help" in guide
     assert "docs/GUI_USER_GUIDE.md" in guide
     assert "`Help` 버튼" in guide
+    assert "`English`로 바꿨을 때" in guide
+    assert "percent text" in guide
     assert "Cancel" in guide
     assert "Open Markdown" in guide
     assert "Clear recent" in guide
@@ -170,6 +176,9 @@ def test_gui_user_guide_is_separate_from_cli_docs() -> None:
     assert "`PDF file`" in guide
     assert "`PDF folder`" in guide
     assert "`Output folder`" in guide
+    assert "기본 언어는 한국어" in guide
+    assert "`RAG 등록용(최적화)`" in guide
+    assert "`2/10 (20%)`" in guide
     assert "`Status`" in guide
     assert "`Warnings`" in guide
     assert "`Retry`" in guide
@@ -235,9 +244,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q57. Non-Developer GUI Distribution Guide" not in next_plan
     assert "Q58. GUI Smoke And Contract Test Expansion" not in next_plan
     assert "Q59. GUI User Guide And Help Entry" not in next_plan
-    assert "Q60. GUI Practical UX And Distribution Hardening" in next_plan
-    assert "최근 입력/출력 경로를 local-only 상태로 저장" in next_plan
-    assert "PyInstaller/native bundle은 별도 feasibility smoke" in next_plan
+    assert "Q60. GUI Practical UX And Distribution Hardening" not in next_plan
+    assert "Q61. GUI Localization, Presets, And Progress Percent" in next_plan
+    assert "기본 `한국어`, 선택 `English`" in next_plan
+    assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
@@ -248,16 +258,17 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q57. Non-Developer GUI Distribution Guide" not in development_specs
     assert "Q58. GUI Smoke And Contract Test Expansion" not in development_specs
     assert "Q59. GUI User Guide And Help Entry" not in development_specs
-    assert "Q60. GUI Practical UX And Distribution Hardening" in development_specs
-    assert "recent state 저장/로드" in development_specs
-    assert "로컬 GUI smoke checklist" in development_specs
+    assert "Q60. GUI Practical UX And Distribution Hardening" not in development_specs
+    assert "Q61. GUI Localization, Presets, And Progress Percent" in development_specs
+    assert "`GuiOptionPreset`: `preserve`, `rag_optimized`, `custom`" in development_specs
+    assert "batch progress percent text" in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q59" in development_specs
+    assert "완료된 Q34-Q60" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -276,6 +287,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q57. Non-Developer GUI Distribution Guide" in implemented_specs
     assert "Q58. GUI Smoke And Contract Test Expansion" in implemented_specs
     assert "Q59. GUI User Guide And Help Entry" in implemented_specs
+    assert "Q60. GUI Practical UX And Distribution Hardening" in implemented_specs
+    assert "pdf2md/gui_state.py" in implemented_specs
+    assert "PR #37" in implemented_specs
     assert "docs/MACOS_GUI_QUICKSTART.md" in implemented_specs
     assert "docs/GUI_USER_GUIDE.md" in implemented_specs
     assert "python -m pdf2md.gui" in implemented_specs
@@ -316,6 +330,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q59. GUI User Guide And Help Entry" in quality_scorecard
     assert "Q60. GUI Practical UX And Distribution Hardening" in quality_scorecard
     assert "GUI 실사용 UX 및 배포 계획" in quality_scorecard
+    assert "Q61. GUI Localization, Presets, And Progress Percent" in quality_scorecard
+    assert "GUI 언어/프리셋/진행률 계획" in quality_scorecard
     assert "GUI contract test 확장" in quality_scorecard
     assert "다음 active backlog는 Q55-Q58" in quality_scorecard
     assert "다음 active backlog는 Q56-Q58" in quality_scorecard

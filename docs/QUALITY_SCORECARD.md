@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-16 | GUI 언어/프리셋/진행률 계획 | 97/100 | 0 | Q61. GUI Localization, Presets, And Progress Percent active backlog/spec 추가. 변환 품질과 schema 계약은 유지하고, 한글 기본 UI, English 선택, 목적 기반 preset, 신뢰 가능한 batch percent 표시를 구현 전 계약으로 정리 |
 | 2026-05-16 | GUI 실사용 UX 및 배포 계획 | 97/100 | 0 | Q60. GUI Practical UX And Distribution Hardening active backlog/spec 추가. 실제 변환 품질과 schema 계약은 유지하고, 로컬 GUI smoke, 결과 파일 열기, 최근 경로 저장, 비개발자 배포 방식 결정을 구현 전 계약으로 정리 |
 | 2026-05-16 | GUI 전용 사용자 도움말 | 97/100 | 0 | Q59. GUI User Guide And Help Entry 구현. CLI 문서와 분리된 GUI_USER_GUIDE와 GUI Help 버튼 추가. active quality backlog 없음 |
 | 2026-05-16 | GUI contract test 확장 | 97/100 | 0 | Q58. GUI Smoke And Contract Test Expansion 구현. option mapping, diagnostics, batch naming/order/cancel/retry/fingerprint 계약을 headless tests로 고정. active quality backlog 없음 |
@@ -51,6 +52,20 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-16 (Q61 계획 수립)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 사용성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+이번 변경은 구현 완료 평가가 아니라 GUI 수동 확인 후 발견한 UX 개선 후보를 Q61 active backlog와 개발 명세로 정리한 것이다. 변환 엔진, Markdown/manifest/report 산출물, public schema 계약은 바뀌지 않았으므로 점수는 유지한다.
+
+Q61은 한글 기본 UI와 English 선택, `기본 모드(원본 유지)` / `RAG 등록용(최적화)` / `Optimize Options(유저 선택)` preset, 그리고 document-level batch progress percent 표시를 다룬다. 단일 PDF percent는 page-level progress callback이 생기기 전까지 추정하지 않는 정책으로 제한한다.
+
+#### 다음 개선 참조
+
+- Q61. GUI Localization, Presets, And Progress Percent
 
 ### 2026-05-16 (Q60 계획 수립)
 

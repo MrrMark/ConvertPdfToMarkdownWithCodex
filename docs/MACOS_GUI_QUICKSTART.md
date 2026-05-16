@@ -130,10 +130,13 @@ GUI 화면에서 바로 설명이 필요하면 `Help` 버튼을 누른다.
 2. `python -m pdf2md.gui`로 GUI 창을 연다.
 3. 단일 PDF를 변환하고 Results 표에서 Markdown/report/manifest 경로를 확인한다.
 4. 선택한 결과 행의 Markdown/report/manifest/assets 또는 output folder가 열리는지 확인한다.
-5. 폴더 배치 변환에서 문서 index/total progress가 움직이는지 확인한다.
-6. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
-7. GUI를 닫고 다시 열었을 때 최근 경로가 복구되는지 확인한다.
-8. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.
+5. 기본 한국어 UI에서 `English`로 바꿨을 때 주요 label/button/status가 영어로 바뀌는지 확인한다.
+6. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset 변경 시 세부 옵션 잠금/해제가 맞는지 확인한다.
+7. 폴더 배치 변환에서 문서 index/total과 percent text가 함께 움직이는지 확인한다.
+8. 단일 PDF 변환은 처리 중 percent를 추정하지 않고 완료 시 `100%`만 표시하는지 확인한다.
+9. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
+10. GUI를 닫고 다시 열었을 때 최근 경로, 언어, preset이 복구되는지 확인한다.
+11. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.
 
 ## 9) 배포 방식 판단
 

@@ -7,8 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
+from pdf2md.gui_i18n import DEFAULT_GUI_LANGUAGE, GuiLanguage, normalize_language
+from pdf2md.gui_presets import DEFAULT_GUI_OPTION_PRESET, GuiOptionPreset, normalize_preset
 
-GUI_STATE_SCHEMA_VERSION = 1
+GUI_STATE_SCHEMA_VERSION = 2
+SUPPORTED_GUI_STATE_SCHEMA_VERSIONS = {1, 2}
 DEFAULT_RECENT_LIMIT = 5
 
 RecentPathKind = Literal["input_file", "input_folder", "output_dir"]
@@ -28,6 +31,8 @@ class GuiRecentState:
     recent_input_files: tuple[Path, ...] = ()
     recent_input_folders: tuple[Path, ...] = ()
     recent_output_dirs: tuple[Path, ...] = ()
+    language: GuiLanguage = DEFAULT_GUI_LANGUAGE
+    option_preset: GuiOptionPreset = DEFAULT_GUI_OPTION_PRESET
 
     def is_empty(self) -> bool:
         """Return whether no recent GUI path is available."""
@@ -63,12 +68,16 @@ def load_gui_recent_state(path: Path | None = None) -> GuiRecentState:
         payload = json.loads(state_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return GuiRecentState()
-    if not isinstance(payload, dict) or payload.get("schema_version") != GUI_STATE_SCHEMA_VERSION:
+    if not isinstance(payload, dict) or payload.get("schema_version") not in SUPPORTED_GUI_STATE_SCHEMA_VERSIONS:
         return GuiRecentState()
     return GuiRecentState(
         recent_input_files=_coerce_recent_paths(payload.get("recent_input_files")),
         recent_input_folders=_coerce_recent_paths(payload.get("recent_input_folders")),
         recent_output_dirs=_coerce_recent_paths(payload.get("recent_output_dirs")),
+        language=normalize_language(payload.get("language") if isinstance(payload.get("language"), str) else None),
+        option_preset=normalize_preset(
+            payload.get("option_preset") if isinstance(payload.get("option_preset"), str) else None
+        ),
     )
 
 
@@ -86,6 +95,8 @@ def save_gui_recent_state(
         "recent_input_files": _serialize_paths(state.recent_input_files, max_items=max_items),
         "recent_input_folders": _serialize_paths(state.recent_input_folders, max_items=max_items),
         "recent_output_dirs": _serialize_paths(state.recent_output_dirs, max_items=max_items),
+        "language": state.language,
+        "option_preset": state.option_preset,
     }
     state_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -113,17 +124,39 @@ def remember_gui_path(
             recent_input_files=_promote_path(state.recent_input_files, path, max_items=max_items),
             recent_input_folders=state.recent_input_folders,
             recent_output_dirs=state.recent_output_dirs,
+            language=state.language,
+            option_preset=state.option_preset,
         )
     if kind == "input_folder":
         return GuiRecentState(
             recent_input_files=state.recent_input_files,
             recent_input_folders=_promote_path(state.recent_input_folders, path, max_items=max_items),
             recent_output_dirs=state.recent_output_dirs,
+            language=state.language,
+            option_preset=state.option_preset,
         )
     return GuiRecentState(
         recent_input_files=state.recent_input_files,
         recent_input_folders=state.recent_input_folders,
         recent_output_dirs=_promote_path(state.recent_output_dirs, path, max_items=max_items),
+        language=state.language,
+        option_preset=state.option_preset,
+    )
+
+
+def remember_gui_preferences(
+    state: GuiRecentState,
+    *,
+    language: str | None = None,
+    option_preset: str | None = None,
+) -> GuiRecentState:
+    """Return updated recent state with GUI-only preference values."""
+    return GuiRecentState(
+        recent_input_files=state.recent_input_files,
+        recent_input_folders=state.recent_input_folders,
+        recent_output_dirs=state.recent_output_dirs,
+        language=normalize_language(language or state.language),
+        option_preset=normalize_preset(option_preset or state.option_preset),
     )
 
 
@@ -179,7 +212,7 @@ def gui_batch_progress_snapshot(*, current: int, total: int, input_pdf: Path, st
         current=safe_current,
         total=safe_total,
         percent=percent,
-        label=f"Batch {safe_current}/{safe_total} {input_pdf.name}: {status}",
+        label=f"Batch {safe_current}/{safe_total} ({percent}%) {input_pdf.name}: {status}",
     )
 
 

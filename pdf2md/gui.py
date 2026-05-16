@@ -20,6 +20,12 @@ from pdf2md.gui_runner import (
     run_gui_conversion,
     validate_gui_request,
 )
+from pdf2md.gui_i18n import GuiLanguage, translate
+from pdf2md.gui_presets import (
+    GuiOptionPreset,
+    apply_preset_to_options,
+    preset_allows_custom_options,
+)
 from pdf2md.gui_state import (
     GuiRecentState,
     GuiStateStore,
@@ -28,6 +34,7 @@ from pdf2md.gui_state import (
     first_existing_path,
     gui_batch_progress_snapshot,
     gui_document_open_target,
+    remember_gui_preferences,
     remember_gui_path,
 )
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
@@ -52,7 +59,7 @@ class Pdf2MdGuiApp:
 
         self.root = root
         self.root.title("pdf2md")
-        self.root.minsize(760, 560)
+        self.root.minsize(820, 680)
         self.queue: Queue[tuple[str, object]] = Queue()
         self.worker: threading.Thread | None = None
         self.cancel_event = threading.Event()
@@ -60,11 +67,18 @@ class Pdf2MdGuiApp:
         self.result_documents: dict[str, GuiDocumentSummary] = {}
         self.state_store = GuiStateStore()
         self.recent_state = self.state_store.load()
+        self.localized_widgets: dict[str, list[object]] = {}
+        self.localized_headings: dict[str, str] = {}
+        self.advanced_option_widgets: list[object] = []
 
+        self.language = tk.StringVar(value=self.recent_state.language)
+        self.option_preset = tk.StringVar(value=self.recent_state.option_preset)
+        self.status_key: str | None = "ready"
+        self.status_values: dict[str, object] = {}
         self.input_mode = tk.StringVar(value="file")
         self.input_path = tk.StringVar()
         self.output_dir = tk.StringVar()
-        self.status_text = tk.StringVar(value="Ready")
+        self.status_text = tk.StringVar(value=self._t("ready"))
         self.progress_value = tk.DoubleVar(value=0.0)
         self.pages = tk.StringVar()
         self.password = tk.StringVar()
@@ -84,7 +98,31 @@ class Pdf2MdGuiApp:
 
         self._restore_recent_paths()
         self._build_ui()
+        self._apply_selected_preset(save=False)
+        self._refresh_texts()
         self.root.after(100, self._poll_queue)
+
+    def _t(self, key: str, **values: object) -> str:
+        return translate(self.language.get(), key, **values)
+
+    def _track_text(self, key: str, widget: object) -> object:
+        self.localized_widgets.setdefault(key, []).append(widget)
+        return widget
+
+    def _configure_text(self, widget: object, text: str) -> None:
+        if hasattr(widget, "configure"):
+            widget.configure(text=text)
+
+    def _refresh_texts(self) -> None:
+        self.root.title(self._t("app_title"))
+        for key, widgets in self.localized_widgets.items():
+            for widget in widgets:
+                self._configure_text(widget, self._t(key))
+        for column, key in self.localized_headings.items():
+            self.result_tree.heading(column, text=self._t(key))
+        if self.status_key is not None:
+            self.status_text.set(self._t(self.status_key, **self.status_values))
+        self._update_result_action_buttons()
 
     def _build_ui(self) -> None:
         import tkinter as tk
@@ -96,63 +134,137 @@ class Pdf2MdGuiApp:
         self.root.rowconfigure(0, weight=1)
         frame.columnconfigure(1, weight=1)
 
-        mode_frame = ttk.LabelFrame(frame, text="Input")
-        mode_frame.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        settings_frame = ttk.LabelFrame(frame, text=self._t("language"))
+        self._track_text("language", settings_frame)
+        settings_frame.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        settings_frame.columnconfigure(1, weight=1)
+        self._track_text(
+            "language_ko",
+            ttk.Radiobutton(settings_frame, text=self._t("language_ko"), variable=self.language, value="ko", command=self._change_language),
+        ).grid(row=0, column=0, sticky="w", padx=(0, 12))
+        self._track_text(
+            "language_en",
+            ttk.Radiobutton(settings_frame, text=self._t("language_en"), variable=self.language, value="en", command=self._change_language),
+        ).grid(row=0, column=1, sticky="w")
+
+        preset_frame = ttk.LabelFrame(frame, text=self._t("preset"))
+        self._track_text("preset", preset_frame)
+        preset_frame.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        for col in range(3):
+            preset_frame.columnconfigure(col, weight=1)
+        self._track_text(
+            "preset_preserve",
+            ttk.Radiobutton(
+                preset_frame,
+                text=self._t("preset_preserve"),
+                variable=self.option_preset,
+                value="preserve",
+                command=self._change_preset,
+            ),
+        ).grid(row=0, column=0, sticky="w")
+        self._track_text(
+            "preset_rag_optimized",
+            ttk.Radiobutton(
+                preset_frame,
+                text=self._t("preset_rag_optimized"),
+                variable=self.option_preset,
+                value="rag_optimized",
+                command=self._change_preset,
+            ),
+        ).grid(row=0, column=1, sticky="w")
+        self._track_text(
+            "preset_custom",
+            ttk.Radiobutton(
+                preset_frame,
+                text=self._t("preset_custom"),
+                variable=self.option_preset,
+                value="custom",
+                command=self._change_preset,
+            ),
+        ).grid(row=0, column=2, sticky="w")
+
+        mode_frame = ttk.LabelFrame(frame, text=self._t("input"))
+        self._track_text("input", mode_frame)
+        mode_frame.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         mode_frame.columnconfigure(1, weight=1)
-        ttk.Radiobutton(mode_frame, text="PDF file", variable=self.input_mode, value="file").grid(row=0, column=0, sticky="w")
-        ttk.Radiobutton(mode_frame, text="PDF folder", variable=self.input_mode, value="folder").grid(row=0, column=1, sticky="w")
+        self._track_text("pdf_file", ttk.Radiobutton(mode_frame, text=self._t("pdf_file"), variable=self.input_mode, value="file")).grid(row=0, column=0, sticky="w")
+        self._track_text("pdf_folder", ttk.Radiobutton(mode_frame, text=self._t("pdf_folder"), variable=self.input_mode, value="folder")).grid(row=0, column=1, sticky="w")
         ttk.Entry(mode_frame, textvariable=self.input_path).grid(row=1, column=0, columnspan=2, sticky="ew", padx=(0, 8), pady=4)
-        ttk.Button(mode_frame, text="Browse", command=self._browse_input).grid(row=1, column=2, pady=4)
+        self._track_text("browse", ttk.Button(mode_frame, text=self._t("browse"), command=self._browse_input)).grid(row=1, column=2, pady=4)
 
-        ttk.Label(frame, text="Output folder").grid(row=1, column=0, sticky="w")
-        ttk.Entry(frame, textvariable=self.output_dir).grid(row=1, column=1, sticky="ew", padx=(0, 8), pady=4)
-        ttk.Button(frame, text="Browse", command=self._browse_output).grid(row=1, column=2, pady=4)
+        self._track_text("output_folder", ttk.Label(frame, text=self._t("output_folder"))).grid(row=3, column=0, sticky="w")
+        ttk.Entry(frame, textvariable=self.output_dir).grid(row=3, column=1, sticky="ew", padx=(0, 8), pady=4)
+        self._track_text("browse", ttk.Button(frame, text=self._t("browse"), command=self._browse_output)).grid(row=3, column=2, pady=4)
 
-        options = ttk.LabelFrame(frame, text="Options")
-        options.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(4, 8))
+        options = ttk.LabelFrame(frame, text=self._t("options"))
+        self._track_text("options", options)
+        options.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(4, 8))
         for col in range(4):
             options.columnconfigure(col, weight=1)
 
-        self._add_labeled_entry(options, "Pages", self.pages, 0, 0)
-        self._add_labeled_entry(options, "Password", self.password, 0, 2, show="*")
-        self._add_labeled_entry(options, "OCR lang", self.ocr_lang, 1, 0)
-        self._add_labeled_combo(options, "Image", self.image_mode, [mode.value for mode in ImageMode], 1, 2)
-        self._add_labeled_combo(options, "Table", self.table_mode, [mode.value for mode in TableMode], 2, 0)
-        self._add_labeled_combo(options, "RAG tables", self.rag_table_output, [mode.value for mode in RagTableOutputMode], 2, 2)
-        self._add_labeled_combo(options, "Domain", self.domain_adapter, [mode.value for mode in DomainAdapterMode], 3, 0)
+        self._add_labeled_entry(options, "pages", self.pages, 0, 0)
+        self._add_labeled_entry(options, "password", self.password, 0, 2, show="*")
+        self._add_labeled_entry(options, "ocr_lang", self.ocr_lang, 1, 0)
+        self._add_labeled_combo(options, "image", self.image_mode, [mode.value for mode in ImageMode], 1, 2)
+        self._add_labeled_combo(options, "table", self.table_mode, [mode.value for mode in TableMode], 2, 0)
+        self._add_labeled_combo(options, "rag_tables", self.rag_table_output, [mode.value for mode in RagTableOutputMode], 2, 2)
+        self._add_labeled_combo(options, "domain", self.domain_adapter, [mode.value for mode in DomainAdapterMode], 3, 0)
 
-        flags = ttk.LabelFrame(frame, text="Flags")
-        flags.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        flags = ttk.LabelFrame(frame, text=self._t("flags"))
+        self._track_text("flags", flags)
+        flags.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         for col in range(3):
             flags.columnconfigure(col, weight=1)
         checkboxes = [
-            ("Skip existing", self.skip_existing),
-            ("Confidential safe", self.confidential_safe_mode),
-            ("Force OCR", self.force_ocr),
-            ("Page markers", self.keep_page_markers),
-            ("Remove header/footer", self.remove_header_footer),
-            ("Dedupe images", self.dedupe_images),
-            ("Repair hyphenation", self.repair_hyphenation),
-            ("Figure crop fallback", self.figure_crop_fallback),
+            ("skip_existing", self.skip_existing),
+            ("confidential_safe", self.confidential_safe_mode),
+            ("force_ocr", self.force_ocr),
+            ("page_markers", self.keep_page_markers),
+            ("remove_header_footer", self.remove_header_footer),
+            ("dedupe_images", self.dedupe_images),
+            ("repair_hyphenation", self.repair_hyphenation),
+            ("figure_crop_fallback", self.figure_crop_fallback),
         ]
-        for idx, (label, variable) in enumerate(checkboxes):
-            ttk.Checkbutton(flags, text=label, variable=variable).grid(row=idx // 3, column=idx % 3, sticky="w")
+        for idx, (label_key, variable) in enumerate(checkboxes):
+            checkbox = self._track_text(
+                label_key,
+                ttk.Checkbutton(flags, text=self._t(label_key), variable=variable),
+            )
+            checkbox.grid(row=idx // 3, column=idx % 3, sticky="w")
+            self.advanced_option_widgets.append(checkbox)
 
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(0, 8))
-        self.start_button = ttk.Button(button_frame, text="Start conversion", command=self._start_conversion)
+        button_frame.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        self.start_button = self._track_text(
+            "start_conversion",
+            ttk.Button(button_frame, text=self._t("start_conversion"), command=self._start_conversion),
+        )
         self.start_button.pack(side=tk.LEFT)
-        self.cancel_button = ttk.Button(button_frame, text="Cancel", command=self._request_cancel, state=tk.DISABLED)
+        self.cancel_button = self._track_text(
+            "cancel",
+            ttk.Button(button_frame, text=self._t("cancel"), command=self._request_cancel, state=tk.DISABLED),
+        )
         self.cancel_button.pack(side=tk.LEFT, padx=(8, 0))
-        self.open_output_button = ttk.Button(button_frame, text="Open output folder", command=self._open_output, state=tk.DISABLED)
+        self.open_output_button = self._track_text(
+            "open_output_folder",
+            ttk.Button(
+                button_frame,
+                text=self._t("open_output_folder"),
+                command=self._open_output,
+                state=tk.DISABLED,
+            ),
+        )
         self.open_output_button.pack(side=tk.LEFT, padx=(8, 0))
-        self.help_button = ttk.Button(button_frame, text="Help", command=self._open_help)
+        self.help_button = self._track_text("help", ttk.Button(button_frame, text=self._t("help"), command=self._open_help))
         self.help_button.pack(side=tk.LEFT, padx=(8, 0))
-        self.clear_recent_button = ttk.Button(button_frame, text="Clear recent", command=self._clear_recent)
+        self.clear_recent_button = self._track_text(
+            "clear_recent",
+            ttk.Button(button_frame, text=self._t("clear_recent"), command=self._clear_recent),
+        )
         self.clear_recent_button.pack(side=tk.LEFT, padx=(8, 0))
 
         progress_frame = ttk.Frame(frame)
-        progress_frame.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(0, 8))
+        progress_frame.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         progress_frame.columnconfigure(1, weight=1)
         ttk.Label(progress_frame, textvariable=self.status_text).grid(row=0, column=0, sticky="w", padx=(0, 8))
         self.progress_bar = ttk.Progressbar(
@@ -163,8 +275,9 @@ class Pdf2MdGuiApp:
         )
         self.progress_bar.grid(row=0, column=1, sticky="ew")
 
-        results = ttk.LabelFrame(frame, text="Results")
-        results.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(0, 8))
+        results = ttk.LabelFrame(frame, text=self._t("results"))
+        self._track_text("results", results)
+        results.grid(row=8, column=0, columnspan=3, sticky="nsew", pady=(0, 8))
         results.columnconfigure(0, weight=1)
         results.rowconfigure(0, weight=1)
         self.result_tree = ttk.Treeview(
@@ -173,12 +286,16 @@ class Pdf2MdGuiApp:
             show="headings",
             height=5,
         )
-        self.result_tree.heading("document", text="Document")
-        self.result_tree.heading("status", text="Status")
-        self.result_tree.heading("warnings", text="Warnings")
-        self.result_tree.heading("retry", text="Retry")
-        self.result_tree.heading("markdown", text="Markdown")
-        self.result_tree.heading("report", text="Report")
+        self.localized_headings = {
+            "document": "document",
+            "status": "status",
+            "warnings": "warnings",
+            "retry": "retry",
+            "markdown": "markdown",
+            "report": "report",
+        }
+        for column, label_key in self.localized_headings.items():
+            self.result_tree.heading(column, text=self._t(label_key))
         self.result_tree.column("document", width=150, anchor="w")
         self.result_tree.column("status", width=110, anchor="w")
         self.result_tree.column("warnings", width=90, anchor="center")
@@ -192,55 +309,136 @@ class Pdf2MdGuiApp:
         result_actions.grid(row=1, column=0, sticky="ew", pady=(6, 0))
         self.open_markdown_button = ttk.Button(
             result_actions,
-            text="Open Markdown",
+            text=self._t("open_markdown"),
             command=lambda: self._open_selected_result("markdown"),
             state=tk.DISABLED,
         )
+        self._track_text("open_markdown", self.open_markdown_button)
         self.open_markdown_button.pack(side=tk.LEFT)
         self.open_report_button = ttk.Button(
             result_actions,
-            text="Open Report",
+            text=self._t("open_report"),
             command=lambda: self._open_selected_result("report"),
             state=tk.DISABLED,
         )
+        self._track_text("open_report", self.open_report_button)
         self.open_report_button.pack(side=tk.LEFT, padx=(8, 0))
         self.open_manifest_button = ttk.Button(
             result_actions,
-            text="Open Manifest",
+            text=self._t("open_manifest"),
             command=lambda: self._open_selected_result("manifest"),
             state=tk.DISABLED,
         )
+        self._track_text("open_manifest", self.open_manifest_button)
         self.open_manifest_button.pack(side=tk.LEFT, padx=(8, 0))
         self.open_assets_button = ttk.Button(
             result_actions,
-            text="Open Assets",
+            text=self._t("open_assets"),
             command=lambda: self._open_selected_result("assets"),
             state=tk.DISABLED,
         )
+        self._track_text("open_assets", self.open_assets_button)
         self.open_assets_button.pack(side=tk.LEFT, padx=(8, 0))
 
         self.log_text = tk.Text(frame, height=9, wrap="word", state=tk.DISABLED)
-        self.log_text.grid(row=7, column=0, columnspan=3, sticky="nsew")
-        frame.rowconfigure(6, weight=1)
-        frame.rowconfigure(7, weight=1)
+        self.log_text.grid(row=9, column=0, columnspan=3, sticky="nsew")
+        frame.rowconfigure(8, weight=1)
+        frame.rowconfigure(9, weight=1)
 
-    def _add_labeled_entry(self, parent, label: str, variable, row: int, col: int, show: str | None = None) -> None:  # noqa: ANN001
+    def _add_labeled_entry(self, parent, label_key: str, variable, row: int, col: int, show: str | None = None) -> None:  # noqa: ANN001
         from tkinter import ttk
 
-        ttk.Label(parent, text=label).grid(row=row, column=col, sticky="w", padx=(0, 4), pady=3)
+        self._track_text(label_key, ttk.Label(parent, text=self._t(label_key))).grid(
+            row=row,
+            column=col,
+            sticky="w",
+            padx=(0, 4),
+            pady=3,
+        )
         ttk.Entry(parent, textvariable=variable, show=show).grid(row=row, column=col + 1, sticky="ew", padx=(0, 8), pady=3)
 
-    def _add_labeled_combo(self, parent, label: str, variable, values: list[str], row: int, col: int) -> None:  # noqa: ANN001
+    def _add_labeled_combo(self, parent, label_key: str, variable, values: list[str], row: int, col: int) -> None:  # noqa: ANN001
         from tkinter import ttk
 
-        ttk.Label(parent, text=label).grid(row=row, column=col, sticky="w", padx=(0, 4), pady=3)
-        ttk.Combobox(parent, textvariable=variable, values=values, state="readonly").grid(
+        self._track_text(label_key, ttk.Label(parent, text=self._t(label_key))).grid(
+            row=row,
+            column=col,
+            sticky="w",
+            padx=(0, 4),
+            pady=3,
+        )
+        combo = ttk.Combobox(parent, textvariable=variable, values=values, state="readonly")
+        combo.grid(
             row=row,
             column=col + 1,
             sticky="ew",
             padx=(0, 8),
             pady=3,
         )
+        self.advanced_option_widgets.append(combo)
+
+    def _set_status(self, key: str, **values: object) -> None:
+        self.status_key = key
+        self.status_values = dict(values)
+        self.status_text.set(self._t(key, **values))
+
+    def _set_status_text(self, message: str) -> None:
+        self.status_key = None
+        self.status_values = {}
+        self.status_text.set(message)
+
+    def _change_language(self) -> None:
+        self._refresh_texts()
+        self._save_gui_preferences(language=self.language.get())
+
+    def _change_preset(self) -> None:
+        self._apply_selected_preset(save=True)
+
+    def _save_gui_preferences(
+        self,
+        *,
+        language: GuiLanguage | str | None = None,
+        option_preset: GuiOptionPreset | str | None = None,
+    ) -> None:
+        try:
+            self.recent_state = remember_gui_preferences(
+                self.recent_state,
+                language=language,
+                option_preset=option_preset,
+            )
+            self.state_store.save(self.recent_state)
+        except Exception as exc:  # noqa: BLE001
+            self._append_log(self._t("save_recent_failed", error=exc))
+
+    def _apply_selected_preset(self, *, save: bool) -> None:
+        options = apply_preset_to_options(self.option_preset.get(), self._options())
+        self._set_option_vars(options)
+        self._set_advanced_options_state()
+        if save:
+            self._save_gui_preferences(option_preset=self.option_preset.get())
+
+    def _set_option_vars(self, options: GuiConversionOptions) -> None:
+        self.pages.set(options.pages or "")
+        self.password.set(options.password or "")
+        self.image_mode.set(options.image_mode)
+        self.table_mode.set(options.table_mode)
+        self.rag_table_output.set(options.rag_table_output)
+        self.domain_adapter.set(options.domain_adapter)
+        self.ocr_lang.set(options.ocr_lang or "eng")
+        self.skip_existing.set(options.skip_existing)
+        self.confidential_safe_mode.set(options.confidential_safe_mode)
+        self.force_ocr.set(options.force_ocr)
+        self.keep_page_markers.set(options.keep_page_markers)
+        self.remove_header_footer.set(options.remove_header_footer)
+        self.dedupe_images.set(options.dedupe_images)
+        self.repair_hyphenation.set(options.repair_hyphenation)
+        self.figure_crop_fallback.set(options.figure_crop_fallback)
+
+    def _set_advanced_options_state(self) -> None:
+        editable = preset_allows_custom_options(self.option_preset.get())
+        for widget in self.advanced_option_widgets:
+            normal_state = "readonly" if getattr(widget, "winfo_class", lambda: "")() == "TCombobox" else "normal"
+            widget.configure(state=normal_state if editable else "disabled")
 
     def _restore_recent_paths(self) -> None:
         recent_file = first_existing_path(self.recent_state.recent_input_files)
@@ -260,7 +458,7 @@ class Pdf2MdGuiApp:
             self.recent_state = remember_gui_path(self.recent_state, kind, path, max_items=self.state_store.max_items)
             self.state_store.save(self.recent_state)
         except Exception as exc:  # noqa: BLE001
-            self._append_log(f"Could not save recent GUI path: {exc}")
+            self._append_log(self._t("save_recent_failed", error=exc))
 
     def _remember_request_paths(self, request: GuiConversionRequest) -> None:
         if request.input_mode.lower() == "folder":
@@ -274,9 +472,12 @@ class Pdf2MdGuiApp:
         from tkinter import filedialog
 
         if self.input_mode.get() == "folder":
-            selected = filedialog.askdirectory(title="Select PDF folder")
+            selected = filedialog.askdirectory(title=self._t("select_pdf_folder"))
         else:
-            selected = filedialog.askopenfilename(title="Select PDF file", filetypes=[("PDF files", "*.pdf")])
+            selected = filedialog.askopenfilename(
+                title=self._t("select_pdf_file"),
+                filetypes=[(self._t("pdf_files"), "*.pdf")],
+            )
         if selected:
             self.input_path.set(selected)
             if self.input_mode.get() == "folder":
@@ -287,7 +488,7 @@ class Pdf2MdGuiApp:
     def _browse_output(self) -> None:
         from tkinter import filedialog
 
-        selected = filedialog.askdirectory(title="Select output folder")
+        selected = filedialog.askdirectory(title=self._t("select_output_folder"))
         if selected:
             self.output_dir.set(selected)
             self._remember_recent_path("output_dir", Path(selected))
@@ -326,7 +527,7 @@ class Pdf2MdGuiApp:
         if self.worker is not None and self.worker.is_alive():
             return
         if not self.input_path.get().strip():
-            messagebox.showerror("Missing input", "Select a PDF file or folder.")
+            messagebox.showerror(self._t("missing_input_title"), self._t("missing_input_message"))
             return
         request = self._request()
         self.start_button.configure(state="disabled")
@@ -336,16 +537,16 @@ class Pdf2MdGuiApp:
         self.last_summary = None
         self._clear_log()
         self._clear_results()
-        self.status_text.set("Validating request")
+        self._set_status("validating_request")
         self.progress_value.set(0)
-        self._append_log("Starting conversion")
+        self._append_log(self._t("starting_conversion"))
         diagnostics = validate_gui_request(request)
         if diagnostics.has_errors:
             self.start_button.configure(state="normal")
             self.cancel_button.configure(state="disabled")
-            self._reset_progress("Cannot start conversion")
+            self._reset_progress("cannot_start_conversion")
             self._append_log(diagnostics.user_message())
-            messagebox.showerror("Cannot start conversion", diagnostics.user_message())
+            messagebox.showerror(self._t("cannot_start_conversion"), diagnostics.user_message())
             return
         if diagnostics.warnings:
             self._append_log(diagnostics.user_message())
@@ -378,32 +579,36 @@ class Pdf2MdGuiApp:
                 event, payload = self.queue.get_nowait()
                 if event == "log":
                     self._append_log(str(payload))
-                    self.status_text.set(str(payload))
+                    self._set_status_text(str(payload))
                 elif event == "batch_progress" and isinstance(payload, GuiBatchProgress):
                     self._handle_batch_progress(payload)
                 elif event == "diagnostic_error" and isinstance(payload, GuiDiagnosticError):
                     self.start_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
-                    self._finish_progress("Cannot start conversion", value=0)
+                    self._finish_progress_key("cannot_start_conversion", value=0)
                     self._append_log(payload.report.user_message())
-                    messagebox.showerror("Cannot start conversion", payload.report.user_message())
+                    messagebox.showerror(self._t("cannot_start_conversion"), payload.report.user_message())
                 elif event == "error":
                     self.start_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
-                    self._finish_progress("Conversion failed", value=0)
-                    self._append_log(f"Failed: {payload}")
-                    messagebox.showerror("Conversion failed", str(payload))
+                    self._finish_progress_key("conversion_failed", value=0)
+                    self._append_log(self._t("failed_prefix", error=payload))
+                    messagebox.showerror(self._t("conversion_failed"), str(payload))
                 elif event == "done" and isinstance(payload, GuiConversionSummary):
                     self.last_summary = payload
                     self.start_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
                     self.open_output_button.configure(state="normal")
                     self._remember_recent_path("output_dir", payload.output_root)
-                    status_text = "Conversion finished" if payload.exit_code == 0 else "Conversion finished with warnings or failures"
-                    self._finish_progress(status_text, value=100)
+                    status_key = (
+                        "conversion_finished_percent"
+                        if payload.exit_code == 0
+                        else "conversion_finished_with_warnings_percent"
+                    )
+                    self._finish_progress_key(status_key, value=100, percent=self._t("single_complete_percent"))
                     self._populate_results(payload)
                     self._append_log(format_gui_summary(payload))
-                    messagebox.showinfo("Conversion finished", self._summary_text(payload))
+                    messagebox.showinfo(self._t("conversion_finished"), self._summary_text(payload))
         except Empty:
             pass
         self.root.after(100, self._poll_queue)
@@ -425,7 +630,7 @@ class Pdf2MdGuiApp:
                     document.input_pdf.name,
                     document.status,
                     warning_value,
-                    "yes" if document.retry_candidate else "",
+                    self._t("yes") if document.retry_candidate else "",
                     str(document.markdown_path or ""),
                     str(document.report_path or ""),
                 ),
@@ -447,22 +652,35 @@ class Pdf2MdGuiApp:
     def _request_cancel(self) -> None:
         self.cancel_event.set()
         self.cancel_button.configure(state="disabled")
-        self.status_text.set("Cancel requested")
-        self._append_log("Cancel requested; the current document will finish before the batch stops.")
+        self._set_status("cancel_requested")
+        self._append_log(self._t("cancel_requested_detail"))
 
     def _batch_progress_text(self, event: GuiBatchProgress) -> str:
-        return f"Batch {event.current}/{event.total} {event.input_pdf.name}: {event.status}"
+        snapshot = gui_batch_progress_snapshot(
+            current=event.current,
+            total=event.total,
+            input_pdf=event.input_pdf,
+            status=event.status,
+        )
+        return self._t(
+            "batch_progress",
+            current=snapshot.current,
+            total=snapshot.total,
+            percent=snapshot.percent,
+            document=event.input_pdf.name,
+            status=event.status,
+        )
 
     def _begin_progress(self, request: GuiConversionRequest) -> None:
         self.progress_bar.stop()
         if request.input_mode.lower() == "folder":
             self.progress_bar.configure(mode="determinate", maximum=100)
             self.progress_value.set(0)
-            self.status_text.set("Batch conversion starting")
+            self._set_status("batch_conversion_starting")
         else:
             self.progress_bar.configure(mode="indeterminate", maximum=100)
             self.progress_value.set(0)
-            self.status_text.set("Conversion starting")
+            self._set_status("conversion_starting")
             self.progress_bar.start(10)
 
     def _handle_batch_progress(self, event: GuiBatchProgress) -> None:
@@ -475,17 +693,31 @@ class Pdf2MdGuiApp:
         self.progress_bar.stop()
         self.progress_bar.configure(mode="determinate", maximum=100)
         self.progress_value.set(snapshot.percent)
-        self.status_text.set(snapshot.label)
-        self._append_log(snapshot.label)
+        label = self._t(
+            "batch_progress",
+            current=snapshot.current,
+            total=snapshot.total,
+            percent=snapshot.percent,
+            document=event.input_pdf.name,
+            status=event.status,
+        )
+        self._set_status_text(label)
+        self._append_log(label)
 
     def _finish_progress(self, message: str, *, value: int) -> None:
         self.progress_bar.stop()
         self.progress_bar.configure(mode="determinate", maximum=100)
         self.progress_value.set(value)
-        self.status_text.set(message)
+        self._set_status_text(message)
 
-    def _reset_progress(self, message: str = "Ready") -> None:
-        self._finish_progress(message, value=0)
+    def _finish_progress_key(self, key: str, *, value: int, **values: object) -> None:
+        self.progress_bar.stop()
+        self.progress_bar.configure(mode="determinate", maximum=100)
+        self.progress_value.set(value)
+        self._set_status(key, **values)
+
+    def _reset_progress(self, key: str = "ready") -> None:
+        self._finish_progress_key(key, value=0)
 
     def _append_log(self, message: str) -> None:
         self.log_text.configure(state="normal")
@@ -521,37 +753,37 @@ class Pdf2MdGuiApp:
     def _open_selected_result(self, target: ResultOpenTarget) -> None:
         document = self._selected_document()
         path = gui_document_open_target(document, target) if document is not None else None
-        self._open_path(path, f"Open {target} failed")
+        self._open_path(path, self._t("open_target_failed", target=target))
 
     def _open_output(self) -> None:
         if self.last_summary is None:
             return
         document = self._selected_document()
         path = gui_document_open_target(document, "output_dir") if document is not None else self.last_summary.output_root
-        self._open_path(path, "Open output folder failed")
+        self._open_path(path, self._t("open_output_failed"))
 
     def _open_path(self, path: Path | None, failure_title: str) -> None:
         from tkinter import messagebox
 
         if path is None:
-            message = "No result path is available for the selected document."
+            message = self._t("no_result_path")
             self._append_log(message)
             messagebox.showwarning(failure_title, message)
             return
         if not path.exists():
-            message = f"Result path does not exist: {path}"
+            message = self._t("result_path_missing", path=path)
             self._append_log(message)
             messagebox.showwarning(failure_title, message)
             return
         try:
             opened = webbrowser.open(path.resolve().as_uri())
         except Exception as exc:  # noqa: BLE001
-            message = f"Could not open result path: {exc}"
+            message = self._t("result_path_open_error", error=exc)
             self._append_log(message)
             messagebox.showwarning(failure_title, message)
             return
         if not opened:
-            message = f"Could not open result path: {path}"
+            message = self._t("result_path_open_false", path=path)
             self._append_log(message)
             messagebox.showwarning(failure_title, message)
 
@@ -559,41 +791,48 @@ class Pdf2MdGuiApp:
         from tkinter import messagebox
 
         try:
-            self.recent_state = self.state_store.clear()
+            cleared_state = self.state_store.clear()
+            self.recent_state = remember_gui_preferences(
+                cleared_state,
+                language=self.language.get(),
+                option_preset=self.option_preset.get(),
+            )
+            self.state_store.save(self.recent_state)
         except Exception as exc:  # noqa: BLE001
-            self.recent_state = GuiRecentState()
-            message = f"Could not clear recent GUI paths: {exc}"
+            self.recent_state = remember_gui_preferences(
+                GuiRecentState(),
+                language=self.language.get(),
+                option_preset=self.option_preset.get(),
+            )
+            message = self._t("save_recent_failed", error=exc)
             self._append_log(message)
-            messagebox.showwarning("Clear recent failed", message)
+            messagebox.showwarning(self._t("clear_recent_failed"), message)
             return
         self.input_path.set("")
         self.output_dir.set("")
-        self._append_log("Recent GUI paths cleared.")
-        self.status_text.set("Recent paths cleared")
+        self._append_log(self._t("recent_paths_cleared"))
+        self._set_status("recent_paths_cleared_status")
 
     def _open_help(self) -> None:
         from tkinter import messagebox
 
         guide_path = gui_user_guide_path()
         if not guide_path.exists():
-            message = (
-                "GUI user guide was not found. "
-                "Open docs/GUI_USER_GUIDE.md from the project root, or reinstall from the source checkout."
-            )
+            message = self._t("help_missing")
             self._append_log(message)
-            messagebox.showwarning("Help unavailable", message)
+            messagebox.showwarning(self._t("help_unavailable"), message)
             return
         try:
             opened = webbrowser.open(guide_path.resolve().as_uri())
         except Exception as exc:  # noqa: BLE001
-            message = f"Could not open GUI user guide: {exc}"
+            message = self._t("help_open_error", error=exc)
             self._append_log(message)
-            messagebox.showwarning("Help unavailable", message)
+            messagebox.showwarning(self._t("help_unavailable"), message)
             return
         if not opened:
-            message = f"Could not open GUI user guide: {guide_path}"
+            message = self._t("help_open_false", path=guide_path)
             self._append_log(message)
-            messagebox.showwarning("Help unavailable", message)
+            messagebox.showwarning(self._t("help_unavailable"), message)
 
 
 def _write_startup_diagnostics(report: GuiDiagnosticReport) -> None:
