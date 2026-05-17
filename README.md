@@ -308,6 +308,8 @@ python3 scripts/create_gui_support_bundle.py --output-dir /tmp/pdf2md-gui-suppor
 
 `gui_support_bundle.json`과 `gui_support_bundle.md`는 local-only 지원 artifact입니다. status count, warning code/count, sanitized artifact label, environment/runtime code만 저장하고 원문 PDF/Markdown 내용, 표/이미지 내용, 변환 warning message, home/workspace absolute path는 저장하지 않습니다.
 
+wheel 설치 환경에서는 repository-level `docs/GUI_USER_GUIDE.md`가 없을 수 있으므로 GUI help는 packaged `pdf2md.resources/GUI_USER_GUIDE.md` fallback도 지원합니다. release packaging gate는 wheel 안에 GUI module, support/profile helper, packaged help resource, `pdf2md-gui` console script metadata가 포함되는지 검사합니다.
+
 ### 가장 기본 실행
 
 macOS/Linux 예시:
@@ -910,7 +912,8 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
 - `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref coverage, chunk token 분포, threshold summary
-- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, schema check, packaging smoke command/status summary
+- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, schema check, packaging smoke/wheel contract command/status summary
+- `wheel_contract_report.json`: wheel 내부 GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
 - benchmark는 수동/릴리스 전 검증용이며 기본 CI 테스트에는 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
@@ -931,7 +934,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q69-Q71입니다. 완료된 Q34-Q68 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q70-Q71입니다. 완료된 Q34-Q69 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 

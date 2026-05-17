@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | Wheel GUI help resource contract | 97/100 | 0 | Q69. Wheel Contents And GUI Help Resource Contract 구현. packaged GUI help fallback, wheel content/console script inspector, packaging gate의 GUI module help와 support/profile helper 포함 검증을 추가. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q70-Q71 |
 | 2026-05-17 | GUI release gate integration | 97/100 | 0 | Q68. GUI Release Gate Integration 구현. optional `gui` release gate로 GUI help, doctor JSON, headless smoke evidence, sanitized support bundle redaction 검증을 Tk window 없이 실행하고 command/status/report path를 기록. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q69-Q71 |
 | 2026-05-17 | GUI expert options/profile | 97/100 | 0 | Q67. GUI Expert Options And Profile Import/Export 구현. GUI에 page_workers/debug/verbose expert options와 local-only profile import/export를 추가하고, password/path/raw content 미저장 profile validation을 고정. 변환 품질과 public schema 계약은 유지하며 active quality backlog는 없다 |
 | 2026-05-17 | GUI support bundle | 97/100 | 0 | Q66. Sanitized GUI Support Bundle 구현. GUI summary, runtime doctor, smoke evidence를 raw text/message/path 없이 status count, warning code/count, sanitized artifact label, runtime code 중심 JSON/Markdown support artifact로 생성. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q67 |
@@ -59,6 +60,19 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q69 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + GUI 배포 신뢰도** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q69는 wheel 배포에서 GUI help와 console script 계약이 깨지는 리스크를 줄였다. source checkout의 `docs/GUI_USER_GUIDE.md`를 우선하되 wheel 설치 환경에서는 packaged `pdf2md.resources/GUI_USER_GUIDE.md` fallback을 사용하고, packaging gate가 built wheel의 GUI module, support/profile helper, packaged help resource, `pdf2md`/`pdf2md-gui` entry point metadata를 `wheel_contract_report.json`으로 검증한다.
+
+#### 다음 개선 참조
+
+- Q70. GUI Profile And Support Bundle Failure Fixture
+- Q71. Quality Scorecard Refresh And Next Backlog Reassessment
 
 ### 2026-05-17 (Q68 구현 후)
 

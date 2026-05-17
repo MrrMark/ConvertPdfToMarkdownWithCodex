@@ -23,39 +23,6 @@
 
 ## 현재 Active Development Specs
 
-## P1 / Q69. Wheel Contents And GUI Help Resource Contract
-
-### 배경
-
-GUI Help는 source checkout의 `docs/GUI_USER_GUIDE.md`를 기준으로 동작한다. wheel/sdist 배포에서는 docs 파일 포함 여부와 console script metadata가 깨질 수 있으므로 package artifact 수준의 검증이 필요하다.
-
-### 목표
-
-- wheel build 결과에 GUI 관련 module/script metadata가 포함되는지 검사한다.
-- wheel 또는 package resource 경로에서도 GUI help document availability가 명확히 진단되도록 한다.
-- packaging gate가 CLI뿐 아니라 GUI entry point와 support/profile helper 포함 여부를 검증한다.
-
-### 구현 범위
-
-- 필요 시 `pdf2md/resources/` 또는 package data 정책 추가
-- `gui_user_guide_path()` 또는 help path helper fallback 개선
-- wheel zip content inspection helper/script 추가 또는 packaging gate 확장
-- tests에서 wheel content, console script metadata, GUI help resource contract 검증
-
-### 검증
-
-- `.venv311/bin/python -m pytest tests/test_gui_runner.py tests/test_quality_gate_scripts.py`
-- `.venv311/bin/python scripts/run_release_gates.py --output-dir /private/tmp/pdf2md-q69-packaging --gates packaging`
-- `python3 -m pdf2md.gui --doctor --doctor-format json`
-- `.venv311/bin/python -m pytest`
-- `git diff --check`
-
-### 비범위
-
-- PyPI upload
-- code signing/notarization
-- 외부 네트워크 dependency download 전제
-
 ## P2 / Q70. GUI Profile And Support Bundle Failure Fixture
 
 ### 배경
@@ -112,4 +79,4 @@ Q53-Q67까지 GUI 사용성/호환성 작업이 누적되었고 현재 점수는
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q68 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q69 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

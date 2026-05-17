@@ -8,6 +8,7 @@ import sys
 import threading
 import webbrowser
 
+from pdf2md.gui_help import gui_user_guide_path
 from pdf2md.gui_runner import (
     GuiBatchProgress,
     GuiConversionOptions,
@@ -49,11 +50,6 @@ from pdf2md.gui_state import (
     remember_gui_path,
 )
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
-
-
-def gui_user_guide_path() -> Path:
-    """Return the local GUI user guide path for source checkout/editable installs."""
-    return Path(__file__).resolve().parents[1] / "docs" / "GUI_USER_GUIDE.md"
 
 
 def build_parser() -> argparse.ArgumentParser:

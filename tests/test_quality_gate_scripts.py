@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
 from scripts import benchmark_conversion
 from scripts import check_ocr_runtime
+from scripts import inspect_wheel_contract
 from scripts import run_corpus_eval
 from scripts import run_release_gates
 
@@ -203,12 +205,14 @@ def test_release_gate_runner_writes_success_summary(monkeypatch, tmp_path: Path)
     )
 
     assert payload["passed_release_gate"] is True
-    assert payload["summary"]["total_gate_commands"] == 6
+    assert payload["summary"]["total_gate_commands"] == 8
     assert (tmp_path / "release" / "release_gate_report.json").exists()
     assert (tmp_path / "release" / "ocr_runtime_report.json").exists()
     assert any(any(str(part).endswith("run_corpus_eval.py") for part in command) for command in calls)
     assert any(any(str(part).endswith("benchmark_conversion.py") for part in command) for command in calls)
     assert any(any(str(part).endswith("export_output_schema.py") for part in command) for command in calls)
+    assert any(any(str(part).endswith("inspect_wheel_contract.py") for part in command) for command in calls)
+    assert any(command[1:] == ["-m", "pdf2md.gui", "--help"] for command in calls)
     benchmark_command = next(command for command in calls if any(str(part).endswith("benchmark_conversion.py") for part in command))
     assert "--page-workers" in benchmark_command
 
@@ -418,3 +422,70 @@ def test_release_gate_runner_fails_gui_gate_on_redaction_failure(monkeypatch, tm
     failed = [record for record in payload["gates"] if record["status"] == "failed"]
     assert failed[0]["gate"] == "gui:smoke-evidence"
     assert "redaction failed" in failed[0]["stderr_tail"]
+
+
+def test_wheel_contract_inspector_accepts_gui_resource_and_entry_points(tmp_path: Path) -> None:
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    wheel_path = dist_dir / "pdf2md-0.1.0-py3-none-any.whl"
+    _write_wheel(
+        wheel_path,
+        {
+            *inspect_wheel_contract.REQUIRED_WHEEL_MEMBERS,
+            "pdf2md-0.1.0.dist-info/entry_points.txt",
+        },
+        entry_points="\n".join(
+            [
+                "[console_scripts]",
+                "pdf2md = pdf2md.cli:main",
+                "pdf2md-gui = pdf2md.gui:main",
+                "",
+            ]
+        ),
+    )
+
+    payload = inspect_wheel_contract.inspect_wheel_contract(dist_dir)
+
+    assert payload["status"] == "passed"
+    assert payload["summary"]["failed_count"] == 0
+    assert any(check["name"] == "wheel_member:pdf2md/resources/GUI_USER_GUIDE.md" for check in payload["checks"])
+    assert any(check["name"] == "console_script:pdf2md-gui" for check in payload["checks"])
+
+
+def test_wheel_contract_inspector_fails_without_gui_help_resource(tmp_path: Path) -> None:
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    wheel_path = dist_dir / "pdf2md-0.1.0-py3-none-any.whl"
+    members = set(inspect_wheel_contract.REQUIRED_WHEEL_MEMBERS)
+    members.remove("pdf2md/resources/GUI_USER_GUIDE.md")
+    members.add("pdf2md-0.1.0.dist-info/entry_points.txt")
+    _write_wheel(
+        wheel_path,
+        members,
+        entry_points="\n".join(
+            [
+                "[console_scripts]",
+                "pdf2md = pdf2md.cli:main",
+                "pdf2md-gui = pdf2md.gui:main",
+                "",
+            ]
+        ),
+    )
+
+    payload = inspect_wheel_contract.inspect_wheel_contract(dist_dir)
+
+    assert payload["status"] == "failed"
+    failed = [check for check in payload["checks"] if check["status"] == "failed"]
+    assert failed == [
+        {
+            "name": "wheel_member:pdf2md/resources/GUI_USER_GUIDE.md",
+            "status": "failed",
+            "message": "missing",
+        }
+    ]
+
+
+def _write_wheel(wheel_path: Path, members: set[str], *, entry_points: str) -> None:
+    with zipfile.ZipFile(wheel_path, "w") as wheel:
+        for member in sorted(members):
+            wheel.writestr(member, entry_points if member.endswith("entry_points.txt") else "")

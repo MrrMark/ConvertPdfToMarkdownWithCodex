@@ -432,8 +432,25 @@ def _packaging_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
             report_path=dist_dir,
         ),
         _run_command(
+            gate="packaging:wheel-contract",
+            command=[
+                sys.executable,
+                "scripts/inspect_wheel_contract.py",
+                "--dist-dir",
+                str(dist_dir),
+                "--report-file",
+                str(dist_dir / "wheel_contract_report.json"),
+            ],
+            report_path=dist_dir / "wheel_contract_report.json",
+        ),
+        _run_command(
             gate="packaging:module-help",
             command=[sys.executable, "-m", "pdf2md", "--help"],
+            report_path=None,
+        ),
+        _run_command(
+            gate="packaging:gui-module-help",
+            command=[_gui_python_executable(), "-m", "pdf2md.gui", "--help"],
             report_path=None,
         ),
     ]
