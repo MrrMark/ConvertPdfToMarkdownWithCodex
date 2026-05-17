@@ -101,6 +101,40 @@ def test_gui_profile_invalid_payload_returns_structured_diagnostics() -> None:
         options_from_gui_profile(payload)
 
 
+def test_gui_profile_invalid_payload_diagnostics_do_not_echo_raw_values(tmp_path: Path) -> None:
+    payload = {
+        "schema_version": f"{tmp_path}/schema-secret",
+        "kind": f"{tmp_path}/kind-secret",
+        "options": {
+            f"{tmp_path}/unknown-secret.pdf": True,
+            "table_mode": "customer-secret-table-mode",
+            "page_workers": f"{tmp_path}/workers",
+            "raw_pdf_text": "raw customer text",
+        },
+    }
+
+    report = validate_gui_profile_payload(payload)
+    diagnostic_text = json.dumps(
+        [
+            {
+                "code": diagnostic.code,
+                "message": diagnostic.message,
+                "action": diagnostic.action,
+                "path": str(diagnostic.path) if diagnostic.path is not None else None,
+            }
+            for diagnostic in report.diagnostics
+        ],
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+
+    assert report.has_errors is True
+    assert str(tmp_path) not in diagnostic_text
+    assert "unknown-secret.pdf" not in diagnostic_text
+    assert "customer-secret-table-mode" not in diagnostic_text
+    assert "raw customer text" not in diagnostic_text
+
+
 def test_gui_profile_unknown_options_are_warnings_and_ignored() -> None:
     payload = gui_profile_payload(GuiConversionOptions(force_ocr=True))
     payload["options"]["future_option"] = True
@@ -110,6 +144,7 @@ def test_gui_profile_unknown_options_are_warnings_and_ignored() -> None:
 
     assert report.has_errors is False
     assert [diagnostic.code for diagnostic in report.warnings] == ["profile_unknown_options_ignored"]
+    assert "future_option" not in report.warnings[0].message
     assert options.force_ocr is True
     assert not hasattr(options, "future_option")
 

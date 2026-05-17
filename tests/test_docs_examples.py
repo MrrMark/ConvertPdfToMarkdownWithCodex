@@ -56,8 +56,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q70-Q71" in readme
-    assert "완료된 Q34-Q69" in readme
+    assert "현재 active quality backlog는 Q71" in readme
+    assert "완료된 Q34-Q70" in readme
     assert "wheel_contract_report.json" in readme
     assert "pdf2md.resources/GUI_USER_GUIDE.md" in readme
     assert "Expert options" in readme
@@ -307,7 +307,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q67. GUI Expert Options And Profile Import/Export" not in next_plan
     assert "Q68. GUI Release Gate Integration" not in next_plan
     assert "Q69. Wheel Contents And GUI Help Resource Contract" not in next_plan
-    assert "Q70. GUI Profile And Support Bundle Failure Fixture" in next_plan
+    assert "Q70. GUI Profile And Support Bundle Failure Fixture" not in next_plan
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" in next_plan
     assert "Tcl/Tk patchlevel" not in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
@@ -329,16 +329,16 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q67. GUI Expert Options And Profile Import/Export" not in development_specs
     assert "Q68. GUI Release Gate Integration" not in development_specs
     assert "Q69. Wheel Contents And GUI Help Resource Contract" not in development_specs
-    assert "Q70. GUI Profile And Support Bundle Failure Fixture" in development_specs
+    assert "Q70. GUI Profile And Support Bundle Failure Fixture" not in development_specs
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" in development_specs
-    assert "tests/test_gui_profiles.py" in development_specs
+    assert "tests/test_gui_profiles.py" not in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q69" in development_specs
+    assert "완료된 Q34-Q70" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -367,8 +367,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q67. GUI Expert Options And Profile Import/Export" in implemented_specs
     assert "Q68. GUI Release Gate Integration" in implemented_specs
     assert "Q69. Wheel Contents And GUI Help Resource Contract" in implemented_specs
+    assert "Q70. GUI Profile And Support Bundle Failure Fixture" in implemented_specs
     assert "scripts/inspect_wheel_contract.py" in implemented_specs
     assert "pdf2md/resources/GUI_USER_GUIDE.md" in implemented_specs
+    assert "tests/test_gui_profiles.py" in implemented_specs
     assert "--gates gui" in implemented_specs
     assert "python -m pdf2md.gui --doctor" in implemented_specs
     assert "scripts/create_gui_support_bundle.py" in implemented_specs
@@ -436,6 +438,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q67. GUI Expert Options And Profile Import/Export" in quality_scorecard
     assert "Q68. GUI Release Gate Integration" in quality_scorecard
     assert "Q69. Wheel Contents And GUI Help Resource Contract" in quality_scorecard
+    assert "Q70. GUI Profile And Support Bundle Failure Fixture" in quality_scorecard
+    assert "GUI failure fixture hardening" in quality_scorecard
+    assert "다음 active backlog는 Q71" in quality_scorecard
     assert "Wheel GUI help resource contract" in quality_scorecard
     assert "다음 active backlog는 Q70-Q71" in quality_scorecard
     assert "GUI release gate integration" in quality_scorecard

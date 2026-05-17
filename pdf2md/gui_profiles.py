@@ -85,7 +85,7 @@ def validate_gui_profile_payload(payload: object) -> GuiDiagnosticReport:
             GuiDiagnostic(
                 code="profile_schema_unsupported",
                 severity="error",
-                message=f"Unsupported GUI profile schema version: {schema_version}.",
+                message="Unsupported GUI profile schema version.",
                 action=f"Use schema_version {GUI_PROFILE_SCHEMA_VERSION}.",
             )
         )
@@ -94,7 +94,7 @@ def validate_gui_profile_payload(payload: object) -> GuiDiagnosticReport:
             GuiDiagnostic(
                 code="profile_kind_unsupported",
                 severity="error",
-                message=f"Unsupported GUI profile kind: {payload.get('kind')}.",
+                message="Unsupported GUI profile kind.",
                 action=f"Use kind {GUI_PROFILE_KIND}.",
             )
         )
@@ -121,7 +121,7 @@ def validate_gui_profile_payload(payload: object) -> GuiDiagnosticReport:
             GuiDiagnostic(
                 code="profile_unknown_options_ignored",
                 severity="warning",
-                message=f"Unknown GUI profile options will be ignored: {', '.join(unknown_fields)}.",
+                message=f"{len(unknown_fields)} unknown GUI profile option(s) will be ignored.",
                 action="Remove unknown fields if this was not intentional.",
             )
         )

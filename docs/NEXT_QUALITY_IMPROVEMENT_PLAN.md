@@ -23,18 +23,6 @@
 
 ## 남은 작업
 
-### P2 / Q70. GUI Profile And Support Bundle Failure Fixture
-
-실패/partial success 상황에서 support bundle과 profile import가 raw exception/warning/path를 누출하지 않는지 regression fixture를 강화한다.
-
-핵심 범위:
-
-- 실패/partial GUI summary fixture 추가
-- support bundle이 retry candidate, warning code/count, status count만 저장하고 raw exception/warning message를 저장하지 않는지 검증
-- invalid profile import가 구조화된 diagnostic만 표시하는지 headless contract 강화
-
-비범위는 GUI modal click automation과 GitHub issue 자동 생성이다.
-
 ### P2 / Q71. Quality Scorecard Refresh And Next Backlog Reassessment
 
 Q68-Q70 결과를 반영해 scorecard를 보수적으로 재평가하고, 다음 backlog를 비워둘지 변환 품질 중심 Q72+를 새로 열지 결정한다.
