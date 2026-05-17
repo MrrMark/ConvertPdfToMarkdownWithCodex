@@ -12,9 +12,19 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Sequence
 
+from pdf2md.batch_runner import (
+    BatchConversionOptions,
+    BatchDocumentEvent,
+    BatchDocumentResult,
+    BatchRunResult,
+    build_batch_config as build_shared_batch_config,
+    detect_duplicate_stems,
+    iter_pdf_paths,
+    run_batch_conversion as run_shared_batch_conversion,
+)
 from pdf2md.config import Config, default_output_dir_for_input
 from pdf2md.gui_help import gui_user_guide_path
-from pdf2md.models import ConversionStatus, DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode, WarningEntry
+from pdf2md.models import ConversionStatus, DomainAdapterMode, ImageMode, RagTableOutputMode, Report, TableMode, WarningEntry
 from pdf2md.pipeline import EXIT_FATAL, EXIT_PARTIAL, ConversionResult, run_conversion
 
 
@@ -134,6 +144,10 @@ class GuiConversionSummary:
     output_root: Path
     documents: list[GuiDocumentSummary]
     exit_code: int
+    batch_report_path: Path | None = None
+    corpus_manifest_path: Path | None = None
+    corpus_diff_report_path: Path | None = None
+    requirement_change_impact_report_path: Path | None = None
 
     @property
     def success_count(self) -> int:
@@ -782,7 +796,7 @@ def validate_gui_request(request: GuiConversionRequest) -> GuiDiagnosticReport:
                         path=input_path,
                     )
                 )
-            duplicates = _detect_duplicate_stems(pdf_paths)
+            duplicates = detect_duplicate_stems(pdf_paths)
             if duplicates:
                 diagnostics.append(
                     GuiDiagnostic(
@@ -828,6 +842,29 @@ def _coerce_options(options: GuiConversionOptions) -> dict:
     }
 
 
+def _batch_options_from_gui(options: GuiConversionOptions) -> BatchConversionOptions:
+    return BatchConversionOptions(
+        pages=options.pages or None,
+        password=options.password or None,
+        image_mode=ImageMode(options.image_mode),
+        table_mode=TableMode(options.table_mode),
+        rag_table_output=RagTableOutputMode(options.rag_table_output),
+        domain_adapter=DomainAdapterMode(options.domain_adapter),
+        confidential_safe_mode=options.confidential_safe_mode,
+        force_ocr=options.force_ocr,
+        ocr_lang=options.ocr_lang or "eng",
+        keep_page_markers=options.keep_page_markers,
+        remove_header_footer=options.remove_header_footer,
+        dedupe_images=options.dedupe_images,
+        repair_hyphenation=options.repair_hyphenation,
+        figure_crop_fallback=options.figure_crop_fallback,
+        page_workers=options.page_workers,
+        debug=options.debug,
+        verbose=options.verbose,
+        skip_existing=options.skip_existing,
+    )
+
+
 def gui_options_fingerprint(options: GuiConversionOptions) -> str:
     """Return a deterministic local-only fingerprint for GUI conversion options."""
     payload = json.dumps(asdict(options), sort_keys=True, separators=(",", ":"))
@@ -843,31 +880,7 @@ def build_single_config(request: GuiConversionRequest) -> Config:
 
 def build_batch_config(request: GuiConversionRequest, pdf_path: Path, output_root: Path) -> Config:
     """Build a batch-document Config using the CLI batch naming contract."""
-    stem = pdf_path.stem
-    return Config(
-        input_pdf=pdf_path,
-        output_dir=output_root / stem,
-        markdown_filename=f"{stem}.md",
-        manifest_filename=f"{stem}_manifest.json",
-        report_filename=f"{stem}_report.json",
-        assets_dirname=f"{stem}_assets",
-        **_coerce_options(request.options),
-    )
-
-
-def iter_pdf_paths(input_dir: Path) -> list[Path]:
-    """Return direct child PDF files in deterministic order."""
-    return sorted(
-        [path for path in input_dir.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"],
-        key=lambda path: (path.name.lower(), path.name),
-    )
-
-
-def _detect_duplicate_stems(pdf_paths: list[Path]) -> list[str]:
-    stem_map: dict[str, list[str]] = {}
-    for path in pdf_paths:
-        stem_map.setdefault(path.stem.casefold(), []).append(path.name)
-    return sorted(", ".join(sorted(names)) for names in stem_map.values() if len(names) > 1)
+    return build_shared_batch_config(pdf_path, output_root, _batch_options_from_gui(request.options))
 
 
 def _has_existing_core_outputs(config: Config) -> bool:
@@ -978,6 +991,70 @@ def _failed_document_summary(config: Config, exc: Exception, option_fingerprint:
     )
 
 
+def _warning_codes_from_report(config: Config) -> tuple[str, ...]:
+    report_path = config.output_dir / config.report_filename
+    if not report_path.exists():
+        return ()
+    try:
+        report = Report.model_validate(json.loads(report_path.read_text(encoding="utf-8")))
+    except Exception:  # noqa: BLE001
+        return ()
+    return warning_codes_for_display(list(report.warnings))
+
+
+def _document_summary_from_batch_document(
+    request: GuiConversionRequest,
+    output_root: Path,
+    pdf_path: Path,
+    document: BatchDocumentResult,
+    *,
+    option_fingerprint: str,
+) -> GuiDocumentSummary:
+    config = build_batch_config(request, pdf_path, output_root)
+    status = document.status
+    return GuiDocumentSummary(
+        input_pdf=pdf_path,
+        output_dir=config.output_dir,
+        status=status,
+        exit_code=document.exit_code,
+        markdown_path=_markdown_path(config),
+        manifest_path=_manifest_path(config),
+        report_path=_report_path(config),
+        assets_dir=_assets_dir(config),
+        warning_count=document.warning_count,
+        warning_codes=_warning_codes_from_report(config),
+        skipped=document.skipped,
+        retry_candidate=status == ConversionStatus.FAILED.value,
+        option_fingerprint=option_fingerprint,
+        message="cancelled before conversion" if status == GUI_STATUS_CANCELLED else None,
+    )
+
+
+def _handle_batch_event(
+    event: BatchDocumentEvent,
+    *,
+    progress: ProgressCallback | None,
+    batch_progress: BatchProgressCallback | None,
+) -> None:
+    if event.status == "started":
+        _emit(progress, f"Converting {event.input_pdf}")
+    elif event.status == GUI_STATUS_SKIPPED:
+        _emit(progress, f"Skipped {event.input_pdf.name}: existing core outputs")
+    elif event.status == GUI_STATUS_CANCELLED:
+        _emit(progress, f"Cancelled {event.input_pdf.name}: request received before conversion")
+    elif event.status == ConversionStatus.FAILED.value:
+        _emit(progress, f"Failed {event.input_pdf.name}: conversion failed")
+    else:
+        _emit(progress, f"Finished {event.input_pdf.name}: {event.status}")
+    _emit_batch_progress(
+        batch_progress,
+        current=event.current,
+        total=event.total,
+        input_pdf=event.input_pdf,
+        status=event.status,
+    )
+
+
 def _run_batch(
     request: GuiConversionRequest,
     progress: ProgressCallback | None,
@@ -985,101 +1062,37 @@ def _run_batch(
     cancel_requested: CancelCallback | None,
 ) -> GuiConversionSummary:
     input_dir = request.input_path
-    if not input_dir.exists() or not input_dir.is_dir():
-        raise ValueError(f"Input directory does not exist or is not a directory: {input_dir}")
-    pdf_paths = iter_pdf_paths(input_dir)
-    if not pdf_paths:
-        raise ValueError(f"No PDF files found in directory: {input_dir}")
-    duplicates = _detect_duplicate_stems(pdf_paths)
-    if duplicates:
-        raise ValueError(f"Duplicate PDF stems found: {'; '.join(duplicates)}")
-
     output_root = request.output_dir if request.output_dir is not None else input_dir / "output"
-    output_root.mkdir(parents=True, exist_ok=True)
-    documents: list[GuiDocumentSummary] = []
-    exit_code = 0
     option_fingerprint = gui_options_fingerprint(request.options)
-    total = len(pdf_paths)
-    for index, pdf_path in enumerate(pdf_paths, start=1):
-        config = build_batch_config(request, pdf_path, output_root)
-        if cancel_requested is not None and cancel_requested():
-            exit_code = EXIT_PARTIAL
-            for cancelled_path in pdf_paths[index - 1 :]:
-                cancelled_config = build_batch_config(request, cancelled_path, output_root)
-                _emit(progress, f"Cancelled {cancelled_path.name}: request received before conversion")
-                _emit_batch_progress(
-                    batch_progress,
-                    current=pdf_paths.index(cancelled_path) + 1,
-                    total=total,
-                    input_pdf=cancelled_path,
-                    status=GUI_STATUS_CANCELLED,
-                )
-                documents.append(_cancelled_document_summary(cancelled_config, option_fingerprint))
-            break
-        if request.options.skip_existing and _has_existing_core_outputs(config):
-            _emit(progress, f"Skipped {pdf_path.name}: existing core outputs")
-            _emit_batch_progress(
-                batch_progress,
-                current=index,
-                total=total,
-                input_pdf=pdf_path,
-                status=GUI_STATUS_SKIPPED,
-            )
-            documents.append(
-                GuiDocumentSummary(
-                    input_pdf=pdf_path,
-                    output_dir=config.output_dir,
-                    status=GUI_STATUS_SKIPPED,
-                    exit_code=0,
-                    markdown_path=_markdown_path(config),
-                    manifest_path=_manifest_path(config),
-                    report_path=_report_path(config),
-                    assets_dir=_assets_dir(config),
-                    skipped=True,
-                    option_fingerprint=option_fingerprint,
-                    message="existing core outputs",
-                )
-            )
-            continue
-        _emit(progress, f"Converting {pdf_path}")
-        _emit_batch_progress(
-            batch_progress,
-            current=index,
-            total=total,
-            input_pdf=pdf_path,
-            status="started",
+    batch_result: BatchRunResult = run_shared_batch_conversion(
+        input_dir=input_dir,
+        output_root=output_root,
+        options=_batch_options_from_gui(request.options),
+        run_document=run_conversion,
+        progress=lambda event: _handle_batch_event(event, progress=progress, batch_progress=batch_progress),
+        cancel_requested=cancel_requested,
+        catch_document_exceptions=True,
+    )
+    documents = [
+        _document_summary_from_batch_document(
+            request,
+            batch_result.output_root,
+            pdf_path,
+            document,
+            option_fingerprint=option_fingerprint,
         )
-        try:
-            result = run_conversion(config)
-        except Exception as exc:  # noqa: BLE001
-            exit_code = EXIT_PARTIAL
-            _emit(progress, f"Failed {pdf_path.name}: {exc}")
-            _emit_batch_progress(
-                batch_progress,
-                current=index,
-                total=total,
-                input_pdf=pdf_path,
-                status=ConversionStatus.FAILED.value,
-            )
-            documents.append(_failed_document_summary(config, exc, option_fingerprint))
-            continue
-        _emit(progress, f"Finished {pdf_path.name}: {result.status.value}")
-        _emit_batch_progress(
-            batch_progress,
-            current=index,
-            total=total,
-            input_pdf=pdf_path,
-            status=result.status.value,
-        )
-        if result.exit_code != 0:
-            exit_code = EXIT_PARTIAL
-        documents.append(_document_summary_from_result(config, result, option_fingerprint=option_fingerprint))
+        for pdf_path, document in zip(batch_result.pdf_paths, batch_result.documents)
+    ]
     return GuiConversionSummary(
         input_mode="folder",
         input_path=input_dir,
-        output_root=output_root,
+        output_root=batch_result.output_root,
         documents=documents,
-        exit_code=exit_code,
+        exit_code=batch_result.exit_code,
+        batch_report_path=batch_result.batch_report_path,
+        corpus_manifest_path=batch_result.corpus_manifest_path,
+        corpus_diff_report_path=batch_result.corpus_diff_report_path,
+        requirement_change_impact_report_path=batch_result.requirement_change_impact_report_path,
     )
 
 

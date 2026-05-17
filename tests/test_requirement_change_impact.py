@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pdf2md import cli
+from pdf2md.batch_runner import build_requirement_change_impact_report
 from pdf2md.models import CorpusManifest
 from scripts.build_requirement_impact_review_pack import build_review_pack, main as review_pack_main, render_markdown
 
@@ -90,7 +90,7 @@ def test_requirement_change_impact_report_tracks_added_changed_removed_and_sourc
         }
     )
 
-    report = cli._build_requirement_change_impact_report(
+    report = build_requirement_change_impact_report(
         previous_manifest_path=previous_manifest,
         current_manifest_path=current_manifest_path,
         current_manifest=current_manifest,
