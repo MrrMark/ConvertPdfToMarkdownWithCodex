@@ -23,48 +23,8 @@
 
 ## 현재 Active Development Specs
 
-## P2 / Q76. CLI/GUI Performance Benchmark Report
-
-### 배경
-
-현재 간단한 로컬 측정에서는 GUI headless runner와 CLI 실행 시간이 거의 비슷하지만, 이를 장기적으로 추적하는 공식 local benchmark는 없다. GUI가 CLI 수준의 운영 신뢰도를 갖추려면 output parity뿐 아니라 성능 오버헤드도 수치로 확인할 수 있어야 한다.
-
-### 목표
-
-- CLI와 GUI headless runner의 실행 시간을 같은 synthetic fixture와 같은 옵션으로 비교한다.
-- output hash equality와 성능 값을 함께 기록한다.
-- report는 local-only 검증 artifact로 두고 public output schema로 취급하지 않는다.
-
-### 구현 범위
-
-- 새 script 예: `scripts/benchmark_gui_cli_parity.py`
-  - single/batch synthetic PDF fixture 생성
-  - CLI 실행과 GUI headless runner 실행
-  - elapsed ms, pages/sec, output hash equality 기록
-  - optional memory metric은 플랫폼 안정성이 확인될 때만 포함
-- optional release/performance gate 연결
-  - threshold는 기본 advisory로 시작
-  - fail-on-regression은 baseline report가 명시된 경우에만 사용
-- 테스트
-  - report 구조, output equality, threshold/advisory policy 검증
-  - raw PDF text/path가 local-only report 밖으로 노출되지 않는지 검증
-- 문서
-  - README/quality docs에 benchmark 사용법과 해석 기준 추가
-
-### 검증
-
-- `.venv311/bin/python -m pytest tests/test_quality_gate_scripts.py`
-- `.venv311/bin/python scripts/benchmark_gui_cli_parity.py --output-dir /private/tmp/pdf2md-gui-cli-benchmark`
-- `.venv311/bin/python -m pytest`
-- `git diff --check`
-
-### 비범위
-
-- GUI rendering/frame-rate benchmark
-- OS-level click automation
-- hard performance threshold를 baseline 없이 강제
-- public output schema 추가
+현재 active 개발 명세 없음.
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q75 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q76 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

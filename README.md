@@ -312,6 +312,7 @@ python3 scripts/create_gui_support_bundle.py --output-dir /tmp/pdf2md-gui-suppor
 wheel 설치 환경에서는 repository-level `docs/GUI_USER_GUIDE.md`가 없을 수 있으므로 GUI help는 packaged `pdf2md.resources/GUI_USER_GUIDE.md` fallback도 지원합니다. release packaging gate는 wheel 안에 GUI module, support/profile helper, packaged help resource, `pdf2md-gui` console script metadata가 포함되는지 검사합니다.
 
 CLI/GUI 출력 동등성을 릴리스 전에 확인하려면 `scripts/run_gui_cli_parity.py` 또는 `scripts/run_release_gates.py --gates gui-parity`를 실행합니다. `gui_cli_parity_report.json`은 raw PDF/Markdown 본문 없이 artifact별 normalized hash match 결과만 저장하는 local-only 검증 artifact입니다.
+CLI/GUI headless 성능 차이는 `scripts/benchmark_gui_cli_parity.py` 또는 `scripts/run_release_gates.py --gates gui-benchmark`로 확인합니다. `gui_cli_benchmark_report.json`은 elapsed ms, pages/sec, GUI duration ratio, output hash equality를 기록하며 기본 성능 threshold는 advisory입니다.
 
 ### 가장 기본 실행
 
@@ -912,14 +913,17 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates gui
 ./.venv311/bin/python scripts/run_gui_cli_parity.py --output-dir /tmp/pdf2md-gui-cli-parity
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui-parity --gates gui-parity
+./.venv311/bin/python scripts/benchmark_gui_cli_parity.py --output-dir /tmp/pdf2md-gui-cli-benchmark
+./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui-benchmark --gates gui-benchmark
 ```
 
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
 - `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref coverage, chunk token 분포, threshold summary
-- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, schema check, packaging smoke/wheel contract command/status summary
+- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, optional GUI/CLI benchmark gate, schema check, packaging smoke/wheel contract command/status summary
 - `wheel_contract_report.json`: wheel 내부 GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
 - `gui_cli_parity_report.json`: CLI와 GUI headless runner가 같은 synthetic PDF/옵션에서 생성한 Markdown, manifest, report, RAG sidecar의 normalized hash equality 결과
+- `gui_cli_benchmark_report.json`: CLI와 GUI headless runner의 elapsed ms, pages/sec, GUI duration ratio, output hash equality, optional threshold/advisory policy 결과
 - benchmark는 수동/릴리스 전 검증용이며 기본 CI 테스트에는 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
@@ -940,7 +944,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q76입니다. 완료된 Q34-Q75 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 없습니다. 완료된 Q34-Q76 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 

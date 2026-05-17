@@ -297,6 +297,15 @@ python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui-parity 
 
 `gui_cli_parity_report.json`은 synthetic PDF fixture의 raw 본문을 저장하지 않고, Markdown, manifest, report, RAG sidecar별 normalized hash match 결과와 mismatch summary만 저장하는 local-only 검증 artifact다.
 
+CLI와 GUI headless runner의 성능 차이는 local-only benchmark로 확인한다.
+
+```bash
+python scripts/benchmark_gui_cli_parity.py --output-dir /tmp/pdf2md-gui-cli-benchmark
+python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui-benchmark --gates gui-benchmark
+```
+
+`gui_cli_benchmark_report.json`은 elapsed ms, pages/sec, GUI duration ratio, output hash equality, optional threshold/advisory policy 결과를 저장한다. 기본 threshold는 advisory이며, 명시 threshold와 fail 옵션이 함께 있을 때만 성능 회귀를 실패로 처리한다.
+
 ## 12) 배포 방식 메모
 
 현재 비개발자 기본 경로는 source/ZIP + venv setup + `python -m pdf2md.gui` 실행이다.

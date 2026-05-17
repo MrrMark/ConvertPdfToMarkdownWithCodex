@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from scripts import benchmark_conversion
+from scripts import benchmark_gui_cli_parity
 from scripts import check_ocr_runtime
 from scripts import inspect_wheel_contract
 from scripts import run_gui_cli_parity
@@ -464,6 +465,58 @@ def test_release_gate_runner_supports_optional_gui_parity_gate(monkeypatch, tmp_
     assert any(str(part).endswith("run_gui_cli_parity.py") for part in command)
     assert "--output-dir" in command
     assert payload["gates"][0]["report_path"].endswith("gui_cli_parity_report.json")
+
+
+def test_gui_cli_benchmark_policy_is_advisory_by_default() -> None:
+    payload = benchmark_gui_cli_parity.apply_benchmark_policy(
+        cli_elapsed_ms=100,
+        gui_elapsed_ms=150,
+        max_gui_duration_ratio=1.2,
+        fail_on_regression=False,
+    )
+
+    assert payload["passed"] is True
+    assert payload["threshold_status"] == "advisory"
+    assert payload["gui_duration_ratio"] == 1.5
+    assert payload["regressions"][0]["severity"] == "advisory"
+
+
+def test_gui_cli_benchmark_policy_can_fail_on_threshold() -> None:
+    payload = benchmark_gui_cli_parity.apply_benchmark_policy(
+        cli_elapsed_ms=100,
+        gui_elapsed_ms=150,
+        max_gui_duration_ratio=1.2,
+        fail_on_regression=True,
+    )
+
+    assert payload["passed"] is False
+    assert payload["threshold_status"] == "failed"
+    assert payload["regressions"][0]["severity"] == "failed"
+
+
+def test_release_gate_runner_supports_optional_gui_benchmark_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="Wrote gui_cli_benchmark_report.json", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-gui-benchmark",
+            gates=["gui-benchmark"],
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["summary"]["total_gate_commands"] == 1
+    assert payload["gates"][0]["gate"] == "gui-benchmark"
+    command = calls[0]
+    assert any(str(part).endswith("benchmark_gui_cli_parity.py") for part in command)
+    assert "--output-dir" in command
+    assert payload["gates"][0]["report_path"].endswith("gui_cli_benchmark_report.json")
 
 
 def test_wheel_contract_inspector_accepts_gui_resource_and_entry_points(tmp_path: Path) -> None:
