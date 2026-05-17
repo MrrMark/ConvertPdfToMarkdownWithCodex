@@ -23,17 +23,6 @@
 
 ## 남은 작업
 
-### P2 / Q75. GUI Metrics And Page Progress Contract
-
-GUI에서 CLI 운영자가 보는 수준의 성능/진행 판단 정보를 확인할 수 있게 한다.
-
-핵심 범위:
-
-- GUI summary/log에 elapsed time, pages/sec, document count, status count, retry candidate count 표시
-- pipeline page progress callback contract 설계
-- 단일 PDF는 실제 page progress가 있을 때만 percent 표시
-- batch progress는 기존 document-level percent와 page-level detail을 혼동하지 않도록 분리
-
 ### P2 / Q76. CLI/GUI Performance Benchmark Report
 
 CLI와 GUI headless runner의 성능 차이를 수치로 추적하는 local-only benchmark report를 추가한다.

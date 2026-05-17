@@ -18,6 +18,7 @@ from pdf2md.gui_runner import (
     GuiDiagnostic,
     GuiDiagnosticError,
     GuiDiagnosticReport,
+    GuiPageProgress,
     check_gui_runtime,
     format_gui_diagnostic_report,
     format_gui_summary,
@@ -825,6 +826,7 @@ class Pdf2MdGuiApp:
                     request,
                     progress=lambda message: self.queue.put(("log", message)),
                     batch_progress=lambda event: self.queue.put(("batch_progress", event)),
+                    page_progress=lambda event: self.queue.put(("page_progress", event)),
                     cancel_requested=self.cancel_event.is_set,
                 )
             except GuiDiagnosticError as exc:
@@ -848,6 +850,8 @@ class Pdf2MdGuiApp:
                     self._set_status_text(str(payload))
                 elif event == "batch_progress" and isinstance(payload, GuiBatchProgress):
                     self._handle_batch_progress(payload)
+                elif event == "page_progress" and isinstance(payload, GuiPageProgress):
+                    self._handle_page_progress(payload)
                 elif event == "diagnostic_error" and isinstance(payload, GuiDiagnosticError):
                     self.start_button.configure(state="normal")
                     self.cancel_button.configure(state="disabled")
@@ -966,6 +970,20 @@ class Pdf2MdGuiApp:
             percent=snapshot.percent,
             document=event.input_pdf.name,
             status=event.status,
+        )
+        self._set_status_text(label)
+        self._append_log(label)
+
+    def _handle_page_progress(self, event: GuiPageProgress) -> None:
+        self.progress_bar.stop()
+        self.progress_bar.configure(mode="determinate", maximum=100)
+        self.progress_value.set(event.percent)
+        label = self._t(
+            "page_progress",
+            current=event.current,
+            total=event.total,
+            percent=event.percent,
+            page=event.page,
         )
         self._set_status_text(label)
         self._append_log(label)

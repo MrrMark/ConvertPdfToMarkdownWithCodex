@@ -15,6 +15,7 @@ from pdf2md.gui_runner import (
     GuiDiagnosticError,
     GuiConversionOptions,
     GuiConversionRequest,
+    GuiPageProgress,
     build_batch_config,
     build_single_config,
     check_gui_runtime,
@@ -34,6 +35,7 @@ from pdf2md.models import (
     WarningEntry,
 )
 from pdf2md.pipeline import ConversionResult, run_conversion
+from tests.fixtures.pdf_builder import build_multi_page_text_pdf
 from helpers.normalize_outputs import normalize_manifest, normalize_report
 
 
@@ -526,6 +528,11 @@ def test_gui_single_conversion_uses_same_core_output_as_run_conversion(sample_pd
 
     assert summary.exit_code == direct_result.exit_code == 0
     assert summary.success_count == 1
+    assert summary.document_count == 1
+    assert summary.processed_pages == 1
+    assert summary.elapsed_ms >= 0
+    assert summary.pages_per_second is not None
+    assert summary.status_counts["success"] == 1
     assert summary.documents[0].markdown_path == gui_output / "document.md"
     assert summary.documents[0].manifest_path == gui_output / "manifest.json"
     assert summary.documents[0].report_path == gui_output / "report.json"
@@ -539,6 +546,33 @@ def test_gui_single_conversion_uses_same_core_output_as_run_conversion(sample_pd
     assert normalize_report(json.loads((gui_output / "report.json").read_text(encoding="utf-8"))) == (
         normalize_report(json.loads((direct_output / "report.json").read_text(encoding="utf-8")))
     )
+    text = format_gui_summary(summary)
+    assert "documents=1" in text
+    assert "processed_pages=1" in text
+    assert "pages_per_second=" in text
+
+
+def test_gui_single_conversion_emits_page_progress_events(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "multi.pdf"
+    build_multi_page_text_pdf(pdf_path, page_count=3)
+    events: list[GuiPageProgress] = []
+
+    summary = run_gui_conversion(
+        GuiConversionRequest(
+            input_mode="file",
+            input_path=pdf_path,
+            output_dir=tmp_path / "gui-output",
+        ),
+        page_progress=events.append,
+    )
+
+    assert summary.exit_code == 0
+    assert [(event.current, event.total, event.page, event.percent) for event in events] == [
+        (1, 3, 1, 33),
+        (2, 3, 2, 67),
+        (3, 3, 3, 100),
+    ]
+    assert all(event.status == "page_finished" for event in events)
 
 
 def test_gui_batch_conversion_uses_cli_batch_names_and_skip_existing(sample_pdf: Path, tmp_path: Path) -> None:

@@ -129,6 +129,7 @@ GUI 완료 후 Results 표에서 아래를 확인한다.
 - `Retry`: 실패 문서가 재시도 후보인지 여부
 
 원문 텍스트, 표, 이미지 내용은 GUI summary에서 요약하지 않는다. 자세한 품질 판단은 `report.json`과 `manifest.json`을 확인한다.
+완료 summary/log에는 `documents`, status count, retry candidate count, `elapsed_ms`, `processed_pages`, `pages_per_second`가 표시된다.
 
 GUI 화면에서 바로 설명이 필요하면 `Help` 버튼을 누른다.
 
@@ -186,7 +187,7 @@ python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui-parity 
 13. 창 높이를 줄였을 때 세로 스크롤로 input/options/results/log 영역에 접근할 수 있는지 확인한다.
 14. Results 표의 긴 Markdown/report 경로를 horizontal scrollbar로 확인할 수 있는지 확인한다.
 15. 폴더 배치 변환에서 문서 index/total과 percent text가 함께 움직이는지 확인한다.
-16. 단일 PDF 변환은 처리 중 percent를 추정하지 않고 완료 시 `100%`만 표시하는지 확인한다.
+16. 단일 PDF 변환은 실제 page-level callback이 들어올 때만 `Page 1/3 (33%)` 같은 percent로 전환하고 완료 시 `100%`를 표시하는지 확인한다.
 17. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
 18. GUI를 닫고 다시 열었을 때 최근 경로, 언어, preset이 복구되는지 확인한다.
 19. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.

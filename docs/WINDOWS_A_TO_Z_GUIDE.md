@@ -187,11 +187,12 @@ GUI 사용 순서:
 6. 폴더 배치에서 이전 batch와 비교하려면 `Previous corpus manifest`로 이전 `corpus_manifest.json`을 선택하고, 변경 없는 PDF 산출물을 재사용하려면 `Reuse unchanged`를 켭니다.
 7. OCR이 필요하면 `OCR lang`을 지정하고, 강제 OCR 같은 세부 flag는 `Optimize Options(유저 선택)`에서 설정합니다.
 8. `Start conversion`을 누릅니다.
-9. 실행 중 progress가 단일 변환 처리 중 상태 또는 폴더 배치 문서 index/total과 percent text로 표시되는지 확인합니다.
-10. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`, `Retry`를 확인합니다.
-11. 선택한 결과 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 엽니다.
-12. 폴더 배치 산출물은 `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`로 엽니다.
-13. 화면 설명이 필요하면 `Help` 버튼을 누릅니다.
+9. 실행 중 progress가 단일 변환 page-level percent 또는 폴더 배치 문서 index/total percent text로 표시되는지 확인합니다.
+10. 완료 summary/log에 document count, status count, retry candidate count, elapsed time, processed page count, pages/sec가 표시되는지 확인합니다.
+11. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`, `Retry`를 확인합니다.
+12. 선택한 결과 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 엽니다.
+13. 폴더 배치 산출물은 `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`로 엽니다.
+14. 화면 설명이 필요하면 `Help` 버튼을 누릅니다.
 
 `Optimize Options(유저 선택)`에서는 Expert options로 `Page workers`, `Debug artifacts`, `Verbose logs`를 조정할 수 있습니다. Import profile / Export profile은 local-only JSON으로 반복 실행 option을 저장/불러오기 위한 기능입니다. profile에는 password, input/output path, previous corpus manifest path, 원문 PDF/Markdown 내용, 표/이미지 내용을 저장하지 않습니다.
 
@@ -222,7 +223,7 @@ python scripts\run_gui_smoke_evidence.py --output-dir "$env:TEMP\pdf2md-gui-smok
 python scripts\run_gui_smoke_evidence.py --output-dir "$env:TEMP\pdf2md-gui-smoke" --state-path "$env:TEMP\pdf2md-gui-smoke\gui_state.json" --json-only
 ```
 
-`gui_smoke_evidence.json`은 local-only artifact이며 pass/fail, command return code, runtime diagnostic code/message/action, preset/language 상태, warning code/count, 산출물 존재 여부만 저장합니다. 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않습니다. 실제 GUI window에서 한국어/English 전환, preset lock/unlock, batch percent, 단일 완료 `100%`, `Clear recent`는 수동 smoke checklist로 확인합니다.
+`gui_smoke_evidence.json`은 local-only artifact이며 pass/fail, command return code, runtime diagnostic code/message/action, preset/language 상태, warning code/count, 산출물 존재 여부만 저장합니다. 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않습니다. 실제 GUI window에서 한국어/English 전환, preset lock/unlock, batch percent, 단일 page-level percent와 완료 `100%`, `Clear recent`는 수동 smoke checklist로 확인합니다.
 
 문제 보고용 공유 자료가 필요하면 sanitized support bundle을 생성합니다.
 

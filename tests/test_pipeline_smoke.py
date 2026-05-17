@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 
 from pdf2md.config import Config
-from pdf2md.pipeline import EXIT_SUCCESS, run_conversion
+from pdf2md.pipeline import EXIT_SUCCESS, ConversionProgressEvent, run_conversion
+from tests.fixtures.pdf_builder import build_multi_page_text_pdf
 
 
 def test_pipeline_generates_outputs(sample_pdf: Path, tmp_path: Path) -> None:
@@ -76,3 +77,23 @@ def test_pipeline_writes_debug_artifacts(sample_pdf: Path, tmp_path: Path) -> No
     assert (debug_dir / "page-0001-image-candidates.json").exists()
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["options"]["debug"] is True
+
+
+def test_pipeline_emits_observer_only_page_progress(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "multi.pdf"
+    build_multi_page_text_pdf(pdf_path, page_count=3)
+    events: list[ConversionProgressEvent] = []
+
+    result = run_conversion(Config(input_pdf=pdf_path, output_dir=tmp_path / "out"), progress=events.append)
+
+    assert result.exit_code == EXIT_SUCCESS
+    assert [(event.status, event.current, event.total, event.page) for event in events] == [
+        ("pages_selected", 0, 3, None),
+        ("page_started", 0, 3, 1),
+        ("page_finished", 1, 3, 1),
+        ("page_started", 1, 3, 2),
+        ("page_finished", 2, 3, 2),
+        ("page_started", 2, 3, 3),
+        ("page_finished", 3, 3, 3),
+    ]
+    assert all(event.stage in {"page_selection", "normalization"} for event in events)

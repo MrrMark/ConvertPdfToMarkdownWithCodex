@@ -114,7 +114,7 @@ python -m pdf2md.gui --doctor --doctor-format json
 
 - 단일 PDF 변환은 처리 중임을 나타내는 indeterminate progress로 표시된다.
 - 폴더 배치 변환은 현재 문서 index/total과 percent text를 함께 표시한다. 예: `2/10 (20%)`
-- page-level 진행률 callback이 없으므로 실제 page 처리율처럼 보이는 임의 진행률은 표시하지 않는다.
+- 단일 PDF는 실제 page-level 진행률 callback이 들어올 때만 `Page 1/3 (33%)` 같은 percent로 전환한다. callback이 없을 때는 실제 page 처리율처럼 보이는 임의 진행률을 표시하지 않는다.
 - 단일 PDF는 완료 시에만 `100%`가 표시된다.
 
 ### Layout
@@ -158,7 +158,7 @@ GUI 완료 후 Results 표에서 문서별 결과를 확인한다.
 | `Markdown` | 생성된 Markdown 경로 |
 | `Report` | `report.json` 경로 |
 
-상세 품질 판단은 `report.json`과 `manifest.json`에서 확인한다. GUI summary는 원문 텍스트, 표, 이미지 내용을 요약하거나 재서술하지 않는다.
+완료 summary/log에는 `documents`, status count, retry candidate count, `elapsed_ms`, `processed_pages`, `pages_per_second`가 표시된다. 상세 품질 판단은 `report.json`과 `manifest.json`에서 확인한다. GUI summary는 원문 텍스트, 표, 이미지 내용을 요약하거나 재서술하지 않는다.
 
 결과 행을 선택하면 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 해당 산출물을 바로 열 수 있다. 폴더 배치 산출물은 `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`로 열 수 있다. 경로가 없거나 OS가 열 수 없는 경우에는 변환 실패가 아니라 GUI warning/log로만 표시된다.
 
@@ -261,7 +261,7 @@ python scripts/run_gui_smoke_evidence.py --output-dir /tmp/pdf2md-gui-smoke --st
 
 생성되는 `gui_smoke_evidence.json`은 public output schema가 아니라 로컬 검증 artifact다. 포함 대상은 GUI runtime doctor diagnostics, `python -m pdf2md.gui --help` 결과, preset별 runner smoke status, isolated GUI state round-trip, 산출물 존재 여부, 수동 checklist 상태다.
 
-evidence에는 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path를 저장하지 않는다. 실제 Tk window에서 한국어 기본 UI, English 전환, preset lock/unlock, batch percent, 단일 완료 `100%`, local-only state 복구/clear는 macOS/Windows checklist에 따라 사람이 확인한다.
+evidence에는 원문 PDF 텍스트, 표 내용, 이미지 내용, 변환 warning message, workspace/home absolute path를 저장하지 않는다. 실제 Tk window에서 한국어 기본 UI, English 전환, preset lock/unlock, batch percent, 단일 page-level percent와 완료 `100%`, local-only state 복구/clear는 macOS/Windows checklist에 따라 사람이 확인한다.
 
 ## 11) Support bundle
 
