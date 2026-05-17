@@ -23,12 +23,4 @@
 
 ## 남은 작업
 
-### P2 / Q71. Quality Scorecard Refresh And Next Backlog Reassessment
-
-Q68-Q70 결과를 반영해 scorecard를 보수적으로 재평가하고, 다음 backlog를 비워둘지 변환 품질 중심 Q72+를 새로 열지 결정한다.
-
-핵심 범위:
-
-- `docs/QUALITY_SCORECARD.md` 보수적 재평가
-- `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`와 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md` 갱신
-- `tests/test_docs_examples.py` 문서 계약 갱신
+현재 남은 작업 없음.

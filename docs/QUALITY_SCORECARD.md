@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | Q68-Q70 reassessment | 97/100 | 0 | Q71. Quality Scorecard Refresh And Next Backlog Reassessment 수행. Q68-Q70은 GUI release/packaging/support artifact 신뢰도 개선으로 의미가 크지만 core 변환 품질을 새로 입증한 작업은 아니므로 97/100 유지. 구체적인 corpus failure evidence가 생길 때 Q72+를 새로 열기로 하고 active quality backlog는 없다 |
 | 2026-05-17 | GUI failure fixture hardening | 97/100 | 0 | Q70. GUI Profile And Support Bundle Failure Fixture 구현. partial/failed GUI summary와 invalid profile diagnostic fixture를 보강해 raw exception/warning/path/value echo를 막고 status count, warning code/count, retry candidate 중심 계약을 고정. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q71 |
 | 2026-05-17 | Wheel GUI help resource contract | 97/100 | 0 | Q69. Wheel Contents And GUI Help Resource Contract 구현. packaged GUI help fallback, wheel content/console script inspector, packaging gate의 GUI module help와 support/profile helper 포함 검증을 추가. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q70-Q71 |
 | 2026-05-17 | GUI release gate integration | 97/100 | 0 | Q68. GUI Release Gate Integration 구현. optional `gui` release gate로 GUI help, doctor JSON, headless smoke evidence, sanitized support bundle redaction 검증을 Tk window 없이 실행하고 command/status/report path를 기록. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q69-Q71 |
@@ -61,6 +62,20 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q71 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + GUI 릴리스/배포 신뢰도** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q68-Q70은 release gate, wheel packaging contract, support/profile failure fixture를 보강해 운영 안정성을 높였다. 다만 core conversion의 text/table/image/OCR 품질을 새 fixture나 real corpus evidence로 추가 입증한 작업은 아니므로 점수 상승은 보류한다.
+
+다음 active backlog는 비워 둔다. Q72+는 지금 추상적으로 열지 않고, 실제 변환 품질 regression이나 real corpus failure evidence가 생길 때 table/layout/OCR/reading-order처럼 원인과 검증 기준이 분명한 항목으로 새로 등록한다.
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다.
 
 ### 2026-05-17 (Q70 구현 후)
 
