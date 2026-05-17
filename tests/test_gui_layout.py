@@ -34,7 +34,17 @@ def test_gui_layout_text_keys_are_known_i18n_keys() -> None:
     layout_keys = set(gui_layout_text_keys())
 
     assert layout_keys <= set(GUI_TEXT_TRACKING_KEYS)
-    assert {"preset_preserve", "preset_rag_optimized", "expert_options", "page_workers", "open_output_folder", "open_assets"} <= layout_keys
+    assert {
+        "preset_preserve",
+        "preset_rag_optimized",
+        "expert_options",
+        "page_workers",
+        "previous_corpus_manifest",
+        "reuse_unchanged",
+        "open_output_folder",
+        "open_assets",
+        "open_corpus_diff",
+    } <= layout_keys
 
 
 def test_gui_layout_wraps_long_localized_controls() -> None:
@@ -51,6 +61,11 @@ def test_gui_layout_wraps_long_localized_controls() -> None:
         "import_profile",
         "export_profile",
         "batch_progress",
+        "previous_corpus_manifest",
+        "reuse_unchanged",
+        "open_corpus_manifest",
+        "open_corpus_diff",
+        "open_requirement_impact",
     } <= wrapping_keys
 
 

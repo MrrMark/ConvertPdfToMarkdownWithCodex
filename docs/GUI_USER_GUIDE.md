@@ -137,10 +137,13 @@ python -m pdf2md.gui --doctor --doctor-format json
 1. `PDF folder`를 선택한다.
 2. PDF 파일들이 들어 있는 폴더를 선택한다.
 3. 이미 변환된 문서를 건너뛰려면 `Optimize Options(유저 선택)`에서 `Skip existing`을 켠다.
-4. `Start conversion`을 누른다.
-5. 중간에 멈추려면 `Cancel`을 누른다.
+4. 이전 batch와 비교하려면 `Previous corpus manifest`에서 이전 `corpus_manifest.json`을 선택한다.
+5. 변경 없는 PDF 산출물을 재사용하려면 `Reuse unchanged`를 켠다.
+6. `Start conversion`을 누른다.
+7. 중간에 멈추려면 `Cancel`을 누른다.
 
 취소는 문서 경계에서 처리된다. 현재 처리 중인 PDF는 가능한 한 끝까지 처리하고, 아직 시작하지 않은 PDF는 `cancelled` 상태로 기록한다.
+이전 manifest를 선택하면 GUI도 CLI batch와 같은 `corpus_diff_report.json`, `requirement_change_impact_report.json`을 생성한다.
 
 ## 5) Results 표 읽기
 
@@ -157,7 +160,7 @@ GUI 완료 후 Results 표에서 문서별 결과를 확인한다.
 
 상세 품질 판단은 `report.json`과 `manifest.json`에서 확인한다. GUI summary는 원문 텍스트, 표, 이미지 내용을 요약하거나 재서술하지 않는다.
 
-결과 행을 선택하면 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 해당 산출물을 바로 열 수 있다. 경로가 없거나 OS가 열 수 없는 경우에는 변환 실패가 아니라 GUI warning/log로만 표시된다.
+결과 행을 선택하면 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 해당 산출물을 바로 열 수 있다. 폴더 배치 산출물은 `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`로 열 수 있다. 경로가 없거나 OS가 열 수 없는 경우에는 변환 실패가 아니라 GUI warning/log로만 표시된다.
 
 ## 6) Status 의미
 
@@ -175,6 +178,9 @@ GUI 완료 후 Results 표에서 문서별 결과를 확인한다.
 - `Open Report`: 선택한 결과 행의 `report.json`을 연다.
 - `Open Manifest`: 선택한 결과 행의 `manifest.json`을 연다.
 - `Open Assets`: 선택한 결과 행의 assets 폴더를 연다.
+- `Open Corpus Manifest`: 폴더 배치의 `corpus_manifest.json`을 연다.
+- `Open Corpus Diff`: 이전 manifest를 사용한 폴더 배치의 `corpus_diff_report.json`을 연다.
+- `Open Requirement Impact`: 이전 manifest를 사용한 폴더 배치의 `requirement_change_impact_report.json`을 연다.
 - `Open output folder`: 선택한 결과 행의 output folder를 열고, 선택된 행이 없으면 마지막 변환의 output root를 연다.
 - `Help`: 이 GUI 사용자 가이드를 연다.
 - `Clear recent`: 저장된 최근 입력/출력 경로를 지운다.
@@ -184,6 +190,7 @@ GUI 완료 후 Results 표에서 문서별 결과를 확인한다.
 GUI는 반복 사용성을 위해 최근 입력 PDF, 입력 폴더, output folder를 local-only JSON state로 저장한다.
 
 - 저장 대상은 경로 목록뿐이다.
+- previous corpus manifest path는 profile이나 recent state에 저장하지 않는다.
 - 원문 텍스트, 표 내용, 이미지 내용, warning message는 저장하지 않는다.
 - 시작 시 아직 존재하는 최근 경로만 보수적으로 입력칸에 복구한다.
 - 공유 PC나 민감한 경로가 노출될 수 있는 환경에서는 `Clear recent`를 누른다.

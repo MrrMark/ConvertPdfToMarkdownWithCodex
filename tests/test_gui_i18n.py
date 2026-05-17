@@ -21,6 +21,8 @@ def test_gui_i18n_formats_placeholders_and_falls_back() -> None:
         "배치 2/10 (20%) a.pdf: success"
     )
     assert translate("ko", "conversion_finished_percent", percent="100%") == "변환 완료 (100%)"
+    assert translate("ko", "reuse_unchanged") == "변경 없는 문서 재사용"
+    assert translate("en", "open_corpus_diff") == "Open Corpus Diff"
     assert translate("ko", "missing_key") == "missing_key"
     assert translate("unknown", "start_conversion") == "변환 시작"
 

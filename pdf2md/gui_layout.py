@@ -36,7 +36,20 @@ GUI_LAYOUT_SECTIONS: tuple[GuiLayoutSection, ...] = (
     ),
     GuiLayoutSection(
         key="options",
-        text_keys=("options", "pages", "password", "ocr_lang", "image", "table", "rag_tables", "domain"),
+        text_keys=(
+            "options",
+            "pages",
+            "password",
+            "ocr_lang",
+            "image",
+            "table",
+            "rag_tables",
+            "domain",
+            "previous_corpus_manifest",
+            "reuse_unchanged",
+            "browse",
+        ),
+        wraps_text=True,
     ),
     GuiLayoutSection(
         key="flags",
@@ -80,7 +93,16 @@ GUI_LAYOUT_SECTIONS: tuple[GuiLayoutSection, ...] = (
     ),
     GuiLayoutSection(
         key="result_actions",
-        text_keys=("open_markdown", "open_report", "open_manifest", "open_assets", "open_output_folder"),
+        text_keys=(
+            "open_markdown",
+            "open_report",
+            "open_manifest",
+            "open_assets",
+            "open_output_folder",
+            "open_corpus_manifest",
+            "open_corpus_diff",
+            "open_requirement_impact",
+        ),
         wraps_text=True,
     ),
 )

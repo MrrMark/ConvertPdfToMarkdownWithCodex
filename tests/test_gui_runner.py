@@ -454,6 +454,54 @@ def test_gui_request_diagnostics_reject_duplicate_batch_stems(
     assert [diagnostic.code for diagnostic in report.errors] == ["duplicate_pdf_stems"]
 
 
+def test_gui_request_diagnostics_require_folder_manifest_pair(sample_pdf: Path, tmp_path: Path) -> None:
+    manifest_path = tmp_path / "corpus_manifest.json"
+    manifest_path.write_text("{}", encoding="utf-8")
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    (input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+
+    file_report = validate_gui_request(
+        GuiConversionRequest(
+            input_mode="file",
+            input_path=sample_pdf,
+            output_dir=tmp_path / "single-output",
+            previous_corpus_manifest=manifest_path,
+        )
+    )
+    reuse_report = validate_gui_request(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=input_dir,
+            output_dir=tmp_path / "batch-output",
+            reuse_unchanged=True,
+        )
+    )
+
+    assert file_report.has_errors is True
+    assert [diagnostic.code for diagnostic in file_report.errors] == ["incremental_corpus_requires_folder"]
+    assert reuse_report.has_errors is True
+    assert [diagnostic.code for diagnostic in reuse_report.errors] == ["reuse_unchanged_requires_manifest"]
+
+
+def test_gui_request_diagnostics_reject_missing_previous_manifest(sample_pdf: Path, tmp_path: Path) -> None:
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    (input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+
+    report = validate_gui_request(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=input_dir,
+            output_dir=tmp_path / "batch-output",
+            previous_corpus_manifest=tmp_path / "missing_corpus_manifest.json",
+        )
+    )
+
+    assert report.has_errors is True
+    assert [diagnostic.code for diagnostic in report.errors] == ["previous_corpus_manifest_missing"]
+
+
 def test_gui_single_conversion_uses_same_core_output_as_run_conversion(sample_pdf: Path, tmp_path: Path) -> None:
     options = GuiConversionOptions(pages="1", keep_page_markers=True)
     gui_output = tmp_path / "gui-output"
@@ -579,6 +627,80 @@ def test_gui_batch_artifacts_match_cli_batch_contract(sample_pdf: Path, tmp_path
     gui_manifest = json.loads((gui_output_root / "corpus_manifest.json").read_text(encoding="utf-8"))
     assert _batch_report_contract(gui_report) == _batch_report_contract(cli_report)
     assert _corpus_manifest_contract(gui_manifest) == _corpus_manifest_contract(cli_manifest)
+
+
+def test_gui_incremental_batch_matches_cli_reuse_contract(sample_pdf: Path, tmp_path: Path) -> None:
+    previous_input_dir = tmp_path / "previous-pdfs"
+    cli_current_input_dir = tmp_path / "cli-current-pdfs"
+    gui_current_input_dir = tmp_path / "gui-current-pdfs"
+    previous_input_dir.mkdir()
+    cli_current_input_dir.mkdir()
+    gui_current_input_dir.mkdir()
+    for folder in (previous_input_dir, cli_current_input_dir, gui_current_input_dir):
+        (folder / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+
+    previous_run = subprocess.run(
+        [sys.executable, "-m", "pdf2md", "--input-dir", str(previous_input_dir), "--pages", "1"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert previous_run.returncode == 0
+    previous_manifest = previous_input_dir / "output" / "corpus_manifest.json"
+
+    cli_run = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pdf2md",
+            "--input-dir",
+            str(cli_current_input_dir),
+            "--pages",
+            "1",
+            "--previous-corpus-manifest",
+            str(previous_manifest),
+            "--reuse-unchanged",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert cli_run.returncode == 0
+
+    gui_output_root = tmp_path / "gui-output"
+    summary = run_gui_conversion(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=gui_current_input_dir,
+            output_dir=gui_output_root,
+            previous_corpus_manifest=previous_manifest,
+            reuse_unchanged=True,
+            options=GuiConversionOptions(pages="1"),
+        )
+    )
+
+    assert summary.exit_code == 0
+    assert summary.skipped_count == 1
+    assert summary.corpus_diff_report_path == gui_output_root / "corpus_diff_report.json"
+    assert summary.requirement_change_impact_report_path == gui_output_root / "requirement_change_impact_report.json"
+    assert (gui_output_root / "alpha" / "alpha.md").exists()
+    assert "corpus_diff=" in format_gui_summary(summary)
+    assert "requirement_impact=" in format_gui_summary(summary)
+    cli_output_root = cli_current_input_dir / "output"
+    cli_batch = json.loads((cli_output_root / "batch_report.json").read_text(encoding="utf-8"))
+    gui_batch = json.loads((gui_output_root / "batch_report.json").read_text(encoding="utf-8"))
+    assert cli_batch["summary"]["skipped_count"] == gui_batch["summary"]["skipped_count"] == 1
+    cli_diff = json.loads((cli_output_root / "corpus_diff_report.json").read_text(encoding="utf-8"))
+    gui_diff = json.loads((gui_output_root / "corpus_diff_report.json").read_text(encoding="utf-8"))
+    assert cli_diff["summary"] == gui_diff["summary"] == {
+        "added_count": 0,
+        "changed_count": 0,
+        "removed_count": 0,
+        "unchanged_count": 1,
+    }
+    cli_impact = json.loads((cli_output_root / "requirement_change_impact_report.json").read_text(encoding="utf-8"))
+    gui_impact = json.loads((gui_output_root / "requirement_change_impact_report.json").read_text(encoding="utf-8"))
+    assert cli_impact["summary"] == gui_impact["summary"]
 
 
 def test_gui_batch_uses_deterministic_case_stable_order(sample_pdf: Path, tmp_path: Path) -> None:

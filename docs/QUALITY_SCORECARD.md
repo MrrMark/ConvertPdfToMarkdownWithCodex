@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI incremental corpus options | 97/100 | 0 | Q73. GUI Incremental Corpus Options 구현. GUI folder mode에서 previous corpus manifest 선택과 reuse unchanged를 지원하고, `corpus_diff_report.json`, `requirement_change_impact_report.json` artifact open action을 추가. profile/recent state에는 previous manifest path를 저장하지 않으며 CLI reuse/skip 계약과 동등성을 테스트로 고정 |
 | 2026-05-17 | GUI batch artifact parity | 97/100 | 0 | Q72. Shared Batch Runner And GUI Batch Artifact Parity 구현. CLI batch 실행 로직을 `pdf2md.batch_runner`로 분리하고 GUI folder mode도 같은 runner를 호출해 `batch_report.json`, `corpus_manifest.json`을 생성한다. GUI/CLI batch artifact normalized contract를 테스트로 고정했으며 변환 core 품질과 public schema는 유지 |
 | 2026-05-17 | GUI/CLI parity backlog | 97/100 | 0 | Q72-Q76 active backlog/spec 추가. GUI 변환 품질은 CLI와 거의 동일하지만 batch/corpus artifact, incremental corpus, parity gate, metrics/progress, performance benchmark를 CLI 운영 수준으로 끌어올리는 계획을 수립. 구현 전 계획 단계이므로 점수는 유지 |
 | 2026-05-17 | Q68-Q70 reassessment | 97/100 | 0 | Q71. Quality Scorecard Refresh And Next Backlog Reassessment 수행. Q68-Q70은 GUI release/packaging/support artifact 신뢰도 개선으로 의미가 크지만 core 변환 품질을 새로 입증한 작업은 아니므로 97/100 유지. 구체적인 corpus failure evidence가 생길 때 Q72+를 새로 열기로 하고 active quality backlog는 없다 |
@@ -64,6 +65,20 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q73 구현 후)
+
+#### 총평
+
+Q73은 GUI folder mode가 CLI incremental corpus 운영 흐름을 따라갈 수 있게 만든 작업이다. `GuiConversionRequest`에 previous corpus manifest와 reuse unchanged 입력을 추가하고, Q72의 shared batch runner로 전달해 GUI에서도 `corpus_diff_report.json`, `requirement_change_impact_report.json`을 생성한다.
+
+GUI 화면에는 `Previous corpus manifest`, `Reuse unchanged`, `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`를 추가했다. profile과 recent state에는 previous manifest path를 저장하지 않는다. 변환 core와 public schema는 유지하므로 점수는 97/100을 유지한다.
+
+#### 다음 개선 참조
+
+- Q74. CLI/GUI Golden Parity Gate
+- Q75. GUI Metrics And Page Progress Contract
+- Q76. CLI/GUI Performance Benchmark Report
 
 ### 2026-05-17 (Q72 구현 후)
 

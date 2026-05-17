@@ -20,6 +20,8 @@ python -m pdf2md.gui --doctor --doctor-format json
 - 단순 표만 Markdown table로 출력하고 복잡하거나 애매한 표는 HTML fallback을 우선한다.
 - 이미지는 기본적으로 referenced mode로 별도 파일에 저장하고 Markdown에서 상대경로로 참조한다.
 - 실패는 숨기지 않고 `report.json`, GUI summary, support artifact에 구조화된 code/count 중심으로 기록한다.
+- 폴더 배치에서는 previous corpus manifest와 reuse unchanged를 사용해 CLI incremental corpus 흐름과 같은 `corpus_diff_report.json`, `requirement_change_impact_report.json`을 생성할 수 있다.
+- previous corpus manifest path는 GUI profile이나 recent state에 저장하지 않는다.
 
 ## Local-only 지원 artifact
 

@@ -23,17 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q73. GUI Incremental Corpus Options
-
-CLI의 `--previous-corpus-manifest`, `--reuse-unchanged` 기능을 GUI에서도 사용할 수 있게 한다.
-
-핵심 범위:
-
-- GUI에 previous corpus manifest 선택과 reuse unchanged toggle 추가
-- profile에는 manifest path를 저장하지 않고 현재 세션/local-only state 정책만 유지
-- GUI batch 결과에 `corpus_diff_report.json`, `requirement_change_impact_report.json` 생성 경로 표시
-- CLI와 동일한 reuse/skip 상태 계약을 테스트로 고정
-
 ### P1 / Q74. CLI/GUI Golden Parity Gate
 
 같은 입력 PDF와 같은 옵션에서 CLI와 GUI headless runner가 동일 산출물을 생성하는지 자동 검증하는 parity gate를 추가한다.
