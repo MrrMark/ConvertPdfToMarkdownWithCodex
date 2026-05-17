@@ -234,6 +234,8 @@ python scripts\create_gui_support_bundle.py --output-dir "$env:TEMP\pdf2md-gui-s
 
 wheel 설치 환경에서는 repository-level `docs\GUI_USER_GUIDE.md`가 없을 수 있으므로 GUI help는 packaged `pdf2md.resources\GUI_USER_GUIDE.md` fallback도 지원합니다. release packaging gate는 wheel 안에 GUI module, support/profile helper, packaged help resource, `pdf2md-gui` console script metadata가 포함되는지 검사합니다.
 
+CLI/GUI 출력 동등성을 릴리스 전에 확인하려면 `scripts\run_gui_cli_parity.py` 또는 `scripts\run_release_gates.py --gates gui-parity`를 실행합니다. `gui_cli_parity_report.json`은 원문 PDF/Markdown 본문 없이 artifact별 normalized hash match 결과만 저장하는 local-only 검증 artifact입니다.
+
 Windows 비개발자 기본 배포 경로는 ZIP/source checkout + `.venv314` setup script + `python -m pdf2md.gui`입니다. PyInstaller/native bundle은 Tkinter, PyMuPDF, Tesseract 포함/진단과 code signing smoke가 정리되기 전까지 공식 기본 배포 경로로 보지 않습니다.
 
 CLI 기본 실행:
@@ -622,6 +624,8 @@ python scripts\build_requirement_impact_review_pack.py --impact-report .\output\
 python scripts\run_release_gates.py --output-dir .\release_gate_output --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf\baseline\corpus_eval_report.json --benchmark-baseline-report .\benchmark_baseline\benchmark_report.json
 python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag --rag-output-dir .\output --rag-eval-set .\rag_eval_queries.json --rag-min-expected-source-coverage 0.9 --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
 python scripts\run_release_gates.py --output-dir .\release_gate_gui --gates gui
+python scripts\run_gui_cli_parity.py --output-dir .\gui_cli_parity
+python scripts\run_release_gates.py --output-dir .\release_gate_gui_parity --gates gui-parity
 ```
 
 - 실제 PDF는 `pdf\` 같은 로컬 디렉터리에만 두고 repo에 커밋하지 않습니다.
@@ -634,8 +638,9 @@ python scripts\run_release_gates.py --output-dir .\release_gate_gui --gates gui
 - `corpus_evidence_analysis_report.json`: redacted evidence pack의 category/domain/spec hotspot과 follow-up hint
 - `corpus_evidence_trend_report.json`: baseline/current evidence pack의 added/persisting/resolved signature 비교와 신규 error gate
 - `requirement_impact_review_pack.json` / `.md`: requirement change impact를 리뷰어/AI Agent가 바로 확인할 수 있게 정리한 provenance 중심 요약
-- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, schema check, packaging smoke/wheel contract command/status summary
+- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, schema check, packaging smoke/wheel contract command/status summary
 - `wheel_contract_report.json`: wheel 내부 GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
+- `gui_cli_parity_report.json`: CLI와 GUI headless runner가 같은 synthetic PDF/옵션에서 생성한 Markdown, manifest, report, RAG sidecar의 normalized hash equality 결과
 - benchmark는 수동/릴리스 전 검증용이며 기본 테스트에 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.

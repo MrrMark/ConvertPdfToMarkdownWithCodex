@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from scripts import benchmark_conversion
 from scripts import check_ocr_runtime
 from scripts import inspect_wheel_contract
+from scripts import run_gui_cli_parity
 from scripts import run_corpus_eval
 from scripts import run_release_gates
 
@@ -422,6 +423,47 @@ def test_release_gate_runner_fails_gui_gate_on_redaction_failure(monkeypatch, tm
     failed = [record for record in payload["gates"] if record["status"] == "failed"]
     assert failed[0]["gate"] == "gui:smoke-evidence"
     assert "redaction failed" in failed[0]["stderr_tail"]
+
+
+def test_gui_cli_parity_report_detects_hash_mismatch(tmp_path: Path) -> None:
+    cli_output = tmp_path / "cli"
+    gui_output = tmp_path / "gui"
+    cli_output.mkdir()
+    gui_output.mkdir()
+    (cli_output / "document.md").write_text("cli\n", encoding="utf-8")
+    (gui_output / "document.md").write_text("gui\n", encoding="utf-8")
+
+    payload = run_gui_cli_parity.compare_artifacts(cli_output, gui_output, artifact_names=("document.md",))
+
+    assert payload["passed"] is False
+    assert payload["summary"]["mismatched_count"] == 1
+    assert payload["artifacts"][0]["artifact"] == "document.md"
+    assert payload["artifacts"][0]["status"] == "mismatched"
+
+
+def test_release_gate_runner_supports_optional_gui_parity_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="Wrote gui_cli_parity_report.json", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-gui-parity",
+            gates=["gui-parity"],
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["summary"]["total_gate_commands"] == 1
+    assert payload["gates"][0]["gate"] == "gui-parity"
+    command = calls[0]
+    assert any(str(part).endswith("run_gui_cli_parity.py") for part in command)
+    assert "--output-dir" in command
+    assert payload["gates"][0]["report_path"].endswith("gui_cli_parity_report.json")
 
 
 def test_wheel_contract_inspector_accepts_gui_resource_and_entry_points(tmp_path: Path) -> None:
