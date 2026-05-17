@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI/CLI golden parity gate | 97/100 | 0 | Q74. CLI/GUI Golden Parity Gate 구현. `scripts/run_gui_cli_parity.py`와 optional `gui-parity` release gate로 CLI/GUI headless output의 Markdown, manifest, report, RAG sidecar normalized hash equality를 검증. report는 raw PDF/Markdown 본문 없이 local-only hash/status만 기록하며 변환 core 품질과 public schema는 유지 |
 | 2026-05-17 | GUI incremental corpus options | 97/100 | 0 | Q73. GUI Incremental Corpus Options 구현. GUI folder mode에서 previous corpus manifest 선택과 reuse unchanged를 지원하고, `corpus_diff_report.json`, `requirement_change_impact_report.json` artifact open action을 추가. profile/recent state에는 previous manifest path를 저장하지 않으며 CLI reuse/skip 계약과 동등성을 테스트로 고정 |
 | 2026-05-17 | GUI batch artifact parity | 97/100 | 0 | Q72. Shared Batch Runner And GUI Batch Artifact Parity 구현. CLI batch 실행 로직을 `pdf2md.batch_runner`로 분리하고 GUI folder mode도 같은 runner를 호출해 `batch_report.json`, `corpus_manifest.json`을 생성한다. GUI/CLI batch artifact normalized contract를 테스트로 고정했으며 변환 core 품질과 public schema는 유지 |
 | 2026-05-17 | GUI/CLI parity backlog | 97/100 | 0 | Q72-Q76 active backlog/spec 추가. GUI 변환 품질은 CLI와 거의 동일하지만 batch/corpus artifact, incremental corpus, parity gate, metrics/progress, performance benchmark를 CLI 운영 수준으로 끌어올리는 계획을 수립. 구현 전 계획 단계이므로 점수는 유지 |
@@ -66,6 +67,19 @@
 
 ## 평가 히스토리
 
+### 2026-05-17 (Q74 구현 후)
+
+#### 총평
+
+Q74는 GUI가 CLI와 같은 core conversion output을 유지하는지 release 전에 자동 확인하는 회귀 방어 작업이다. `scripts/run_gui_cli_parity.py`가 deterministic synthetic PDF를 만들고 CLI와 GUI headless runner를 같은 옵션으로 실행한 뒤 Markdown, manifest, report, RAG sidecar를 normalized SHA-256으로 비교한다.
+
+`scripts/run_release_gates.py --gates gui-parity`에서도 같은 검증을 실행할 수 있다. `gui_cli_parity_report.json`은 raw PDF/Markdown 본문을 저장하지 않고 artifact 이름, 존재 여부, normalized hash, mismatch count만 남기는 local-only artifact다. 변환 engine과 public schema는 유지하므로 점수는 97/100을 유지한다.
+
+#### 다음 개선 참조
+
+- Q75. GUI Metrics And Page Progress Contract
+- Q76. CLI/GUI Performance Benchmark Report
+
 ### 2026-05-17 (Q73 구현 후)
 
 #### 총평
@@ -76,7 +90,6 @@ GUI 화면에는 `Previous corpus manifest`, `Reuse unchanged`, `Open Corpus Man
 
 #### 다음 개선 참조
 
-- Q74. CLI/GUI Golden Parity Gate
 - Q75. GUI Metrics And Page Progress Contract
 - Q76. CLI/GUI Performance Benchmark Report
 

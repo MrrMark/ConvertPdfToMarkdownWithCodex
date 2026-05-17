@@ -56,8 +56,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q74-Q76" in readme
-    assert "완료된 Q34-Q73" in readme
+    assert "현재 active quality backlog는 Q75-Q76" in readme
+    assert "완료된 Q34-Q74" in readme
     assert "Previous corpus manifest" in readme
     assert "Reuse unchanged" in readme
     assert "Open Corpus Diff" in readme
@@ -73,10 +73,13 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "python3 -m pdf2md.gui --help" in readme
     assert "python3 -m pdf2md.gui --doctor" in readme
     assert "scripts/run_gui_smoke_evidence.py" in readme
+    assert "scripts/run_gui_cli_parity.py" in readme
     assert "gui_smoke_evidence.json" in readme
+    assert "gui_cli_parity_report.json" in readme
     assert "scripts/create_gui_support_bundle.py" in readme
     assert "gui_support_bundle.json" in readme
     assert "--json-only" in readme
+    assert "--gates gui-parity" in readme
     assert "runtime diagnostic code/message/action" in readme
     assert "변환 warning message" in readme
     assert "문서 경계 취소" in readme
@@ -154,12 +157,15 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "Reuse unchanged" in guide
     assert "Open Corpus Diff" in guide
     assert "scripts\\run_gui_smoke_evidence.py" in guide
+    assert "scripts\\run_gui_cli_parity.py" in guide
     assert "scripts\\create_gui_support_bundle.py" in guide
     assert "wheel_contract_report.json" in guide
+    assert "gui_cli_parity_report.json" in guide
     assert "pdf2md.resources\\GUI_USER_GUIDE.md" in guide
     assert "gui_support_bundle.json" in guide
     assert "gui_smoke_evidence.json" in guide
     assert "--json-only" in guide
+    assert "--gates gui-parity" in guide
     assert "runtime diagnostic code/message/action" in guide
     assert "변환 warning message" in guide
     assert "pdf2md-gui" in guide
@@ -190,11 +196,14 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     assert "Expert options" in guide
     assert "Export profile" in guide
     assert "scripts/run_gui_smoke_evidence.py" in guide
+    assert "scripts/run_gui_cli_parity.py" in guide
     assert "scripts/create_gui_support_bundle.py" in guide
     assert "scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates gui" in guide
+    assert "scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui-parity --gates gui-parity" in guide
     assert "pdf2md.resources/GUI_USER_GUIDE.md" in guide
     assert "gui_support_bundle.json" in guide
     assert "gui_smoke_evidence.json" in guide
+    assert "gui_cli_parity_report.json" in guide
     assert "--json-only" in guide
     assert "GUI runtime doctor diagnostics" in guide
     assert "workspace/home absolute path" in guide
@@ -226,8 +235,10 @@ def test_gui_user_guide_is_separate_from_cli_docs() -> None:
     assert "Expert options" in guide
     assert "invalid profile" in guide
     assert "scripts/run_gui_smoke_evidence.py" in guide
+    assert "scripts/run_gui_cli_parity.py" in guide
     assert "scripts/create_gui_support_bundle.py" in guide
     assert "wheel_contract_report.json" in guide
+    assert "gui_cli_parity_report.json" in guide
     assert "pdf2md.resources/GUI_USER_GUIDE.md" in guide
     assert "gui_support_bundle.json" in guide
     assert "gui_smoke_evidence.json" in guide
@@ -255,6 +266,7 @@ def test_gui_user_guide_is_separate_from_cli_docs() -> None:
     assert "page-level 진행률 callback" in guide
     assert "원문 텍스트, 표, 이미지 내용을 요약하거나 재서술하지 않는다" in guide
     assert "자동화, CI, 반복 스크립트 실행은 GUI보다 CLI를 권장" in guide
+    assert "--gates gui-parity" in guide
 
 
 def test_ci_and_next_plan_contracts_are_present() -> None:
@@ -325,7 +337,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in next_plan
     assert "Q73. GUI Incremental Corpus Options" not in next_plan
-    assert "Q74. CLI/GUI Golden Parity Gate" in next_plan
+    assert "Q74. CLI/GUI Golden Parity Gate" not in next_plan
     assert "Q75. GUI Metrics And Page Progress Contract" in next_plan
     assert "Q76. CLI/GUI Performance Benchmark Report" in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
@@ -334,10 +346,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
-    assert "Q74. CLI/GUI Golden Parity Gate" in development_specs
+    assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
     assert "Q75. GUI Metrics And Page Progress Contract" in development_specs
     assert "Q76. CLI/GUI Performance Benchmark Report" in development_specs
-    assert "scripts/run_gui_cli_parity.py" in development_specs
+    assert "scripts/run_gui_cli_parity.py" not in development_specs
     assert "scripts/benchmark_gui_cli_parity.py" in development_specs
     assert "Q54. GUI Runtime And Install Diagnostics" not in development_specs
     assert "Q55. GUI Conversion Result Review UX" not in development_specs
@@ -356,6 +368,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q69. Wheel Contents And GUI Help Resource Contract" not in development_specs
     assert "Q70. GUI Profile And Support Bundle Failure Fixture" not in development_specs
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" not in development_specs
+    assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
     assert "tests/test_gui_profiles.py" not in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
@@ -363,7 +376,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q73" in development_specs
+    assert "완료된 Q34-Q74" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -396,8 +409,12 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" in implemented_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" in implemented_specs
     assert "Q73. GUI Incremental Corpus Options" in implemented_specs
+    assert "Q74. CLI/GUI Golden Parity Gate" in implemented_specs
     assert "pdf2md/batch_runner.py" in implemented_specs
     assert "previous_corpus_manifest" in implemented_specs
+    assert "scripts/run_gui_cli_parity.py" in implemented_specs
+    assert "gui_cli_parity_report.json" in implemented_specs
+    assert "--gates gui-parity" in implemented_specs
     assert "tests/test_gui_profiles.py" in implemented_specs
     assert "Q72+" in implemented_specs
     assert "scripts/inspect_wheel_contract.py" in implemented_specs
@@ -474,6 +491,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" in quality_scorecard
     assert "GUI batch artifact parity" in quality_scorecard
     assert "GUI incremental corpus options" in quality_scorecard
+    assert "GUI/CLI golden parity gate" in quality_scorecard
     assert "GUI/CLI parity backlog" in quality_scorecard
     assert "Q72-Q76 active backlog/spec 추가" in quality_scorecard
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" in quality_scorecard
@@ -481,6 +499,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q74. CLI/GUI Golden Parity Gate" in quality_scorecard
     assert "Q75. GUI Metrics And Page Progress Contract" in quality_scorecard
     assert "Q76. CLI/GUI Performance Benchmark Report" in quality_scorecard
+    assert "scripts/run_gui_cli_parity.py" in quality_scorecard
+    assert "gui_cli_parity_report.json" in quality_scorecard
     assert "Q68-Q70 reassessment" in quality_scorecard
     assert "active quality backlog는 없다" in quality_scorecard
     assert "Q72+" in quality_scorecard

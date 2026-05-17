@@ -288,6 +288,15 @@ python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates
 
 wheel 설치 환경에서는 source checkout의 `docs/GUI_USER_GUIDE.md`가 없을 수 있으므로 GUI help는 packaged `pdf2md.resources/GUI_USER_GUIDE.md` fallback을 사용한다. packaging release gate는 `wheel_contract_report.json`으로 GUI module, support/profile helper, packaged help resource, `pdf2md-gui` console script metadata 포함 여부를 검사한다.
 
+CLI와 GUI headless runner가 같은 산출물을 만드는지도 release 전에 확인할 수 있다.
+
+```bash
+python scripts/run_gui_cli_parity.py --output-dir /tmp/pdf2md-gui-cli-parity
+python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui-parity --gates gui-parity
+```
+
+`gui_cli_parity_report.json`은 synthetic PDF fixture의 raw 본문을 저장하지 않고, Markdown, manifest, report, RAG sidecar별 normalized hash match 결과와 mismatch summary만 저장하는 local-only 검증 artifact다.
+
 ## 12) 배포 방식 메모
 
 현재 비개발자 기본 경로는 source/ZIP + venv setup + `python -m pdf2md.gui` 실행이다.

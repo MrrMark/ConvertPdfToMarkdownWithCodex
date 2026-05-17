@@ -23,17 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q74. CLI/GUI Golden Parity Gate
-
-같은 입력 PDF와 같은 옵션에서 CLI와 GUI headless runner가 동일 산출물을 생성하는지 자동 검증하는 parity gate를 추가한다.
-
-핵심 범위:
-
-- CLI/GUI 동일 옵션 실행 후 Markdown, manifest, report, RAG sidecar normalized hash 비교
-- optional release gate 또는 별도 script로 `gui-parity` 검증 추가
-- nondeterministic path/timing field는 기존 normalize helper로 비교
-- GUI가 CLI와 같은 core pipeline을 쓰는 계약을 회귀 방어
-
 ### P2 / Q75. GUI Metrics And Page Progress Contract
 
 GUI에서 CLI 운영자가 보는 수준의 성능/진행 판단 정보를 확인할 수 있게 한다.
