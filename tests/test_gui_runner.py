@@ -37,6 +37,58 @@ from pdf2md.pipeline import ConversionResult, run_conversion
 from helpers.normalize_outputs import normalize_manifest, normalize_report
 
 
+def _batch_file_suffixes(files: dict) -> dict[str, str | None]:
+    suffixes: dict[str, str | None] = {}
+    for key, value in files.items():
+        if value is None:
+            suffixes[key] = None
+            continue
+        path = Path(value)
+        parts = path.parts[-2:] if len(path.parts) >= 2 else path.parts
+        suffixes[key] = "/".join(parts)
+    return suffixes
+
+
+def _batch_report_contract(payload: dict) -> dict:
+    return {
+        "schema_version": payload["schema_version"],
+        "summary": payload["summary"],
+        "documents": [
+            {
+                "input_pdf": Path(document["input_pdf"]).name,
+                "status": document["status"],
+                "exit_code": document["exit_code"],
+                "warning_count": document["warning_count"],
+                "table_count": document["table_count"],
+                "image_count": document["image_count"],
+                "used_ocr": document["used_ocr"],
+                "skipped": document["skipped"],
+                "files": _batch_file_suffixes(document["files"]),
+            }
+            for document in payload["documents"]
+        ],
+    }
+
+
+def _corpus_manifest_contract(payload: dict) -> dict:
+    return {
+        "schema_version": payload["schema_version"],
+        "purpose": payload["purpose"],
+        "documents": [
+            {
+                "doc_id": document["doc_id"],
+                "input_pdf": Path(document["input_pdf"]).name,
+                "source_sha256": document["source_sha256"],
+                "status": document["status"],
+                "selected_pages": document["selected_pages"],
+                "skipped": document["skipped"],
+                "files": _batch_file_suffixes(document["files"]),
+            }
+            for document in payload["documents"]
+        ],
+    }
+
+
 def test_gui_module_help_does_not_launch_window() -> None:
     completed = subprocess.run(
         [sys.executable, "-m", "pdf2md.gui", "--help"],
@@ -470,6 +522,10 @@ def test_gui_batch_conversion_uses_cli_batch_names_and_skip_existing(sample_pdf:
     )
 
     assert first.success_count == 1
+    assert first.batch_report_path == output_root / "batch_report.json"
+    assert first.corpus_manifest_path == output_root / "corpus_manifest.json"
+    assert (output_root / "batch_report.json").exists()
+    assert (output_root / "corpus_manifest.json").exists()
     assert (output_root / "alpha" / "alpha.md").exists()
     assert (output_root / "alpha" / "alpha_manifest.json").exists()
     assert (output_root / "alpha" / "alpha_report.json").exists()
@@ -481,6 +537,48 @@ def test_gui_batch_conversion_uses_cli_batch_names_and_skip_existing(sample_pdf:
     assert second.documents[0].option_fingerprint == gui_options_fingerprint(
         GuiConversionOptions(pages="1", skip_existing=True)
     )
+    batch_report = json.loads((output_root / "batch_report.json").read_text(encoding="utf-8"))
+    corpus_manifest = json.loads((output_root / "corpus_manifest.json").read_text(encoding="utf-8"))
+    assert batch_report["summary"]["skipped_count"] == 1
+    assert batch_report["documents"][0]["status"] == "skipped"
+    assert corpus_manifest["documents"][0]["skipped"] is True
+
+
+def test_gui_batch_artifacts_match_cli_batch_contract(sample_pdf: Path, tmp_path: Path) -> None:
+    cli_input_dir = tmp_path / "cli-pdfs"
+    gui_input_dir = tmp_path / "gui-pdfs"
+    cli_input_dir.mkdir()
+    gui_input_dir.mkdir()
+    (cli_input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+    (gui_input_dir / "alpha.pdf").write_bytes(sample_pdf.read_bytes())
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "pdf2md", "--input-dir", str(cli_input_dir), "--pages", "1"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0
+
+    gui_output_root = tmp_path / "gui-output"
+    summary = run_gui_conversion(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=gui_input_dir,
+            output_dir=gui_output_root,
+            options=GuiConversionOptions(pages="1"),
+        )
+    )
+
+    assert summary.exit_code == 0
+    assert summary.batch_report_path == gui_output_root / "batch_report.json"
+    assert summary.corpus_manifest_path == gui_output_root / "corpus_manifest.json"
+    cli_report = json.loads((cli_input_dir / "output" / "batch_report.json").read_text(encoding="utf-8"))
+    gui_report = json.loads((gui_output_root / "batch_report.json").read_text(encoding="utf-8"))
+    cli_manifest = json.loads((cli_input_dir / "output" / "corpus_manifest.json").read_text(encoding="utf-8"))
+    gui_manifest = json.loads((gui_output_root / "corpus_manifest.json").read_text(encoding="utf-8"))
+    assert _batch_report_contract(gui_report) == _batch_report_contract(cli_report)
+    assert _corpus_manifest_contract(gui_manifest) == _corpus_manifest_contract(cli_manifest)
 
 
 def test_gui_batch_uses_deterministic_case_stable_order(sample_pdf: Path, tmp_path: Path) -> None:
@@ -573,6 +671,9 @@ def test_gui_batch_failure_becomes_retry_candidate(monkeypatch: pytest.MonkeyPat
     assert summary.success_count == 1
     assert summary.failed_count == 1
     assert summary.exit_code == 2
+    assert (tmp_path / "batch-output" / "batch_report.json").exists()
+    batch_report = json.loads((tmp_path / "batch-output" / "batch_report.json").read_text(encoding="utf-8"))
+    assert batch_report["summary"]["failed_count"] == 1
     assert len(summary.retry_candidates) == 1
     retry = summary.retry_candidates[0]
     assert retry.input_pdf.name == "beta.pdf"

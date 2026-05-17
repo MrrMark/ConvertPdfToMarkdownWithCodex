@@ -31,6 +31,8 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI batch artifact parity | 97/100 | 0 | Q72. Shared Batch Runner And GUI Batch Artifact Parity 구현. CLI batch 실행 로직을 `pdf2md.batch_runner`로 분리하고 GUI folder mode도 같은 runner를 호출해 `batch_report.json`, `corpus_manifest.json`을 생성한다. GUI/CLI batch artifact normalized contract를 테스트로 고정했으며 변환 core 품질과 public schema는 유지 |
+| 2026-05-17 | GUI/CLI parity backlog | 97/100 | 0 | Q72-Q76 active backlog/spec 추가. GUI 변환 품질은 CLI와 거의 동일하지만 batch/corpus artifact, incremental corpus, parity gate, metrics/progress, performance benchmark를 CLI 운영 수준으로 끌어올리는 계획을 수립. 구현 전 계획 단계이므로 점수는 유지 |
 | 2026-05-17 | Q68-Q70 reassessment | 97/100 | 0 | Q71. Quality Scorecard Refresh And Next Backlog Reassessment 수행. Q68-Q70은 GUI release/packaging/support artifact 신뢰도 개선으로 의미가 크지만 core 변환 품질을 새로 입증한 작업은 아니므로 97/100 유지. 구체적인 corpus failure evidence가 생길 때 Q72+를 새로 열기로 하고 active quality backlog는 없다 |
 | 2026-05-17 | GUI failure fixture hardening | 97/100 | 0 | Q70. GUI Profile And Support Bundle Failure Fixture 구현. partial/failed GUI summary와 invalid profile diagnostic fixture를 보강해 raw exception/warning/path/value echo를 막고 status count, warning code/count, retry candidate 중심 계약을 고정. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q71 |
 | 2026-05-17 | Wheel GUI help resource contract | 97/100 | 0 | Q69. Wheel Contents And GUI Help Resource Contract 구현. packaged GUI help fallback, wheel content/console script inspector, packaging gate의 GUI module help와 support/profile helper 포함 검증을 추가. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q70-Q71 |
@@ -62,6 +64,37 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q72 구현 후)
+
+#### 총평
+
+Q72는 변환 engine 자체를 바꾸지 않고 batch 운영 계층을 정렬한 작업이다. `pdf2md.batch_runner`가 input folder validation, deterministic ordering, duplicate stem detection, skip-existing, partial aggregation, `batch_report.json`, `corpus_manifest.json` 생성을 담당하고 CLI/GUI가 같은 경로를 호출한다.
+
+GUI folder mode도 이제 batch-level public artifact를 남기며, CLI와 GUI batch output의 핵심 계약은 normalized test로 비교된다. 점수는 97/100을 유지한다. 남은 gap은 Q73 incremental corpus UI, Q74 parity gate, Q75 metrics/progress, Q76 benchmark다.
+
+#### 다음 개선 참조
+
+- Q73. GUI Incremental Corpus Options
+- Q74. CLI/GUI Golden Parity Gate
+- Q75. GUI Metrics And Page Progress Contract
+- Q76. CLI/GUI Performance Benchmark Report
+
+### 2026-05-17 (Q72-Q76 계획 수립)
+
+#### 총평
+
+현재 프로젝트를 **GUI/CLI 운영 기능 parity** 관점으로 보면 변환 품질 자체는 CLI와 거의 같은 수준이지만, batch/corpus 운영 artifact와 성능 관측성은 아직 CLI가 우위다.
+
+Q72-Q76은 이 gap을 줄이기 위한 active backlog다. Q72에서 batch runner를 공용화하고, Q73에서 incremental corpus 옵션을 GUI에 노출하며, Q74-Q76에서 CLI/GUI output parity, progress/metrics, performance benchmark를 release 전 검증 가능한 형태로 고정한다.
+
+#### 다음 개선 참조
+
+- Q72. Shared Batch Runner And GUI Batch Artifact Parity
+- Q73. GUI Incremental Corpus Options
+- Q74. CLI/GUI Golden Parity Gate
+- Q75. GUI Metrics And Page Progress Contract
+- Q76. CLI/GUI Performance Benchmark Report
 
 ### 2026-05-17 (Q71 구현 후)
 
