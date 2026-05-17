@@ -23,19 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q69. Wheel Contents And GUI Help Resource Contract
-
-wheel/sdist 배포에서 GUI module, console script metadata, help document availability가 깨지지 않도록 package artifact 수준의 검증을 강화한다.
-
-핵심 범위:
-
-- 필요 시 `pdf2md/resources/` 또는 package data 정책 추가
-- `gui_user_guide_path()` 또는 help path helper fallback 개선
-- packaging gate가 CLI뿐 아니라 GUI entry point와 support/profile helper 포함 여부를 검증
-- wheel content, console script metadata, GUI help resource contract test 추가
-
-비범위는 PyPI upload, code signing/notarization, 외부 네트워크 dependency download 전제다.
-
 ### P2 / Q70. GUI Profile And Support Bundle Failure Fixture
 
 실패/partial success 상황에서 support bundle과 profile import가 raw exception/warning/path를 누출하지 않는지 regression fixture를 강화한다.

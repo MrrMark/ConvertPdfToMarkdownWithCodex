@@ -150,6 +150,8 @@ python scripts/create_gui_support_bundle.py --output-dir /tmp/pdf2md-gui-support
 
 `gui_support_bundle.json`과 `gui_support_bundle.md`에는 status count, warning code/count, sanitized artifact label, environment/runtime code만 포함한다. 원문 PDF/Markdown 내용, 표/이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않는다.
 
+wheel 설치 환경에서는 source checkout의 `docs/GUI_USER_GUIDE.md`가 없을 수 있으므로 GUI help는 packaged `pdf2md.resources/GUI_USER_GUIDE.md` fallback도 지원한다.
+
 릴리스 전 자동 점검에서는 optional GUI release gate로 help, doctor, smoke evidence, support bundle redaction 검증을 한 번에 실행할 수 있다.
 
 ```bash

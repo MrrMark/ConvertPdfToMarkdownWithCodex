@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Sequence
 
 from pdf2md.config import Config, default_output_dir_for_input
+from pdf2md.gui_help import gui_user_guide_path
 from pdf2md.models import ConversionStatus, DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode, WarningEntry
 from pdf2md.pipeline import EXIT_FATAL, EXIT_PARTIAL, ConversionResult, run_conversion
 
@@ -206,7 +207,7 @@ def _console_script_names() -> set[str]:
 
 
 def _default_gui_help_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "docs" / "GUI_USER_GUIDE.md"
+    return gui_user_guide_path()
 
 
 def _discover_tesseract() -> Path | None:

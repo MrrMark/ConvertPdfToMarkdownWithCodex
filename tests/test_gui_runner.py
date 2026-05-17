@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from pdf2md.config import Config
+from pdf2md import gui_help
 from pdf2md.gui import gui_user_guide_path
 from pdf2md.gui_runner import (
     GuiDiagnosticError,
@@ -54,6 +55,19 @@ def test_gui_user_guide_path_points_to_local_help_document() -> None:
     assert guide_path.name == "GUI_USER_GUIDE.md"
     assert guide_path.exists()
     assert "GUI 사용자 가이드" in guide_path.read_text(encoding="utf-8")
+
+
+def test_gui_user_guide_path_falls_back_to_packaged_resource(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(gui_help, "source_gui_user_guide_path", lambda: tmp_path / "missing.md")
+
+    guide_path = gui_help.gui_user_guide_path()
+
+    assert guide_path.name == "GUI_USER_GUIDE.md"
+    assert guide_path.exists()
+    assert "packaged fallback" in guide_path.read_text(encoding="utf-8")
 
 
 def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp_path: Path) -> None:

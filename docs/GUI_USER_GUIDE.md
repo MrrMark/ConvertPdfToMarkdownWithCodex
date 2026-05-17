@@ -279,6 +279,8 @@ python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates
 
 이 gate는 `python -m pdf2md.gui --help`, `python -m pdf2md.gui --doctor --doctor-format json`, smoke evidence runner, support bundle 생성기를 순차 실행하고 `release_gate_report.json`에 command/status/report path를 기록한다. smoke evidence 또는 support bundle redaction 검증이 실패하면 release gate도 실패한다.
 
+wheel 설치 환경에서는 source checkout의 `docs/GUI_USER_GUIDE.md`가 없을 수 있으므로 GUI help는 packaged `pdf2md.resources/GUI_USER_GUIDE.md` fallback을 사용한다. packaging release gate는 `wheel_contract_report.json`으로 GUI module, support/profile helper, packaged help resource, `pdf2md-gui` console script metadata 포함 여부를 검사한다.
+
 ## 12) 배포 방식 메모
 
 현재 비개발자 기본 경로는 source/ZIP + venv setup + `python -m pdf2md.gui` 실행이다.
