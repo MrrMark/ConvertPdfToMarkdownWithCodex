@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import hashlib
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Literal, Optional
 
 from pdf2md.config import Config
 from pdf2md.constants import WarningCode
@@ -80,6 +80,25 @@ class ConversionResult:
     warnings: list[WarningEntry]
     status: ConversionStatus
     report: Report | None = None
+
+
+@dataclass(frozen=True)
+class ConversionProgressEvent:
+    """Observer-only conversion progress event emitted without affecting output determinism."""
+
+    current: int
+    total: int
+    page: int | None
+    status: Literal["pages_selected", "page_started", "page_finished"]
+    stage: str
+
+
+ConversionProgressCallback = Callable[[ConversionProgressEvent], None]
+
+
+def _emit_progress(progress: ConversionProgressCallback | None, event: ConversionProgressEvent) -> None:
+    if progress is not None:
+        progress(event)
 
 
 def _file_sha256(path: Path) -> str:
@@ -360,7 +379,7 @@ def _write_technical_table_output(config: Config, records: list[dict]) -> tuple[
     return len(records), 1
 
 
-def run_conversion(config: Config) -> ConversionResult:
+def run_conversion(config: Config, *, progress: ConversionProgressCallback | None = None) -> ConversionResult:
     """Run conversion and write markdown, manifest, and report outputs."""
     started_at = datetime.now(timezone.utc)
     logger.info("Starting conversion input=%s output_dir=%s", config.input_pdf, config.output_dir)
@@ -502,6 +521,16 @@ def run_conversion(config: Config) -> ConversionResult:
             report=report,
         )
     finish_stage("page_selection", page_selection_started)
+    _emit_progress(
+        progress,
+        ConversionProgressEvent(
+            current=0,
+            total=len(selected_pages),
+            page=None,
+            status="pages_selected",
+            stage="page_selection",
+        ),
+    )
 
     requested_page_workers = config.page_workers
     effective_page_workers = effective_page_worker_count(requested_page_workers, len(selected_pages))
@@ -725,8 +754,18 @@ def run_conversion(config: Config) -> ConversionResult:
     total_deduplicated_blocks = 0
     total_suppressed_lines = len(header_footer_suppressed_payload)
     normalization_started = stage_start()
-    for page in selected_pages:
+    for index, page in enumerate(selected_pages, start=1):
         logger.debug("Normalizing page=%s", page)
+        _emit_progress(
+            progress,
+            ConversionProgressEvent(
+                current=index - 1,
+                total=len(selected_pages),
+                page=page,
+                status="page_started",
+                stage="normalization",
+            ),
+        )
         recovered_lines = _apply_structure_recoveries(
             page=page,
             lines=page_layout_lines.get(page, []),
@@ -761,6 +800,16 @@ def run_conversion(config: Config) -> ConversionResult:
             [item.model_dump(mode="json") for item in normalization.deduplicated_blocks]
         )
         suppressed_lines_payload.extend([item.model_dump(mode="json") for item in normalization.suppressed_lines])
+        _emit_progress(
+            progress,
+            ConversionProgressEvent(
+                current=index,
+                total=len(selected_pages),
+                page=page,
+                status="page_finished",
+                stage="normalization",
+            ),
+        )
     finish_stage("normalization", normalization_started)
 
     page_blocks_with_anchor: dict[int, list[tuple[int, float, str]]] = {}

@@ -83,6 +83,7 @@ GUI_LAYOUT_SECTIONS: tuple[GuiLayoutSection, ...] = (
             "conversion_starting",
             "batch_conversion_starting",
             "batch_progress",
+            "page_progress",
             "single_complete_percent",
         ),
         wraps_text=True,

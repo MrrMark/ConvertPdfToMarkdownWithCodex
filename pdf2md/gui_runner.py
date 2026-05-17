@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 from importlib import metadata as importlib_metadata
 import hashlib
+import inspect
 import json
 import os
 import platform
@@ -25,11 +26,12 @@ from pdf2md.batch_runner import (
 from pdf2md.config import Config, default_output_dir_for_input
 from pdf2md.gui_help import gui_user_guide_path
 from pdf2md.models import ConversionStatus, DomainAdapterMode, ImageMode, RagTableOutputMode, Report, TableMode, WarningEntry
-from pdf2md.pipeline import EXIT_FATAL, EXIT_PARTIAL, ConversionResult, run_conversion
+from pdf2md.pipeline import EXIT_FATAL, EXIT_PARTIAL, ConversionProgressEvent, ConversionResult, run_conversion
 
 
 ProgressCallback = Callable[[str], None]
 BatchProgressCallback = Callable[["GuiBatchProgress"], None]
+PageProgressCallback = Callable[["GuiPageProgress"], None]
 CancelCallback = Callable[[], bool]
 DiagnosticSeverity = Literal["info", "advisory", "warning", "error"]
 MIN_GUI_PYTHON_VERSION = (3, 11)
@@ -122,6 +124,23 @@ class GuiBatchProgress:
 
 
 @dataclass(frozen=True)
+class GuiPageProgress:
+    current: int
+    total: int
+    page: int
+    percent: int
+    stage: str
+    status: str
+
+
+@dataclass(frozen=True)
+class GuiReportMetrics:
+    warning_codes: tuple[str, ...] = ()
+    processed_pages: int = 0
+    pages_per_second: float | None = None
+
+
+@dataclass(frozen=True)
 class GuiDocumentSummary:
     input_pdf: Path
     output_dir: Path
@@ -133,6 +152,9 @@ class GuiDocumentSummary:
     assets_dir: Path | None = None
     warning_count: int = 0
     warning_codes: tuple[str, ...] = ()
+    duration_ms: int = 0
+    processed_pages: int = 0
+    pages_per_second: float | None = None
     skipped: bool = False
     retry_candidate: bool = False
     option_fingerprint: str | None = None
@@ -175,6 +197,36 @@ class GuiConversionSummary:
     def retry_candidates(self) -> tuple[GuiDocumentSummary, ...]:
         return tuple(document for document in self.documents if document.retry_candidate)
 
+    @property
+    def document_count(self) -> int:
+        return len(self.documents)
+
+    @property
+    def elapsed_ms(self) -> int:
+        return sum(document.duration_ms for document in self.documents)
+
+    @property
+    def processed_pages(self) -> int:
+        return sum(document.processed_pages for document in self.documents)
+
+    @property
+    def pages_per_second(self) -> float | None:
+        if self.document_count == 1:
+            return self.documents[0].pages_per_second
+        if self.elapsed_ms <= 0 or self.processed_pages <= 0:
+            return None
+        return round(self.processed_pages / (self.elapsed_ms / 1000), 4)
+
+    @property
+    def status_counts(self) -> dict[str, int]:
+        return {
+            "success": self.success_count,
+            "partial_success": self.partial_success_count,
+            "failed": self.failed_count,
+            "skipped": self.skipped_count,
+            "cancelled": self.cancelled_count,
+        }
+
 
 def warning_codes_for_display(warnings: list[WarningEntry]) -> tuple[str, ...]:
     """Return deterministic warning codes for GUI display without copying source text."""
@@ -183,15 +235,20 @@ def warning_codes_for_display(warnings: list[WarningEntry]) -> tuple[str, ...]:
 
 def format_gui_summary(summary: GuiConversionSummary) -> str:
     """Format a compact GUI result summary using artifact paths and structured warning counts."""
+    pages_per_second = _format_rate(summary.pages_per_second)
     lines = [
         (
             "Finished: "
+            f"documents={summary.document_count}, "
             f"success={summary.success_count}, "
             f"partial={summary.partial_success_count}, "
             f"failed={summary.failed_count}, "
             f"skipped={summary.skipped_count}, "
             f"cancelled={summary.cancelled_count}, "
             f"retry_candidates={len(summary.retry_candidates)}, "
+            f"elapsed_ms={summary.elapsed_ms}, "
+            f"processed_pages={summary.processed_pages}, "
+            f"pages_per_second={pages_per_second}, "
             f"output={summary.output_root}"
         )
     ]
@@ -214,6 +271,12 @@ def format_gui_summary(summary: GuiConversionSummary) -> str:
     if summary.requirement_change_impact_report_path is not None:
         lines.append(f"- requirement_impact={summary.requirement_change_impact_report_path}")
     return "\n".join(lines)
+
+
+def _format_rate(value: float | None) -> str:
+    if value is None:
+        return "unknown"
+    return f"{value:.4f}".rstrip("0").rstrip(".")
 
 
 def _format_version(version: Sequence[int]) -> str:
@@ -1000,6 +1063,7 @@ def _document_summary_from_result(
     *,
     option_fingerprint: str | None = None,
 ) -> GuiDocumentSummary:
+    report = result.report
     return GuiDocumentSummary(
         input_pdf=config.input_pdf,
         output_dir=config.output_dir,
@@ -1011,6 +1075,9 @@ def _document_summary_from_result(
         assets_dir=_assets_dir(config),
         warning_count=len(result.warnings),
         warning_codes=warning_codes_for_display(result.warnings),
+        duration_ms=report.duration_ms if report is not None else 0,
+        processed_pages=report.summary.processed_pages if report is not None else 0,
+        pages_per_second=report.summary.pages_per_second if report is not None else None,
         retry_candidate=result.status == ConversionStatus.FAILED,
         option_fingerprint=option_fingerprint,
     )
@@ -1033,10 +1100,46 @@ def _emit_batch_progress(
         batch_progress(GuiBatchProgress(current=current, total=total, input_pdf=input_pdf, status=status))
 
 
-def _run_single(request: GuiConversionRequest, progress: ProgressCallback | None) -> GuiConversionSummary:
+def _gui_page_progress_from_event(event: ConversionProgressEvent) -> GuiPageProgress | None:
+    if event.status != "page_finished" or event.page is None or event.total <= 0:
+        return None
+    safe_current = min(max(event.current, 0), event.total)
+    return GuiPageProgress(
+        current=safe_current,
+        total=event.total,
+        page=event.page,
+        percent=round((safe_current / event.total) * 100),
+        stage=event.stage,
+        status=event.status,
+    )
+
+
+def _run_core_conversion(
+    config: Config,
+    *,
+    page_progress: PageProgressCallback | None = None,
+) -> ConversionResult:
+    if page_progress is None:
+        return run_conversion(config)
+
+    def handle_progress(event: ConversionProgressEvent) -> None:
+        gui_event = _gui_page_progress_from_event(event)
+        if gui_event is not None:
+            page_progress(gui_event)
+
+    if "progress" not in inspect.signature(run_conversion).parameters:
+        return run_conversion(config)
+    return run_conversion(config, progress=handle_progress)
+
+
+def _run_single(
+    request: GuiConversionRequest,
+    progress: ProgressCallback | None,
+    page_progress: PageProgressCallback | None,
+) -> GuiConversionSummary:
     config = build_single_config(request)
     _emit(progress, f"Converting {config.input_pdf}")
-    result = run_conversion(config)
+    result = _run_core_conversion(config, page_progress=page_progress)
     _emit(progress, f"Finished {config.input_pdf.name}: {result.status.value}")
     document = _document_summary_from_result(config, result, option_fingerprint=gui_options_fingerprint(request.options))
     return GuiConversionSummary(
@@ -1079,15 +1182,19 @@ def _failed_document_summary(config: Config, exc: Exception, option_fingerprint:
     )
 
 
-def _warning_codes_from_report(config: Config) -> tuple[str, ...]:
+def _report_metrics_from_report(config: Config) -> GuiReportMetrics:
     report_path = config.output_dir / config.report_filename
     if not report_path.exists():
-        return ()
+        return GuiReportMetrics()
     try:
         report = Report.model_validate(json.loads(report_path.read_text(encoding="utf-8")))
     except Exception:  # noqa: BLE001
-        return ()
-    return warning_codes_for_display(list(report.warnings))
+        return GuiReportMetrics()
+    return GuiReportMetrics(
+        warning_codes=warning_codes_for_display(list(report.warnings)),
+        processed_pages=report.summary.processed_pages,
+        pages_per_second=report.summary.pages_per_second,
+    )
 
 
 def _document_summary_from_batch_document(
@@ -1100,6 +1207,7 @@ def _document_summary_from_batch_document(
 ) -> GuiDocumentSummary:
     config = build_batch_config(request, pdf_path, output_root)
     status = document.status
+    report_metrics = _report_metrics_from_report(config)
     return GuiDocumentSummary(
         input_pdf=pdf_path,
         output_dir=config.output_dir,
@@ -1110,7 +1218,10 @@ def _document_summary_from_batch_document(
         report_path=_report_path(config),
         assets_dir=_assets_dir(config),
         warning_count=document.warning_count,
-        warning_codes=_warning_codes_from_report(config),
+        warning_codes=report_metrics.warning_codes,
+        duration_ms=document.duration_ms,
+        processed_pages=report_metrics.processed_pages,
+        pages_per_second=report_metrics.pages_per_second,
         skipped=document.skipped,
         retry_candidate=status == ConversionStatus.FAILED.value,
         option_fingerprint=option_fingerprint,
@@ -1189,6 +1300,7 @@ def run_gui_conversion(
     *,
     progress: ProgressCallback | None = None,
     batch_progress: BatchProgressCallback | None = None,
+    page_progress: PageProgressCallback | None = None,
     cancel_requested: CancelCallback | None = None,
 ) -> GuiConversionSummary:
     """Run a GUI-initiated conversion through the same core pipeline as CLI conversions."""
@@ -1201,7 +1313,7 @@ def run_gui_conversion(
             raise ValueError(f"Input PDF does not exist or is not a file: {request.input_path}")
         if request.input_path.suffix.lower() != ".pdf":
             raise ValueError(f"Input file is not a PDF: {request.input_path}")
-        return _run_single(request, progress)
+        return _run_single(request, progress, page_progress)
     if mode == "folder":
         return _run_batch(request, progress, batch_progress, cancel_requested)
     raise ValueError(f"Unsupported GUI input mode: {request.input_mode}")

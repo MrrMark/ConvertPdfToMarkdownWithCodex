@@ -61,6 +61,7 @@ def test_gui_layout_wraps_long_localized_controls() -> None:
         "import_profile",
         "export_profile",
         "batch_progress",
+        "page_progress",
         "previous_corpus_manifest",
         "reuse_unchanged",
         "open_corpus_manifest",
