@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI release gate integration | 97/100 | 0 | Q68. GUI Release Gate Integration 구현. optional `gui` release gate로 GUI help, doctor JSON, headless smoke evidence, sanitized support bundle redaction 검증을 Tk window 없이 실행하고 command/status/report path를 기록. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q69-Q71 |
 | 2026-05-17 | GUI expert options/profile | 97/100 | 0 | Q67. GUI Expert Options And Profile Import/Export 구현. GUI에 page_workers/debug/verbose expert options와 local-only profile import/export를 추가하고, password/path/raw content 미저장 profile validation을 고정. 변환 품질과 public schema 계약은 유지하며 active quality backlog는 없다 |
 | 2026-05-17 | GUI support bundle | 97/100 | 0 | Q66. Sanitized GUI Support Bundle 구현. GUI summary, runtime doctor, smoke evidence를 raw text/message/path 없이 status count, warning code/count, sanitized artifact label, runtime code 중심 JSON/Markdown support artifact로 생성. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q67 |
 | 2026-05-17 | GUI runtime doctor | 97/100 | 0 | Q65. GUI Runtime Doctor And Packaging Compatibility Smoke 구현. Tcl/Tk patchlevel, display/window advisory, optional OCR/Tesseract, Pillow/pypdfium2, help document, package mode 진단과 `--doctor` 명령 추가. 변환 품질과 public schema 계약은 유지하고 다음 active backlog는 Q66-Q67 |
@@ -58,6 +59,20 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q68 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + 간편 GUI 릴리스 신뢰도** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q68은 GUI 기능 자체가 아니라 release gate 통합을 보강했다. `scripts/run_release_gates.py --gates gui`가 `python -m pdf2md.gui --help`, `python -m pdf2md.gui --doctor --doctor-format json`, headless smoke evidence, sanitized support bundle 생성을 순차 실행하고 `release_gate_report.json`에 command/status/report path를 남긴다. smoke evidence/support bundle의 raw PDF text, table/image content, warning message, absolute path redaction 검증 실패는 release gate 실패로 전파된다.
+
+#### 다음 개선 참조
+
+- Q69. Wheel Contents And GUI Help Resource Contract
+- Q70. GUI Profile And Support Bundle Failure Fixture
+- Q71. Quality Scorecard Refresh And Next Backlog Reassessment
 
 ### 2026-05-17 (Q67 구현 후)
 

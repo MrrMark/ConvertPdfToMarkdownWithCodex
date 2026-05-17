@@ -280,7 +280,8 @@ GUI 실행 전 문제가 나면 아래를 먼저 확인하세요.
 - `python3 --version`이 `Python 3.11+`인지 확인
 - `python3 -m pip install -e .[dev]`로 editable install 수행
 - `python3 -m pdf2md.gui --help`가 창 없이 도움말을 출력하는지 확인
-- `python3 -m pdf2md.gui --doctor`로 Tcl/Tk patchlevel, display/window advisory, OCR/Tesseract, Pillow/pypdfium2, help document, packaging mode를 확인
+- `python3 -m pdf2md.gui --doctor`로 Tcl/Tk patchlevel, display/window advisory, OCR/Tesseract, Pillow/pypdfium2, help document, packaging mode를 창 없이 확인
+- 실제 Tk window 생성까지 확인해야 하는 desktop session에서는 `python3 -m pdf2md.gui --doctor --doctor-check-window`를 별도로 실행
 - Tkinter 오류가 나면 Python 설치본에 Tcl/Tk 지원이 포함되어 있는지 확인
 - output folder 권한 오류가 나면 쓰기 가능한 사용자 폴더를 선택
 
@@ -903,12 +904,13 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100 --baseline-report /tmp/pdf2md-baseline/benchmark_report.json --max-duration-regression 0.2 --max-memory-regression 0.2 --min-pages-per-second 1.0 --fail-on-regression
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gates --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf/baseline/corpus_eval_report.json --benchmark-baseline-report /tmp/pdf2md-baseline/benchmark_report.json
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-rag --gates rag --rag-output-dir output --rag-eval-set rag_eval_queries.json --rag-min-expected-source-coverage 0.9 --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
+./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates gui
 ```
 
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
 - `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref coverage, chunk token 분포, threshold summary
-- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, schema check, packaging smoke command/status summary
+- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, schema check, packaging smoke command/status summary
 - benchmark는 수동/릴리스 전 검증용이며 기본 CI 테스트에는 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
@@ -929,7 +931,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 없습니다. 완료된 Q34-Q67 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q69-Q71입니다. 완료된 Q34-Q68 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 

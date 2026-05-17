@@ -28,6 +28,12 @@ runtime doctor는 아래 명령으로 확인한다. 이 명령은 Tcl/Tk patchle
 python -m pdf2md.gui --doctor
 ```
 
+실제 Tk window 생성/파괴 probe까지 확인해야 하는 desktop session에서는 아래처럼 명시한다.
+
+```bash
+python -m pdf2md.gui --doctor --doctor-check-window
+```
+
 자동화에서 읽기 쉬운 JSON이 필요하면:
 
 ```bash
@@ -264,6 +270,14 @@ python scripts/create_gui_support_bundle.py --output-dir /tmp/pdf2md-gui-support
 - `gui_support_bundle.md`
 
 support bundle은 public output schema가 아니라 local-only 지원 artifact다. 포함 대상은 status count, warning code/count, sanitized artifact label, environment/runtime code, smoke failed check code다. 원문 PDF 텍스트, Markdown 본문, 표 내용, 이미지 내용, 변환 warning message, home/workspace absolute path는 저장하지 않는다.
+
+릴리스 전에는 optional GUI release gate로 같은 headless 흐름을 한 번에 확인할 수 있다.
+
+```bash
+python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates gui
+```
+
+이 gate는 `python -m pdf2md.gui --help`, `python -m pdf2md.gui --doctor --doctor-format json`, smoke evidence runner, support bundle 생성기를 순차 실행하고 `release_gate_report.json`에 command/status/report path를 기록한다. smoke evidence 또는 support bundle redaction 검증이 실패하면 release gate도 실패한다.
 
 ## 12) 배포 방식 메모
 

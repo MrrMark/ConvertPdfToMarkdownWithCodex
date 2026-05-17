@@ -206,7 +206,7 @@ python -m pdf2md.gui --doctor
 python -m pdf2md.gui --doctor --doctor-format json
 ```
 
-`error`는 먼저 조치하고, `advisory`는 OCR 미사용 또는 headless/CI window probe처럼 선택 기능/환경 의존 항목으로 해석합니다. `pdf2md-gui` entry point가 필요한 배포라면 doctor의 package/entry point diagnostic이 source checkout, editable install, wheel smoke 의도와 맞는지 확인합니다.
+`error`는 먼저 조치하고, `advisory`는 OCR 미사용 또는 headless/CI window probe처럼 선택 기능/환경 의존 항목으로 해석합니다. 실제 Tk window 생성까지 확인해야 하는 desktop session에서는 `python -m pdf2md.gui --doctor --doctor-check-window`를 별도로 실행합니다. `pdf2md-gui` entry point가 필요한 배포라면 doctor의 package/entry point diagnostic이 source checkout, editable install, wheel smoke 의도와 맞는지 확인합니다.
 
 GUI 변경을 검증할 때는 먼저 headless smoke evidence runner를 실행할 수 있습니다. 이 명령은 Tk window를 띄우지 않고 GUI runtime doctor diagnostics, `python -m pdf2md.gui --help`, preset별 single/batch runner smoke, isolated state round-trip, 수동 checklist 상태를 `gui_smoke_evidence.json`에 기록합니다.
 
@@ -617,6 +617,7 @@ python scripts\compare_corpus_evidence_packs.py --baseline .\old_evidence_pack.j
 python scripts\build_requirement_impact_review_pack.py --impact-report .\output\requirement_change_impact_report.json
 python scripts\run_release_gates.py --output-dir .\release_gate_output --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf\baseline\corpus_eval_report.json --benchmark-baseline-report .\benchmark_baseline\benchmark_report.json
 python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag --rag-output-dir .\output --rag-eval-set .\rag_eval_queries.json --rag-min-expected-source-coverage 0.9 --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
+python scripts\run_release_gates.py --output-dir .\release_gate_gui --gates gui
 ```
 
 - 실제 PDF는 `pdf\` 같은 로컬 디렉터리에만 두고 repo에 커밋하지 않습니다.
@@ -629,7 +630,7 @@ python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag 
 - `corpus_evidence_analysis_report.json`: redacted evidence pack의 category/domain/spec hotspot과 follow-up hint
 - `corpus_evidence_trend_report.json`: baseline/current evidence pack의 added/persisting/resolved signature 비교와 신규 error gate
 - `requirement_impact_review_pack.json` / `.md`: requirement change impact를 리뷰어/AI Agent가 바로 확인할 수 있게 정리한 provenance 중심 요약
-- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, schema check, packaging smoke command/status summary
+- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, schema check, packaging smoke command/status summary
 - benchmark는 수동/릴리스 전 검증용이며 기본 테스트에 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.

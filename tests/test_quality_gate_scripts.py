@@ -357,3 +357,64 @@ def test_release_gate_runner_supports_optional_artifact_integrity_gate(monkeypat
     assert "--fail-on-error" in command
     assert "--confidential-safe" in command
     assert "--fail-on-warning" in command
+
+
+def test_release_gate_runner_supports_optional_gui_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        stdout = '{"kind": "gui_runtime_doctor", "passed": true}' if "--doctor" in command else "ok"
+        return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-gui",
+            gates=["gui"],
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["summary"]["total_gate_commands"] == 4
+    assert [record["gate"] for record in payload["gates"]] == [
+        "gui:module-help",
+        "gui:doctor",
+        "gui:smoke-evidence",
+        "gui:support-bundle",
+    ]
+    assert (tmp_path / "release-gui" / "gui" / "gui_help_report.json").exists()
+    assert (tmp_path / "release-gui" / "gui" / "gui_doctor_report.json").exists()
+    assert any(command[1:] == ["-m", "pdf2md.gui", "--help"] for command in calls)
+    assert any("--doctor-format" in command and "json" in command for command in calls)
+    smoke_command = next(command for command in calls if any(str(part).endswith("run_gui_smoke_evidence.py") for part in command))
+    support_command = next(command for command in calls if any(str(part).endswith("create_gui_support_bundle.py") for part in command))
+    assert "--state-path" in smoke_command
+    assert str(tmp_path / "release-gui" / "gui" / "smoke") in smoke_command
+    assert "--smoke-evidence" in support_command
+    assert str(tmp_path / "release-gui" / "gui" / "smoke" / "gui_smoke_evidence.json") in support_command
+    assert payload["gates"][2]["report_path"].endswith("gui_smoke_evidence.json")
+    assert payload["gates"][3]["report_path"].endswith("gui_support_bundle.json")
+
+
+def test_release_gate_runner_fails_gui_gate_on_redaction_failure(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        if any(str(part).endswith("run_gui_smoke_evidence.py") for part in command):
+            return SimpleNamespace(returncode=1, stdout="", stderr="redaction failed")
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-gui-redaction-fail",
+            gates=["gui"],
+        )
+    )
+
+    assert payload["passed_release_gate"] is False
+    assert payload["summary"]["failed_count"] == 1
+    failed = [record for record in payload["gates"] if record["status"] == "failed"]
+    assert failed[0]["gate"] == "gui:smoke-evidence"
+    assert "redaction failed" in failed[0]["stderr_tail"]

@@ -35,6 +35,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "--min-expected-source-coverage" in readme
     assert "scripts/check_ocr_runtime.py --ocr-lang kor+eng" in readme
     assert "scripts/run_release_gates.py" in readme
+    assert "--gates gui" in readme
     assert "scripts/run_ssd_corpus_profile.py" in readme
     assert "scripts/validate_ssd_rag_contract.py" in readme
     assert "rag_requirements.py" in readme
@@ -55,8 +56,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 없습니다" in readme
-    assert "완료된 Q34-Q67" in readme
+    assert "현재 active quality backlog는 Q69-Q71" in readme
+    assert "완료된 Q34-Q68" in readme
     assert "Expert options" in readme
     assert "Import profile / Export profile" in readme
     assert "horizontal scrollbar" in readme
@@ -119,6 +120,7 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "--min-expected-source-coverage" in guide
     assert "scripts\\check_ocr_runtime.py --ocr-lang kor+eng" in guide
     assert "scripts\\run_release_gates.py" in guide
+    assert "--gates gui" in guide
     assert "scripts\\run_ssd_corpus_profile.py" in guide
     assert "scripts\\validate_ssd_rag_contract.py" in guide
     assert "requirement_change_impact_report.json" in guide
@@ -178,6 +180,7 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     assert "Export profile" in guide
     assert "scripts/run_gui_smoke_evidence.py" in guide
     assert "scripts/create_gui_support_bundle.py" in guide
+    assert "scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates gui" in guide
     assert "gui_support_bundle.json" in guide
     assert "gui_smoke_evidence.json" in guide
     assert "--json-only" in guide
@@ -295,13 +298,15 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" not in next_plan
     assert "Q66. Sanitized GUI Support Bundle" not in next_plan
     assert "Q67. GUI Expert Options And Profile Import/Export" not in next_plan
+    assert "Q68. GUI Release Gate Integration" not in next_plan
+    assert "Q69. Wheel Contents And GUI Help Resource Contract" in next_plan
+    assert "Q70. GUI Profile And Support Bundle Failure Fixture" in next_plan
+    assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" in next_plan
     assert "Tcl/Tk patchlevel" not in next_plan
-    assert "support bundle" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "현재 Active Development Specs" in development_specs
-    assert "현재 active 개발 명세 없음." in development_specs
+    assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q54. GUI Runtime And Install Diagnostics" not in development_specs
     assert "Q55. GUI Conversion Result Review UX" not in development_specs
     assert "Q56. GUI Batch Operation Controls" not in development_specs
@@ -315,14 +320,18 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" not in development_specs
     assert "Q66. Sanitized GUI Support Bundle" not in development_specs
     assert "Q67. GUI Expert Options And Profile Import/Export" not in development_specs
-    assert "tests/test_gui_profiles.py" not in development_specs
+    assert "Q68. GUI Release Gate Integration" not in development_specs
+    assert "Q69. Wheel Contents And GUI Help Resource Contract" in development_specs
+    assert "Q70. GUI Profile And Support Bundle Failure Fixture" in development_specs
+    assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" in development_specs
+    assert "tests/test_gui_profiles.py" in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q67" in development_specs
+    assert "완료된 Q34-Q68" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -349,6 +358,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in implemented_specs
     assert "Q66. Sanitized GUI Support Bundle" in implemented_specs
     assert "Q67. GUI Expert Options And Profile Import/Export" in implemented_specs
+    assert "Q68. GUI Release Gate Integration" in implemented_specs
+    assert "--gates gui" in implemented_specs
     assert "python -m pdf2md.gui --doctor" in implemented_specs
     assert "scripts/create_gui_support_bundle.py" in implemented_specs
     assert "build_gui_support_bundle()" in implemented_specs
@@ -413,6 +424,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q65. GUI Runtime Doctor And Packaging Compatibility Smoke" in quality_scorecard
     assert "Q66. Sanitized GUI Support Bundle" in quality_scorecard
     assert "Q67. GUI Expert Options And Profile Import/Export" in quality_scorecard
+    assert "Q68. GUI Release Gate Integration" in quality_scorecard
+    assert "GUI release gate integration" in quality_scorecard
+    assert "다음 active backlog는 Q69-Q71" in quality_scorecard
     assert "GUI runtime doctor" in quality_scorecard
     assert "다음 active backlog는 Q66-Q67" in quality_scorecard
     assert "GUI support bundle" in quality_scorecard
