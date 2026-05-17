@@ -23,13 +23,4 @@
 
 ## 남은 작업
 
-### P2 / Q76. CLI/GUI Performance Benchmark Report
-
-CLI와 GUI headless runner의 성능 차이를 수치로 추적하는 local-only benchmark report를 추가한다.
-
-핵심 범위:
-
-- synthetic fixture 기반 CLI vs GUI headless benchmark script 추가
-- elapsed ms, pages/sec, output hash equality, optional memory metric 기록
-- `scripts/run_release_gates.py`에 optional performance/parity check로 연결 가능하게 설계
-- report는 local-only 검증 artifact로 두고 public output schema로 취급하지 않음
+현재 남은 작업 없음.

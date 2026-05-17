@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI/CLI benchmark report | 97/100 | 0 | Q76. CLI/GUI Performance Benchmark Report 구현. `scripts/benchmark_gui_cli_parity.py`와 optional `gui-benchmark` release gate로 CLI/GUI headless elapsed ms, pages/sec, GUI duration ratio, output hash equality, advisory threshold policy를 기록. 변환 core output과 public schema는 유지하며 active quality backlog는 없다 |
 | 2026-05-17 | GUI metrics and page progress | 97/100 | 0 | Q75. GUI Metrics And Page Progress Contract 구현. pipeline observer-only page progress callback, GUI page percent event, summary/log의 documents/status/retry/elapsed/pages/sec metric을 추가. batch progress는 document-level percent로 유지해 단일 page progress와 분리했으며 변환 core output과 public schema는 유지 |
 | 2026-05-17 | GUI/CLI golden parity gate | 97/100 | 0 | Q74. CLI/GUI Golden Parity Gate 구현. `scripts/run_gui_cli_parity.py`와 optional `gui-parity` release gate로 CLI/GUI headless output의 Markdown, manifest, report, RAG sidecar normalized hash equality를 검증. report는 raw PDF/Markdown 본문 없이 local-only hash/status만 기록하며 변환 core 품질과 public schema는 유지 |
 | 2026-05-17 | GUI incremental corpus options | 97/100 | 0 | Q73. GUI Incremental Corpus Options 구현. GUI folder mode에서 previous corpus manifest 선택과 reuse unchanged를 지원하고, `corpus_diff_report.json`, `requirement_change_impact_report.json` artifact open action을 추가. profile/recent state에는 previous manifest path를 저장하지 않으며 CLI reuse/skip 계약과 동등성을 테스트로 고정 |
@@ -68,6 +69,18 @@
 
 ## 평가 히스토리
 
+### 2026-05-17 (Q76 구현 후)
+
+#### 총평
+
+Q76은 CLI와 GUI headless runner의 성능 차이를 release 전에 수치로 확인할 수 있게 한 작업이다. `scripts/benchmark_gui_cli_parity.py`는 deterministic synthetic PDF를 CLI와 GUI headless runner로 각각 변환하고 elapsed ms, pages/sec, GUI duration ratio, output hash equality를 `gui_cli_benchmark_report.json`에 기록한다.
+
+`scripts/run_release_gates.py --gates gui-benchmark`에서도 같은 benchmark를 실행할 수 있다. 기본 성능 threshold는 advisory이고, 명시 threshold와 fail option이 있을 때만 실패로 처리한다. 변환 engine과 public schema는 유지하므로 점수는 97/100을 유지한다.
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다.
+
 ### 2026-05-17 (Q75 구현 후)
 
 #### 총평
@@ -78,7 +91,7 @@ Q75는 GUI 운영자가 CLI report에서 보던 성능/진행 판단 정보를 G
 
 #### 다음 개선 참조
 
-- Q76. CLI/GUI Performance Benchmark Report
+현재 active quality backlog는 없다.
 
 ### 2026-05-17 (Q74 구현 후)
 

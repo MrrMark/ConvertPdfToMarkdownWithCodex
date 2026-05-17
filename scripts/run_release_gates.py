@@ -15,7 +15,15 @@ from pdf2md.utils.io import write_json
 
 
 DEFAULT_GATES = ("ocr", "corpus", "benchmark", "schema", "packaging")
-OPTIONAL_GATES = ("rag", "index-contract", "provenance-integrity", "artifact-integrity", "gui", "gui-parity")
+OPTIONAL_GATES = (
+    "rag",
+    "index-contract",
+    "provenance-integrity",
+    "artifact-integrity",
+    "gui",
+    "gui-parity",
+    "gui-benchmark",
+)
 KNOWN_GATES = DEFAULT_GATES + OPTIONAL_GATES
 
 
@@ -420,6 +428,23 @@ def _gui_parity_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     ]
 
 
+def _gui_benchmark_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    output_dir = config.output_dir / "gui-benchmark"
+    report_path = output_dir / "gui_cli_benchmark_report.json"
+    return [
+        _run_command(
+            gate="gui-benchmark",
+            command=[
+                sys.executable,
+                "scripts/benchmark_gui_cli_parity.py",
+                "--output-dir",
+                str(output_dir),
+            ],
+            report_path=report_path,
+        )
+    ]
+
+
 def _schema_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     return [
         _run_command(
@@ -495,6 +520,8 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
             records.extend(_gui_gate(config))
         elif gate == "gui-parity":
             records.extend(_gui_parity_gate(config))
+        elif gate == "gui-benchmark":
+            records.extend(_gui_benchmark_gate(config))
         elif gate == "schema":
             records.extend(_schema_gate(config))
         elif gate == "packaging":
@@ -525,7 +552,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Comma-separated gates: "
             "ocr,corpus,benchmark,schema,packaging,rag,index-contract,provenance-integrity,"
-            "artifact-integrity,gui,gui-parity."
+            "artifact-integrity,gui,gui-parity,gui-benchmark."
         ),
     )
     parser.add_argument("--ocr-lang", default="eng")
