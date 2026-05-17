@@ -23,35 +23,6 @@
 
 ## 현재 Active Development Specs
 
-## P2 / Q70. GUI Profile And Support Bundle Failure Fixture
-
-### 배경
-
-Q66/Q67은 정상/구조 검증 중심이다. 실제 실패/partial success 상황에서 support bundle과 profile이 raw message/path를 누출하지 않는지 더 강한 regression fixture가 필요하다.
-
-### 목표
-
-- 실패/partial GUI summary fixture를 추가한다.
-- support bundle이 retry candidate, warning code/count, status count만 저장하고 raw exception/warning message를 저장하지 않는지 검증한다.
-- invalid profile import가 구조화된 diagnostic만 표시하는지 headless contract를 강화한다.
-
-### 구현 범위
-
-- `tests/test_gui_support.py`
-- `tests/test_gui_profiles.py`
-- 필요 시 `pdf2md/gui_support.py`, `pdf2md/gui_profiles.py` 소폭 보강
-
-### 검증
-
-- `.venv311/bin/python -m pytest tests/test_gui_support.py tests/test_gui_profiles.py`
-- `.venv311/bin/python -m pytest`
-- `git diff --check`
-
-### 비범위
-
-- GUI modal click automation
-- GitHub issue 자동 생성
-
 ## P2 / Q71. Quality Scorecard Refresh And Next Backlog Reassessment
 
 ### 배경
@@ -79,4 +50,4 @@ Q53-Q67까지 GUI 사용성/호환성 작업이 누적되었고 현재 점수는
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q69 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q70 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

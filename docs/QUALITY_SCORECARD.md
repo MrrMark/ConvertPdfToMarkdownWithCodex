@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-17 | GUI failure fixture hardening | 97/100 | 0 | Q70. GUI Profile And Support Bundle Failure Fixture 구현. partial/failed GUI summary와 invalid profile diagnostic fixture를 보강해 raw exception/warning/path/value echo를 막고 status count, warning code/count, retry candidate 중심 계약을 고정. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q71 |
 | 2026-05-17 | Wheel GUI help resource contract | 97/100 | 0 | Q69. Wheel Contents And GUI Help Resource Contract 구현. packaged GUI help fallback, wheel content/console script inspector, packaging gate의 GUI module help와 support/profile helper 포함 검증을 추가. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q70-Q71 |
 | 2026-05-17 | GUI release gate integration | 97/100 | 0 | Q68. GUI Release Gate Integration 구현. optional `gui` release gate로 GUI help, doctor JSON, headless smoke evidence, sanitized support bundle redaction 검증을 Tk window 없이 실행하고 command/status/report path를 기록. 변환 품질과 public schema 계약은 유지하며 다음 active backlog는 Q69-Q71 |
 | 2026-05-17 | GUI expert options/profile | 97/100 | 0 | Q67. GUI Expert Options And Profile Import/Export 구현. GUI에 page_workers/debug/verbose expert options와 local-only profile import/export를 추가하고, password/path/raw content 미저장 profile validation을 고정. 변환 품질과 public schema 계약은 유지하며 active quality backlog는 없다 |
@@ -60,6 +61,18 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-17 (Q70 구현 후)
+
+#### 총평
+
+현재 프로젝트를 **Storage/PCIe/Security Spec용 RAG 운영툴 + GUI 지원 artifact 안전성** 관점으로 보면 **97/100점** 수준을 유지한다.
+
+Q70은 새 변환 기능이 아니라 실패 회귀 fixture를 보강한 작업이다. partial/failed GUI summary에서 support bundle이 status count, warning code/count, retry candidate만 남기고 raw warning/exception message와 absolute path를 저장하지 않는지 확인한다. invalid profile diagnostic도 unsupported value, unknown option path/name, raw content를 echo하지 않고 구조화된 code/action 중심으로 표시한다.
+
+#### 다음 개선 참조
+
+- Q71. Quality Scorecard Refresh And Next Backlog Reassessment
 
 ### 2026-05-17 (Q69 구현 후)
 

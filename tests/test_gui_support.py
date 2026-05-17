@@ -65,6 +65,62 @@ def test_gui_support_bundle_sanitizes_summary_paths_and_warning_messages(tmp_pat
     assert support_bundle_redaction_findings(bundle, forbidden_values=("table fallback secret",), roots=(tmp_path,)) == []
 
 
+def test_gui_support_bundle_failure_fixture_keeps_only_counts_codes_and_retry(tmp_path: Path) -> None:
+    input_dir = tmp_path / "private inputs"
+    output_root = tmp_path / "support-output"
+    summary = GuiConversionSummary(
+        input_mode="folder",
+        input_path=input_dir,
+        output_root=output_root,
+        documents=[
+            GuiDocumentSummary(
+                input_pdf=input_dir / "partial-secret.pdf",
+                output_dir=output_root / "partial-secret",
+                status="partial_success",
+                exit_code=2,
+                warning_count=3,
+                warning_codes=("OCR_LOW_CONFIDENCE", "TABLE_FALLBACK"),
+                retry_candidate=False,
+                message=f"warning message leaked {tmp_path}/partial-secret.pdf",
+            ),
+            GuiDocumentSummary(
+                input_pdf=input_dir / "failed-secret.pdf",
+                output_dir=output_root / "failed-secret",
+                status="failed",
+                exit_code=1,
+                warning_count=1,
+                warning_codes=("GUI_CONVERSION_FAILED",),
+                retry_candidate=True,
+                message=f"Traceback raw exception at {tmp_path}/failed-secret.pdf",
+            ),
+        ],
+        exit_code=2,
+    )
+
+    bundle = build_gui_support_bundle(summary=summary, roots=(tmp_path,))
+    serialized = json.dumps(bundle, ensure_ascii=False, sort_keys=True)
+    documents = bundle["conversion_summary"]["documents"]
+
+    assert bundle["conversion_summary"]["status_counts"]["partial_success"] == 1
+    assert bundle["conversion_summary"]["status_counts"]["failed"] == 1
+    assert bundle["conversion_summary"]["warning_count"] == 4
+    assert bundle["conversion_summary"]["warning_codes"] == [
+        "GUI_CONVERSION_FAILED",
+        "OCR_LOW_CONFIDENCE",
+        "TABLE_FALLBACK",
+    ]
+    assert documents[1]["retry_candidate"] is True
+    assert documents[1]["warning_codes"] == ["GUI_CONVERSION_FAILED"]
+    assert "Traceback raw exception" not in serialized
+    assert "warning message leaked" not in serialized
+    assert str(tmp_path) not in serialized
+    assert support_bundle_redaction_findings(
+        bundle,
+        forbidden_values=("Traceback raw exception", "warning message leaked"),
+        roots=(tmp_path,),
+    ) == []
+
+
 def test_gui_support_bundle_keeps_runtime_codes_without_messages_or_paths(tmp_path: Path) -> None:
     runtime_report = GuiDiagnosticReport(
         [
