@@ -460,7 +460,10 @@ def check_gui_runtime(
                     code="tk_window_check_advisory",
                     severity="advisory",
                     message="Tk window creation was not attempted during this headless-safe runtime check.",
-                    action="Run python -m pdf2md.gui --doctor from a desktop session for an optional window probe.",
+                    action=(
+                        "Run python -m pdf2md.gui --doctor --doctor-check-window "
+                        "from a desktop session for an optional window probe."
+                    ),
                 )
             )
 

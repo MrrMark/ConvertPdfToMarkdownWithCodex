@@ -94,7 +94,7 @@ GUI runtime doctor:
 python -m pdf2md.gui --doctor
 ```
 
-doctor는 Tcl/Tk patchlevel, display/window advisory, OCR/Tesseract, Pillow/pypdfium2, help document, source checkout/editable/wheel packaging mode를 `code`, `severity`, `message`, `action` 형태로 출력한다. `error`는 먼저 조치하고, `advisory`는 OCR 미사용 또는 CI/headless window probe처럼 선택 기능/환경 의존 항목으로 해석한다.
+doctor는 Tcl/Tk patchlevel, display/window advisory, OCR/Tesseract, Pillow/pypdfium2, help document, source checkout/editable/wheel packaging mode를 `code`, `severity`, `message`, `action` 형태로 출력한다. `error`는 먼저 조치하고, `advisory`는 OCR 미사용 또는 CI/headless window probe처럼 선택 기능/환경 의존 항목으로 해석한다. 실제 Tk window 생성까지 확인해야 하는 desktop session에서는 `python -m pdf2md.gui --doctor --doctor-check-window`를 별도로 실행한다.
 
 ## 5) 단일 PDF 변환
 
@@ -149,6 +149,12 @@ python scripts/create_gui_support_bundle.py --output-dir /tmp/pdf2md-gui-support
 ```
 
 `gui_support_bundle.json`과 `gui_support_bundle.md`에는 status count, warning code/count, sanitized artifact label, environment/runtime code만 포함한다. 원문 PDF/Markdown 내용, 표/이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않는다.
+
+릴리스 전 자동 점검에서는 optional GUI release gate로 help, doctor, smoke evidence, support bundle redaction 검증을 한 번에 실행할 수 있다.
+
+```bash
+python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates gui
+```
 
 수동 Tk window 확인:
 

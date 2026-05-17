@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -13,7 +15,7 @@ from pdf2md.utils.io import write_json
 
 
 DEFAULT_GATES = ("ocr", "corpus", "benchmark", "schema", "packaging")
-OPTIONAL_GATES = ("rag", "index-contract", "provenance-integrity", "artifact-integrity")
+OPTIONAL_GATES = ("rag", "index-contract", "provenance-integrity", "artifact-integrity", "gui")
 KNOWN_GATES = DEFAULT_GATES + OPTIONAL_GATES
 
 
@@ -103,6 +105,28 @@ def _run_command(
         "stdout_tail": _tail(completed.stdout or ""),
         "stderr_tail": _tail(completed.stderr or ""),
     }
+
+
+def _gui_python_executable() -> str:
+    if importlib.util.find_spec("tkinter") is not None and importlib.util.find_spec("_tkinter") is not None:
+        return sys.executable
+    return shutil.which("python3") or shutil.which("python") or sys.executable
+
+
+def _write_command_report(record: dict[str, Any], report_path: Path) -> None:
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(
+        report_path,
+        {
+            "schema_version": "1.0",
+            "gate": record["gate"],
+            "command": record["command"],
+            "exit_code": record["exit_code"],
+            "status": record["status"],
+            "stdout_tail": record["stdout_tail"],
+            "stderr_tail": record["stderr_tail"],
+        },
+    )
 
 
 def _write_ocr_report(record: dict[str, Any], report_path: Path) -> None:
@@ -320,6 +344,65 @@ def _artifact_integrity_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     return [_run_command(gate="artifact-integrity", command=command, report_path=report_path)]
 
 
+def _gui_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    gui_python = _gui_python_executable()
+    output_dir = config.output_dir / "gui"
+    smoke_output_dir = output_dir / "smoke"
+    support_output_dir = output_dir / "support"
+    smoke_evidence_path = smoke_output_dir / "gui_smoke_evidence.json"
+    support_bundle_path = support_output_dir / "gui_support_bundle.json"
+    state_path = smoke_output_dir / "gui_state.json"
+    records: list[dict[str, Any]] = []
+
+    help_report_path = output_dir / "gui_help_report.json"
+    help_record = _run_command(
+        gate="gui:module-help",
+        command=[gui_python, "-m", "pdf2md.gui", "--help"],
+        report_path=help_report_path,
+    )
+    _write_command_report(help_record, help_report_path)
+    records.append(help_record)
+
+    doctor_report_path = output_dir / "gui_doctor_report.json"
+    doctor_record = _run_command(
+        gate="gui:doctor",
+        command=[gui_python, "-m", "pdf2md.gui", "--doctor", "--doctor-format", "json"],
+        report_path=doctor_report_path,
+    )
+    _write_command_report(doctor_record, doctor_report_path)
+    records.append(doctor_record)
+
+    records.append(
+        _run_command(
+            gate="gui:smoke-evidence",
+            command=[
+                gui_python,
+                "scripts/run_gui_smoke_evidence.py",
+                "--output-dir",
+                str(smoke_output_dir),
+                "--state-path",
+                str(state_path),
+            ],
+            report_path=smoke_evidence_path,
+        )
+    )
+    records.append(
+        _run_command(
+            gate="gui:support-bundle",
+            command=[
+                gui_python,
+                "scripts/create_gui_support_bundle.py",
+                "--output-dir",
+                str(support_output_dir),
+                "--smoke-evidence",
+                str(smoke_evidence_path),
+            ],
+            report_path=support_bundle_path,
+        )
+    )
+    return records
+
+
 def _schema_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     return [
         _run_command(
@@ -374,6 +457,8 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
             records.extend(_provenance_integrity_gate(config))
         elif gate == "artifact-integrity":
             records.extend(_artifact_integrity_gate(config))
+        elif gate == "gui":
+            records.extend(_gui_gate(config))
         elif gate == "schema":
             records.extend(_schema_gate(config))
         elif gate == "packaging":
@@ -403,7 +488,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=",".join(DEFAULT_GATES),
         help=(
             "Comma-separated gates: "
-            "ocr,corpus,benchmark,schema,packaging,rag,index-contract,provenance-integrity,artifact-integrity."
+            "ocr,corpus,benchmark,schema,packaging,rag,index-contract,provenance-integrity,artifact-integrity,gui."
         ),
     )
     parser.add_argument("--ocr-lang", default="eng")

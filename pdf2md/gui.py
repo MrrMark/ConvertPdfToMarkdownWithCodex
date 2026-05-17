@@ -72,6 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="text",
         help="Output format for --doctor. Default: text.",
     )
+    parser.add_argument(
+        "--doctor-check-window",
+        action="store_true",
+        help="When used with --doctor, also try creating and destroying a Tk window.",
+    )
     return parser
 
 
@@ -1063,7 +1068,7 @@ def launch_gui() -> int:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.doctor:
-        report = check_gui_runtime(check_window=True)
+        report = check_gui_runtime(check_window=args.doctor_check_window)
         if args.doctor_format == "json":
             print(json.dumps(gui_diagnostic_report_to_dict(report), indent=2, sort_keys=True))
         else:
