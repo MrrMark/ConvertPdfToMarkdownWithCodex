@@ -56,8 +56,11 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q73-Q76" in readme
-    assert "완료된 Q34-Q72" in readme
+    assert "현재 active quality backlog는 Q74-Q76" in readme
+    assert "완료된 Q34-Q73" in readme
+    assert "Previous corpus manifest" in readme
+    assert "Reuse unchanged" in readme
+    assert "Open Corpus Diff" in readme
     assert "wheel_contract_report.json" in readme
     assert "pdf2md.resources/GUI_USER_GUIDE.md" in readme
     assert "Expert options" in readme
@@ -83,6 +86,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "Clear recent" in readme
     assert "PyInstaller/native bundle" in readme
     assert "GUI 화면의 `Help` 버튼" in readme
+    assert "previous corpus manifest path" in readme
     assert "pdf/v10" not in readme
     assert "프로젝트 scaffold 생성" not in readme
     assert "metadata.py" not in readme
@@ -146,6 +150,9 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "python -m pdf2md.gui --doctor" in guide
     assert "source checkout/editable/wheel packaging mode" in guide
     assert "Import profile / Export profile" in guide
+    assert "Previous corpus manifest" in guide
+    assert "Reuse unchanged" in guide
+    assert "Open Corpus Diff" in guide
     assert "scripts\\run_gui_smoke_evidence.py" in guide
     assert "scripts\\create_gui_support_bundle.py" in guide
     assert "wheel_contract_report.json" in guide
@@ -203,6 +210,7 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     assert "PyInstaller/native bundle" in guide
     assert "`success`, `partial_success`, `failed`, `skipped`, `cancelled`" in guide
     assert "Retry" in guide
+    assert "previous corpus manifest path" in guide
     assert "원문 텍스트, 표, 이미지 내용은 GUI summary에서 요약하지 않는다" in guide
     assert "tesseract --version" in guide
 
@@ -238,8 +246,12 @@ def test_gui_user_guide_is_separate_from_cli_docs() -> None:
     assert "`Retry`" in guide
     assert "`cancelled`" in guide
     assert "`Open Manifest`" in guide
+    assert "`Open Corpus Manifest`" in guide
+    assert "`Open Corpus Diff`" in guide
+    assert "`Open Requirement Impact`" in guide
     assert "`Clear recent`" in guide
     assert "local-only JSON state" in guide
+    assert "previous corpus manifest path는 profile이나 recent state에 저장하지 않는다" in guide
     assert "page-level 진행률 callback" in guide
     assert "원문 텍스트, 표, 이미지 내용을 요약하거나 재서술하지 않는다" in guide
     assert "자동화, CI, 반복 스크립트 실행은 GUI보다 CLI를 권장" in guide
@@ -312,7 +324,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Tcl/Tk patchlevel" not in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in next_plan
-    assert "Q73. GUI Incremental Corpus Options" in next_plan
+    assert "Q73. GUI Incremental Corpus Options" not in next_plan
     assert "Q74. CLI/GUI Golden Parity Gate" in next_plan
     assert "Q75. GUI Metrics And Page Progress Contract" in next_plan
     assert "Q76. CLI/GUI Performance Benchmark Report" in next_plan
@@ -321,7 +333,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "현재 Active Development Specs" in development_specs
     assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
-    assert "Q73. GUI Incremental Corpus Options" in development_specs
+    assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" in development_specs
     assert "Q75. GUI Metrics And Page Progress Contract" in development_specs
     assert "Q76. CLI/GUI Performance Benchmark Report" in development_specs
@@ -344,14 +356,14 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q69. Wheel Contents And GUI Help Resource Contract" not in development_specs
     assert "Q70. GUI Profile And Support Bundle Failure Fixture" not in development_specs
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" not in development_specs
-    assert "tests/test_gui_profiles.py" in development_specs
+    assert "tests/test_gui_profiles.py" not in development_specs
     assert "Q44. Domain Technical Table Coverage Expansion" not in development_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" not in development_specs
     assert "Q47. Local Technical Corpus Evidence Pack" not in development_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q72" in development_specs
+    assert "완료된 Q34-Q73" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -383,7 +395,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q70. GUI Profile And Support Bundle Failure Fixture" in implemented_specs
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" in implemented_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" in implemented_specs
+    assert "Q73. GUI Incremental Corpus Options" in implemented_specs
     assert "pdf2md/batch_runner.py" in implemented_specs
+    assert "previous_corpus_manifest" in implemented_specs
+    assert "tests/test_gui_profiles.py" in implemented_specs
     assert "Q72+" in implemented_specs
     assert "scripts/inspect_wheel_contract.py" in implemented_specs
     assert "pdf2md/resources/GUI_USER_GUIDE.md" in implemented_specs
@@ -458,6 +473,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q70. GUI Profile And Support Bundle Failure Fixture" in quality_scorecard
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" in quality_scorecard
     assert "GUI batch artifact parity" in quality_scorecard
+    assert "GUI incremental corpus options" in quality_scorecard
     assert "GUI/CLI parity backlog" in quality_scorecard
     assert "Q72-Q76 active backlog/spec 추가" in quality_scorecard
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" in quality_scorecard

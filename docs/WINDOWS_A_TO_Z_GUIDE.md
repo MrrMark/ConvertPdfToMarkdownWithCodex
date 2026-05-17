@@ -184,20 +184,22 @@ GUI 사용 순서:
 3. `PDF file` 또는 `PDF folder`를 선택합니다.
 4. `Browse`로 입력 파일/폴더를 선택합니다.
 5. 필요하면 `Output folder`를 선택합니다.
-6. OCR이 필요하면 `OCR lang`을 지정하고, 강제 OCR 같은 세부 flag는 `Optimize Options(유저 선택)`에서 설정합니다.
-7. `Start conversion`을 누릅니다.
-8. 실행 중 progress가 단일 변환 처리 중 상태 또는 폴더 배치 문서 index/total과 percent text로 표시되는지 확인합니다.
-9. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`, `Retry`를 확인합니다.
-10. 선택한 결과 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 엽니다.
-11. 화면 설명이 필요하면 `Help` 버튼을 누릅니다.
+6. 폴더 배치에서 이전 batch와 비교하려면 `Previous corpus manifest`로 이전 `corpus_manifest.json`을 선택하고, 변경 없는 PDF 산출물을 재사용하려면 `Reuse unchanged`를 켭니다.
+7. OCR이 필요하면 `OCR lang`을 지정하고, 강제 OCR 같은 세부 flag는 `Optimize Options(유저 선택)`에서 설정합니다.
+8. `Start conversion`을 누릅니다.
+9. 실행 중 progress가 단일 변환 처리 중 상태 또는 폴더 배치 문서 index/total과 percent text로 표시되는지 확인합니다.
+10. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`, `Retry`를 확인합니다.
+11. 선택한 결과 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 엽니다.
+12. 폴더 배치 산출물은 `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`로 엽니다.
+13. 화면 설명이 필요하면 `Help` 버튼을 누릅니다.
 
-`Optimize Options(유저 선택)`에서는 Expert options로 `Page workers`, `Debug artifacts`, `Verbose logs`를 조정할 수 있습니다. Import profile / Export profile은 local-only JSON으로 반복 실행 option을 저장/불러오기 위한 기능입니다. profile에는 password, input/output path, 원문 PDF/Markdown 내용, 표/이미지 내용을 저장하지 않습니다.
+`Optimize Options(유저 선택)`에서는 Expert options로 `Page workers`, `Debug artifacts`, `Verbose logs`를 조정할 수 있습니다. Import profile / Export profile은 local-only JSON으로 반복 실행 option을 저장/불러오기 위한 기능입니다. profile에는 password, input/output path, previous corpus manifest path, 원문 PDF/Markdown 내용, 표/이미지 내용을 저장하지 않습니다.
 
 작은 화면이나 Windows display scaling 환경에서는 GUI 본문을 세로 스크롤해 input/options/results/log 영역에 접근할 수 있습니다. Results 표의 긴 Markdown/report 경로는 horizontal scrollbar로 확인합니다.
 
 폴더 배치 변환 중 `Cancel`을 누르면 현재 문서가 끝난 뒤 남은 문서는 `cancelled`로 표시됩니다. 실패 문서는 `Retry` 열에 재시도 후보로 표시됩니다.
 
-GUI는 최근 입력 파일/폴더, output folder, 선택 언어, 선택 preset을 local-only state로 저장합니다. 원문 텍스트, 표, 이미지 내용, warning message는 저장하지 않으며, 공유 PC에서는 `Clear recent`로 최근 경로를 지울 수 있습니다.
+GUI는 최근 입력 파일/폴더, output folder, 선택 언어, 선택 preset을 local-only state로 저장합니다. previous corpus manifest path, 원문 텍스트, 표, 이미지 내용, warning message는 저장하지 않으며, 공유 PC에서는 `Clear recent`로 최근 경로를 지울 수 있습니다.
 
 GUI 실행 환경은 먼저 doctor 명령으로 확인할 수 있습니다. 이 명령은 Tk window를 계속 띄우지 않고 Tcl/Tk patchlevel, display/window advisory, OCR/Tesseract, Pillow/pypdfium2, help document, source checkout/editable/wheel packaging mode를 `code`, `severity`, `message`, `action` 형태로 출력합니다.
 

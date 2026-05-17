@@ -35,6 +35,9 @@ GUI_PROFILE_FORBIDDEN_FIELDS: tuple[str, ...] = (
     "password",
     "input_path",
     "output_dir",
+    "previous_corpus_manifest",
+    "previous_corpus_manifest_path",
+    "previous_manifest_path",
     "raw_pdf_text",
     "raw_markdown",
     "table_content",
@@ -57,6 +60,7 @@ def gui_profile_payload(options: GuiConversionOptions, *, name: str = GUI_PROFIL
         "redaction_policy": {
             "stores_input_path": False,
             "stores_output_dir": False,
+            "stores_previous_corpus_manifest": False,
             "stores_password": False,
             "stores_raw_pdf_text": False,
             "stores_table_content": False,

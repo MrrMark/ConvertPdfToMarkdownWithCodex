@@ -108,6 +108,8 @@ class GuiConversionRequest:
     input_mode: str
     input_path: Path
     output_dir: Path | None = None
+    previous_corpus_manifest: Path | None = None
+    reuse_unchanged: bool = False
     options: GuiConversionOptions = field(default_factory=GuiConversionOptions)
 
 
@@ -203,6 +205,14 @@ def format_gui_summary(summary: GuiConversionSummary) -> str:
             f"markdown={document.markdown_path}, report={document.report_path}, manifest={document.manifest_path}"
             f"{retry_text}"
         )
+    if summary.batch_report_path is not None:
+        lines.append(f"- batch_report={summary.batch_report_path}")
+    if summary.corpus_manifest_path is not None:
+        lines.append(f"- corpus_manifest={summary.corpus_manifest_path}")
+    if summary.corpus_diff_report_path is not None:
+        lines.append(f"- corpus_diff={summary.corpus_diff_report_path}")
+    if summary.requirement_change_impact_report_path is not None:
+        lines.append(f"- requirement_impact={summary.requirement_change_impact_report_path}")
     return "\n".join(lines)
 
 
@@ -766,6 +776,15 @@ def validate_gui_request(request: GuiConversionRequest) -> GuiDiagnosticReport:
             )
         output_dir = request.output_dir if request.output_dir is not None else default_output_dir_for_input(input_path)
         _validate_output_dir(output_dir, diagnostics)
+        if request.previous_corpus_manifest is not None or request.reuse_unchanged:
+            diagnostics.append(
+                GuiDiagnostic(
+                    code="incremental_corpus_requires_folder",
+                    severity="error",
+                    message="Incremental corpus options are only supported for PDF folder input.",
+                    action="Switch input mode to PDF folder before selecting a previous corpus manifest.",
+                )
+            )
     elif mode == "folder":
         if not input_path.exists() or not input_path.is_dir():
             diagnostics.append(
@@ -808,7 +827,27 @@ def validate_gui_request(request: GuiConversionRequest) -> GuiDiagnosticReport:
                 )
         output_root = request.output_dir if request.output_dir is not None else input_path / "output"
         _validate_output_dir(output_root, diagnostics)
+        if request.reuse_unchanged and request.previous_corpus_manifest is None:
+            diagnostics.append(
+                GuiDiagnostic(
+                    code="reuse_unchanged_requires_manifest",
+                    severity="error",
+                    message="Reuse unchanged requires a previous corpus manifest.",
+                    action="Select a previous corpus_manifest.json or turn off reuse unchanged.",
+                )
+            )
+        if request.previous_corpus_manifest is not None:
+            _validate_previous_corpus_manifest(request.previous_corpus_manifest, diagnostics)
     else:
+        if request.previous_corpus_manifest is not None or request.reuse_unchanged:
+            diagnostics.append(
+                GuiDiagnostic(
+                    code="incremental_corpus_requires_folder",
+                    severity="error",
+                    message="Incremental corpus options are only supported for PDF folder input.",
+                    action="Switch input mode to PDF folder before selecting a previous corpus manifest.",
+                )
+            )
         diagnostics.append(
             GuiDiagnostic(
                 code="input_mode_unsupported",
@@ -817,6 +856,29 @@ def validate_gui_request(request: GuiConversionRequest) -> GuiDiagnosticReport:
             )
         )
     return GuiDiagnosticReport(diagnostics)
+
+
+def _validate_previous_corpus_manifest(path: Path, diagnostics: list[GuiDiagnostic]) -> None:
+    if not path.exists() or not path.is_file():
+        diagnostics.append(
+            GuiDiagnostic(
+                code="previous_corpus_manifest_missing",
+                severity="error",
+                message="Previous corpus manifest does not exist or is not a file.",
+                path=path,
+                action="Select an existing corpus_manifest.json file.",
+            )
+        )
+    elif path.suffix.lower() != ".json":
+        diagnostics.append(
+            GuiDiagnostic(
+                code="previous_corpus_manifest_not_json",
+                severity="error",
+                message="Previous corpus manifest must be a JSON file.",
+                path=path,
+                action="Select the previous batch output corpus_manifest.json file.",
+            )
+        )
 
 
 def _coerce_options(options: GuiConversionOptions) -> dict:
@@ -862,6 +924,32 @@ def _batch_options_from_gui(options: GuiConversionOptions) -> BatchConversionOpt
         debug=options.debug,
         verbose=options.verbose,
         skip_existing=options.skip_existing,
+    )
+
+
+def _batch_options_from_request(request: GuiConversionRequest) -> BatchConversionOptions:
+    options = _batch_options_from_gui(request.options)
+    return BatchConversionOptions(
+        pages=options.pages,
+        password=options.password,
+        image_mode=options.image_mode,
+        table_mode=options.table_mode,
+        rag_table_output=options.rag_table_output,
+        domain_adapter=options.domain_adapter,
+        confidential_safe_mode=options.confidential_safe_mode,
+        force_ocr=options.force_ocr,
+        ocr_lang=options.ocr_lang,
+        keep_page_markers=options.keep_page_markers,
+        remove_header_footer=options.remove_header_footer,
+        dedupe_images=options.dedupe_images,
+        repair_hyphenation=options.repair_hyphenation,
+        figure_crop_fallback=options.figure_crop_fallback,
+        page_workers=options.page_workers,
+        debug=options.debug,
+        verbose=options.verbose,
+        skip_existing=options.skip_existing,
+        previous_corpus_manifest=request.previous_corpus_manifest,
+        reuse_unchanged=request.reuse_unchanged,
     )
 
 
@@ -1067,7 +1155,7 @@ def _run_batch(
     batch_result: BatchRunResult = run_shared_batch_conversion(
         input_dir=input_dir,
         output_root=output_root,
-        options=_batch_options_from_gui(request.options),
+        options=_batch_options_from_request(request),
         run_document=run_conversion,
         progress=lambda event: _handle_batch_event(event, progress=progress, batch_progress=batch_progress),
         cancel_requested=cancel_requested,

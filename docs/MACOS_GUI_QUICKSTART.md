@@ -111,8 +111,10 @@ doctor는 Tcl/Tk patchlevel, display/window advisory, OCR/Tesseract, Pillow/pypd
 1. `PDF folder`를 선택한다.
 2. PDF가 들어 있는 폴더를 선택한다.
 3. 필요하면 `Skip existing`을 켠다.
-4. `Start conversion`을 누른다.
-5. 진행 중 중단하려면 `Cancel`을 누른다.
+4. 이전 batch와 비교하려면 `Previous corpus manifest`에서 이전 `corpus_manifest.json`을 선택한다.
+5. 변경 없는 PDF 산출물을 재사용하려면 `Reuse unchanged`를 켠다.
+6. `Start conversion`을 누른다.
+7. 진행 중 중단하려면 `Cancel`을 누른다.
 
 취소는 문서 경계에서 처리된다. 이미 완료된 문서의 산출물은 삭제하지 않고, 아직 시작하지 않은 문서는 `cancelled` 상태로 표시된다.
 
@@ -130,7 +132,7 @@ GUI 완료 후 Results 표에서 아래를 확인한다.
 
 GUI 화면에서 바로 설명이 필요하면 `Help` 버튼을 누른다.
 
-선택한 Results 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 바로 열 수 있다. GUI는 최근 입력 파일/폴더와 output folder를 local-only state로 저장하며, `Clear recent`로 지울 수 있다.
+선택한 Results 행에서 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 바로 열 수 있다. 폴더 배치 산출물은 `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`로 열 수 있다. GUI는 최근 입력 파일/폴더와 output folder를 local-only state로 저장하지만 previous corpus manifest path는 저장하지 않으며, `Clear recent`로 지울 수 있다.
 
 ## 8) 로컬 GUI smoke checklist
 
@@ -166,18 +168,19 @@ python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates
 4. `python -m pdf2md.gui`로 GUI 창을 연다.
 5. 단일 PDF를 변환하고 Results 표에서 Markdown/report/manifest 경로를 확인한다.
 6. 선택한 결과 행의 Markdown/report/manifest/assets 또는 output folder가 열리는지 확인한다.
-7. 기본 한국어 UI에서 `English`로 바꿨을 때 주요 label/button/status가 영어로 바뀌는지 확인한다.
-8. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset 변경 시 세부 옵션 잠금/해제가 맞는지 확인한다.
-9. Expert options에서 `Page workers`, `Debug artifacts`, `Verbose logs`를 조정할 수 있는지 확인한다.
-10. Export profile로 저장한 JSON에 password, input/output path, 원문 PDF/Markdown 내용이 들어가지 않는지 확인한다.
-11. Import profile이 현재 password를 유지하면서 option만 적용하는지 확인한다.
-12. 창 높이를 줄였을 때 세로 스크롤로 input/options/results/log 영역에 접근할 수 있는지 확인한다.
-13. Results 표의 긴 Markdown/report 경로를 horizontal scrollbar로 확인할 수 있는지 확인한다.
-14. 폴더 배치 변환에서 문서 index/total과 percent text가 함께 움직이는지 확인한다.
-15. 단일 PDF 변환은 처리 중 percent를 추정하지 않고 완료 시 `100%`만 표시하는지 확인한다.
-16. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
-17. GUI를 닫고 다시 열었을 때 최근 경로, 언어, preset이 복구되는지 확인한다.
-18. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.
+7. 폴더 배치에서 `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`가 생성된 corpus-level artifact를 여는지 확인한다.
+8. 기본 한국어 UI에서 `English`로 바꿨을 때 주요 label/button/status가 영어로 바뀌는지 확인한다.
+9. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset 변경 시 세부 옵션 잠금/해제가 맞는지 확인한다.
+10. Expert options에서 `Page workers`, `Debug artifacts`, `Verbose logs`를 조정할 수 있는지 확인한다.
+11. Export profile로 저장한 JSON에 password, input/output path, previous corpus manifest path, 원문 PDF/Markdown 내용이 들어가지 않는지 확인한다.
+12. Import profile이 현재 password를 유지하면서 option만 적용하는지 확인한다.
+13. 창 높이를 줄였을 때 세로 스크롤로 input/options/results/log 영역에 접근할 수 있는지 확인한다.
+14. Results 표의 긴 Markdown/report 경로를 horizontal scrollbar로 확인할 수 있는지 확인한다.
+15. 폴더 배치 변환에서 문서 index/total과 percent text가 함께 움직이는지 확인한다.
+16. 단일 PDF 변환은 처리 중 percent를 추정하지 않고 완료 시 `100%`만 표시하는지 확인한다.
+17. `Cancel`을 눌렀을 때 현재 문서 완료 후 남은 문서가 `cancelled`로 표시되는지 확인한다.
+18. GUI를 닫고 다시 열었을 때 최근 경로, 언어, preset이 복구되는지 확인한다.
+19. `Clear recent` 후 재실행하면 최근 경로가 복구되지 않는지 확인한다.
 
 ## 9) 배포 방식 판단
 

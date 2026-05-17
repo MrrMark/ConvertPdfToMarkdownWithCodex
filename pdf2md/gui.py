@@ -113,7 +113,9 @@ class Pdf2MdGuiApp:
         self.rag_table_output = tk.StringVar(value=RagTableOutputMode.NONE.value)
         self.domain_adapter = tk.StringVar(value=DomainAdapterMode.NONE.value)
         self.ocr_lang = tk.StringVar(value="eng")
+        self.previous_corpus_manifest = tk.StringVar()
         self.skip_existing = tk.BooleanVar(value=False)
+        self.reuse_unchanged = tk.BooleanVar(value=False)
         self.confidential_safe_mode = tk.BooleanVar(value=False)
         self.force_ocr = tk.BooleanVar(value=False)
         self.keep_page_markers = tk.BooleanVar(value=False)
@@ -260,6 +262,28 @@ class Pdf2MdGuiApp:
         self._add_labeled_combo(options, "table", self.table_mode, [mode.value for mode in TableMode], 4, 0)
         self._add_labeled_combo(options, "rag_tables", self.rag_table_output, [mode.value for mode in RagTableOutputMode], 5, 0)
         self._add_labeled_combo(options, "domain", self.domain_adapter, [mode.value for mode in DomainAdapterMode], 6, 0)
+        self._track_text("previous_corpus_manifest", ttk.Label(options, text=self._t("previous_corpus_manifest"))).grid(
+            row=7,
+            column=0,
+            sticky="w",
+            padx=(0, 4),
+            pady=3,
+        )
+        ttk.Entry(options, textvariable=self.previous_corpus_manifest).grid(
+            row=7,
+            column=1,
+            sticky="ew",
+            padx=(0, 8),
+            pady=3,
+        )
+        self._track_text(
+            "browse",
+            ttk.Button(options, text=self._t("browse"), command=self._browse_previous_corpus_manifest),
+        ).grid(row=7, column=2, sticky="ew", pady=3)
+        self._track_text(
+            "reuse_unchanged",
+            ttk.Checkbutton(options, text=self._t("reuse_unchanged"), variable=self.reuse_unchanged),
+        ).grid(row=8, column=0, columnspan=2, sticky="w", pady=1)
 
         flags = ttk.LabelFrame(frame, text=self._t("flags"))
         self._track_text("flags", flags)
@@ -423,6 +447,30 @@ class Pdf2MdGuiApp:
         )
         self._track_text("open_assets", self.open_assets_button)
         self.open_assets_button.grid(row=1, column=1, sticky="ew", pady=2)
+        self.open_corpus_manifest_button = ttk.Button(
+            result_actions,
+            text=self._t("open_corpus_manifest"),
+            command=lambda: self._open_summary_artifact("corpus_manifest"),
+            state=tk.DISABLED,
+        )
+        self._track_text("open_corpus_manifest", self.open_corpus_manifest_button)
+        self.open_corpus_manifest_button.grid(row=2, column=0, sticky="ew", padx=(0, 6), pady=2)
+        self.open_corpus_diff_button = ttk.Button(
+            result_actions,
+            text=self._t("open_corpus_diff"),
+            command=lambda: self._open_summary_artifact("corpus_diff"),
+            state=tk.DISABLED,
+        )
+        self._track_text("open_corpus_diff", self.open_corpus_diff_button)
+        self.open_corpus_diff_button.grid(row=2, column=1, sticky="ew", pady=2)
+        self.open_requirement_impact_button = ttk.Button(
+            result_actions,
+            text=self._t("open_requirement_impact"),
+            command=lambda: self._open_summary_artifact("requirement_impact"),
+            state=tk.DISABLED,
+        )
+        self._track_text("open_requirement_impact", self.open_requirement_impact_button)
+        self.open_requirement_impact_button.grid(row=3, column=0, columnspan=2, sticky="ew", pady=2)
 
         self.log_text = tk.Text(frame, height=9, wrap="word", state=tk.DISABLED)
         self.log_text.grid(row=10, column=0, columnspan=3, sticky="nsew")
@@ -607,6 +655,16 @@ class Pdf2MdGuiApp:
             self.output_dir.set(selected)
             self._remember_recent_path("output_dir", Path(selected))
 
+    def _browse_previous_corpus_manifest(self) -> None:
+        from tkinter import filedialog
+
+        selected = filedialog.askopenfilename(
+            title=self._t("select_previous_corpus_manifest"),
+            filetypes=[(self._t("corpus_manifest_files"), "*.json"), ("JSON", "*.json"), ("All files", "*.*")],
+        )
+        if selected:
+            self.previous_corpus_manifest.set(selected)
+
     def _page_workers_value(self, *, strict: bool) -> int:
         raw_value = self.page_workers.get().strip()
         try:
@@ -659,10 +717,13 @@ class Pdf2MdGuiApp:
 
     def _request(self) -> GuiConversionRequest:
         output_text = self.output_dir.get().strip()
+        previous_manifest_text = self.previous_corpus_manifest.get().strip()
         return GuiConversionRequest(
             input_mode=self.input_mode.get(),
             input_path=Path(self.input_path.get().strip()),
             output_dir=Path(output_text) if output_text else None,
+            previous_corpus_manifest=Path(previous_manifest_text) if previous_manifest_text else None,
+            reuse_unchanged=self.reuse_unchanged.get(),
             options=self._options(),
         )
 
@@ -954,11 +1015,33 @@ class Pdf2MdGuiApp:
         for button, target in button_targets:
             path = gui_document_open_target(document, target) if document is not None else None
             button.configure(state="normal" if path is not None else "disabled")
+        summary_targets = (
+            (self.open_corpus_manifest_button, "corpus_manifest"),
+            (self.open_corpus_diff_button, "corpus_diff"),
+            (self.open_requirement_impact_button, "requirement_impact"),
+        )
+        for button, target in summary_targets:
+            path = self._summary_artifact_path(target)
+            button.configure(state="normal" if path is not None else "disabled")
 
     def _open_selected_result(self, target: ResultOpenTarget) -> None:
         document = self._selected_document()
         path = gui_document_open_target(document, target) if document is not None else None
         self._open_path(path, self._t("open_target_failed", target=target))
+
+    def _summary_artifact_path(self, target: str) -> Path | None:
+        if self.last_summary is None:
+            return None
+        if target == "corpus_manifest":
+            return self.last_summary.corpus_manifest_path
+        if target == "corpus_diff":
+            return self.last_summary.corpus_diff_report_path
+        if target == "requirement_impact":
+            return self.last_summary.requirement_change_impact_report_path
+        return None
+
+    def _open_summary_artifact(self, target: str) -> None:
+        self._open_path(self._summary_artifact_path(target), self._t("open_target_failed", target=target))
 
     def _open_output(self) -> None:
         if self.last_summary is None:
@@ -1015,6 +1098,8 @@ class Pdf2MdGuiApp:
             return
         self.input_path.set("")
         self.output_dir.set("")
+        self.previous_corpus_manifest.set("")
+        self.reuse_unchanged.set(False)
         self._append_log(self._t("recent_paths_cleared"))
         self._set_status("recent_paths_cleared_status")
 

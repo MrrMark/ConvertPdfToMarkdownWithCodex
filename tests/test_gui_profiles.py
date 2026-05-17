@@ -43,6 +43,8 @@ def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path)
     assert payload["options"]["debug"] is True
     assert payload["options"]["verbose"] is True
     assert "password" not in payload["options"]
+    assert "previous_corpus_manifest" not in payload["options"]
+    assert "previous_manifest_path" not in payload["options"]
     assert "secret-password" not in serialized
     assert "input_path" not in payload["options"]
     assert "output_dir" not in payload["options"]
@@ -82,6 +84,7 @@ def test_gui_profile_invalid_payload_returns_structured_diagnostics() -> None:
         "input_path": "/Users/example/private.pdf",
         "options": {
             "password": "secret",
+            "previous_corpus_manifest": "/Users/example/previous/corpus_manifest.json",
             "image_mode": "bad",
             "page_workers": 0,
             "debug": "yes",

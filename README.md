@@ -263,13 +263,13 @@ pdf2md-gui
 
 GUI 기본 언어는 한국어이며, 화면 상단에서 `English`로 바꿀 수 있습니다.
 옵션은 처음부터 세부 flag를 고르는 대신 `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset 중 하나를 먼저 선택합니다. `pages`, `password`, `OCR lang`, 입력/출력 경로는 preset이 바뀌어도 유지됩니다.
-GUI에서는 입력 모드(단일 PDF 파일 / PDF 폴더), 입력 경로, 출력 폴더, page range, password, OCR, image/table/RAG/domain 옵션, confidential-safe mode, skip-existing 같은 주요 옵션을 선택할 수 있습니다.
-`Optimize Options(유저 선택)`에서는 Expert options로 `page_workers`, `debug`, `verbose`를 조정할 수 있고, Import profile / Export profile로 local-only 실행 profile을 저장하거나 불러올 수 있습니다. profile은 password, input/output path, 원문 PDF/Markdown 내용, 표/이미지 내용을 저장하지 않습니다.
+GUI에서는 입력 모드(단일 PDF 파일 / PDF 폴더), 입력 경로, 출력 폴더, page range, password, OCR, image/table/RAG/domain 옵션, confidential-safe mode, skip-existing 같은 주요 옵션을 선택할 수 있습니다. 폴더 배치에서는 `Previous corpus manifest`와 `Reuse unchanged`로 CLI의 `--previous-corpus-manifest`, `--reuse-unchanged` 흐름을 사용할 수 있습니다.
+`Optimize Options(유저 선택)`에서는 Expert options로 `page_workers`, `debug`, `verbose`를 조정할 수 있고, Import profile / Export profile로 local-only 실행 profile을 저장하거나 불러올 수 있습니다. profile은 password, input/output path, previous corpus manifest path, 원문 PDF/Markdown 내용, 표/이미지 내용을 저장하지 않습니다.
 실행 중에는 단일 변환 indeterminate progress 또는 폴더 배치 문서 index/total progress와 percent text를 표시합니다. 단일 PDF는 page-level 진행률 callback이 없는 동안 임의 percent를 표시하지 않고, 완료 시에만 `100%`를 표시합니다.
-완료 후에는 문서별 status, warning count/code, Markdown/report/manifest 경로를 확인할 수 있고, 선택한 결과 행의 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 바로 열 수 있습니다.
+완료 후에는 문서별 status, warning count/code, Markdown/report/manifest 경로를 확인할 수 있고, 선택한 결과 행의 `Open Markdown`, `Open Report`, `Open Manifest`, `Open Assets`, `Open output folder`로 산출물을 바로 열 수 있습니다. 폴더 배치 산출물은 `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`로 열 수 있습니다.
 작은 화면이나 display scaling 환경에서는 GUI 본문을 세로 스크롤해 input/options/results/log 영역에 접근할 수 있고, Results 표의 긴 경로는 horizontal scrollbar로 확인할 수 있습니다.
 폴더 배치 변환은 문서 경계 취소와 실패 문서 retry candidate 표시를 지원합니다.
-GUI는 최근 입력 파일/폴더, output folder, 선택 언어, 선택 preset을 local-only state로 저장하지만, 원문 텍스트, 표, 이미지 내용, warning message는 저장하지 않습니다. 필요하면 `Clear recent`로 최근 경로를 지울 수 있습니다.
+GUI는 최근 입력 파일/폴더, output folder, 선택 언어, 선택 preset을 local-only state로 저장하지만, previous corpus manifest path, 원문 텍스트, 표, 이미지 내용, warning message는 저장하지 않습니다. 필요하면 `Clear recent`로 최근 경로를 지울 수 있습니다.
 GUI 화면의 `Help` 버튼은 [docs/GUI_USER_GUIDE.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/GUI_USER_GUIDE.md)를 엽니다.
 자동화, CI, 대량 반복 실행에는 여전히 CLI와 batch script 사용을 권장합니다.
 
@@ -934,7 +934,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q73-Q76입니다. 완료된 Q34-Q72 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q74-Q76입니다. 완료된 Q34-Q73 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 
