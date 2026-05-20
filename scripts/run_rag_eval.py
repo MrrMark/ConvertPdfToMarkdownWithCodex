@@ -10,6 +10,8 @@ from typing import Any
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]+")
 TABLE_CONTEXT_CHUNK_TYPES = {"table_row", "technical_table", "domain_unit"}
 DEFAULT_CHUNK_TOKEN_TARGET = 512
+TEXT_CHUNK_MERGE_POLICY = "merged_sibling_text_blocks"
+TEXT_CHUNK_MERGE_REASON = "sibling_text_merge"
 
 
 def _tokens(text: str) -> set[str]:
@@ -132,7 +134,18 @@ def intrinsic_chunk_metrics(
         and chunk.get("embedding_text") != chunk.get("text")
     ]
     source_ref_chunks = [chunk for chunk in chunks if isinstance(chunk.get("source_refs"), list) and chunk["source_refs"]]
+    merged_chunks = [
+        chunk
+        for chunk in chunks
+        if chunk.get("chunk_boundary_policy") == TEXT_CHUNK_MERGE_POLICY
+        or TEXT_CHUNK_MERGE_REASON in list(chunk.get("chunk_boundary_reasons") or [])
+    ]
+    source_record_counts = [
+        int(chunk.get("source_record_count") or len(chunk.get("source_refs") or []))
+        for chunk in chunks
+    ]
     return {
+        "chunk_count": len(chunks),
         "chunk_token_max": max(token_lengths, default=0),
         "chunk_token_p95": token_lengths_sorted[p95_index] if token_lengths_sorted else 0,
         "chunk_size_compliance": round(
@@ -144,6 +157,11 @@ def intrinsic_chunk_metrics(
         "source_ref_presence_coverage": round(len(source_ref_chunks) / len(chunks), 4) if chunks else 0.0,
         "duplicate_source_ratio": round(duplicate_source_count / len(keyed_source_refs), 4)
         if keyed_source_refs
+        else 0.0,
+        "merged_chunk_count": len(merged_chunks),
+        "merged_source_chunk_count": sum(int(chunk.get("merged_source_chunk_count") or 0) for chunk in merged_chunks),
+        "average_source_record_count": round(sum(source_record_counts) / len(source_record_counts), 4)
+        if source_record_counts
         else 0.0,
         "table_contextual_embedding_coverage": round(len(contextual_table_chunks) / len(table_chunks), 4)
         if table_chunks

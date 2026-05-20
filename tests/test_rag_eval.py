@@ -45,11 +45,15 @@ def test_rag_eval_reports_hit_mrr_and_citation_coverage() -> None:
         "expected_source_miss_count": 0,
         "requirement_coverage": 1.0,
         "table_field_coverage": 0.0,
+        "chunk_count": 2,
         "chunk_token_max": 0,
         "chunk_token_p95": 0,
         "chunk_size_compliance": 1.0,
         "source_ref_presence_coverage": 1.0,
         "duplicate_source_ratio": 0.0,
+        "merged_chunk_count": 0,
+        "merged_source_chunk_count": 0,
+        "average_source_record_count": 1.0,
         "table_contextual_embedding_coverage": 0.0,
         "table_contextual_embedding_count": 0,
         "table_contextual_embedding_total": 0,
@@ -113,6 +117,31 @@ def test_rag_eval_scores_optional_embedding_text_and_reports_intrinsic_metrics()
     assert report["metrics"]["table_contextual_embedding_total"] == 1
     assert report["metrics"]["chunk_size_compliance"] == 1.0
     assert report["metrics"]["duplicate_source_ratio"] == 0.0
+
+
+def test_rag_eval_reports_merged_text_chunk_metrics() -> None:
+    chunks = [
+        _chunk("chunk-000001", "Alpha status.\n\nBeta status.", "page-0001-block-0001")
+        | {
+            "chunk_boundary_policy": "merged_sibling_text_blocks",
+            "chunk_boundary_reasons": ["sibling_text_merge", "text_block_boundary"],
+            "merged_source_chunk_count": 2,
+            "source_record_count": 2,
+            "source_refs": [
+                {"source_type": "text_block", "source_id": "page-0001-block-0001", "page": 1},
+                {"source_type": "text_block", "source_id": "page-0001-block-0002", "page": 1},
+            ],
+            "token_estimate": 4,
+        },
+        _chunk("chunk-000002", "Gamma status.", "page-0001-block-0003") | {"token_estimate": 2},
+    ]
+
+    report = evaluate_queries(chunks=chunks, queries=[], top_k=1)
+
+    assert report["metrics"]["chunk_count"] == 2
+    assert report["metrics"]["merged_chunk_count"] == 1
+    assert report["metrics"]["merged_source_chunk_count"] == 2
+    assert report["metrics"]["average_source_record_count"] == 1.5
 
 
 def test_rag_eval_cli_writes_report(tmp_path: Path) -> None:

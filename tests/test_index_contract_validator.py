@@ -94,6 +94,56 @@ def test_index_contract_reports_metadata_size_guardrail_as_warning(tmp_path: Pat
     assert "metadata_size_exceeds_limit" in {finding["code"] for finding in report["findings"]}
 
 
+def test_index_contract_validates_optional_chunk_relationship_targets(tmp_path: Path) -> None:
+    first = _valid_chunk(
+        next_chunk_id="chunk-000002",
+        related_chunk_ids=["chunk-000002"],
+        relationship_strategy="chunk_group_prev_next_section_anchor",
+    )
+    second = _valid_chunk(
+        chunk_id="chunk-000002",
+        chunk_index=2,
+        text="The controller shall report status.",
+        source_refs=[
+            {
+                "source_type": "requirement_trace",
+                "source_id": "req-trace-000002",
+                "page": 1,
+                "bbox": [72.0, 112.0, 240.0, 122.0],
+            }
+        ],
+        source_dedupe_key="req-trace-000002",
+        previous_chunk_id="chunk-000001",
+        section_anchor_chunk_id="chunk-000001",
+        related_chunk_ids=["chunk-000001"],
+        relationship_strategy="chunk_group_prev_next_section_anchor",
+    )
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [first, second])
+
+    report = validate_index_contract(output_dir=tmp_path, target="openai")
+
+    assert report["status"] == "passed"
+    assert report["findings"] == []
+
+
+def test_index_contract_reports_missing_chunk_relationship_targets(tmp_path: Path) -> None:
+    _write_jsonl(
+        tmp_path / "retrieval_chunks_rag.jsonl",
+        [
+            _valid_chunk(
+                previous_chunk_id="chunk-missing",
+                related_chunk_ids=["chunk-missing"],
+                relationship_strategy="chunk_group_prev_next_section_anchor",
+            )
+        ],
+    )
+
+    report = validate_index_contract(output_dir=tmp_path, target="openai")
+
+    assert report["status"] == "failed"
+    assert {finding["code"] for finding in report["findings"]} == {"relationship_target_missing"}
+
+
 def test_index_contract_confidential_safe_detects_paths_filename_and_hash(tmp_path: Path) -> None:
     _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
     _write_jsonl(

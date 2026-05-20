@@ -1807,3 +1807,88 @@ Q68-Q70 결과를 반영해 scorecard를 보수적으로 재평가하고, 다음
 - 변환 heuristic 신규 추가
 - Q72+ 선등록
 - public output schema 추가
+
+## P1 / Q77. RAG Sibling Chunk Merge
+
+### 목표
+
+짧은 text block retrieval chunk가 과도하게 잘게 나뉘는 문제를 줄이기 위해 같은 page/section/heading context의 인접 `text_block` chunk만 token budget 안에서 병합한다.
+
+### 구현 범위
+
+- `pdf2md/serializers/rag_chunks.py`
+  - `merge_sibling_text_chunks()` 추가
+  - `chunk_boundary_policy="merged_sibling_text_blocks"`, `merged_source_chunk_ids`, `merged_source_chunk_count`, `merge_strategy` metadata 추가
+- `pdf2md/config.py`, `pdf2md/cli.py`, `pdf2md/gui_runner.py`, `pdf2md/batch_runner.py`, `pdf2md/pipeline.py`
+  - `rag_merge_sibling_text_chunks` opt-in 옵션 연결
+- `pdf2md/gui_presets.py`
+  - RAG optimized profile에서 sibling merge 활성화
+- `scripts/run_rag_eval.py`
+  - `chunk_count`, `merged_chunk_count`, `merged_source_chunk_count`, `average_source_record_count` metric 추가
+
+### 구현 결과
+
+- 기본 preserve 변환은 backward compatible하게 유지한다.
+- opt-in/RAG optimized 경로에서는 인접 sibling text block을 source 순서대로만 결합하며 requirement/table/technical/domain chunk는 병합하지 않는다.
+- merged chunk는 모든 source id를 `source_refs`와 `source_dedupe_key`로 추적할 수 있다.
+
+### 검증
+
+- `.venv311/bin/python -m pytest`
+- `git diff --check`
+
+## P1 / Q78. RAG Chunk Relationship Metadata
+
+### 목표
+
+retrieval chunk 사이의 previous/next/section relationship metadata를 deterministic하게 추가해 citation expansion, UI drilldown, downstream context expansion을 쉽게 만든다.
+
+### 구현 범위
+
+- `pdf2md/serializers/rag_chunks.py`
+  - `assign_chunk_relationships()` 추가
+  - `previous_chunk_id`, `next_chunk_id`, `section_anchor_chunk_id`, `related_chunk_ids`, `relationship_strategy` optional metadata 추가
+- `pdf2md/config.py`, `pdf2md/cli.py`, `pdf2md/gui_runner.py`, `pdf2md/batch_runner.py`, `pdf2md/pipeline.py`
+  - `rag_chunk_relationship_metadata` opt-in 옵션 연결
+- `scripts/validate_index_contract.py`
+  - relationship field type과 target chunk id 존재 여부 검증
+
+### 구현 결과
+
+- relationship metadata는 merge/split 이후 최종 chunk id 기준으로 생성된다.
+- 같은 `chunk_group_id` 안에서 prev/next를 연결하고, 같은 `section_path`의 첫 chunk를 section anchor로 참조한다.
+- target id는 같은 `retrieval_chunks_rag.jsonl` 안에서 해소 가능해야 한다.
+
+### 검증
+
+- `.venv311/bin/python -m pytest`
+- `git diff --check`
+
+## P2 / Q79. Purpose-Specific RAG Profiles
+
+### 목표
+
+단일 `rag_optimized` preset을 보완해 technical spec ingest, confidential sharing, preserve+sidecar 같은 반복 목적을 CLI/GUI에서 같은 option matrix로 재사용하게 한다.
+
+### 구현 범위
+
+- `pdf2md/rag_profiles.py`
+  - `preserve`, `rag_optimized`, `technical_spec_rag`, `confidential_rag`, `preserve_with_sidecars` profile matrix 추가
+- `pdf2md/cli.py`
+  - `--rag-profile` 추가
+- `pdf2md/gui_presets.py`, `pdf2md/gui_i18n.py`, `pdf2md/gui_layout.py`, `pdf2md/gui.py`
+  - GUI preset 확장, localized label, locked/editable contract 갱신
+- 문서
+  - README, GUI guide, Windows guide, RAG indexer recipe 갱신
+
+### 구현 결과
+
+- 기존 `preserve`, `rag_optimized`, `custom` GUI 동작은 유지한다.
+- CLI와 GUI가 같은 local-only profile matrix를 사용한다.
+- profile export/import는 기존처럼 password, path, raw PDF/Markdown/table/image content를 저장하지 않는다.
+- 외부 RAG, embedding, indexing 서비스 호출은 추가하지 않았다.
+
+### 검증
+
+- `.venv311/bin/python -m pytest`
+- `git diff --check`

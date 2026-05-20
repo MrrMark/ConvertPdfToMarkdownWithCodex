@@ -22,6 +22,23 @@
 
 Vector DB에는 보통 `retrieval_chunks_rag.jsonl`만 넣고, 나머지 sidecar는 citation expansion, impact analysis, UI drilldown, test script 수정 범위 계산에 사용한다.
 
+## Purpose Profiles
+
+CLI와 GUI preset은 같은 local-only profile matrix를 사용한다.
+
+| Profile | 목적 | 주요 효과 |
+| --- | --- | --- |
+| `preserve` | 기본 원문 보존 | RAG table sidecar와 chunk 보강 옵션을 보수적으로 끔 |
+| `rag_optimized` | 일반 RAG ingest | RAG table both, page marker, header/footer removal, hyphen repair, contextual embedding text, sibling merge, relationship metadata |
+| `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg`와 함께 사용 |
+| `confidential_rag` | 공유/evidence pack | confidential-safe mode, JSONL table sidecar, chunk 보강, sanitized report |
+| `preserve_with_sidecars` | Markdown 원문 보존 + sidecar ingest | 본문 변화 가능성이 있는 header/footer/hyphen repair는 끄고 JSONL sidecar와 relationship metadata만 추가 |
+
+```bash
+python3 -m pdf2md spec.pdf -o output/spec --rag-profile technical_spec_rag --domain-adapter nvme
+python3 -m pdf2md spec.pdf -o output/share --rag-profile confidential_rag
+```
+
 ## 공통 Field Mapping
 
 | Index field | Source field | 비고 |
@@ -39,6 +56,12 @@ Vector DB에는 보통 `retrieval_chunks_rag.jsonl`만 넣고, 나머지 sidecar
 | `token_estimate` | `token_estimate` | chunk budget diagnostics |
 | `embedding_token_estimate` | `embedding_token_estimate` | optional context-prefixed embedding budget diagnostics |
 | `source_dedupe_key` | `source_dedupe_key` | duplicate guard |
+| `merged_source_chunk_ids` | `merged_source_chunk_ids` | optional original chunk ids for merged sibling text chunks |
+| `previous_chunk_id` | `previous_chunk_id` | optional same-group neighbor for context expansion |
+| `next_chunk_id` | `next_chunk_id` | optional same-group neighbor for context expansion |
+| `section_anchor_chunk_id` | `section_anchor_chunk_id` | optional first chunk in the same section |
+| `related_chunk_ids` | `related_chunk_ids` | optional lightweight relationship id list |
+| `relationship_strategy` | `relationship_strategy` | optional relationship generation strategy |
 | `schema_version` | `schema_version` | chunk contract version |
 | `source_sha256` | `source_sha256` | 원본 PDF identity / corpus diff guard |
 
@@ -91,6 +114,8 @@ python scripts/validate_artifact_integrity.py --output-dir output --fail-on-erro
 
 - `source_refs`는 citation 화면이나 test script generator에서 원문 위치로 되돌아가기 위해 보존한다.
 - table/technical table chunk에 `embedding_text`가 있으면 embedding 대상은 `embedding_text`, citation 화면과 원문 검증 대상은 `text`를 사용한다.
+- `chunk_boundary_policy="merged_sibling_text_blocks"`인 chunk는 adjacent text block만 token budget 안에서 결합한 것이므로 citation expansion에는 `source_refs`와 `merged_source_chunk_ids`를 함께 보존한다.
+- relationship metadata가 있으면 `previous_chunk_id`, `next_chunk_id`, `section_anchor_chunk_id`, `related_chunk_ids`는 같은 `retrieval_chunks_rag.jsonl` 내부 final chunk id를 가리킨다. Downstream에서 neighbor expansion에 사용하되 원문 검증은 계속 `source_refs`를 기준으로 한다.
 - metadata 크기 제한이 있는 indexer에서는 `source_refs` 전체를 별도 object store에 저장하고 `source_dedupe_key`나 `chunk_id`만 metadata에 둔다.
 - confidential safe mode 산출물을 공유할 때는 path, filename, customer-specific identifier가 노출되지 않았는지 확인한다.
 

@@ -124,6 +124,11 @@ class Pdf2MdGuiApp:
         self.dedupe_images = tk.BooleanVar(value=False)
         self.repair_hyphenation = tk.BooleanVar(value=False)
         self.figure_crop_fallback = tk.BooleanVar(value=False)
+        self.retrieval_chunk_max_tokens = tk.StringVar(value="512")
+        self.retrieval_tokenizer = tk.StringVar(value="char")
+        self.rag_contextual_embedding_text = tk.BooleanVar(value=False)
+        self.rag_merge_sibling_text_chunks = tk.BooleanVar(value=False)
+        self.rag_chunk_relationship_metadata = tk.BooleanVar(value=False)
         self.page_workers = tk.StringVar(value="1")
         self.debug = tk.BooleanVar(value=False)
         self.verbose = tk.BooleanVar(value=False)
@@ -208,36 +213,26 @@ class Pdf2MdGuiApp:
         self._track_text("preset", preset_frame)
         preset_frame.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         preset_frame.columnconfigure(0, weight=1)
-        self._track_text(
-            "preset_preserve",
-            ttk.Radiobutton(
-                preset_frame,
-                text=self._t("preset_preserve"),
-                variable=self.option_preset,
-                value="preserve",
-                command=self._change_preset,
-            ),
-        ).grid(row=0, column=0, sticky="w", pady=1)
-        self._track_text(
-            "preset_rag_optimized",
-            ttk.Radiobutton(
-                preset_frame,
-                text=self._t("preset_rag_optimized"),
-                variable=self.option_preset,
-                value="rag_optimized",
-                command=self._change_preset,
-            ),
-        ).grid(row=1, column=0, sticky="w", pady=1)
-        self._track_text(
-            "preset_custom",
-            ttk.Radiobutton(
-                preset_frame,
-                text=self._t("preset_custom"),
-                variable=self.option_preset,
-                value="custom",
-                command=self._change_preset,
-            ),
-        ).grid(row=2, column=0, sticky="w", pady=1)
+        for row, (value, text_key) in enumerate(
+            (
+                ("preserve", "preset_preserve"),
+                ("rag_optimized", "preset_rag_optimized"),
+                ("technical_spec_rag", "preset_technical_spec_rag"),
+                ("confidential_rag", "preset_confidential_rag"),
+                ("preserve_with_sidecars", "preset_preserve_with_sidecars"),
+                ("custom", "preset_custom"),
+            )
+        ):
+            self._track_text(
+                text_key,
+                ttk.Radiobutton(
+                    preset_frame,
+                    text=self._t(text_key),
+                    variable=self.option_preset,
+                    value=value,
+                    command=self._change_preset,
+                ),
+            ).grid(row=row, column=0, sticky="w", pady=1)
 
         mode_frame = ttk.LabelFrame(frame, text=self._t("input"))
         self._track_text("input", mode_frame)
@@ -593,6 +588,11 @@ class Pdf2MdGuiApp:
         self.dedupe_images.set(options.dedupe_images)
         self.repair_hyphenation.set(options.repair_hyphenation)
         self.figure_crop_fallback.set(options.figure_crop_fallback)
+        self.retrieval_chunk_max_tokens.set(str(options.retrieval_chunk_max_tokens))
+        self.retrieval_tokenizer.set(options.retrieval_tokenizer)
+        self.rag_contextual_embedding_text.set(options.rag_contextual_embedding_text)
+        self.rag_merge_sibling_text_chunks.set(options.rag_merge_sibling_text_chunks)
+        self.rag_chunk_relationship_metadata.set(options.rag_chunk_relationship_metadata)
         self.page_workers.set(str(options.page_workers))
         self.debug.set(options.debug)
         self.verbose.set(options.verbose)
@@ -710,6 +710,11 @@ class Pdf2MdGuiApp:
             dedupe_images=self.dedupe_images.get(),
             repair_hyphenation=self.repair_hyphenation.get(),
             figure_crop_fallback=self.figure_crop_fallback.get(),
+            retrieval_chunk_max_tokens=int(self.retrieval_chunk_max_tokens.get() or "512"),
+            retrieval_tokenizer=self.retrieval_tokenizer.get() or "char",
+            rag_contextual_embedding_text=self.rag_contextual_embedding_text.get(),
+            rag_merge_sibling_text_chunks=self.rag_merge_sibling_text_chunks.get(),
+            rag_chunk_relationship_metadata=self.rag_chunk_relationship_metadata.get(),
             page_workers=self._page_workers_value(strict=strict_page_workers),
             debug=self.debug.get(),
             verbose=self.verbose.get(),

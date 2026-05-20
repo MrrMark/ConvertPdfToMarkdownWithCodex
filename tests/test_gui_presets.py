@@ -13,6 +13,7 @@ from pdf2md.models import ImageMode, RagTableOutputMode, TableMode
 
 def test_gui_preset_display_names_are_localized() -> None:
     assert preset_display_name("ko", "preserve") == "기본 모드(원본 유지)"
+    assert preset_display_name("ko", "technical_spec_rag") == "기술 스펙 RAG"
     assert preset_display_name("en", "custom") == "Optimize Options"
     assert normalize_preset(None) == "preserve"
     assert normalize_preset("unknown") == "preserve"
@@ -49,6 +50,8 @@ def test_preserve_preset_is_conservative_and_keeps_document_inputs() -> None:
     assert options.retrieval_chunk_max_tokens == 512
     assert options.retrieval_tokenizer == "char"
     assert options.rag_contextual_embedding_text is False
+    assert options.rag_merge_sibling_text_chunks is False
+    assert options.rag_chunk_relationship_metadata is False
     assert options.skip_existing is True
 
 
@@ -69,8 +72,37 @@ def test_rag_optimized_preset_enables_sidecar_options_without_force_ocr() -> Non
     assert options.retrieval_chunk_max_tokens == 512
     assert options.retrieval_tokenizer == "regex"
     assert options.rag_contextual_embedding_text is True
+    assert options.rag_merge_sibling_text_chunks is True
+    assert options.rag_chunk_relationship_metadata is True
     assert options.force_ocr is False
     assert options.confidential_safe_mode is False
+
+
+def test_purpose_specific_rag_presets_apply_expected_option_matrix() -> None:
+    technical = apply_preset_to_options("technical_spec_rag", GuiConversionOptions(force_ocr=True))
+    confidential = apply_preset_to_options("confidential_rag", GuiConversionOptions())
+    sidecar = apply_preset_to_options("preserve_with_sidecars", GuiConversionOptions(remove_header_footer=True))
+
+    assert technical.rag_table_output == RagTableOutputMode.BOTH.value
+    assert technical.force_ocr is False
+    assert technical.remove_header_footer is True
+    assert technical.repair_hyphenation is True
+    assert technical.retrieval_tokenizer == "regex"
+    assert technical.rag_contextual_embedding_text is True
+    assert technical.rag_merge_sibling_text_chunks is True
+    assert technical.rag_chunk_relationship_metadata is True
+
+    assert confidential.confidential_safe_mode is True
+    assert confidential.rag_table_output == RagTableOutputMode.JSONL.value
+    assert confidential.retrieval_tokenizer == "regex"
+    assert confidential.rag_chunk_relationship_metadata is True
+
+    assert sidecar.rag_table_output == RagTableOutputMode.JSONL.value
+    assert sidecar.remove_header_footer is False
+    assert sidecar.repair_hyphenation is False
+    assert sidecar.rag_contextual_embedding_text is False
+    assert sidecar.rag_merge_sibling_text_chunks is False
+    assert sidecar.rag_chunk_relationship_metadata is True
 
 
 def test_custom_preset_preserves_current_options() -> None:
@@ -98,7 +130,10 @@ def test_preset_editable_fields_lock_advanced_options_headlessly() -> None:
     assert preserve_fields["skip_existing"] is False
     assert rag_fields["rag_table_output"] is False
     assert rag_fields["rag_contextual_embedding_text"] is False
+    assert rag_fields["rag_merge_sibling_text_chunks"] is False
+    assert rag_fields["rag_chunk_relationship_metadata"] is False
     assert rag_fields["remove_header_footer"] is False
+    assert preset_editable_fields("technical_spec_rag")["retrieval_tokenizer"] is False
     assert custom_fields["image_mode"] is True
     assert custom_fields["page_workers"] is True
     assert custom_fields["retrieval_tokenizer"] is True

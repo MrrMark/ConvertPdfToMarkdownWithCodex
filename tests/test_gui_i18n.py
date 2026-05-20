@@ -14,6 +14,7 @@ def test_gui_i18n_supports_english_catalog() -> None:
     assert normalize_language("en") == "en"
     assert translate("en", "start_conversion") == "Start conversion"
     assert translate("en", "preset_rag_optimized") == "RAG optimized"
+    assert translate("en", "preset_technical_spec_rag") == "Technical spec RAG"
 
 
 def test_gui_i18n_formats_placeholders_and_falls_back() -> None:
@@ -33,3 +34,4 @@ def test_gui_i18n_catalog_covers_tracked_visible_text_keys() -> None:
     assert missing_catalog_keys() == {"ko": (), "en": ()}
     assert "preset_custom" in catalog_keys("ko")
     assert "preset_custom" in catalog_keys("en")
+    assert "preset_confidential_rag" in catalog_keys("ko")

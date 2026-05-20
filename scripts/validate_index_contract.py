@@ -57,6 +57,11 @@ RETRIEVAL_REQUIRED_FIELDS = {
     "chunk_boundary_policy",
     "chunk_boundary_reasons",
 }
+RELATIONSHIP_ID_FIELDS = (
+    "previous_chunk_id",
+    "next_chunk_id",
+    "section_anchor_chunk_id",
+)
 SOURCE_REF_SIDECARS = {
     "semantic_units_rag.jsonl": "semantic_id",
     "requirements_rag.jsonl": "semantic_id",
@@ -438,6 +443,7 @@ def _validate_retrieval_chunk_record(
         "chunk_group_id",
         "source_dedupe_key",
         "chunk_boundary_policy",
+        "relationship_strategy",
     ):
         if field in record and not isinstance(record.get(field), str):
             _add_finding(
@@ -531,6 +537,78 @@ def _validate_retrieval_chunk_record(
             line=line,
             record_id=record_id,
         )
+    for field in RELATIONSHIP_ID_FIELDS:
+        if field in record and not isinstance(record.get(field), str):
+            _add_finding(
+                findings,
+                severity="error",
+                code="invalid_relationship_id_field",
+                target="common",
+                file=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+                message=f"{field} must be a string chunk id when present.",
+            )
+    related_chunk_ids = record.get("related_chunk_ids")
+    if "related_chunk_ids" in record and (
+        not isinstance(related_chunk_ids, list) or not all(isinstance(item, str) for item in related_chunk_ids)
+    ):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_related_chunk_ids",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="related_chunk_ids",
+            message="related_chunk_ids must be a list of string chunk ids.",
+        )
+
+
+def _validate_chunk_relationship_targets(
+    records: list[tuple[int, dict[str, Any]]],
+    *,
+    findings: list[dict[str, Any]],
+) -> None:
+    chunk_ids = {str(record.get("chunk_id")) for _, record in records if isinstance(record.get("chunk_id"), str)}
+    for line, record in records:
+        record_id = _record_id(record)
+        for field in RELATIONSHIP_ID_FIELDS:
+            value = record.get(field)
+            if not isinstance(value, str):
+                continue
+            if value not in chunk_ids:
+                _add_finding(
+                    findings,
+                    severity="error",
+                    code="relationship_target_missing",
+                    target="common",
+                    file=RETRIEVAL_CHUNKS,
+                    line=line,
+                    record_id=record_id,
+                    field=field,
+                    message=f"{field} references missing chunk id: {value}.",
+                )
+        related_chunk_ids = record.get("related_chunk_ids")
+        if not isinstance(related_chunk_ids, list):
+            continue
+        for related_index, value in enumerate(related_chunk_ids, start=1):
+            if not isinstance(value, str):
+                continue
+            if value not in chunk_ids:
+                _add_finding(
+                    findings,
+                    severity="error",
+                    code="relationship_target_missing",
+                    target="common",
+                    file=RETRIEVAL_CHUNKS,
+                    line=line,
+                    record_id=record_id,
+                    field=f"related_chunk_ids[{related_index}]",
+                    message=f"related_chunk_ids references missing chunk id: {value}.",
+                )
 
 
 def _json_metadata_size(value: dict[str, Any]) -> int | None:
@@ -552,6 +630,11 @@ def _openai_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "retrieval_priority": record.get("retrieval_priority"),
         "token_estimate": record.get("token_estimate"),
         "source_dedupe_key": record.get("source_dedupe_key"),
+        "previous_chunk_id": record.get("previous_chunk_id"),
+        "next_chunk_id": record.get("next_chunk_id"),
+        "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
+        "related_chunk_ids": record.get("related_chunk_ids"),
+        "relationship_strategy": record.get("relationship_strategy"),
         "schema_version": record.get("schema_version"),
         "source_sha256": record.get("source_sha256"),
     }
@@ -572,6 +655,11 @@ def _azure_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "page_end": page_range[1] if len(page_range) == 2 else None,
         "retrieval_priority": record.get("retrieval_priority"),
         "token_estimate": record.get("token_estimate"),
+        "previous_chunk_id": record.get("previous_chunk_id"),
+        "next_chunk_id": record.get("next_chunk_id"),
+        "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
+        "related_chunk_ids": record.get("related_chunk_ids"),
+        "relationship_strategy": record.get("relationship_strategy"),
         "source_refs_json": source_refs_json,
     }
 
@@ -585,6 +673,11 @@ def _document_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "page_range": record.get("page_range"),
         "semantic_types": record.get("semantic_types"),
         "retrieval_priority": record.get("retrieval_priority"),
+        "previous_chunk_id": record.get("previous_chunk_id"),
+        "next_chunk_id": record.get("next_chunk_id"),
+        "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
+        "related_chunk_ids": record.get("related_chunk_ids"),
+        "relationship_strategy": record.get("relationship_strategy"),
     }
 
 
@@ -958,6 +1051,7 @@ def validate_index_contract(
                 record_id=_record_id(record),
                 source_hash_seen=source_hash_seen,
             )
+    _validate_chunk_relationship_targets(retrieval_records, findings=findings)
 
     for file_name in SIDE_CAR_FILES:
         records, summary = _read_jsonl(output_dir / file_name, file_name=file_name, findings=findings)

@@ -5,12 +5,19 @@ from typing import Literal
 
 from pdf2md.gui_i18n import GuiLanguage, translate
 from pdf2md.gui_runner import GuiConversionOptions
-from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
+from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, rag_profile_options
 
 
-GuiOptionPreset = Literal["preserve", "rag_optimized", "custom"]
+GuiOptionPreset = Literal[
+    "preserve",
+    "rag_optimized",
+    "technical_spec_rag",
+    "confidential_rag",
+    "preserve_with_sidecars",
+    "custom",
+]
 DEFAULT_GUI_OPTION_PRESET: GuiOptionPreset = "preserve"
-SUPPORTED_GUI_OPTION_PRESETS: tuple[GuiOptionPreset, ...] = ("preserve", "rag_optimized", "custom")
+SUPPORTED_GUI_OPTION_PRESETS: tuple[GuiOptionPreset, ...] = (*SUPPORTED_RAG_PURPOSE_PROFILES, "custom")
 GUI_ALWAYS_EDITABLE_OPTION_FIELDS: tuple[str, ...] = ("pages", "password", "ocr_lang")
 GUI_PRESET_LOCKED_OPTION_FIELDS: tuple[str, ...] = (
     "image_mode",
@@ -27,6 +34,8 @@ GUI_PRESET_LOCKED_OPTION_FIELDS: tuple[str, ...] = (
     "retrieval_chunk_max_tokens",
     "retrieval_tokenizer",
     "rag_contextual_embedding_text",
+    "rag_merge_sibling_text_chunks",
+    "rag_chunk_relationship_metadata",
     "page_workers",
     "debug",
     "verbose",
@@ -52,39 +61,29 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
     normalized = normalize_preset(str(preset))
     if normalized == "custom":
         return current
-    if normalized == "rag_optimized":
-        return replace(
-            current,
-            image_mode=ImageMode.REFERENCED.value,
-            table_mode=TableMode.AUTO.value,
-            rag_table_output=RagTableOutputMode.BOTH.value,
-            domain_adapter=DomainAdapterMode.NONE.value,
-            force_ocr=False,
-            keep_page_markers=True,
-            remove_header_footer=True,
-            dedupe_images=current.dedupe_images,
-            repair_hyphenation=True,
-            figure_crop_fallback=current.figure_crop_fallback,
-            retrieval_chunk_max_tokens=512,
-            retrieval_tokenizer="regex",
-            rag_contextual_embedding_text=True,
-        )
+    profile_options = rag_profile_options(normalized)
+    dedupe_images = current.dedupe_images if normalized == "rag_optimized" else profile_options.dedupe_images
+    figure_crop_fallback = (
+        current.figure_crop_fallback if normalized == "rag_optimized" else profile_options.figure_crop_fallback
+    )
     return replace(
         current,
-        image_mode=ImageMode.REFERENCED.value,
-        table_mode=TableMode.AUTO.value,
-        rag_table_output=RagTableOutputMode.NONE.value,
-        domain_adapter=DomainAdapterMode.NONE.value,
-        confidential_safe_mode=False,
-        force_ocr=False,
-        keep_page_markers=False,
-        remove_header_footer=False,
-        dedupe_images=False,
-        repair_hyphenation=False,
-        figure_crop_fallback=False,
-        retrieval_chunk_max_tokens=512,
-        retrieval_tokenizer="char",
-        rag_contextual_embedding_text=False,
+        image_mode=profile_options.image_mode,
+        table_mode=profile_options.table_mode,
+        rag_table_output=profile_options.rag_table_output,
+        domain_adapter=profile_options.domain_adapter,
+        confidential_safe_mode=profile_options.confidential_safe_mode,
+        force_ocr=profile_options.force_ocr,
+        keep_page_markers=profile_options.keep_page_markers,
+        remove_header_footer=profile_options.remove_header_footer,
+        dedupe_images=dedupe_images,
+        repair_hyphenation=profile_options.repair_hyphenation,
+        figure_crop_fallback=figure_crop_fallback,
+        retrieval_chunk_max_tokens=profile_options.retrieval_chunk_max_tokens,
+        retrieval_tokenizer=profile_options.retrieval_tokenizer,
+        rag_contextual_embedding_text=profile_options.rag_contextual_embedding_text,
+        rag_merge_sibling_text_chunks=profile_options.rag_merge_sibling_text_chunks,
+        rag_chunk_relationship_metadata=profile_options.rag_chunk_relationship_metadata,
     )
 
 

@@ -68,6 +68,7 @@ Stable nested fields:
 - `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
 - `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
 - `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
+- `options.retrieval_chunk_max_tokens`, `options.retrieval_tokenizer`, `options.rag_contextual_embedding_text`, `options.rag_merge_sibling_text_chunks`, `options.rag_chunk_relationship_metadata`
 - `options.confidential_safe_mode`, `options.local_only_processing`, `options.external_llm_calls`, `options.external_embedding_calls`, `options.path_redaction`
 - `options.page_workers`, `options.page_worker_effective_count`, `options.page_parallel_enabled`
 - `images[].page`, `index`, `path`, `source`, `bbox`, `sha256`
@@ -349,11 +350,22 @@ Optional per JSONL record:
 - `embedding_text`: context-prefixed text for index embedding. It may add section, caption, header, table id, or unit type context for table-like chunks.
 - `embedding_token_estimate`: token budget estimate for `embedding_text`.
 - `embedding_text_strategy`: deterministic strategy label such as `table_context_prefix`.
+- `merged_source_chunk_ids`: original chunk ids represented by a merged sibling text chunk.
+- `merged_source_chunk_count`: number of original text chunks represented by a merged sibling text chunk.
+- `merge_strategy`: deterministic strategy label such as `adjacent_text_block_same_section_token_budget`.
+- `previous_chunk_id`: previous chunk id in the same `chunk_group_id`, when relationship metadata is enabled and a previous chunk exists.
+- `next_chunk_id`: next chunk id in the same `chunk_group_id`, when relationship metadata is enabled and a next chunk exists.
+- `section_anchor_chunk_id`: first chunk id with the same `section_path`, omitted when the current chunk is already the section anchor.
+- `related_chunk_ids`: ordered list of available neighbor/section-anchor chunk ids for lightweight citation expansion.
+- `relationship_strategy`: deterministic strategy label such as `chunk_group_prev_next_section_anchor`.
 
 Policy:
 
 - `text` remains extracted source text or deterministic row text, not a summary or paraphrase.
 - `embedding_text`, when present, is an index helper only. It must not replace `text` for citation or source-of-truth checks.
+- `rag_merge_sibling_text_chunks`, when enabled, only merges adjacent `text_block` chunks with the same page/section/heading context and only while the combined `token_estimate` stays within `retrieval_chunk_max_tokens`.
+- Merged sibling text chunks use `chunk_boundary_policy="merged_sibling_text_blocks"` and keep every original source id in `source_refs`; requirement, requirement trace, table row, technical table, and domain unit chunks are not merged by this policy.
+- `rag_chunk_relationship_metadata`, when enabled, is added after merge/split optimization so `previous_chunk_id`, `next_chunk_id`, and `section_anchor_chunk_id` point to final chunk ids in the same JSONL file.
 - `source_refs` must be sufficient to trace a chunk back to the originating block, table row, requirement, requirement trace, technical table unit, or domain unit.
 - `source_sha256` is the lowercase SHA-256 of the input PDF and is copied into each chunk for downstream index identity checks.
 - Chunk boundary fields are deterministic diagnostics for long technical specs; token-budget splitting does not summarize or rewrite source text.

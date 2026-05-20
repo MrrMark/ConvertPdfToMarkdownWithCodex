@@ -13,6 +13,7 @@ from pdf2md.models import (
     TableMode,
 )
 from pdf2md.pipeline import run_conversion
+from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, rag_profile_options
 from pdf2md.utils.logging import configure_logging
 
 
@@ -21,6 +22,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("input_pdf", nargs="?", help="Input PDF file path")
     parser.add_argument("--input-dir", default=None, help="Input directory containing PDF files for batch conversion")
     parser.add_argument("-o", "--output-dir", default=None, help="Output directory for single PDF conversion")
+    parser.add_argument(
+        "--rag-profile",
+        choices=SUPPORTED_RAG_PURPOSE_PROFILES,
+        default="preserve",
+        help="Purpose-specific local option bundle for RAG-oriented conversion.",
+    )
     parser.add_argument("--skip-existing", action="store_true", default=False, help="Skip batch documents with existing core outputs")
     parser.add_argument(
         "--previous-corpus-manifest",
@@ -39,33 +46,33 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--image-mode",
         choices=[m.value for m in ImageMode],
-        default=ImageMode.REFERENCED.value,
+        default=None,
     )
     parser.add_argument(
         "--table-mode",
         choices=[m.value for m in TableMode],
-        default=TableMode.AUTO.value,
+        default=None,
         help="Table output mode: auto, html, markdown. html-only/gfm-only are legacy compatibility modes.",
     )
     parser.add_argument(
         "--rag-table-output",
         choices=[m.value for m in RagTableOutputMode],
-        default=RagTableOutputMode.NONE.value,
+        default=None,
         help="Optional RAG sidecar table output: none, markdown, jsonl, or both.",
     )
     parser.add_argument(
         "--domain-adapter",
         choices=[m.value for m in DomainAdapterMode],
-        default=DomainAdapterMode.NONE.value,
+        default=None,
         help="Optional domain-specific RAG adapter: nvme, pcie, ocp, tcg, or customer-requirements.",
     )
     parser.add_argument(
         "--confidential-safe-mode",
         action="store_true",
-        default=False,
+        default=None,
         help="Redact source filenames/paths in public metadata and emit sanitized_report.json.",
     )
-    parser.add_argument("--force-ocr", action="store_true", default=False)
+    parser.add_argument("--force-ocr", action="store_true", default=None)
     parser.add_argument("--ocr-lang", default="eng", help="Tesseract language code for OCR, for example eng or kor+eng.")
     parser.add_argument(
         "--page-workers",
@@ -76,77 +83,108 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--remove-header-footer",
         action="store_true",
-        default=False,
+        default=None,
         help="Conservatively suppress repeated page headers and footers.",
     )
     parser.add_argument(
         "--dedupe-images",
         action="store_true",
-        default=False,
+        default=None,
         help="Reuse the first extracted file for repeated image objects with the same sha256.",
     )
     parser.add_argument(
         "--repair-hyphenation",
         action="store_true",
-        default=False,
+        default=None,
         help="Opt-in repair for clear line-break hyphenation.",
     )
     parser.add_argument(
         "--figure-crop-fallback",
         action="store_true",
-        default=False,
+        default=None,
         help="Opt-in page crop fallback for captioned figures without embedded image objects.",
     )
     parser.add_argument(
         "--retrieval-chunk-max-tokens",
         type=int,
-        default=512,
+        default=None,
         help="Maximum token budget for deterministic retrieval chunk splitting.",
     )
     parser.add_argument(
         "--retrieval-tokenizer",
         choices=SUPPORTED_RETRIEVAL_TOKENIZERS,
-        default="char",
+        default=None,
         help="Token counter used for retrieval chunk budget diagnostics.",
     )
     parser.add_argument(
         "--rag-contextual-embedding-text",
         action="store_true",
-        default=False,
+        default=None,
         help="Add optional context-prefixed embedding_text for table-like retrieval chunks without changing text.",
+    )
+    parser.add_argument(
+        "--rag-merge-sibling-text-chunks",
+        action="store_true",
+        default=None,
+        help="Merge adjacent same-section text_block retrieval chunks when the combined text fits the token budget.",
+    )
+    parser.add_argument(
+        "--rag-chunk-relationship-metadata",
+        action="store_true",
+        default=None,
+        help="Add optional previous/next/section anchor metadata to retrieval chunks.",
     )
     marker_group = parser.add_mutually_exclusive_group()
     marker_group.add_argument("--keep-page-markers", dest="keep_page_markers", action="store_true")
     marker_group.add_argument("--no-page-markers", dest="keep_page_markers", action="store_false")
-    parser.set_defaults(keep_page_markers=False)
+    parser.set_defaults(keep_page_markers=None)
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--verbose", action="store_true", default=False)
     return parser
 
 
+def _option_value(value: object | None, default: object) -> object:
+    return default if value is None else value
+
+
 def _build_single_config(args: argparse.Namespace) -> Config:
     input_pdf = Path(args.input_pdf)
     output_dir = Path(args.output_dir) if args.output_dir is not None else default_output_dir_for_input(input_pdf)
+    profile_options = rag_profile_options(args.rag_profile)
     return Config(
         input_pdf=input_pdf,
         output_dir=output_dir,
         pages=args.pages,
         password=args.password,
-        image_mode=ImageMode(args.image_mode),
-        table_mode=TableMode(args.table_mode),
-        rag_table_output=RagTableOutputMode(args.rag_table_output),
-        domain_adapter=DomainAdapterMode(args.domain_adapter),
-        confidential_safe_mode=args.confidential_safe_mode,
-        force_ocr=args.force_ocr,
+        image_mode=ImageMode(_option_value(args.image_mode, profile_options.image_mode)),
+        table_mode=TableMode(_option_value(args.table_mode, profile_options.table_mode)),
+        rag_table_output=RagTableOutputMode(_option_value(args.rag_table_output, profile_options.rag_table_output)),
+        domain_adapter=DomainAdapterMode(_option_value(args.domain_adapter, profile_options.domain_adapter)),
+        confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),
+        force_ocr=_option_value(args.force_ocr, profile_options.force_ocr),
         ocr_lang=args.ocr_lang,
-        keep_page_markers=args.keep_page_markers,
-        remove_header_footer=args.remove_header_footer,
-        dedupe_images=args.dedupe_images,
-        repair_hyphenation=args.repair_hyphenation,
-        figure_crop_fallback=args.figure_crop_fallback,
-        retrieval_chunk_max_tokens=args.retrieval_chunk_max_tokens,
-        retrieval_tokenizer=args.retrieval_tokenizer,
-        rag_contextual_embedding_text=args.rag_contextual_embedding_text,
+        keep_page_markers=_option_value(args.keep_page_markers, profile_options.keep_page_markers),
+        remove_header_footer=_option_value(args.remove_header_footer, profile_options.remove_header_footer),
+        dedupe_images=_option_value(args.dedupe_images, profile_options.dedupe_images),
+        repair_hyphenation=_option_value(args.repair_hyphenation, profile_options.repair_hyphenation),
+        figure_crop_fallback=_option_value(args.figure_crop_fallback, profile_options.figure_crop_fallback),
+        retrieval_chunk_max_tokens=_option_value(
+            args.retrieval_chunk_max_tokens,
+            profile_options.retrieval_chunk_max_tokens,
+        ),
+        retrieval_tokenizer=_option_value(args.retrieval_tokenizer, profile_options.retrieval_tokenizer),
+        rag_contextual_embedding_text=_option_value(
+            args.rag_contextual_embedding_text,
+            profile_options.rag_contextual_embedding_text,
+        ),
+        rag_merge_sibling_text_chunks=_option_value(
+            args.rag_merge_sibling_text_chunks,
+            profile_options.rag_merge_sibling_text_chunks,
+        ),
+        rag_chunk_relationship_metadata=_option_value(
+            args.rag_chunk_relationship_metadata,
+            profile_options.rag_chunk_relationship_metadata,
+        ),
         page_workers=args.page_workers,
         debug=args.debug,
         verbose=args.verbose,
@@ -155,24 +193,39 @@ def _build_single_config(args: argparse.Namespace) -> Config:
 
 
 def _run_batch_conversion(args: argparse.Namespace) -> int:
+    profile_options = rag_profile_options(args.rag_profile)
     options = BatchConversionOptions(
         pages=args.pages,
         password=args.password,
-        image_mode=ImageMode(args.image_mode),
-        table_mode=TableMode(args.table_mode),
-        rag_table_output=RagTableOutputMode(args.rag_table_output),
-        domain_adapter=DomainAdapterMode(args.domain_adapter),
-        confidential_safe_mode=args.confidential_safe_mode,
-        force_ocr=args.force_ocr,
+        image_mode=ImageMode(_option_value(args.image_mode, profile_options.image_mode)),
+        table_mode=TableMode(_option_value(args.table_mode, profile_options.table_mode)),
+        rag_table_output=RagTableOutputMode(_option_value(args.rag_table_output, profile_options.rag_table_output)),
+        domain_adapter=DomainAdapterMode(_option_value(args.domain_adapter, profile_options.domain_adapter)),
+        confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),
+        force_ocr=_option_value(args.force_ocr, profile_options.force_ocr),
         ocr_lang=args.ocr_lang,
-        keep_page_markers=args.keep_page_markers,
-        remove_header_footer=args.remove_header_footer,
-        dedupe_images=args.dedupe_images,
-        repair_hyphenation=args.repair_hyphenation,
-        figure_crop_fallback=args.figure_crop_fallback,
-        retrieval_chunk_max_tokens=args.retrieval_chunk_max_tokens,
-        retrieval_tokenizer=args.retrieval_tokenizer,
-        rag_contextual_embedding_text=args.rag_contextual_embedding_text,
+        keep_page_markers=_option_value(args.keep_page_markers, profile_options.keep_page_markers),
+        remove_header_footer=_option_value(args.remove_header_footer, profile_options.remove_header_footer),
+        dedupe_images=_option_value(args.dedupe_images, profile_options.dedupe_images),
+        repair_hyphenation=_option_value(args.repair_hyphenation, profile_options.repair_hyphenation),
+        figure_crop_fallback=_option_value(args.figure_crop_fallback, profile_options.figure_crop_fallback),
+        retrieval_chunk_max_tokens=_option_value(
+            args.retrieval_chunk_max_tokens,
+            profile_options.retrieval_chunk_max_tokens,
+        ),
+        retrieval_tokenizer=_option_value(args.retrieval_tokenizer, profile_options.retrieval_tokenizer),
+        rag_contextual_embedding_text=_option_value(
+            args.rag_contextual_embedding_text,
+            profile_options.rag_contextual_embedding_text,
+        ),
+        rag_merge_sibling_text_chunks=_option_value(
+            args.rag_merge_sibling_text_chunks,
+            profile_options.rag_merge_sibling_text_chunks,
+        ),
+        rag_chunk_relationship_metadata=_option_value(
+            args.rag_chunk_relationship_metadata,
+            profile_options.rag_chunk_relationship_metadata,
+        ),
         page_workers=args.page_workers,
         debug=args.debug,
         verbose=args.verbose,

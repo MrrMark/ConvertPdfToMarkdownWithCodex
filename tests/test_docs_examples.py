@@ -57,7 +57,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
     assert "현재 active quality backlog는 없습니다" in readme
-    assert "완료된 Q34-Q76" in readme
+    assert "완료된 Q34-Q79" in readme
     assert "Previous corpus manifest" in readme
     assert "Reuse unchanged" in readme
     assert "Open Corpus Diff" in readme
@@ -86,7 +86,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "runtime diagnostic code/message/action" in readme
     assert "변환 warning message" in readme
     assert "문서 경계 취소" in readme
-    assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`" in readme
+    assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `기술 스펙 RAG`" in readme
+    assert "`민감정보 보호 RAG`, `원본 유지 + sidecar`, `Optimize Options(유저 선택)`" in readme
     assert "percent text" in readme
     assert "page-level 진행률 callback" in readme
     assert "pages/sec" in readme
@@ -181,7 +182,8 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "desktop GUI wrapper" in guide
     assert "docs\\GUI_USER_GUIDE.md" in guide
     assert "GUI의 `Help` 버튼" in guide
-    assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)`" in guide
+    assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `기술 스펙 RAG`" in guide
+    assert "`민감정보 보호 RAG`, `원본 유지 + sidecar`, `Optimize Options(유저 선택)`" in guide
     assert "percent text" in guide
     assert "page-level percent" in guide
     assert "pages/sec" in guide
@@ -357,6 +359,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" not in next_plan
     assert "Tcl/Tk patchlevel" not in next_plan
     assert "현재 남은 작업 없음." in next_plan
+    assert "Q77. RAG Sibling Chunk Merge" not in next_plan
+    assert "Q78. RAG Chunk Relationship Metadata" not in next_plan
+    assert "Q79. Purpose-Specific RAG Profiles" not in next_plan
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in next_plan
     assert "Q73. GUI Incremental Corpus Options" not in next_plan
     assert "Q74. CLI/GUI Golden Parity Gate" not in next_plan
@@ -366,6 +371,12 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "현재 Active Development Specs" in development_specs
     assert "현재 active 개발 명세 없음." in development_specs
+    assert "Q77. RAG Sibling Chunk Merge" not in development_specs
+    assert "Q78. RAG Chunk Relationship Metadata" not in development_specs
+    assert "Q79. Purpose-Specific RAG Profiles" not in development_specs
+    assert "merge_sibling_text_chunks" not in development_specs
+    assert "previous_chunk_id" not in development_specs
+    assert "technical_spec_rag" not in development_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
@@ -400,11 +411,14 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q76" in development_specs
+    assert "완료된 Q34-Q79" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" in implemented_specs
+    assert "Q77. RAG Sibling Chunk Merge" in implemented_specs
+    assert "Q78. RAG Chunk Relationship Metadata" in implemented_specs
+    assert "Q79. Purpose-Specific RAG Profiles" in implemented_specs
     assert "Q44. Domain Technical Table Coverage Expansion" in implemented_specs
     assert "Q47. Local Technical Corpus Evidence Pack" in implemented_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" in implemented_specs
@@ -533,6 +547,12 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q74. CLI/GUI Golden Parity Gate" in quality_scorecard
     assert "Q75. GUI Metrics And Page Progress Contract" in quality_scorecard
     assert "Q76. CLI/GUI Performance Benchmark Report" in quality_scorecard
+    assert "RAG chunk/profile implementation" in quality_scorecard
+    assert "98/100" in quality_scorecard
+    assert "RAG chunk/profile active backlog" in quality_scorecard
+    assert "Q77. RAG Sibling Chunk Merge" in quality_scorecard
+    assert "Q78. RAG Chunk Relationship Metadata" in quality_scorecard
+    assert "Q79. Purpose-Specific RAG Profiles" in quality_scorecard
     assert "scripts/run_gui_cli_parity.py" in quality_scorecard
     assert "gui_cli_parity_report.json" in quality_scorecard
     assert "ConversionProgressEvent" in quality_scorecard
