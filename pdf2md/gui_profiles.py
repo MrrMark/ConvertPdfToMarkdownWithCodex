@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from pdf2md.config import SUPPORTED_RETRIEVAL_TOKENIZERS
 from pdf2md.gui_runner import GuiConversionOptions, GuiDiagnostic, GuiDiagnosticError, GuiDiagnosticReport
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
 
@@ -26,6 +27,9 @@ GUI_PROFILE_OPTION_FIELDS: tuple[str, ...] = (
     "dedupe_images",
     "repair_hyphenation",
     "figure_crop_fallback",
+    "retrieval_chunk_max_tokens",
+    "retrieval_tokenizer",
+    "rag_contextual_embedding_text",
     "page_workers",
     "debug",
     "verbose",
@@ -191,11 +195,24 @@ def _option_type_diagnostics(options: Mapping[str, object]) -> list[GuiDiagnosti
         "dedupe_images",
         "repair_hyphenation",
         "figure_crop_fallback",
+        "rag_contextual_embedding_text",
         "debug",
         "verbose",
         "skip_existing",
     ):
         _validate_bool(options, field, diagnostics)
+    if "retrieval_chunk_max_tokens" in options:
+        value = options["retrieval_chunk_max_tokens"]
+        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+            diagnostics.append(
+                GuiDiagnostic(
+                    code="profile_option_invalid",
+                    severity="error",
+                    message="profile option retrieval_chunk_max_tokens must be an integer greater than or equal to 1.",
+                    action="Use a conservative budget such as 512.",
+                )
+            )
+    _validate_enum(options, "retrieval_tokenizer", set(SUPPORTED_RETRIEVAL_TOKENIZERS), diagnostics)
     if "page_workers" in options:
         value = options["page_workers"]
         if not isinstance(value, int) or isinstance(value, bool) or not (1 <= value <= GUI_PROFILE_MAX_PAGE_WORKERS):

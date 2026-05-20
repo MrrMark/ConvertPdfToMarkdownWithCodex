@@ -816,7 +816,7 @@ python3 -m pdf2md input.pdf -o output/ --table-mode auto --rag-table-output both
 - `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix와 requirement/log page/feature/opcode/register 참조의 resolved/unresolved 상태를 기록하며, technical ref는 normalized key, candidate count, unresolved reason을 함께 남깁니다.
 - `requirement_traceability_rag.jsonl`: Requirement ID, condition, dependency, exception, testability hint를 원문 기반으로 기록합니다.
 - `technical_tables_rag.jsonl`: register, bitfield, command/opcode, log page, feature identifier, enum/value table row를 typed sidecar로 기록합니다.
-- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록하며, 각 chunk에 `schema_version`과 원본 PDF `source_sha256`를 포함합니다. 긴 chunk는 token budget 기준으로 deterministic split되고 `parent_chunk_id`, `chunk_part_index`, `chunk_part_count`가 보존됩니다.
+- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록하며, 각 chunk에 `schema_version`과 원본 PDF `source_sha256`를 포함합니다. 긴 chunk는 token budget 기준으로 deterministic split되고 `parent_chunk_id`, `chunk_part_index`, `chunk_part_count`가 보존됩니다. RAG 최적화 옵션에서는 table-like chunk에 optional `embedding_text`를 추가해 section/caption/header context를 embedding 대상에만 보강하고, 원문 기준 `text`는 그대로 둡니다.
 - `figures_rag.jsonl`: 이미지/도표 bbox, caption, OCR 후보, nearby heading, figure kind를 별도 기록합니다.
 - `rag_tables.md`: 검색 chunk에 넣기 쉬운 행 단위 Markdown입니다.
 - `tables_rag.jsonl`: `table_id`, `table_row_id`, `page`, `table_index`, `headers`, `cells`, `row_text`, `bbox`, `quality_score`, `fallback_reasons`를 가진 행 단위 JSONL입니다.
@@ -834,10 +834,11 @@ RAG 검색 품질을 로컬 deterministic 방식으로 점검하려면 `retrieva
 ```bash
 ./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --top-k 5
 ./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --top-k 5 --min-expected-source-coverage 0.9 --min-requirement-coverage 0.9 --min-table-field-coverage 0.85 --min-cross-ref-resolved-coverage 0.8 --max-chunk-token-p95 512 --max-conversion-duration-ms 10000 --fail-on-threshold
+./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --chunk-token-target 512 --min-chunk-size-compliance 0.95 --min-source-ref-presence-coverage 1.0 --max-duplicate-source-ratio 0.0 --fail-on-threshold
 ./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --calibration-profile docs/rag_calibration_profile.example.json --fail-on-threshold
 ```
 
-Eval fixture에는 `expected_source_ids`와 `expected_source_types` 외에 `expected_requirement_source_ids`, `expected_table_field_source_ids`를 넣을 수 있으며 report에는 hit@k, MRR, citation coverage, expected source coverage, requirement coverage, table-field coverage, cross-reference resolved coverage, chunk token 분포, conversion duration이 기록됩니다.
+Eval fixture에는 `expected_source_ids`와 `expected_source_types` 외에 `expected_requirement_source_ids`, `expected_table_field_source_ids`를 넣을 수 있으며 report에는 hit@k, MRR, citation coverage, expected source coverage, requirement coverage, table-field coverage, cross-reference resolved coverage, chunk token 분포, source-ref presence, duplicate source ratio, table contextual embedding coverage, conversion duration이 기록됩니다.
 
 `rag_eval_report.json`에는 hit@k, MRR, expected source coverage, query별 retrieved chunk/source id, missing expected source id, threshold 통과/실패 정보가 기록됩니다.
 

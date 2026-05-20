@@ -394,7 +394,14 @@ def _validate_retrieval_chunk_record(
             message="source_sha256 must be a lowercase SHA-256 hex string.",
         )
 
-    for field in ("chunk_index", "retrieval_priority", "char_count", "token_estimate", "source_record_count"):
+    for field in (
+        "chunk_index",
+        "retrieval_priority",
+        "char_count",
+        "token_estimate",
+        "embedding_token_estimate",
+        "source_record_count",
+    ):
         if field in record and not _is_int(record.get(field)):
             _add_finding(
                 findings,
@@ -422,7 +429,16 @@ def _validate_retrieval_chunk_record(
             message="chunk_index should match deterministic JSONL order.",
         )
 
-    for field in ("chunk_type", "text", "section_path", "chunk_group_id", "source_dedupe_key", "chunk_boundary_policy"):
+    for field in (
+        "chunk_type",
+        "text",
+        "embedding_text",
+        "embedding_text_strategy",
+        "section_path",
+        "chunk_group_id",
+        "source_dedupe_key",
+        "chunk_boundary_policy",
+    ):
         if field in record and not isinstance(record.get(field), str):
             _add_finding(
                 findings,

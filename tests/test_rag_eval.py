@@ -47,6 +47,12 @@ def test_rag_eval_reports_hit_mrr_and_citation_coverage() -> None:
         "table_field_coverage": 0.0,
         "chunk_token_max": 0,
         "chunk_token_p95": 0,
+        "chunk_size_compliance": 1.0,
+        "source_ref_presence_coverage": 1.0,
+        "duplicate_source_ratio": 0.0,
+        "table_contextual_embedding_coverage": 0.0,
+        "table_contextual_embedding_count": 0,
+        "table_contextual_embedding_total": 0,
     }
     assert report["results"][0]["retrieved"][0]["chunk_id"] == "chunk-000001"
 
@@ -74,6 +80,39 @@ def test_rag_eval_matches_chunk_ids_and_filters_expected_source_types() -> None:
     assert report["metrics"]["expected_source_hit_count"] == 1
     assert result["covered_source_ids"] == ["chunk-000001", "page-0001-table-0001-row-0001"]
     assert result["missing_expected_source_ids"] == ["page-0001-block-0001"]
+
+
+def test_rag_eval_scores_optional_embedding_text_and_reports_intrinsic_metrics() -> None:
+    chunks = [
+        _chunk("chunk-000001", "Field = STS | Description = ok.", "page-0001-table-0001-row-0001", 80, "table_row")
+        | {
+            "chunk_type": "table_row",
+            "embedding_text": "Caption: Table 1 Status Fields\nHeaders: Field | Description\nText: Field = STS",
+            "token_estimate": 12,
+            "source_dedupe_key": "page-0001-table-0001-row-0001",
+        },
+        _chunk("chunk-000002", "Unrelated body text.", "page-0001-block-0001")
+        | {"token_estimate": 4, "source_dedupe_key": "page-0001-block-0001"},
+    ]
+
+    report = evaluate_queries(
+        chunks=chunks,
+        queries=[
+            {
+                "query": "status fields",
+                "expected_source_ids": ["page-0001-table-0001-row-0001"],
+                "expected_source_types": ["table_row"],
+            }
+        ],
+        top_k=1,
+    )
+
+    assert report["results"][0]["retrieved"][0]["chunk_id"] == "chunk-000001"
+    assert report["metrics"]["table_contextual_embedding_coverage"] == 1.0
+    assert report["metrics"]["table_contextual_embedding_count"] == 1
+    assert report["metrics"]["table_contextual_embedding_total"] == 1
+    assert report["metrics"]["chunk_size_compliance"] == 1.0
+    assert report["metrics"]["duplicate_source_ratio"] == 0.0
 
 
 def test_rag_eval_cli_writes_report(tmp_path: Path) -> None:

@@ -56,7 +56,7 @@ python -m pdf2md.gui --doctor --doctor-format json
 ### Preset
 
 - `기본 모드(원본 유지)`: 원문 보존을 우선하는 보수적 기본값이다.
-- `RAG 등록용(최적화)`: Markdown 원문을 임의로 바꾸지 않고 RAG table sidecar, page marker, header/footer 보정, hyphenation 보정 같은 RAG 친화 옵션을 켠다.
+- `RAG 등록용(최적화)`: Markdown 원문을 임의로 바꾸지 않고 RAG table sidecar, page marker, header/footer 보정, hyphenation 보정, table context `embedding_text` 같은 RAG 친화 옵션을 켠다.
 - `Optimize Options(유저 선택)`: image/table/RAG/domain과 상세 flag를 직접 고른다.
 - `Pages`, `Password`, `OCR lang`, 입력/출력 경로는 preset을 바꿔도 유지된다.
 - `custom`이 아닌 preset에서는 세부 변환 옵션이 읽기 전용으로 표시된다.

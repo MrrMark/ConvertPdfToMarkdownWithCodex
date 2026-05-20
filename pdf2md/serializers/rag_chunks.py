@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import Any, Callable
 
 from pdf2md.serializers.rag_tables import flatten_rag_table_records, normalize_rag_table_payload
 
 
 RAG_CHUNK_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
+REGEX_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]+|[^\sA-Za-z0-9_]")
+TABLE_CONTEXT_CHUNK_TYPES = {"table_row", "technical_table", "domain_unit"}
+TokenCounter = Callable[[str], int]
 
 
 def _page_of(record: dict[str, Any]) -> int:
@@ -47,14 +50,77 @@ def _source_ref(source_type: str, source_id: str | None, record: dict[str, Any])
     }
 
 
-def _token_estimate(text: str) -> int:
+def _char_token_estimate(text: str) -> int:
     return max((len(text) + 3) // 4, 1) if text else 0
 
 
-def _split_text_to_token_budget(text: str, max_tokens: int) -> list[str]:
+def _regex_token_estimate(text: str) -> int:
+    return len(REGEX_TOKEN_PATTERN.findall(text)) if text else 0
+
+
+def make_token_counter(tokenizer: str = "char") -> TokenCounter:
+    """Return a deterministic token counter for retrieval chunk budgeting."""
+    if tokenizer == "regex":
+        return _regex_token_estimate
+    if tokenizer == "tiktoken-cl100k":
+        try:
+            import tiktoken  # type: ignore[import-not-found]
+        except ImportError:
+            return _regex_token_estimate
+        encoding = tiktoken.get_encoding("cl100k_base")
+        return lambda text: len(encoding.encode(text)) if text else 0
+    return _char_token_estimate
+
+
+def _token_estimate(text: str, token_counter: TokenCounter | None = None) -> int:
+    counter = token_counter or _char_token_estimate
+    return counter(text)
+
+
+def _split_oversized_part(part: str, max_tokens: int, token_counter: TokenCounter) -> list[str]:
+    if _token_estimate(part, token_counter) <= max_tokens:
+        return [part]
+    tokens = re.findall(r"\S+\s*", part)
+    if len(tokens) <= 1:
+        char_budget = max(max_tokens * 4, 1)
+        parts: list[str] = []
+        for index in range(0, len(part), char_budget):
+            chunk = part[index : index + char_budget].strip()
+            if not chunk:
+                continue
+            if len(chunk) > 1 and _token_estimate(chunk, token_counter) > max_tokens:
+                midpoint = max(len(chunk) // 2, 1)
+                parts.extend(_split_oversized_part(chunk[:midpoint].strip(), max_tokens, token_counter))
+                parts.extend(_split_oversized_part(chunk[midpoint:].strip(), max_tokens, token_counter))
+                continue
+            parts.append(chunk)
+        return parts
+
+    parts: list[str] = []
+    current = ""
+    for token in tokens:
+        candidate = current + token
+        if current and _token_estimate(candidate.strip(), token_counter) > max_tokens:
+            parts.extend(_split_oversized_part(current.strip(), max_tokens, token_counter))
+            current = token
+        else:
+            current = candidate
+    if current.strip():
+        parts.extend(_split_oversized_part(current.strip(), max_tokens, token_counter))
+    return parts
+
+
+def _split_text_to_token_budget(
+    text: str,
+    max_tokens: int,
+    token_counter: TokenCounter | None = None,
+) -> list[str]:
     stripped = text.strip()
-    if not stripped or _token_estimate(stripped) <= max_tokens:
+    counter = token_counter or _char_token_estimate
+    if not stripped or _token_estimate(stripped, counter) <= max_tokens:
         return [stripped] if stripped else []
+    if token_counter is not None:
+        return _split_oversized_part(stripped, max_tokens, counter)
     char_budget = max(max_tokens * 4, 1)
     parts: list[str] = []
     start = 0
@@ -71,14 +137,19 @@ def _split_text_to_token_budget(text: str, max_tokens: int) -> list[str]:
                 end = start + boundary
         part = stripped[start:end].strip()
         if part:
-            parts.append(part)
+            parts.extend(_split_oversized_part(part, max_tokens, counter))
         start = end
         while start < len(stripped) and stripped[start].isspace():
             start += 1
     return parts
 
 
-def optimize_retrieval_chunks(records: list[dict[str, Any]], *, max_tokens: int = 512) -> list[dict[str, Any]]:
+def optimize_retrieval_chunks(
+    records: list[dict[str, Any]],
+    *,
+    max_tokens: int = 512,
+    token_counter: TokenCounter | None = None,
+) -> list[dict[str, Any]]:
     """Split over-budget RAG chunks deterministically while preserving provenance."""
     if max_tokens <= 0:
         return records
@@ -86,7 +157,7 @@ def optimize_retrieval_chunks(records: list[dict[str, Any]], *, max_tokens: int 
     optimized: list[dict[str, Any]] = []
     for record in records:
         text = str(record.get("text") or "")
-        parts = _split_text_to_token_budget(text, max_tokens)
+        parts = _split_text_to_token_budget(text, max_tokens, token_counter)
         if len(parts) <= 1:
             optimized.append(dict(record))
             continue
@@ -96,7 +167,11 @@ def optimize_retrieval_chunks(records: list[dict[str, Any]], *, max_tokens: int 
             split_record = dict(record)
             split_record["text"] = part
             split_record["char_count"] = len(part)
-            split_record["token_estimate"] = _token_estimate(part)
+            split_record["token_estimate"] = _token_estimate(part, token_counter)
+            if isinstance(record.get("embedding_text"), str):
+                split_record.pop("embedding_text", None)
+                split_record.pop("embedding_token_estimate", None)
+                split_record.pop("embedding_text_strategy", None)
             split_record["parent_chunk_id"] = parent_chunk_id
             split_record["chunk_part_index"] = part_index
             split_record["chunk_part_count"] = len(parts)
@@ -127,13 +202,16 @@ def _make_chunk(
     retrieval_priority: int,
     schema_version: str,
     source_sha256: str,
+    token_counter: TokenCounter | None = None,
     boundary_reasons: list[str] | None = None,
     chunk_group_id: str | None = None,
+    embedding_text: str | None = None,
+    embedding_text_strategy: str | None = None,
 ) -> dict[str, Any]:
     dedupe_key = "|".join(
         sorted(str(ref.get("source_id")) for ref in source_refs if isinstance(ref, dict) and ref.get("source_id"))
     )
-    return {
+    chunk = {
         "chunk_id": f"chunk-{index:06d}",
         "schema_version": schema_version,
         "chunk_index": index,
@@ -148,7 +226,7 @@ def _make_chunk(
         "normative_strength": normative_strength,
         "retrieval_priority": retrieval_priority,
         "char_count": len(text),
-        "token_estimate": _token_estimate(text),
+        "token_estimate": _token_estimate(text, token_counter),
         "section_path": " > ".join(heading_path),
         "chunk_group_id": chunk_group_id,
         "source_record_count": len(source_refs),
@@ -156,6 +234,35 @@ def _make_chunk(
         "chunk_boundary_policy": "source_record",
         "chunk_boundary_reasons": sorted(dict.fromkeys(boundary_reasons or ["single_source_record"])),
     }
+    if embedding_text and embedding_text != text:
+        chunk["embedding_text"] = embedding_text
+        chunk["embedding_token_estimate"] = _token_estimate(embedding_text, token_counter)
+        chunk["embedding_text_strategy"] = embedding_text_strategy or "contextual_embedding_text"
+    return chunk
+
+
+def _contextual_embedding_text(chunk_type: str, text: str, record: dict[str, Any]) -> str | None:
+    if chunk_type not in TABLE_CONTEXT_CHUNK_TYPES:
+        return None
+    context_parts: list[str] = []
+    heading_path = _heading_path(record)
+    if heading_path:
+        context_parts.append("Section: " + " > ".join(heading_path))
+    caption = str(record.get("caption_text") or "").strip()
+    if caption:
+        context_parts.append(f"Caption: {caption}")
+    headers = record.get("headers")
+    if isinstance(headers, list) and headers:
+        context_parts.append("Headers: " + " | ".join(str(header) for header in headers))
+    table_id = record.get("table_id")
+    if table_id:
+        context_parts.append(f"Table: {table_id}")
+    unit_type = record.get("unit_type")
+    if unit_type:
+        context_parts.append(f"Unit type: {unit_type}")
+    if not context_parts:
+        return None
+    return "\n".join(context_parts + [f"Text: {text}"])
 
 
 def _semantic_source_refs(record: dict[str, Any], *, source_type: str) -> list[dict[str, Any]]:
@@ -183,6 +290,8 @@ def build_retrieval_chunks(
     schema_version: str = "1.0",
     source_sha256: str = "",
     max_tokens: int = 512,
+    token_counter: TokenCounter | None = None,
+    contextual_embedding_text: bool = False,
 ) -> list[dict[str, Any]]:
     """Build deterministic ready-to-index chunks for RAG operations."""
     chunks: list[dict[str, Any]] = []
@@ -193,6 +302,7 @@ def build_retrieval_chunks(
                 index=len(chunks) + 1,
                 schema_version=schema_version,
                 source_sha256=source_sha256,
+                token_counter=token_counter,
                 **kwargs,
             )
         )
@@ -330,6 +440,10 @@ def build_retrieval_chunks(
             retrieval_priority=88,
             boundary_reasons=["technical_table_row_boundary"],
             chunk_group_id=f"technical-table-{record.get('table_id') or 'unknown'}",
+            embedding_text=_contextual_embedding_text("technical_table", text, record)
+            if contextual_embedding_text
+            else None,
+            embedding_text_strategy="technical_table_context_prefix",
         )
 
     for record in flatten_rag_table_records(normalize_rag_table_payload(rag_tables)):
@@ -357,9 +471,11 @@ def build_retrieval_chunks(
             retrieval_priority=70,
             boundary_reasons=["table_row_boundary"],
             chunk_group_id=f"table-{record.get('table_id') or 'unknown'}",
+            embedding_text=_contextual_embedding_text("table_row", text, record) if contextual_embedding_text else None,
+            embedding_text_strategy="table_context_prefix",
         )
 
-    return optimize_retrieval_chunks(chunks, max_tokens=max_tokens)
+    return optimize_retrieval_chunks(chunks, max_tokens=max_tokens, token_counter=token_counter)
 
 
 def build_retrieval_chunk_diagnostics(records: list[dict[str, Any]], *, target_tokens: int = 512) -> dict[str, Any]:

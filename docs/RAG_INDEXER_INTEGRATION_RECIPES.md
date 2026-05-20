@@ -27,7 +27,8 @@ Vector DB에는 보통 `retrieval_chunks_rag.jsonl`만 넣고, 나머지 sidecar
 | Index field | Source field | 비고 |
 | --- | --- | --- |
 | `id` | `chunk_id` | deterministic primary key |
-| `text` | `text` | embedding 대상 원문 |
+| `text` | `embedding_text` if present, otherwise `text` | embedding 대상. `embedding_text`는 optional context prefix이며 원문 `text`를 대체하지 않는다. |
+| `source_text` | `text` | citation/원문 확인용 source of truth |
 | `chunk_type` | `chunk_type` | `requirement`, `technical_table`, `table_row` 우선순위 조정에 사용 |
 | `source_refs` | `source_refs` | citation/provenance 원본 |
 | `page_start` | `page_range[0]` | page filter |
@@ -36,6 +37,7 @@ Vector DB에는 보통 `retrieval_chunks_rag.jsonl`만 넣고, 나머지 sidecar
 | `semantic_types` | `semantic_types` | requirement/table/domain unit 필터 |
 | `retrieval_priority` | `retrieval_priority` | re-ranking hint |
 | `token_estimate` | `token_estimate` | chunk budget diagnostics |
+| `embedding_token_estimate` | `embedding_token_estimate` | optional context-prefixed embedding budget diagnostics |
 | `source_dedupe_key` | `source_dedupe_key` | duplicate guard |
 | `schema_version` | `schema_version` | chunk contract version |
 | `source_sha256` | `source_sha256` | 원본 PDF identity / corpus diff guard |
@@ -88,6 +90,7 @@ python scripts/validate_artifact_integrity.py --output-dir output --fail-on-erro
 운영 체크:
 
 - `source_refs`는 citation 화면이나 test script generator에서 원문 위치로 되돌아가기 위해 보존한다.
+- table/technical table chunk에 `embedding_text`가 있으면 embedding 대상은 `embedding_text`, citation 화면과 원문 검증 대상은 `text`를 사용한다.
 - metadata 크기 제한이 있는 indexer에서는 `source_refs` 전체를 별도 object store에 저장하고 `source_dedupe_key`나 `chunk_id`만 metadata에 둔다.
 - confidential safe mode 산출물을 공유할 때는 path, filename, customer-specific identifier가 노출되지 않았는지 확인한다.
 
@@ -161,9 +164,10 @@ python scripts/compare_corpus_evidence_packs.py --baseline old_evidence_pack.jso
 
 ```python
 Document(
-    page_content=record["text"],
+    page_content=record.get("embedding_text") or record["text"],
     metadata={
         "id": record["chunk_id"],
+        "source_text": record["text"],
         "chunk_type": record["chunk_type"],
         "source_refs": record["source_refs"],
         "section_path": record["section_path"],
@@ -186,9 +190,10 @@ Document(
 ```python
 TextNode(
     id_=record["chunk_id"],
-    text=record["text"],
+    text=record.get("embedding_text") or record["text"],
     metadata={
         "chunk_type": record["chunk_type"],
+        "source_text": record["text"],
         "source_refs": record["source_refs"],
         "section_path": record["section_path"],
         "page_range": record["page_range"],
@@ -242,7 +247,11 @@ python scripts/run_rag_eval.py \
   --min-requirement-coverage 0.9 \
   --min-table-field-coverage 0.85 \
   --min-cross-ref-resolved-coverage 0.8 \
+  --chunk-token-target 512 \
+  --min-chunk-size-compliance 0.95 \
+  --min-source-ref-presence-coverage 1.0 \
   --max-chunk-token-p95 512 \
+  --max-duplicate-source-ratio 0.0 \
   --max-conversion-duration-ms 10000 \
   --fail-on-threshold
 ```

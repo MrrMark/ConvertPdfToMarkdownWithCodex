@@ -3,13 +3,26 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pdf2md.config import default_output_dir_for_input
+import pytest
+from pydantic import ValidationError
+
+from pdf2md.config import Config, default_output_dir_for_input
 from pdf2md.utils.io import validate_output_bundle
 
 
 def test_default_output_dir_for_input_uses_pdf_stem_suffix(tmp_path: Path) -> None:
     input_pdf = tmp_path / "demo.pdf"
     assert default_output_dir_for_input(input_pdf) == tmp_path / "demo_output"
+
+
+def test_config_validates_retrieval_chunk_options(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "demo.pdf"
+
+    with pytest.raises(ValidationError):
+        Config(input_pdf=input_pdf, output_dir=tmp_path / "out", retrieval_chunk_max_tokens=0)
+
+    with pytest.raises(ValidationError):
+        Config(input_pdf=input_pdf, output_dir=tmp_path / "out", retrieval_tokenizer="unknown")
 
 
 def test_validate_output_bundle_accepts_minimum_valid_outputs(tmp_path: Path) -> None:

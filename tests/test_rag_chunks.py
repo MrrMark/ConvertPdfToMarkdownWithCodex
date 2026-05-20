@@ -173,3 +173,68 @@ def test_retrieval_chunk_optimizer_splits_over_budget_chunks_and_reindexes() -> 
     assert all(record["token_estimate"] <= 16 for record in split_parts)
     assert all("token_budget_split" in record["chunk_boundary_reasons"] for record in split_parts)
     assert optimized[-1]["text"] == "Short chunk."
+
+
+def test_retrieval_chunk_optimizer_accepts_token_counter() -> None:
+    records = [
+        {
+            "chunk_id": "chunk-000001",
+            "chunk_index": 1,
+            "chunk_type": "text_block",
+            "text": "one two three four five six seven eight nine",
+            "source_refs": [{"source_type": "text_block", "source_id": "block-1", "page": 1}],
+            "source_dedupe_key": "block-1",
+            "char_count": 44,
+            "token_estimate": 9,
+        },
+    ]
+
+    optimized = optimize_retrieval_chunks(records, max_tokens=3, token_counter=lambda text: len(text.split()))
+
+    assert len(optimized) == 3
+    assert [record["token_estimate"] for record in optimized] == [3, 3, 3]
+    assert [record["text"] for record in optimized] == [
+        "one two three",
+        "four five six",
+        "seven eight nine",
+    ]
+
+
+def test_contextual_embedding_text_keeps_table_row_text_as_source_of_truth() -> None:
+    rag_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "caption_text": "Table 1: Status fields",
+            "headers": ["Field", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "caption_text": "Table 1: Status fields",
+                    "headers": ["Field", "Description"],
+                    "row_text": "Field = Status | Description = Current status",
+                    "heading_path": ["2 Registers"],
+                }
+            ],
+        }
+    ]
+
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=rag_tables,
+        contextual_embedding_text=True,
+        token_counter=lambda text: len(text.split()),
+    )
+
+    assert chunks[0]["chunk_type"] == "table_row"
+    assert chunks[0]["text"] == "Field = Status | Description = Current status"
+    assert chunks[0]["char_count"] == len(chunks[0]["text"])
+    assert chunks[0]["embedding_text_strategy"] == "table_context_prefix"
+    assert "Section: 2 Registers" in chunks[0]["embedding_text"]
+    assert "Caption: Table 1: Status fields" in chunks[0]["embedding_text"]
+    assert "Headers: Field | Description" in chunks[0]["embedding_text"]
+    assert chunks[0]["embedding_token_estimate"] > chunks[0]["token_estimate"]
