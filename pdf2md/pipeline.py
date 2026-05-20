@@ -35,6 +35,7 @@ from pdf2md.serializers.markdown import serialize_markdown_blocks_result
 from pdf2md.serializers.rag_chunks import (
     build_retrieval_chunk_diagnostics,
     build_retrieval_chunks,
+    make_token_counter,
     serialize_retrieval_chunks_jsonl,
 )
 from pdf2md.serializers.rag_domain_adapters import build_domain_units, serialize_domain_units_jsonl
@@ -919,6 +920,9 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         finish_stage("rag_domain_adapter", domain_started)
 
     retrieval_started = stage_start()
+    retrieval_token_counter = (
+        None if config.retrieval_tokenizer == "char" else make_token_counter(config.retrieval_tokenizer)
+    )
     retrieval_chunks = build_retrieval_chunks(
         text_block_records=text_block_result.records,
         semantic_units=semantic_result.semantic_units,
@@ -928,8 +932,14 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         requirement_traceability_records=requirement_traceability_records,
         technical_table_records=technical_table_records,
         source_sha256=source_sha256,
+        max_tokens=config.retrieval_chunk_max_tokens,
+        token_counter=retrieval_token_counter,
+        contextual_embedding_text=config.rag_contextual_embedding_text,
     )
-    retrieval_chunk_diagnostics = build_retrieval_chunk_diagnostics(retrieval_chunks)
+    retrieval_chunk_diagnostics = build_retrieval_chunk_diagnostics(
+        retrieval_chunks,
+        target_tokens=config.retrieval_chunk_max_tokens,
+    )
     retrieval_chunk_record_count, retrieval_chunk_file_count = _write_retrieval_chunk_output(
         config,
         retrieval_chunks,
@@ -1015,6 +1025,9 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             "technical_tables_jsonl_filename": config.technical_tables_jsonl_filename,
             "retrieval_chunks_output": "jsonl",
             "retrieval_chunks_jsonl_filename": config.retrieval_chunks_jsonl_filename,
+            "retrieval_chunk_max_tokens": config.retrieval_chunk_max_tokens,
+            "retrieval_tokenizer": config.retrieval_tokenizer,
+            "rag_contextual_embedding_text": config.rag_contextual_embedding_text,
             "figures_rag_output": "jsonl",
             "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
             "domain_units_jsonl_filename": config.domain_units_jsonl_filename,

@@ -24,6 +24,9 @@ GUI_PRESET_LOCKED_OPTION_FIELDS: tuple[str, ...] = (
     "dedupe_images",
     "repair_hyphenation",
     "figure_crop_fallback",
+    "retrieval_chunk_max_tokens",
+    "retrieval_tokenizer",
+    "rag_contextual_embedding_text",
     "page_workers",
     "debug",
     "verbose",
@@ -62,6 +65,9 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
             dedupe_images=current.dedupe_images,
             repair_hyphenation=True,
             figure_crop_fallback=current.figure_crop_fallback,
+            retrieval_chunk_max_tokens=512,
+            retrieval_tokenizer="regex",
+            rag_contextual_embedding_text=True,
         )
     return replace(
         current,
@@ -76,6 +82,9 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
         dedupe_images=False,
         repair_hyphenation=False,
         figure_crop_fallback=False,
+        retrieval_chunk_max_tokens=512,
+        retrieval_tokenizer="char",
+        rag_contextual_embedding_text=False,
     )
 
 

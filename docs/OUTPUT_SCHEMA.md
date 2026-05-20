@@ -344,9 +344,16 @@ Required per JSONL record:
 - `chunk_boundary_reasons`
 - `parent_chunk_id` / `chunk_part_index` / `chunk_part_count` when a source chunk is split by token budget
 
+Optional per JSONL record:
+
+- `embedding_text`: context-prefixed text for index embedding. It may add section, caption, header, table id, or unit type context for table-like chunks.
+- `embedding_token_estimate`: token budget estimate for `embedding_text`.
+- `embedding_text_strategy`: deterministic strategy label such as `table_context_prefix`.
+
 Policy:
 
 - `text` remains extracted source text or deterministic row text, not a summary or paraphrase.
+- `embedding_text`, when present, is an index helper only. It must not replace `text` for citation or source-of-truth checks.
 - `source_refs` must be sufficient to trace a chunk back to the originating block, table row, requirement, requirement trace, technical table unit, or domain unit.
 - `source_sha256` is the lowercase SHA-256 of the input PDF and is copied into each chunk for downstream index identity checks.
 - Chunk boundary fields are deterministic diagnostics for long technical specs; token-budget splitting does not summarize or rewrite source text.

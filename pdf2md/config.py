@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
 from pdf2md.utils.page_range import parse_page_range
 
+SUPPORTED_RETRIEVAL_TOKENIZERS = ("char", "regex", "tiktoken-cl100k")
+
 
 class Config(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
@@ -28,6 +30,9 @@ class Config(BaseModel):
     dedupe_images: bool = False
     repair_hyphenation: bool = False
     figure_crop_fallback: bool = False
+    retrieval_chunk_max_tokens: int = 512
+    retrieval_tokenizer: str = "char"
+    rag_contextual_embedding_text: bool = False
     debug: bool = False
     verbose: bool = False
     skip_existing: bool = False
@@ -58,6 +63,20 @@ class Config(BaseModel):
     def _validate_page_workers(cls, value: int) -> int:
         if value < 1:
             raise ValueError("page_workers must be >= 1")
+        return value
+
+    @field_validator("retrieval_chunk_max_tokens")
+    @classmethod
+    def _validate_retrieval_chunk_max_tokens(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("retrieval_chunk_max_tokens must be >= 1")
+        return value
+
+    @field_validator("retrieval_tokenizer")
+    @classmethod
+    def _validate_retrieval_tokenizer(cls, value: str) -> str:
+        if value not in SUPPORTED_RETRIEVAL_TOKENIZERS:
+            raise ValueError(f"retrieval_tokenizer must be one of: {', '.join(SUPPORTED_RETRIEVAL_TOKENIZERS)}")
         return value
 
 

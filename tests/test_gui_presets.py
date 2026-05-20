@@ -46,6 +46,9 @@ def test_preserve_preset_is_conservative_and_keeps_document_inputs() -> None:
     assert options.remove_header_footer is False
     assert options.repair_hyphenation is False
     assert options.figure_crop_fallback is False
+    assert options.retrieval_chunk_max_tokens == 512
+    assert options.retrieval_tokenizer == "char"
+    assert options.rag_contextual_embedding_text is False
     assert options.skip_existing is True
 
 
@@ -63,6 +66,9 @@ def test_rag_optimized_preset_enables_sidecar_options_without_force_ocr() -> Non
     assert options.keep_page_markers is True
     assert options.remove_header_footer is True
     assert options.repair_hyphenation is True
+    assert options.retrieval_chunk_max_tokens == 512
+    assert options.retrieval_tokenizer == "regex"
+    assert options.rag_contextual_embedding_text is True
     assert options.force_ocr is False
     assert options.confidential_safe_mode is False
 
@@ -91,9 +97,11 @@ def test_preset_editable_fields_lock_advanced_options_headlessly() -> None:
     assert preserve_fields["verbose"] is False
     assert preserve_fields["skip_existing"] is False
     assert rag_fields["rag_table_output"] is False
+    assert rag_fields["rag_contextual_embedding_text"] is False
     assert rag_fields["remove_header_footer"] is False
     assert custom_fields["image_mode"] is True
     assert custom_fields["page_workers"] is True
+    assert custom_fields["retrieval_tokenizer"] is True
     assert custom_fields["debug"] is True
     assert custom_fields["verbose"] is True
     assert custom_fields["skip_existing"] is True

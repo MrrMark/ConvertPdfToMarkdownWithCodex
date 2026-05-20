@@ -174,3 +174,39 @@ def test_pipeline_does_not_write_rag_sidecars_by_default(sample_pdf: Path, tmp_p
     report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
     assert report["summary"]["rag_table_output"] == "none"
     assert report["summary"]["rag_table_record_count"] == 0
+
+
+def test_pipeline_can_add_contextual_embedding_text_to_table_chunks(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_tables",
+        lambda *args, **kwargs: TableExtractionResult(rag_tables=_rag_table_payload()),
+    )
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "rag-contextual-embedding"
+    result = run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=output_dir,
+            rag_contextual_embedding_text=True,
+            retrieval_tokenizer="regex",
+        )
+    )
+
+    assert result.exit_code == 0
+    chunks = [
+        json.loads(line)
+        for line in (output_dir / "retrieval_chunks_rag.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    table_chunk = next(chunk for chunk in chunks if chunk["chunk_type"] == "table_row")
+    assert table_chunk["text"] == "Field = alpha | Value = beta"
+    assert "Caption: Table 1: Example" in table_chunk["embedding_text"]
+    assert "Headers: Field | Value" in table_chunk["embedding_text"]
+    assert table_chunk["embedding_text_strategy"] == "table_context_prefix"

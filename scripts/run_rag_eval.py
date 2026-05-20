@@ -8,10 +8,19 @@ from typing import Any
 
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]+")
+TABLE_CONTEXT_CHUNK_TYPES = {"table_row", "technical_table", "domain_unit"}
+DEFAULT_CHUNK_TOKEN_TARGET = 512
 
 
 def _tokens(text: str) -> set[str]:
     return {match.group(0).lower() for match in TOKEN_PATTERN.finditer(text)}
+
+
+def _retrieval_text(chunk: dict[str, Any]) -> str:
+    embedding_text = chunk.get("embedding_text")
+    if isinstance(embedding_text, str) and embedding_text.strip():
+        return embedding_text
+    return str(chunk.get("text") or "")
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -75,7 +84,7 @@ def _coverage_for_expected_ids(
 def score_chunk(query: str, chunk: dict[str, Any]) -> float:
     """Return a deterministic local retrieval score for smoke/eval gates."""
     query_tokens = _tokens(query)
-    chunk_tokens = _tokens(str(chunk.get("text") or ""))
+    chunk_tokens = _tokens(_retrieval_text(chunk))
     if not query_tokens or not chunk_tokens:
         return 0.0
     overlap = len(query_tokens & chunk_tokens)
@@ -97,11 +106,59 @@ def retrieve(query: str, chunks: list[dict[str, Any]], *, top_k: int) -> list[di
     return [chunk | {"score": round(score, 6)} for score, _, chunk in scored[:top_k]]
 
 
+def intrinsic_chunk_metrics(
+    chunks: list[dict[str, Any]],
+    *,
+    target_tokens: int = DEFAULT_CHUNK_TOKEN_TARGET,
+) -> dict[str, Any]:
+    """Return local-only intrinsic quality metrics for retrieval chunk outputs."""
+    token_lengths = [int(chunk.get("token_estimate") or 0) for chunk in chunks]
+    token_lengths_sorted = sorted(token_lengths)
+    p95_index = int(round((len(token_lengths_sorted) - 1) * 0.95)) if token_lengths_sorted else 0
+    keyed_source_refs = [
+        str(chunk.get("source_dedupe_key") or "")
+        for chunk in chunks
+        if chunk.get("source_dedupe_key")
+    ]
+    duplicate_source_count = len(keyed_source_refs) - len(set(keyed_source_refs))
+    table_chunks = [
+        chunk for chunk in chunks if str(chunk.get("chunk_type") or "") in TABLE_CONTEXT_CHUNK_TYPES
+    ]
+    contextual_table_chunks = [
+        chunk
+        for chunk in table_chunks
+        if isinstance(chunk.get("embedding_text"), str)
+        and chunk.get("embedding_text")
+        and chunk.get("embedding_text") != chunk.get("text")
+    ]
+    source_ref_chunks = [chunk for chunk in chunks if isinstance(chunk.get("source_refs"), list) and chunk["source_refs"]]
+    return {
+        "chunk_token_max": max(token_lengths, default=0),
+        "chunk_token_p95": token_lengths_sorted[p95_index] if token_lengths_sorted else 0,
+        "chunk_size_compliance": round(
+            sum(1 for value in token_lengths if value <= target_tokens) / len(token_lengths),
+            4,
+        )
+        if token_lengths
+        else 0.0,
+        "source_ref_presence_coverage": round(len(source_ref_chunks) / len(chunks), 4) if chunks else 0.0,
+        "duplicate_source_ratio": round(duplicate_source_count / len(keyed_source_refs), 4)
+        if keyed_source_refs
+        else 0.0,
+        "table_contextual_embedding_coverage": round(len(contextual_table_chunks) / len(table_chunks), 4)
+        if table_chunks
+        else 0.0,
+        "table_contextual_embedding_count": len(contextual_table_chunks),
+        "table_contextual_embedding_total": len(table_chunks),
+    }
+
+
 def evaluate_queries(
     *,
     chunks: list[dict[str, Any]],
     queries: list[dict[str, Any]],
     top_k: int,
+    chunk_token_target: int = DEFAULT_CHUNK_TOKEN_TARGET,
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     hit_count = 0
@@ -175,9 +232,7 @@ def evaluate_queries(
         )
 
     query_count = len(queries)
-    token_lengths = [int(chunk.get("token_estimate") or 0) for chunk in chunks]
-    token_lengths_sorted = sorted(token_lengths)
-    p95_index = int(round((len(token_lengths_sorted) - 1) * 0.95)) if token_lengths_sorted else 0
+    intrinsic_metrics = intrinsic_chunk_metrics(chunks, target_tokens=chunk_token_target)
     return {
         "schema_version": "1.0",
         "top_k": top_k,
@@ -196,8 +251,7 @@ def evaluate_queries(
             "table_field_coverage": round(table_field_covered_total / table_field_expected_total, 4)
             if table_field_expected_total
             else 0.0,
-            "chunk_token_max": max(token_lengths, default=0),
-            "chunk_token_p95": token_lengths_sorted[p95_index] if token_lengths_sorted else 0,
+            **intrinsic_metrics,
         },
         "results": results,
     }
@@ -287,10 +341,14 @@ def apply_calibration_gate(
         "requirement_coverage": "min_requirement_coverage",
         "table_field_coverage": "min_table_field_coverage",
         "cross_ref_resolved_coverage": "min_cross_ref_resolved_coverage",
+        "chunk_size_compliance": "min_chunk_size_compliance",
+        "source_ref_presence_coverage": "min_source_ref_presence_coverage",
+        "table_contextual_embedding_coverage": "min_table_contextual_embedding_coverage",
     }
     max_metrics = {
         "chunk_token_p95": "max_chunk_token_p95",
         "chunk_token_max": "max_chunk_token_max",
+        "duplicate_source_ratio": "max_duplicate_source_ratio",
         "conversion_duration_ms": "max_conversion_duration_ms",
     }
     for metric, threshold_name in min_metrics.items():
@@ -328,6 +386,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", type=Path, required=True, help="pdf2md output directory.")
     parser.add_argument("--eval-set", type=Path, required=True, help="JSON eval set with queries.")
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--chunk-token-target", type=int, default=DEFAULT_CHUNK_TOKEN_TARGET)
     parser.add_argument("--report-path", type=Path, default=None)
     parser.add_argument("--calibration-profile", type=Path, help="JSON file containing profile_name and thresholds.")
     parser.add_argument("--profile-name", default=None, help="Human-readable local calibration profile name.")
@@ -339,14 +398,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-requirement-coverage", type=float)
     parser.add_argument("--min-table-field-coverage", type=float)
     parser.add_argument("--min-cross-ref-resolved-coverage", type=float)
+    parser.add_argument("--min-chunk-size-compliance", type=float)
+    parser.add_argument("--min-source-ref-presence-coverage", type=float)
+    parser.add_argument("--min-table-contextual-embedding-coverage", type=float)
     parser.add_argument("--max-chunk-token-p95", type=float)
     parser.add_argument("--max-chunk-token-max", type=float)
+    parser.add_argument("--max-duplicate-source-ratio", type=float)
     parser.add_argument("--max-conversion-duration-ms", type=float)
     args = parser.parse_args(argv)
 
     chunks = _read_jsonl(args.output_dir / "retrieval_chunks_rag.jsonl")
     queries = _load_eval_set(args.eval_set)
-    report = evaluate_queries(chunks=chunks, queries=queries, top_k=args.top_k)
+    report = evaluate_queries(
+        chunks=chunks,
+        queries=queries,
+        top_k=args.top_k,
+        chunk_token_target=args.chunk_token_target,
+    )
     report["metrics"].update(collect_output_diagnostics(args.output_dir))
     profile_name, thresholds = _profile_thresholds(args.calibration_profile)
     thresholds.update(
@@ -360,8 +428,12 @@ def main(argv: list[str] | None = None) -> int:
                 "min_requirement_coverage": args.min_requirement_coverage,
                 "min_table_field_coverage": args.min_table_field_coverage,
                 "min_cross_ref_resolved_coverage": args.min_cross_ref_resolved_coverage,
+                "min_chunk_size_compliance": args.min_chunk_size_compliance,
+                "min_source_ref_presence_coverage": args.min_source_ref_presence_coverage,
+                "min_table_contextual_embedding_coverage": args.min_table_contextual_embedding_coverage,
                 "max_chunk_token_p95": args.max_chunk_token_p95,
                 "max_chunk_token_max": args.max_chunk_token_max,
+                "max_duplicate_source_ratio": args.max_duplicate_source_ratio,
                 "max_conversion_duration_ms": args.max_conversion_duration_ms,
             }.items()
             if value is not None

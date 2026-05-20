@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from pdf2md.batch_runner import BatchConversionOptions, run_batch_conversion as run_shared_batch_conversion
-from pdf2md.config import Config, default_output_dir_for_input
+from pdf2md.config import Config, SUPPORTED_RETRIEVAL_TOKENIZERS, default_output_dir_for_input
 from pdf2md.models import (
     DomainAdapterMode,
     ImageMode,
@@ -97,6 +97,24 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Opt-in page crop fallback for captioned figures without embedded image objects.",
     )
+    parser.add_argument(
+        "--retrieval-chunk-max-tokens",
+        type=int,
+        default=512,
+        help="Maximum token budget for deterministic retrieval chunk splitting.",
+    )
+    parser.add_argument(
+        "--retrieval-tokenizer",
+        choices=SUPPORTED_RETRIEVAL_TOKENIZERS,
+        default="char",
+        help="Token counter used for retrieval chunk budget diagnostics.",
+    )
+    parser.add_argument(
+        "--rag-contextual-embedding-text",
+        action="store_true",
+        default=False,
+        help="Add optional context-prefixed embedding_text for table-like retrieval chunks without changing text.",
+    )
     marker_group = parser.add_mutually_exclusive_group()
     marker_group.add_argument("--keep-page-markers", dest="keep_page_markers", action="store_true")
     marker_group.add_argument("--no-page-markers", dest="keep_page_markers", action="store_false")
@@ -126,6 +144,9 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         dedupe_images=args.dedupe_images,
         repair_hyphenation=args.repair_hyphenation,
         figure_crop_fallback=args.figure_crop_fallback,
+        retrieval_chunk_max_tokens=args.retrieval_chunk_max_tokens,
+        retrieval_tokenizer=args.retrieval_tokenizer,
+        rag_contextual_embedding_text=args.rag_contextual_embedding_text,
         page_workers=args.page_workers,
         debug=args.debug,
         verbose=args.verbose,
@@ -149,6 +170,9 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
         dedupe_images=args.dedupe_images,
         repair_hyphenation=args.repair_hyphenation,
         figure_crop_fallback=args.figure_crop_fallback,
+        retrieval_chunk_max_tokens=args.retrieval_chunk_max_tokens,
+        retrieval_tokenizer=args.retrieval_tokenizer,
+        rag_contextual_embedding_text=args.rag_contextual_embedding_text,
         page_workers=args.page_workers,
         debug=args.debug,
         verbose=args.verbose,
