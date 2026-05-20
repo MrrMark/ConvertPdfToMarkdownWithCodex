@@ -33,6 +33,8 @@ class Config(BaseModel):
     retrieval_chunk_max_tokens: int = 512
     retrieval_tokenizer: str = "char"
     rag_contextual_embedding_text: bool = False
+    rag_merge_sibling_text_chunks: bool = False
+    rag_chunk_relationship_metadata: bool = False
     debug: bool = False
     verbose: bool = False
     skip_existing: bool = False

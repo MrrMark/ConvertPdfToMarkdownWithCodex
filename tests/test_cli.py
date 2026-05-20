@@ -41,6 +41,34 @@ def test_cli_runs_and_writes_outputs(sample_pdf: Path, tmp_path: Path) -> None:
     assert len(first_chunk["source_sha256"]) == 64
 
 
+def test_cli_rag_profile_applies_purpose_specific_option_bundle(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-profile"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--pages",
+        "1",
+        "--rag-profile",
+        "confidential_rag",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["confidential_safe_mode"] is True
+    assert manifest["options"]["rag_table_output"] == "jsonl"
+    assert manifest["options"]["retrieval_tokenizer"] == "regex"
+    assert manifest["options"]["rag_contextual_embedding_text"] is True
+    assert manifest["options"]["rag_merge_sibling_text_chunks"] is True
+    assert manifest["options"]["rag_chunk_relationship_metadata"] is True
+    assert (output_dir / "sanitized_report.json").exists()
+
+
 def test_cli_uses_default_output_dir_when_output_dir_is_omitted(sample_pdf: Path) -> None:
     default_output_dir = default_output_dir_for_input(sample_pdf)
     cmd = [

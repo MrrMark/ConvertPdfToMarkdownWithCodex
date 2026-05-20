@@ -31,6 +31,8 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-20 | RAG chunk/profile implementation | 98/100 | +1 | Q77 sibling text chunk merge, Q78 final chunk id relationship metadata, Q79 CLI/GUI purpose-specific RAG profiles를 구현했다. 기본 preserve 출력은 유지하고 opt-in/RAG optimized 경로에서 RAG ingest 효율과 downstream citation expansion 완성도를 높였다. 외부 RAG 서비스 호출 없이 local-only tests와 validators로 계약을 고정했으므로 1점 상향 |
+| 2026-05-20 | RAG chunk/profile active backlog | 97/100 | 0 | Q77-Q79 active backlog/spec 추가. Q77은 short sibling text chunk merge, Q78은 retrieval chunk relationship metadata, Q79는 purpose-specific RAG profiles를 구현 전 계약으로 정리했다. 계획 수립 단계이므로 core conversion 품질과 public schema 계약은 유지하며 점수는 보수적으로 유지 |
 | 2026-05-17 | GUI/CLI benchmark report | 97/100 | 0 | Q76. CLI/GUI Performance Benchmark Report 구현. `scripts/benchmark_gui_cli_parity.py`와 optional `gui-benchmark` release gate로 CLI/GUI headless elapsed ms, pages/sec, GUI duration ratio, output hash equality, advisory threshold policy를 기록. 변환 core output과 public schema는 유지하며 active quality backlog는 없다 |
 | 2026-05-17 | GUI metrics and page progress | 97/100 | 0 | Q75. GUI Metrics And Page Progress Contract 구현. pipeline observer-only page progress callback, GUI page percent event, summary/log의 documents/status/retry/elapsed/pages/sec metric을 추가. batch progress는 document-level percent로 유지해 단일 page progress와 분리했으며 변환 core output과 public schema는 유지 |
 | 2026-05-17 | GUI/CLI golden parity gate | 97/100 | 0 | Q74. CLI/GUI Golden Parity Gate 구현. `scripts/run_gui_cli_parity.py`와 optional `gui-parity` release gate로 CLI/GUI headless output의 Markdown, manifest, report, RAG sidecar normalized hash equality를 검증. report는 raw PDF/Markdown 본문 없이 local-only hash/status만 기록하며 변환 core 품질과 public schema는 유지 |
@@ -68,6 +70,32 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-20 (Q77-Q79 구현 후)
+
+#### 총평
+
+Q77-Q79는 RAG sidecar 운영성의 세 가지 병목을 함께 줄였다. Q77은 짧은 sibling text chunk를 token budget 안에서만 보수적으로 병합해 index record 수와 context fragmentation을 줄이고, Q78은 final chunk id 기준 relationship metadata를 추가해 citation expansion과 UI drilldown을 쉽게 만든다. Q79는 CLI `--rag-profile`과 GUI preset이 같은 local-only option matrix를 사용하게 해 technical spec ingest, confidential sharing, preserve+sidecar 흐름을 반복 가능하게 했다.
+
+기본 preserve 변환과 원문 `text` 계약은 유지한다. 새 기능은 opt-in이거나 RAG optimized/profile 경로에 묶여 있으며, 외부 RAG/embedding/indexing 호출은 추가하지 않았다.
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다.
+
+### 2026-05-20 (Q77-Q79 계획 수립)
+
+#### 총평
+
+PR #55에서 RAG optimized preset에 contextual `embedding_text`, configurable token counter, intrinsic eval metrics가 추가되면서 다음 병목은 chunk granularity, chunk relationship, purpose-specific profile로 좁혀졌다.
+
+이번 변경은 구현 완료 평가가 아니라 다음 구현 순서를 active backlog와 개발 명세로 정리한 것이다. 변환 엔진, Markdown/manifest/report 산출물, public schema 계약은 바뀌지 않으므로 점수는 97/100을 유지한다.
+
+#### 다음 개선 참조
+
+- Q77. RAG Sibling Chunk Merge
+- Q78. RAG Chunk Relationship Metadata
+- Q79. Purpose-Specific RAG Profiles
 
 ### 2026-05-17 (Q76 구현 후)
 

@@ -935,6 +935,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         max_tokens=config.retrieval_chunk_max_tokens,
         token_counter=retrieval_token_counter,
         contextual_embedding_text=config.rag_contextual_embedding_text,
+        merge_sibling_text_blocks=config.rag_merge_sibling_text_chunks,
+        relationship_metadata=config.rag_chunk_relationship_metadata,
     )
     retrieval_chunk_diagnostics = build_retrieval_chunk_diagnostics(
         retrieval_chunks,
@@ -1028,6 +1030,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             "retrieval_chunk_max_tokens": config.retrieval_chunk_max_tokens,
             "retrieval_tokenizer": config.retrieval_tokenizer,
             "rag_contextual_embedding_text": config.rag_contextual_embedding_text,
+            "rag_merge_sibling_text_chunks": config.rag_merge_sibling_text_chunks,
+            "rag_chunk_relationship_metadata": config.rag_chunk_relationship_metadata,
             "figures_rag_output": "jsonl",
             "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
             "domain_units_jsonl_filename": config.domain_units_jsonl_filename,

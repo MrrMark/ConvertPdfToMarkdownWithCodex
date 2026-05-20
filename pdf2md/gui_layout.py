@@ -23,7 +23,15 @@ GUI_LAYOUT_SECTIONS: tuple[GuiLayoutSection, ...] = (
     ),
     GuiLayoutSection(
         key="preset",
-        text_keys=("preset", "preset_preserve", "preset_rag_optimized", "preset_custom"),
+        text_keys=(
+            "preset",
+            "preset_preserve",
+            "preset_rag_optimized",
+            "preset_technical_spec_rag",
+            "preset_confidential_rag",
+            "preset_preserve_with_sidecars",
+            "preset_custom",
+        ),
         wraps_text=True,
     ),
     GuiLayoutSection(

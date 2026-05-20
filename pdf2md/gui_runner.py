@@ -102,6 +102,8 @@ class GuiConversionOptions:
     retrieval_chunk_max_tokens: int = 512
     retrieval_tokenizer: str = "char"
     rag_contextual_embedding_text: bool = False
+    rag_merge_sibling_text_chunks: bool = False
+    rag_chunk_relationship_metadata: bool = False
     page_workers: int = 1
     debug: bool = False
     verbose: bool = False
@@ -966,6 +968,8 @@ def _coerce_options(options: GuiConversionOptions) -> dict:
         "retrieval_chunk_max_tokens": options.retrieval_chunk_max_tokens,
         "retrieval_tokenizer": options.retrieval_tokenizer,
         "rag_contextual_embedding_text": options.rag_contextual_embedding_text,
+        "rag_merge_sibling_text_chunks": options.rag_merge_sibling_text_chunks,
+        "rag_chunk_relationship_metadata": options.rag_chunk_relationship_metadata,
         "page_workers": options.page_workers,
         "debug": options.debug,
         "verbose": options.verbose,
@@ -992,6 +996,8 @@ def _batch_options_from_gui(options: GuiConversionOptions) -> BatchConversionOpt
         retrieval_chunk_max_tokens=options.retrieval_chunk_max_tokens,
         retrieval_tokenizer=options.retrieval_tokenizer,
         rag_contextual_embedding_text=options.rag_contextual_embedding_text,
+        rag_merge_sibling_text_chunks=options.rag_merge_sibling_text_chunks,
+        rag_chunk_relationship_metadata=options.rag_chunk_relationship_metadata,
         page_workers=options.page_workers,
         debug=options.debug,
         verbose=options.verbose,
@@ -1019,6 +1025,8 @@ def _batch_options_from_request(request: GuiConversionRequest) -> BatchConversio
         retrieval_chunk_max_tokens=options.retrieval_chunk_max_tokens,
         retrieval_tokenizer=options.retrieval_tokenizer,
         rag_contextual_embedding_text=options.rag_contextual_embedding_text,
+        rag_merge_sibling_text_chunks=options.rag_merge_sibling_text_chunks,
+        rag_chunk_relationship_metadata=options.rag_chunk_relationship_metadata,
         page_workers=options.page_workers,
         debug=options.debug,
         verbose=options.verbose,

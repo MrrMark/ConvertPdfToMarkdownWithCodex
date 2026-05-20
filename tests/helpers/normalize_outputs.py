@@ -16,6 +16,8 @@ def normalize_manifest(payload: dict[str, Any]) -> dict[str, Any]:
             "retrieval_chunk_max_tokens",
             "retrieval_tokenizer",
             "rag_contextual_embedding_text",
+            "rag_merge_sibling_text_chunks",
+            "rag_chunk_relationship_metadata",
         ):
             options.pop(key, None)
     images = normalized.get("images", [])

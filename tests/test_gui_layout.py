@@ -37,6 +37,9 @@ def test_gui_layout_text_keys_are_known_i18n_keys() -> None:
     assert {
         "preset_preserve",
         "preset_rag_optimized",
+        "preset_technical_spec_rag",
+        "preset_confidential_rag",
+        "preset_preserve_with_sidecars",
         "expert_options",
         "page_workers",
         "previous_corpus_manifest",
@@ -55,6 +58,9 @@ def test_gui_layout_wraps_long_localized_controls() -> None:
     assert {
         "preset_preserve",
         "preset_rag_optimized",
+        "preset_technical_spec_rag",
+        "preset_confidential_rag",
+        "preset_preserve_with_sidecars",
         "preset_custom",
         "open_output_folder",
         "clear_recent",

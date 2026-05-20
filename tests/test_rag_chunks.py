@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 
 from pdf2md.serializers.rag_chunks import (
+    assign_chunk_relationships,
     build_retrieval_chunk_diagnostics,
     build_retrieval_chunks,
+    merge_sibling_text_chunks,
     optimize_retrieval_chunks,
     serialize_retrieval_chunks_jsonl,
 )
@@ -198,6 +200,263 @@ def test_retrieval_chunk_optimizer_accepts_token_counter() -> None:
         "four five six",
         "seven eight nine",
     ]
+
+
+def test_merge_sibling_text_chunks_combines_adjacent_same_section_records() -> None:
+    records = [
+        {
+            "chunk_id": "chunk-000001",
+            "chunk_index": 1,
+            "chunk_type": "text_block",
+            "text": "Alpha status.",
+            "source_refs": [{"source_type": "text_block", "source_id": "block-1", "page": 1}],
+            "page_range": [1, 1],
+            "bbox": [10.0, 20.0, 100.0, 30.0],
+            "heading_path": ["1 Status"],
+            "semantic_types": ["paragraph"],
+            "retrieval_priority": 50,
+            "section_path": "1 Status",
+            "chunk_group_id": "text-page-0001",
+            "source_record_count": 1,
+            "source_dedupe_key": "block-1",
+            "chunk_boundary_policy": "source_record",
+            "chunk_boundary_reasons": ["text_block_boundary"],
+        },
+        {
+            "chunk_id": "chunk-000002",
+            "chunk_index": 2,
+            "chunk_type": "text_block",
+            "text": "Beta status.",
+            "source_refs": [{"source_type": "text_block", "source_id": "block-2", "page": 1}],
+            "page_range": [1, 1],
+            "bbox": [12.0, 34.0, 120.0, 44.0],
+            "heading_path": ["1 Status"],
+            "semantic_types": ["paragraph"],
+            "retrieval_priority": 50,
+            "section_path": "1 Status",
+            "chunk_group_id": "text-page-0001",
+            "source_record_count": 1,
+            "source_dedupe_key": "block-2",
+            "chunk_boundary_policy": "source_record",
+            "chunk_boundary_reasons": ["text_block_boundary"],
+        },
+        {
+            "chunk_id": "chunk-000003",
+            "chunk_index": 3,
+            "chunk_type": "requirement",
+            "text": "The controller shall return SUCCESS.",
+            "source_refs": [{"source_type": "requirement", "source_id": "req-1", "page": 1}],
+            "page_range": [1, 1],
+            "heading_path": ["1 Status"],
+            "semantic_types": ["requirement"],
+            "retrieval_priority": 100,
+            "section_path": "1 Status",
+            "chunk_group_id": "requirement-page-0001",
+            "source_record_count": 1,
+            "source_dedupe_key": "req-1",
+            "chunk_boundary_policy": "source_record",
+            "chunk_boundary_reasons": ["requirement_boundary"],
+        },
+    ]
+
+    merged = merge_sibling_text_chunks(records, max_tokens=6, token_counter=lambda text: len(text.split()))
+
+    assert [record["chunk_id"] for record in merged] == ["chunk-000001", "chunk-000002"]
+    assert merged[0]["text"] == "Alpha status.\n\nBeta status."
+    assert merged[0]["source_record_count"] == 2
+    assert [ref["source_id"] for ref in merged[0]["source_refs"]] == ["block-1", "block-2"]
+    assert merged[0]["bbox"] == [10.0, 20.0, 120.0, 44.0]
+    assert merged[0]["source_dedupe_key"] == "block-1|block-2"
+    assert merged[0]["chunk_boundary_policy"] == "merged_sibling_text_blocks"
+    assert "sibling_text_merge" in merged[0]["chunk_boundary_reasons"]
+    assert merged[0]["merged_source_chunk_ids"] == ["chunk-000001", "chunk-000002"]
+    assert merged[0]["merged_source_chunk_count"] == 2
+    assert merged[0]["merge_strategy"] == "adjacent_text_block_same_section_token_budget"
+    assert merged[1]["chunk_type"] == "requirement"
+
+
+def test_build_retrieval_chunks_merges_only_budget_safe_sibling_text_blocks() -> None:
+    text_blocks = [
+        {
+            "block_id": "page-0001-block-0001",
+            "page": 1,
+            "block_index": 1,
+            "block_type": "paragraph",
+            "text": "Alpha status.",
+            "bbox": [10.0, 20.0, 100.0, 30.0],
+            "heading_path": ["1 Status"],
+        },
+        {
+            "block_id": "page-0001-block-0002",
+            "page": 1,
+            "block_index": 2,
+            "block_type": "paragraph",
+            "text": "Beta status.",
+            "bbox": [12.0, 34.0, 120.0, 44.0],
+            "heading_path": ["1 Status"],
+        },
+        {
+            "block_id": "page-0001-block-0003",
+            "page": 1,
+            "block_index": 3,
+            "block_type": "paragraph",
+            "text": "Gamma status.",
+            "bbox": [12.0, 50.0, 120.0, 60.0],
+            "heading_path": ["2 Other"],
+        },
+    ]
+    requirement = {
+        "semantic_id": "page-0001-sem-0001",
+        "semantic_index": 1,
+        "semantic_type": "requirement",
+        "text": "The controller shall return SUCCESS.",
+        "source_refs": [{"source_type": "text_block", "source_id": "page-0001-block-0001", "page": 1}],
+        "page_range": [1, 1],
+        "heading_path": ["1 Status"],
+        "normative_strength": "required",
+    }
+    rag_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "row_text": "Field = Status | Description = Current status",
+                    "bbox": [72.0, 120.0, 420.0, 150.0],
+                }
+            ],
+        }
+    ]
+
+    chunks = build_retrieval_chunks(
+        text_block_records=text_blocks,
+        semantic_units=[requirement],
+        requirements=[requirement],
+        rag_tables=rag_tables,
+        max_tokens=10,
+        token_counter=lambda text: len(text.split()),
+        merge_sibling_text_blocks=True,
+    )
+
+    assert [chunk["chunk_type"] for chunk in chunks] == ["text_block", "text_block", "requirement", "table_row"]
+    assert chunks[0]["text"] == "Alpha status.\n\nBeta status."
+    assert chunks[0]["source_record_count"] == 2
+    assert chunks[0]["token_estimate"] == 4
+    assert chunks[1]["text"] == "Gamma status."
+    assert chunks[2]["chunk_boundary_policy"] == "source_record"
+    assert chunks[3]["chunk_boundary_policy"] == "source_record"
+
+
+def test_build_retrieval_chunks_does_not_merge_text_blocks_over_budget() -> None:
+    text_blocks = [
+        {
+            "block_id": "page-0001-block-0001",
+            "page": 1,
+            "block_index": 1,
+            "block_type": "paragraph",
+            "text": "Alpha status.",
+            "heading_path": ["1 Status"],
+        },
+        {
+            "block_id": "page-0001-block-0002",
+            "page": 1,
+            "block_index": 2,
+            "block_type": "paragraph",
+            "text": "Beta status.",
+            "heading_path": ["1 Status"],
+        },
+    ]
+
+    chunks = build_retrieval_chunks(
+        text_block_records=text_blocks,
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        max_tokens=3,
+        token_counter=lambda text: len(text.split()),
+        merge_sibling_text_blocks=True,
+    )
+
+    assert [chunk["text"] for chunk in chunks] == ["Alpha status.", "Beta status."]
+    assert all(chunk["chunk_boundary_policy"] == "source_record" for chunk in chunks)
+
+
+def test_assign_chunk_relationships_adds_group_neighbors_and_section_anchor() -> None:
+    chunks = [
+        {
+            "chunk_id": "chunk-000001",
+            "chunk_index": 1,
+            "chunk_type": "text_block",
+            "text": "Alpha status.",
+            "chunk_group_id": "text-page-0001",
+            "section_path": "1 Status",
+        },
+        {
+            "chunk_id": "chunk-000002",
+            "chunk_index": 2,
+            "chunk_type": "text_block",
+            "text": "Beta status.",
+            "chunk_group_id": "text-page-0001",
+            "section_path": "1 Status",
+        },
+        {
+            "chunk_id": "chunk-000003",
+            "chunk_index": 3,
+            "chunk_type": "requirement",
+            "text": "The controller shall return SUCCESS.",
+            "chunk_group_id": "requirement-page-0001",
+            "section_path": "1 Status",
+        },
+    ]
+
+    related = assign_chunk_relationships(chunks)
+
+    assert related[0]["next_chunk_id"] == "chunk-000002"
+    assert "previous_chunk_id" not in related[0]
+    assert related[0]["relationship_strategy"] == "chunk_group_prev_next_section_anchor"
+    assert related[1]["previous_chunk_id"] == "chunk-000001"
+    assert related[1]["section_anchor_chunk_id"] == "chunk-000001"
+    assert related[1]["related_chunk_ids"] == ["chunk-000001"]
+    assert related[2]["section_anchor_chunk_id"] == "chunk-000001"
+    assert related[2]["related_chunk_ids"] == ["chunk-000001"]
+    assert "previous_chunk_id" not in chunks[1]
+
+
+def test_build_retrieval_chunks_can_add_relationship_metadata_after_optimization() -> None:
+    text_blocks = [
+        {
+            "block_id": "page-0001-block-0001",
+            "page": 1,
+            "block_index": 1,
+            "block_type": "paragraph",
+            "text": "Alpha status.",
+            "heading_path": ["1 Status"],
+        },
+        {
+            "block_id": "page-0001-block-0002",
+            "page": 1,
+            "block_index": 2,
+            "block_type": "paragraph",
+            "text": "Beta status.",
+            "heading_path": ["1 Status"],
+        },
+    ]
+
+    chunks = build_retrieval_chunks(
+        text_block_records=text_blocks,
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        relationship_metadata=True,
+    )
+
+    assert chunks[0]["next_chunk_id"] == "chunk-000002"
+    assert chunks[1]["previous_chunk_id"] == "chunk-000001"
+    assert chunks[1]["section_anchor_chunk_id"] == "chunk-000001"
+    assert chunks[0]["relationship_strategy"] == "chunk_group_prev_next_section_anchor"
 
 
 def test_contextual_embedding_text_keeps_table_row_text_as_source_of_truth() -> None:
