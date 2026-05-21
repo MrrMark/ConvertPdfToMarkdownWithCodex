@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pdf2md.pipeline as pipeline_module
+from fixtures.pdf_builder import build_image_only_pdf
 from pdf2md.config import Config
 from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrMetrics, OcrResult
@@ -234,6 +235,111 @@ def test_pipeline_records_ocr_page_diagnostics(sample_pdf: Path, tmp_path: Path,
     assert page_result["ocr_runtime_available"] is True
 
 
+def test_pipeline_routes_image_only_scanned_pdf_through_ocr_without_correction(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pdf_path = tmp_path / "image-only.pdf"
+    build_image_only_pdf(pdf_path)
+
+    def fake_run_ocr(pdf_path_arg, selected_pages, existing_page_texts, force_ocr, ocr_lang) -> OcrResult:  # noqa: ANN001
+        assert pdf_path_arg == pdf_path
+        assert selected_pages == [1]
+        assert existing_page_texts == {1: ""}
+        assert force_ocr is False
+        assert ocr_lang == "eng"
+        return OcrResult(
+            warnings=[
+                WarningEntry(
+                    code="OCR_CONFIDENCE_WARN",
+                    message="warn",
+                    page=1,
+                    details={
+                        "ocr_lang": "eng",
+                        "ocr_confidence_mean": 72.0,
+                        "ocr_confidence_median": 72.0,
+                        "low_conf_token_ratio": 0.0,
+                    },
+                )
+            ],
+            page_texts={1: "teh SOURCE scann txt"},
+            ocr_pages=[1],
+            attempted_pages=[1],
+            reasons_by_page={1: "empty_text_layer"},
+            used_ocr=True,
+            runtime_available=True,
+            metrics_by_page={1: OcrMetrics(mean=72.0, median=72.0, low_conf_token_ratio=0.0)},
+        )
+
+    monkeypatch.setattr(pipeline_module, "run_ocr", fake_run_ocr)
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+
+    output_dir = tmp_path / "scanned-ocr"
+    result = run_conversion(Config(input_pdf=pdf_path, output_dir=output_dir, pages="1"))
+
+    assert result.exit_code == EXIT_PARTIAL
+    document = (output_dir / "document.md").read_text(encoding="utf-8")
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    page_result = report["page_results"][0]
+    assert "teh SOURCE scann txt" in document
+    assert page_result["text_layer_char_count"] == 0
+    assert page_result["ocr_attempted"] is True
+    assert page_result["ocr_reason"] == "empty_text_layer"
+    assert page_result["ocr_runtime_available"] is True
+    assert page_result["used_ocr"] is True
+    assert page_result["ocr_confidence_mean"] == 72.0
+    assert report["summary"]["low_confidence_pages"] == [1]
+    assert manifest["ocr_pages"] == [1]
+
+
+def test_pipeline_records_empty_ocr_confidence_metrics_in_report(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def fake_run_ocr(*args, **kwargs) -> OcrResult:  # noqa: ANN001
+        return OcrResult(
+            warnings=[
+                WarningEntry(
+                    code="OCR_EMPTY_RESULT",
+                    message="empty",
+                    page=1,
+                    details={
+                        "ocr_lang": "eng",
+                        "reason": "empty_result",
+                        "ocr_confidence_mean": 0.0,
+                        "ocr_confidence_median": 0.0,
+                        "low_conf_token_ratio": 1.0,
+                    },
+                )
+            ],
+            attempted_pages=[1],
+            reasons_by_page={1: "force"},
+            runtime_available=True,
+            metrics_by_page={1: OcrMetrics(mean=0.0, median=0.0, low_conf_token_ratio=1.0)},
+        )
+
+    monkeypatch.setattr(pipeline_module, "run_ocr", fake_run_ocr)
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+
+    output_dir = tmp_path / "empty-ocr"
+    result = run_conversion(Config(input_pdf=sample_pdf, output_dir=output_dir, pages="1", force_ocr=True))
+
+    assert result.exit_code == EXIT_PARTIAL
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    page_result = report["page_results"][0]
+    assert page_result["used_ocr"] is False
+    assert page_result["ocr_attempted"] is True
+    assert page_result["ocr_confidence_mean"] == 0.0
+    assert page_result["ocr_confidence_median"] == 0.0
+    assert page_result["low_conf_token_ratio"] == 1.0
+    assert report["summary"]["low_confidence_pages"] == [1]
+    assert report["warnings"][0]["details"]["reason"] == "empty_result"
+
+
 def test_pipeline_records_ocr_confidence_matrix_in_report(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
     def fake_run_ocr(*args, **kwargs) -> OcrResult:  # noqa: ANN001
         return OcrResult(
@@ -245,7 +351,7 @@ def test_pipeline_records_ocr_confidence_matrix_in_report(sample_pdf: Path, tmp_
                     details={
                         "ocr_confidence_mean": 72.0,
                         "ocr_confidence_median": 73.0,
-                        "low_conf_token_ratio": 0.3,
+                        "low_conf_token_ratio": 0.0,
                     },
                 )
             ],
@@ -255,7 +361,7 @@ def test_pipeline_records_ocr_confidence_matrix_in_report(sample_pdf: Path, tmp_
             reasons_by_page={1: "force"},
             used_ocr=True,
             runtime_available=True,
-            metrics_by_page={1: OcrMetrics(mean=72.0, median=73.0, low_conf_token_ratio=0.3)},
+            metrics_by_page={1: OcrMetrics(mean=72.0, median=73.0, low_conf_token_ratio=0.0)},
         )
 
     monkeypatch.setattr(pipeline_module, "run_ocr", fake_run_ocr)
@@ -273,12 +379,12 @@ def test_pipeline_records_ocr_confidence_matrix_in_report(sample_pdf: Path, tmp_
     assert page_result["used_ocr"] is True
     assert page_result["ocr_confidence_mean"] == 72.0
     assert page_result["ocr_confidence_median"] == 73.0
-    assert page_result["low_conf_token_ratio"] == 0.3
+    assert page_result["low_conf_token_ratio"] == 0.0
     assert report["summary"]["ocr_confidence_by_page"] == {
         "1": {
             "ocr_confidence_mean": 72.0,
             "ocr_confidence_median": 73.0,
-            "low_conf_token_ratio": 0.3,
+            "low_conf_token_ratio": 0.0,
         }
     }
     assert report["summary"]["low_confidence_pages"] == [1]

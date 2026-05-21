@@ -518,6 +518,7 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - `page_results[].column_count_estimate`
 - `page_results[].text_layer_char_count`
 - `page_results[].ocr_attempted`, `ocr_reason`, `ocr_runtime_available`
+- OCR warning `details.reason`, `ocr_lang`, confidence metrics
 - `page_results[].header_footer_suppressed_count`
 - `summary.page_status_counts`
 - `summary.table_fallback_count`

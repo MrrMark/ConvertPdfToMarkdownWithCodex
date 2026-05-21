@@ -11,7 +11,11 @@ from pdf2md.config import Config
 from pdf2md.constants import WarningCode
 from pdf2md.extractors.header_footer import remove_repeated_header_footer
 from pdf2md.extractors.images import extract_images
-from pdf2md.extractors.ocr import run_ocr
+from pdf2md.extractors.ocr import (
+    OCR_LOW_CONFIDENCE_MEAN_THRESHOLD,
+    OCR_LOW_CONFIDENCE_TOKEN_RATIO_THRESHOLD,
+    run_ocr,
+)
 from pdf2md.extractors.page_worker import PageWorkerInput
 from pdf2md.extractors.structure_normalizer import BlockRegion, normalize_page_lines
 from pdf2md.extractors.tables import PageTableCandidateResult, extract_tables
@@ -648,6 +652,11 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             page_results_map[page].ocr_attempted = True
             page_results_map[page].ocr_reason = ocr_result.reasons_by_page.get(page)
             page_results_map[page].ocr_runtime_available = ocr_result.runtime_available
+            metrics = ocr_result.metrics_by_page.get(page)
+            if metrics:
+                page_results_map[page].ocr_confidence_mean = metrics.mean
+                page_results_map[page].ocr_confidence_median = metrics.median
+                page_results_map[page].low_conf_token_ratio = metrics.low_conf_token_ratio
     for page, text in ocr_result.page_texts.items():
         lines = [line.rstrip() for line in text.splitlines() if line.strip()]
         page_layout_lines[page] = [
@@ -1063,7 +1072,10 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             "ocr_confidence_median": float(page_result.ocr_confidence_median or 0.0),
             "low_conf_token_ratio": float(page_result.low_conf_token_ratio or 0.0),
         }
-        if (page_result.low_conf_token_ratio or 0.0) > 0.25:
+        if (
+            (page_result.ocr_confidence_mean or 100.0) < OCR_LOW_CONFIDENCE_MEAN_THRESHOLD
+            or (page_result.low_conf_token_ratio or 0.0) > OCR_LOW_CONFIDENCE_TOKEN_RATIO_THRESHOLD
+        ):
             low_conf_pages.append(page_result.page)
 
     status, exit_code = determine_conversion_status(warnings, failed_pages)

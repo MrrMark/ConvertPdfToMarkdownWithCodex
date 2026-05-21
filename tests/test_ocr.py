@@ -112,8 +112,11 @@ def test_run_ocr_reports_empty_result_with_confidence_metrics(sample_pdf, monkey
 
     assert result.used_ocr is False
     assert result.page_texts == {}
+    assert result.metrics_by_page[1] == ocr_module.OcrMetrics(mean=0.0, median=0.0, low_conf_token_ratio=1.0)
     assert result.warnings[0].code == "OCR_EMPTY_RESULT"
     assert result.warnings[0].details == {
+        "ocr_lang": "eng",
+        "reason": "empty_result",
         "ocr_confidence_mean": 0.0,
         "ocr_confidence_median": 0.0,
         "low_conf_token_ratio": 1.0,
@@ -138,6 +141,27 @@ def test_run_ocr_reports_missing_language_data_as_runtime_diagnostic(sample_pdf,
     assert result.warnings[0].details == {"ocr_lang": "kor+eng", "reason": "language_data_missing"}
 
 
+def test_run_ocr_reports_missing_tesseract_executable_with_attempt_context(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
+    _patch_ocr_runtime(
+        monkeypatch,
+        image_to_string=lambda image, lang: "unused",  # noqa: ARG005
+        image_to_data=lambda image, lang, output_type: {},  # noqa: ARG005
+    )
+    monkeypatch.setattr(ocr_module, "_resolve_tesseract_cmd", lambda: None)
+
+    result = run_ocr(sample_pdf, [1], {1: ""}, force_ocr=False, ocr_lang="kor+eng")
+
+    assert result.used_ocr is False
+    assert result.runtime_available is False
+    assert result.attempted_pages == [1]
+    assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
+    assert result.warnings[0].details == {
+        "ocr_lang": "kor+eng",
+        "reason": "tesseract_unavailable",
+        "attempted_pages": [1],
+    }
+
+
 def test_run_ocr_runtime_unavailable_records_attempt_without_text(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
     monkeypatch.setattr(ocr_module, "pytesseract", None)
     monkeypatch.setattr(ocr_module, "pdfium", None)
@@ -148,3 +172,8 @@ def test_run_ocr_runtime_unavailable_records_attempt_without_text(sample_pdf, mo
     assert result.runtime_available is False
     assert result.attempted_pages == [1]
     assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
+    assert result.warnings[0].details == {
+        "ocr_lang": "eng",
+        "reason": "dependency_unavailable",
+        "attempted_pages": [1],
+    }
