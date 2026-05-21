@@ -403,6 +403,106 @@ def test_structure_marker_ocr_uses_data_for_text_and_confidence(monkeypatch) -> 
     assert calls == {"data": 4, "string": 0}
 
 
+def test_structure_marker_ocr_stops_early_for_confident_child_context(monkeypatch) -> None:
+    calls = {"data": 0}
+
+    class _FakeOutput:
+        DICT = "dict"
+
+    def fake_image_to_data(image, *, config: str, output_type: str) -> dict:
+        calls["data"] += 1
+        assert output_type == _FakeOutput.DICT
+        assert "--psm 7" in config
+        return {"text": ["2", ".", "2", ".", "1"], "conf": ["95", "91", "93"]}
+
+    fake_tesseract = SimpleNamespace(Output=_FakeOutput, image_to_data=fake_image_to_data)
+    monkeypatch.setitem(sys.modules, "pytesseract", fake_tesseract)
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_SCALES", (1,))
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_PSMS", (7, 8, 13))
+
+    candidates = _collect_structure_marker_candidates(
+        _png_bytes(),
+        parent_heading_index="2.2",
+        child_heading_index="2.2.1.1",
+    )
+
+    assert candidates == [StructureOcrCandidate(text="2.2.1", confidence=93.0, votes=1)]
+    assert calls["data"] == 1
+
+
+def test_structure_marker_ocr_reuses_variant_psm_cache(monkeypatch) -> None:
+    calls = {"data": 0}
+
+    class _FakeOutput:
+        DICT = "dict"
+
+    def fake_image_to_data(image, *, config: str, output_type: str) -> dict:
+        calls["data"] += 1
+        assert output_type == _FakeOutput.DICT
+        assert "--psm 7" in config
+        return {"text": ["3", ".", "1", ".", "4"], "conf": ["80", "84"]}
+
+    fake_tesseract = SimpleNamespace(Output=_FakeOutput, image_to_data=fake_image_to_data)
+    monkeypatch.setitem(sys.modules, "pytesseract", fake_tesseract)
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_SCALES", (1,))
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_PSMS", (7,))
+
+    ocr_cache = {}
+    first = _collect_structure_marker_candidates(_png_bytes(), ocr_cache=ocr_cache)
+    second = _collect_structure_marker_candidates(_png_bytes(), ocr_cache=ocr_cache)
+
+    assert first == [StructureOcrCandidate(text="3.1.4", confidence=82.0, votes=4)]
+    assert second == first
+    assert calls["data"] == 4
+
+
+def test_structure_marker_ocr_stops_after_stable_exact_candidate(monkeypatch) -> None:
+    calls = {"data": 0}
+
+    class _FakeOutput:
+        DICT = "dict"
+
+    def fake_image_to_data(image, *, config: str, output_type: str) -> dict:
+        calls["data"] += 1
+        assert output_type == _FakeOutput.DICT
+        return {"text": ["4", ".", "1", ".", "6"], "conf": ["88", "92"]}
+
+    fake_tesseract = SimpleNamespace(Output=_FakeOutput, image_to_data=fake_image_to_data)
+    monkeypatch.setitem(sys.modules, "pytesseract", fake_tesseract)
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_SCALES", (1, 2))
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_PSMS", (7, 8))
+
+    candidates = _collect_structure_marker_candidates(_png_bytes())
+
+    assert candidates == [StructureOcrCandidate(text="4.1.6", confidence=90.0, votes=12)]
+    assert calls["data"] == 12
+
+
+def test_structure_marker_ocr_does_not_stop_early_for_ambiguous_candidates(monkeypatch) -> None:
+    calls = {"data": 0}
+
+    class _FakeOutput:
+        DICT = "dict"
+
+    def fake_image_to_data(image, *, config: str, output_type: str) -> dict:
+        calls["data"] += 1
+        text = ["2", ".", "2", ".", "1"] if calls["data"] % 2 else ["2", ".", "2", ".", "2"]
+        return {"text": text, "conf": ["90", "94"]}
+
+    fake_tesseract = SimpleNamespace(Output=_FakeOutput, image_to_data=fake_image_to_data)
+    monkeypatch.setitem(sys.modules, "pytesseract", fake_tesseract)
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_SCALES", (1, 2))
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_PSMS", (7, 8))
+
+    candidates = _collect_structure_marker_candidates(_png_bytes())
+
+    assert candidates == [
+        StructureOcrCandidate(text="2.2.1", confidence=92.0, votes=8),
+        StructureOcrCandidate(text="2.2.2", confidence=92.0, votes=8),
+    ]
+    assert calls["data"] == 16
+
+
 def test_extract_images_suppresses_structure_marker_and_recovers_text(monkeypatch, sample_pdf: Path, tmp_path: Path) -> None:
     fake_page = _FakePdfPlumberPage(
         images=[{"top": 260.0, "bottom": 268.0, "x0": 72.0, "x1": 92.0, "width": 20, "height": 7}],
@@ -417,7 +517,7 @@ def test_extract_images_suppresses_structure_marker_and_recovers_text(monkeypatc
     )
     monkeypatch.setattr(
         "pdf2md.extractors.images._collect_structure_marker_candidates",
-        lambda data: [StructureOcrCandidate(text="2.2.1", confidence=98.0, votes=4)],
+        lambda data, **kwargs: [StructureOcrCandidate(text="2.2.1", confidence=98.0, votes=4)],
     )
 
     result = extract_images(
@@ -454,7 +554,7 @@ def test_extract_images_suppresses_structure_marker_without_hallucinating(monkey
     )
     monkeypatch.setattr(
         "pdf2md.extractors.images._collect_structure_marker_candidates",
-        lambda data: [],
+        lambda data, **kwargs: [],
     )
 
     result = extract_images(

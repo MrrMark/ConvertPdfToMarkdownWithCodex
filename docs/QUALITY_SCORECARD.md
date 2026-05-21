@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-22 | Q81 structure marker OCR cache/early stop | 99/100 | 0 | 실제 NVMe Key Value Command Set PDF에서 `document.md`와 `retrieval_chunks_rag.jsonl` SHA-256 동일성을 유지하면서 `image_extraction`을 75.99s에서 24.92s로 줄이고 `pages/sec=0.8951`을 기록했다. structure marker recovered 20/suppressed 0과 retrieval chunk 662개는 유지됐다. 남은 100점 후보는 Q82-Q83 |
 | 2026-05-21 | Real corpus RAG/release validation + Q80 | 99/100 | +1 | 실제 local NVMe Key Value Command Set PDF로 corpus eval, `technical_spec_rag`+`nvme` RAG eval, RAG/core release gates를 수행했다. Q80으로 구조 마커 OCR 중복 Tesseract 호출을 제거해 동일 `document.md`/`retrieval_chunks_rag.jsonl` 기준 profile 변환 duration을 148.6s에서 73.4s로 줄였고, excluded figure provenance warning 26건을 0건으로 줄였다. RAG expected source/table/requirement coverage는 1.0으로 통과. 남은 100점 후보는 Q81-Q83 |
 | 2026-05-20 | RAG chunk/profile implementation | 98/100 | +1 | Q77 sibling text chunk merge, Q78 final chunk id relationship metadata, Q79 CLI/GUI purpose-specific RAG profiles를 구현했다. 기본 preserve 출력은 유지하고 opt-in/RAG optimized 경로에서 RAG ingest 효율과 downstream citation expansion 완성도를 높였다. 외부 RAG 서비스 호출 없이 local-only tests와 validators로 계약을 고정했으므로 1점 상향 |
 | 2026-05-20 | RAG chunk/profile active backlog | 97/100 | 0 | Q77-Q79 active backlog/spec 추가. Q77은 short sibling text chunk merge, Q78은 retrieval chunk relationship metadata, Q79는 purpose-specific RAG profiles를 구현 전 계약으로 정리했다. 계획 수립 단계이므로 core conversion 품질과 public schema 계약은 유지하며 점수는 보수적으로 유지 |
@@ -71,6 +72,19 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-22 (Q81 구현 후)
+
+#### 총평
+
+Q81은 Q80 이후 남은 `image_extraction` 병목을 구조 마커 OCR 후보 수집 단계에서 줄인 작업이다. child heading context가 section marker를 강하게 예측하는 경우 high-confidence 후보에서 즉시 중단하고, 동일 image hash/variant/PSM 조합은 실행 내 cache로 재사용한다. 또한 일정 관측 후 exact/context-normalized marker가 안정적으로 수렴하면 남은 scale/PSM을 생략하되, ambiguous 후보는 끝까지 수집한다.
+
+실제 NVMe `technical_spec_rag --domain-adapter nvme` 변환에서 `document.md`와 `retrieval_chunks_rag.jsonl` SHA-256은 `main` baseline과 동일했다. `image_extraction`은 75.99s에서 24.92s로 줄었고 `pages/sec`는 0.3166에서 0.8951로 개선됐다. structure marker recovered 20/suppressed 0과 retrieval chunk 662개도 유지됐다.
+
+#### 다음 개선 참조
+
+- Q82. Expected Table Fallback Severity Taxonomy
+- Q83. Real Corpus Cross Reference Precision
 
 ### 2026-05-21 (Q80 구현 후)
 
