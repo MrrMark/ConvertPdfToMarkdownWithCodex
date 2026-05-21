@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-22 | Q82 expected table fallback taxonomy | 99/100 | 0 | 복잡 표 HTML fallback을 advisory/expected fallback으로 분리해 실제 NVMe corpus가 `warning_count=39`를 보존하면서도 `status=success`, `partial_success=false`, `actionable_warning_count=0`, `table_expected_fallback_count=39`, `table_low_quality_count=0`로 release gate `--max-partial-rate 0.0`을 통과했다. 남은 100점 후보는 Q83 |
 | 2026-05-22 | Q81 structure marker OCR cache/early stop | 99/100 | 0 | 실제 NVMe Key Value Command Set PDF에서 `document.md`와 `retrieval_chunks_rag.jsonl` SHA-256 동일성을 유지하면서 `image_extraction`을 75.99s에서 24.92s로 줄이고 `pages/sec=0.8951`을 기록했다. structure marker recovered 20/suppressed 0과 retrieval chunk 662개는 유지됐다. 남은 100점 후보는 Q82-Q83 |
 | 2026-05-21 | Real corpus RAG/release validation + Q80 | 99/100 | +1 | 실제 local NVMe Key Value Command Set PDF로 corpus eval, `technical_spec_rag`+`nvme` RAG eval, RAG/core release gates를 수행했다. Q80으로 구조 마커 OCR 중복 Tesseract 호출을 제거해 동일 `document.md`/`retrieval_chunks_rag.jsonl` 기준 profile 변환 duration을 148.6s에서 73.4s로 줄였고, excluded figure provenance warning 26건을 0건으로 줄였다. RAG expected source/table/requirement coverage는 1.0으로 통과. 남은 100점 후보는 Q81-Q83 |
 | 2026-05-20 | RAG chunk/profile implementation | 98/100 | +1 | Q77 sibling text chunk merge, Q78 final chunk id relationship metadata, Q79 CLI/GUI purpose-specific RAG profiles를 구현했다. 기본 preserve 출력은 유지하고 opt-in/RAG optimized 경로에서 RAG ingest 효율과 downstream citation expansion 완성도를 높였다. 외부 RAG 서비스 호출 없이 local-only tests와 validators로 계약을 고정했으므로 1점 상향 |
@@ -72,6 +73,18 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-22 (Q82 구현 후)
+
+#### 총평
+
+Q82는 real corpus gate에서 expected fallback과 actionable failure를 분리한 작업이다. 복잡 표 HTML fallback은 여전히 `report.warnings[]`, `table_fallbacks`, `table_fallback_reason_counts`에 남기지만, `TABLE_COMPLEXITY_HTML_FALLBACK`만 있는 경우 document/page status를 `success`로 유지한다. 대신 `actionable_warning_count`, `advisory_warning_count`, `table_expected_fallback_count`, `table_actionable_fallback_count`를 public report summary에 추가해 release gate가 어느 신호를 보고 있는지 분리했다.
+
+실제 NVMe corpus에서는 39건의 expected fallback이 유지됐고 `table_low_quality_count=0`, `actionable_warning_count=0`으로 확인됐다. `document.md`와 `retrieval_chunks_rag.jsonl`은 Q81 출력과 동일했고, corpus release gate는 `--max-partial-rate 0.0`, `--max-low-quality-table-rate 0.0`, `--corpus-min-pages-per-second 0.7` 기준으로 통과했다.
+
+#### 다음 개선 참조
+
+- Q83. Real Corpus Cross Reference Precision
 
 ### 2026-05-22 (Q81 구현 후)
 

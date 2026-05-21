@@ -23,25 +23,6 @@
 
 ## 현재 Active Development Specs
 
-### Q82. Expected Table Fallback Severity Taxonomy
-
-#### 목표
-
-의도된 HTML fallback warning과 실제 변환 실패를 분리해 real corpus gate의 partial success 신호를 더 유용하게 만든다.
-
-#### 구현 방향
-
-- `TABLE_COMPLEXITY_HTML_FALLBACK`을 expected/advisory fallback으로 분류할 수 있는 summary field 또는 status policy를 검토한다.
-- `table_low_quality_count`, extraction failure, unresolved table count는 계속 actionable signal로 유지한다.
-- Markdown warning comment와 report diagnostics는 삭제하지 않는다.
-- public schema 변경이 필요하면 `docs/OUTPUT_SCHEMA.md`와 schema export를 함께 갱신한다.
-
-#### 검증
-
-- 기존 golden table fallback output 유지
-- partial success 판정 테스트 보강
-- corpus eval에서 expected fallback이 gate threshold를 왜곡하지 않는지 확인
-
 ### Q83. Real Corpus Cross Reference Precision
 
 #### 목표
@@ -62,4 +43,4 @@ NVMe real corpus에서 unresolved cross-ref false positive를 줄이고 RAG cita
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q81 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q82 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

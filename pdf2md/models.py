@@ -110,6 +110,8 @@ class PageResult(BaseModel):
 class ReportSummary(BaseModel):
     processed_pages: int = 0
     warning_count: int = 0
+    actionable_warning_count: int = 0
+    advisory_warning_count: int = 0
     failed_page_count: int = 0
     partial_success: bool = False
     ocr_confidence_by_page: dict[str, dict[str, float]] = Field(default_factory=dict)
@@ -154,6 +156,9 @@ class ReportSummary(BaseModel):
     rag_table_record_count: int = 0
     rag_table_file_count: int = 0
     table_fallback_reason_counts: dict[str, int] = Field(default_factory=dict)
+    table_expected_fallback_count: int = 0
+    table_expected_fallback_reason_counts: dict[str, int] = Field(default_factory=dict)
+    table_actionable_fallback_count: int = 0
     table_low_quality_count: int = 0
     table_caption_linked_count: int = 0
     page_cache_hits: int = 0

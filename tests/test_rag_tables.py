@@ -141,11 +141,16 @@ def test_pipeline_writes_selected_rag_sidecar_outputs(
         assert len(records) == 1
     report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert report["status"] == "partial_success"
+    assert report["summary"]["actionable_warning_count"] == 0
+    assert report["summary"]["advisory_warning_count"] == 1
     assert manifest["options"]["rag_table_output"] == mode.value
     assert report["summary"]["rag_table_output"] == mode.value
     assert report["summary"]["rag_table_record_count"] == 1
     assert report["summary"]["rag_table_file_count"] == file_count
     assert report["summary"]["table_fallback_reason_counts"] == {"AMBIGUOUS_GRID": 1}
+    assert report["summary"]["table_expected_fallback_count"] == 1
+    assert report["summary"]["table_actionable_fallback_count"] == 0
     assert report["summary"]["table_low_quality_count"] == 1
     assert report["summary"]["table_caption_linked_count"] == 1
     assert report["summary"]["semantic_unit_file_count"] == 1

@@ -254,15 +254,22 @@ def _count_table_fallback_reasons(table_fallbacks: list[dict]) -> dict[str, int]
 
 
 def _count_low_quality_tables(table_quality: list[dict]) -> int:
-    count = 0
+    return len(_low_quality_table_pages(table_quality, unique=False))
+
+
+def _low_quality_table_pages(table_quality: list[dict], *, unique: bool = True) -> list[int]:
+    pages: list[int] = []
     for item in table_quality:
         try:
             score = float(item.get("quality_score", 1.0))
         except (TypeError, ValueError):
             continue
         if score < LOW_TABLE_QUALITY_THRESHOLD:
-            count += 1
-    return count
+            try:
+                pages.append(int(item.get("page")))
+            except (TypeError, ValueError):
+                continue
+    return sorted(set(pages)) if unique else pages
 
 
 def _count_caption_linked_tables(table_quality: list[dict]) -> int:
@@ -1061,7 +1068,15 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
 
     finished_at = datetime.now(timezone.utc)
     page_results = [page_results_map[page] for page in sorted(page_results_map)]
-    page_results, page_status_counts = finalize_page_statuses(page_results, warnings)
+    table_fallback_reason_counts = _count_table_fallback_reasons(table_result.fallbacks)
+    table_low_quality_count = _count_low_quality_tables(table_result.table_quality)
+    table_low_quality_pages = _low_quality_table_pages(table_result.table_quality)
+    table_caption_linked_count = _count_caption_linked_tables(table_result.table_quality)
+    page_results, page_status_counts = finalize_page_statuses(
+        page_results,
+        warnings,
+        actionable_pages=table_low_quality_pages,
+    )
     ocr_confidence_by_page = {}
     low_conf_pages: list[int] = []
     for page_result in page_results:
@@ -1078,13 +1093,14 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         ):
             low_conf_pages.append(page_result.page)
 
-    status, exit_code = determine_conversion_status(warnings, failed_pages)
+    status, exit_code = determine_conversion_status(
+        warnings,
+        failed_pages,
+        table_low_quality_count=table_low_quality_count,
+    )
     reporting_started = stage_start()
     elapsed_seconds = (finished_at - started_at).total_seconds()
     pages_per_second = round(len(selected_pages) / elapsed_seconds, 4) if elapsed_seconds > 0 else None
-    table_fallback_reason_counts = _count_table_fallback_reasons(table_result.fallbacks)
-    table_low_quality_count = _count_low_quality_tables(table_result.table_quality)
-    table_caption_linked_count = _count_caption_linked_tables(table_result.table_quality)
     finish_stage("reporting", reporting_started)
     report = build_report(
         started_at=started_at,

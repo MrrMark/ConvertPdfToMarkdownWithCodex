@@ -3,8 +3,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 
-from pdf2md.constants import StructureRecoveryReason
+from pdf2md.constants import StructureRecoveryReason, WarningCode
 from pdf2md.models import ConversionStatus, PageResult, PageStatus, Report, ReportSummary, WarningEntry
+
+ADVISORY_WARNING_CODES = frozenset({WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK})
 
 
 def count_structure_marker_reasons(excluded_assets: Iterable[object]) -> dict[str, int]:
@@ -21,12 +23,48 @@ def count_structure_marker_reasons(excluded_assets: Iterable[object]) -> dict[st
     return counts
 
 
-def finalize_page_statuses(page_results: list[PageResult], warnings: list[WarningEntry]) -> tuple[list[PageResult], dict[str, int]]:
+def is_advisory_warning(warning: WarningEntry) -> bool:
+    return warning.code in ADVISORY_WARNING_CODES
+
+
+def is_actionable_warning(warning: WarningEntry) -> bool:
+    return not is_advisory_warning(warning)
+
+
+def count_actionable_warnings(warnings: Iterable[WarningEntry]) -> int:
+    return sum(1 for warning in warnings if is_actionable_warning(warning))
+
+
+def count_advisory_warnings(warnings: Iterable[WarningEntry]) -> int:
+    return sum(1 for warning in warnings if is_advisory_warning(warning))
+
+
+def count_expected_table_fallback_warnings(warnings: Iterable[WarningEntry]) -> tuple[int, dict[str, int]]:
+    reason_counts: dict[str, int] = {}
+    count = 0
+    for warning in warnings:
+        if warning.code != WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK:
+            continue
+        count += 1
+        for reason in warning.details.get("reasons", []):
+            reason_counts[str(reason)] = reason_counts.get(str(reason), 0) + 1
+    return count, dict(sorted(reason_counts.items()))
+
+
+def finalize_page_statuses(
+    page_results: list[PageResult],
+    warnings: list[WarningEntry],
+    actionable_pages: Iterable[int] | None = None,
+) -> tuple[list[PageResult], dict[str, int]]:
     warning_count_by_page: dict[int, int] = {}
+    actionable_warning_count_by_page: dict[int, int] = {}
     for warning in warnings:
         if warning.page is None:
             continue
         warning_count_by_page[warning.page] = warning_count_by_page.get(warning.page, 0) + 1
+        if is_actionable_warning(warning):
+            actionable_warning_count_by_page[warning.page] = actionable_warning_count_by_page.get(warning.page, 0) + 1
+    actionable_page_set = set(actionable_pages or [])
 
     page_status_counts = {
         "success": 0,
@@ -35,17 +73,28 @@ def finalize_page_statuses(page_results: list[PageResult], warnings: list[Warnin
     }
     for page_result in page_results:
         page_result.warning_count = warning_count_by_page.get(page_result.page, 0)
-        if page_result.status is not PageStatus.FAILED and page_result.warning_count > 0:
+        if (
+            page_result.status is not PageStatus.FAILED
+            and (actionable_warning_count_by_page.get(page_result.page, 0) > 0 or page_result.page in actionable_page_set)
+        ):
             page_result.status = PageStatus.PARTIAL_SUCCESS
         page_status_counts[page_result.status.value] += 1
     return page_results, page_status_counts
 
 
-def determine_conversion_status(warnings: list[WarningEntry], failed_pages: list[int]) -> tuple[ConversionStatus, int]:
+def determine_conversion_status(
+    warnings: list[WarningEntry],
+    failed_pages: list[int],
+    *,
+    table_low_quality_count: int = 0,
+) -> tuple[ConversionStatus, int]:
     if failed_pages or any(warning.code.endswith("_FAILED") for warning in warnings):
         return ConversionStatus.PARTIAL_SUCCESS, 2
+    if table_low_quality_count > 0:
+        return ConversionStatus.PARTIAL_SUCCESS, 2
     if any(
-        warning.code.startswith("OCR_") or warning.code.startswith("TABLE_") or warning.code.startswith("IMAGE_")
+        is_actionable_warning(warning)
+        and (warning.code.startswith("OCR_") or warning.code.startswith("TABLE_") or warning.code.startswith("IMAGE_"))
         for warning in warnings
     ):
         return ConversionStatus.PARTIAL_SUCCESS, 2
@@ -136,10 +185,13 @@ def build_report(
     structure_marker_counts = structure_marker_counts or {}
     stage_durations_ms = stage_durations_ms or {}
     table_fallback_reason_counts = table_fallback_reason_counts or {}
+    expected_table_fallback_count, expected_table_fallback_reason_counts = count_expected_table_fallback_warnings(warnings)
 
     summary = ReportSummary(
         processed_pages=len(page_results),
         warning_count=len(warnings),
+        actionable_warning_count=count_actionable_warnings(warnings),
+        advisory_warning_count=count_advisory_warnings(warnings),
         failed_page_count=len(set(failed_pages)),
         partial_success=status == ConversionStatus.PARTIAL_SUCCESS,
         ocr_confidence_by_page=ocr_confidence_by_page,
@@ -192,6 +244,9 @@ def build_report(
         rag_table_record_count=rag_table_record_count,
         rag_table_file_count=rag_table_file_count,
         table_fallback_reason_counts=table_fallback_reason_counts,
+        table_expected_fallback_count=expected_table_fallback_count,
+        table_expected_fallback_reason_counts=expected_table_fallback_reason_counts,
+        table_actionable_fallback_count=max(len(table_fallbacks) - expected_table_fallback_count, 0),
         table_low_quality_count=table_low_quality_count,
         table_caption_linked_count=table_caption_linked_count,
         page_cache_hits=page_cache_hits,
