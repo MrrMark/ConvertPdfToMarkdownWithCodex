@@ -53,6 +53,8 @@ def normalize_report(payload: dict[str, Any]) -> dict[str, Any]:
     summary_keys = [
         "processed_pages",
         "warning_count",
+        "actionable_warning_count",
+        "advisory_warning_count",
         "partial_success",
         "total_suppressed_lines",
         "table_total",
@@ -60,6 +62,9 @@ def normalize_report(payload: dict[str, Any]) -> dict[str, Any]:
         "table_gfm_count",
         "table_fallback_count",
         "table_fallback_reason_counts",
+        "table_expected_fallback_count",
+        "table_expected_fallback_reason_counts",
+        "table_actionable_fallback_count",
         "table_low_quality_count",
         "table_caption_linked_count",
         "rag_table_output",

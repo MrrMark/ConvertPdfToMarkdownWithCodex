@@ -664,10 +664,15 @@ pdfs/
 - OCR 실패/저신뢰 warning의 `details.reason`, `ocr_lang`, confidence metrics
 - 페이지별 `header_footer_suppressed_count`
 - `summary.page_status_counts`
+- `summary.actionable_warning_count`
+- `summary.advisory_warning_count`
 - `summary.table_mode_requested`
 - `summary.table_quality`
 - `summary.table_fallback_count`
 - `summary.table_fallbacks`
+- `summary.table_expected_fallback_count`
+- `summary.table_expected_fallback_reason_counts`
+- `summary.table_actionable_fallback_count`
 - `summary.table_markdown_forced_count`
 - `summary.table_html_forced_count`
 - `summary.stage_durations_ms`
@@ -771,9 +776,10 @@ multi-page table continuation 후보는 `continuation_reasons`,
 - `1`: 치명적 실패
 - `2`: 부분 성공
 
-`2`는 실패가 아니라, 보수적 fallback 또는 경고가 포함된 성공 실행일 수 있습니다.
-예를 들어 복잡 표가 HTML fallback으로 직렬화되면 `report.json`의 `status`가
-`partial_success`가 될 수 있습니다.
+`2`는 실패가 아니라, actionable warning이나 저품질 표 진단이 포함된 성공 실행일 수 있습니다.
+복잡 표가 의도적으로 HTML fallback으로 직렬화된 경우 `TABLE_COMPLEXITY_HTML_FALLBACK`은
+`summary.table_expected_fallback_count`와 `summary.advisory_warning_count`에 남지만,
+그 자체만으로 `partial_success`가 되지는 않습니다.
 
 `--skip-existing`를 사용하면 기존 핵심 산출물이 있는 문서는 다시 처리하지 않고,
 `batch_report.json`에서 `status == "skipped"` 와 `skipped == true`로 기록됩니다.
@@ -949,7 +955,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q82-Q83입니다. 완료된 Q34-Q81 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q83입니다. 완료된 Q34-Q82 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 

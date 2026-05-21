@@ -157,6 +157,16 @@
     },
     "ReportSummary": {
       "properties": {
+        "actionable_warning_count": {
+          "default": 0,
+          "title": "Actionable Warning Count",
+          "type": "integer"
+        },
+        "advisory_warning_count": {
+          "default": 0,
+          "title": "Advisory Warning Count",
+          "type": "integer"
+        },
         "code_block_count": {
           "default": 0,
           "title": "Code Block Count",
@@ -469,10 +479,27 @@
           "title": "Suppressed Lines",
           "type": "array"
         },
+        "table_actionable_fallback_count": {
+          "default": 0,
+          "title": "Table Actionable Fallback Count",
+          "type": "integer"
+        },
         "table_caption_linked_count": {
           "default": 0,
           "title": "Table Caption Linked Count",
           "type": "integer"
+        },
+        "table_expected_fallback_count": {
+          "default": 0,
+          "title": "Table Expected Fallback Count",
+          "type": "integer"
+        },
+        "table_expected_fallback_reason_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Table Expected Fallback Reason Counts",
+          "type": "object"
         },
         "table_fallback_count": {
           "default": 0,

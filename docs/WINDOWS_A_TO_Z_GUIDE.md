@@ -521,8 +521,13 @@ python -m pdf2md .\sample.pdf -o .\output --force-ocr --ocr-lang kor+eng
 - OCR warning `details.reason`, `ocr_lang`, confidence metrics
 - `page_results[].header_footer_suppressed_count`
 - `summary.page_status_counts`
+- `summary.actionable_warning_count`
+- `summary.advisory_warning_count`
 - `summary.table_fallback_count`
 - `summary.table_fallbacks`
+- `summary.table_expected_fallback_count`
+- `summary.table_expected_fallback_reason_counts`
+- `summary.table_actionable_fallback_count`
 - `summary.table_mode_requested`
 - `summary.stage_durations_ms`
 - `summary.pdf_open_count`

@@ -168,7 +168,7 @@ GUI 완료 후 Results 표에서 문서별 결과를 확인한다.
 ## 6) Status 의미
 
 - `success`: 변환이 정상 완료됐다.
-- `partial_success`: 변환은 완료됐지만 warning이나 fallback이 있다. `report.json`을 확인한다.
+- `partial_success`: 변환은 완료됐지만 actionable warning이나 저품질 표 진단이 있다. 의도된 복잡 표 HTML fallback은 `report.json`의 advisory/expected fallback count에 남지만 그 자체만으로 partial status가 되지는 않는다.
 - `failed`: 해당 문서 변환에 실패했다. `Retry`가 표시되면 입력과 옵션을 확인한 뒤 다시 실행한다.
 - `skipped`: `Skip existing` 조건에 맞아 건너뛰었다.
 - `cancelled`: 배치 변환 중 취소 요청으로 아직 시작하지 않은 문서가 취소됐다.

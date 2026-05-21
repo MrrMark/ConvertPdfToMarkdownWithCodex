@@ -96,10 +96,10 @@ Required:
 
 Stable summary fields:
 
-- `processed_pages`, `warning_count`, `failed_page_count`, `partial_success`
+- `processed_pages`, `warning_count`, `actionable_warning_count`, `advisory_warning_count`, `failed_page_count`, `partial_success`
 - `page_status_counts`
 - `table_total`, `table_html_count`, `table_gfm_count`, `table_fallback_count`
-- `table_fallback_reason_counts`, `table_low_quality_count`, `table_quality`
+- `table_fallback_reason_counts`, `table_expected_fallback_count`, `table_expected_fallback_reason_counts`, `table_actionable_fallback_count`, `table_low_quality_count`, `table_quality`
 - `stage_durations_ms`, `pdf_open_count`, `pages_per_second`
 - `page_worker_count`, `page_worker_effective_count`, `page_parallel_enabled`
 - `page_cache_hits`, `page_cache_misses`, `text_line_extract_count`

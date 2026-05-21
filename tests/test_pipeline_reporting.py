@@ -86,6 +86,10 @@ def test_pipeline_report_schema_and_partial_status(sample_pdf: Path, tmp_path: P
     assert manifest["schema_version"] == "1.0"
     assert report["status"] == "partial_success"
     assert report["summary"]["table_fallback_count"] == 1
+    assert report["summary"]["table_expected_fallback_count"] == 1
+    assert report["summary"]["table_actionable_fallback_count"] == 0
+    assert report["summary"]["advisory_warning_count"] == 1
+    assert report["summary"]["actionable_warning_count"] == 1
     assert report["summary"]["table_mode_requested"] == "auto"
     assert report["summary"]["page_status_counts"]["partial_success"] == 1
     assert report["summary"]["page_status_counts"]["success"] == 1
@@ -95,6 +99,85 @@ def test_pipeline_report_schema_and_partial_status(sample_pdf: Path, tmp_path: P
     assert report["summary"]["structure_marker_recovered_context_count"] == 0
     assert report["summary"]["structure_marker_suppressed_no_candidate_count"] == 0
     assert report["summary"]["structure_marker_suppressed_ambiguous_count"] == 0
+
+
+def test_expected_table_fallback_warning_is_advisory_for_status(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
+    def fake_extract_tables(*args, **kwargs) -> TableExtractionResult:
+        return TableExtractionResult(
+            warnings=[
+                WarningEntry(
+                    code="TABLE_COMPLEXITY_HTML_FALLBACK",
+                    message="fallback",
+                    page=1,
+                    details={"table_index": 1, "reasons": ["AMBIGUOUS_GRID"]},
+                )
+            ],
+            assets=[TableAsset(page=1, index=1, mode="html", bbox=[10.0, 20.0, 30.0, 40.0])],
+            fallbacks=[
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "mode": "html",
+                    "reasons": ["AMBIGUOUS_GRID"],
+                    "selected_strategy": "default",
+                    "quality_score": 0.95,
+                }
+            ],
+            table_quality=[
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "quality_score": 0.95,
+                    "reasons": ["AMBIGUOUS_GRID"],
+                    "unresolved": True,
+                    "mode": "html",
+                }
+            ],
+            table_counts={
+                "table_total": 1,
+                "table_html_count": 1,
+                "table_gfm_count": 0,
+                "table_recovered_count": 0,
+                "table_unresolved_count": 1,
+                "table_markdown_forced_count": 0,
+                "table_html_forced_count": 0,
+            },
+        )
+
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", fake_extract_tables)
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+
+    output_dir = tmp_path / "expected-fallback-advisory"
+    result = run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=output_dir,
+            image_mode=ImageMode.REFERENCED,
+            table_mode=TableMode.AUTO,
+        )
+    )
+
+    assert result.exit_code == EXIT_SUCCESS
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+
+    assert report["status"] == "success"
+    assert report["warnings"][0]["code"] == "TABLE_COMPLEXITY_HTML_FALLBACK"
+    assert manifest["warnings"][0]["code"] == "TABLE_COMPLEXITY_HTML_FALLBACK"
+    assert report["summary"]["partial_success"] is False
+    assert report["summary"]["warning_count"] == 1
+    assert report["summary"]["actionable_warning_count"] == 0
+    assert report["summary"]["advisory_warning_count"] == 1
+    assert report["summary"]["table_fallback_count"] == 1
+    assert report["summary"]["table_expected_fallback_count"] == 1
+    assert report["summary"]["table_actionable_fallback_count"] == 0
+    assert report["summary"]["table_low_quality_count"] == 0
+    assert report["summary"]["page_status_counts"]["partial_success"] == 0
+    assert report["summary"]["page_status_counts"]["success"] == 2
+    page_one = next(page for page in report["page_results"] if page["page"] == 1)
+    assert page_one["warning_count"] == 1
+    assert page_one["status"] == "success"
 
 
 def test_pipeline_outputs_are_deterministic_with_fixed_clock(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:

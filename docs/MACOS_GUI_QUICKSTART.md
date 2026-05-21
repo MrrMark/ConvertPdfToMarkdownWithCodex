@@ -128,6 +128,8 @@ GUI 완료 후 Results 표에서 아래를 확인한다.
 - `Report`: `report.json` 경로
 - `Retry`: 실패 문서가 재시도 후보인지 여부
 
+의도된 복잡 표 HTML fallback은 `report.json`의 advisory/expected fallback count에 남지만 그 자체만으로 `partial_success`가 되지는 않는다. `partial_success`는 actionable warning이나 저품질 표 진단이 있는 경우로 해석한다.
+
 원문 텍스트, 표, 이미지 내용은 GUI summary에서 요약하지 않는다. 자세한 품질 판단은 `report.json`과 `manifest.json`을 확인한다.
 완료 summary/log에는 `documents`, status count, retry candidate count, `elapsed_ms`, `processed_pages`, `pages_per_second`가 표시된다.
 
