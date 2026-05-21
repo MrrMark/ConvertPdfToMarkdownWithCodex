@@ -23,16 +23,6 @@
 
 ## 남은 작업
 
-### Q81. Structure Marker OCR Early Stop And Cache
-
-실제 NVMe Key Value Command Set PDF에서 `image_extraction`이 여전히 전체 변환 시간의 대부분을 차지한다. Q80에서 중복 Tesseract 호출은 제거했지만 25 page 기준 `image_extraction=70.6s`, `pages/sec=0.34` 수준이므로, 구조 마커 OCR 후보 수집에 early stop, variant cache, context-aware PSM 축소를 추가해 산출물 동일성을 유지하면서 0.7 pages/sec 이상을 목표로 한다.
-
-검증 기준:
-
-- 실제 local `pdf/` corpus에서 `document.md`와 `retrieval_chunks_rag.jsonl` normalized diff 없음
-- structure marker recovered/suppressed count 유지
-- corpus gate `--corpus-min-pages-per-second 0.7` 통과 또는 명확한 하드웨어 기준 문서화
-
 ### Q82. Expected Table Fallback Severity Taxonomy
 
 현재 실제 NVMe corpus는 표 52개 중 39개를 HTML fallback으로 안전하게 처리하고 `table_low_quality_count=0`이지만, `TABLE_COMPLEXITY_HTML_FALLBACK` warning 39건 때문에 문서 상태가 `partial_success`가 된다. 복잡 표를 HTML fallback으로 보내는 것은 의도된 보수 동작이므로, release/corpus gate에서 실제 실패와 expected fallback advisory를 더 잘 구분해야 한다.

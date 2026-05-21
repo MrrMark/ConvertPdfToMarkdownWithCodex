@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 
 _STRUCTURE_MARKER_OCR_SCALES = (8, 12, 16)
 _STRUCTURE_MARKER_OCR_PSMS = (6, 7, 8, 13)
+_STRUCTURE_MARKER_CONTEXT_EARLY_STOP_MIN_CONFIDENCE = 70.0
+_STRUCTURE_MARKER_STABLE_EARLY_STOP_MIN_OBSERVATIONS = 12
+_STRUCTURE_MARKER_STABLE_EARLY_STOP_MIN_VOTES = 6
+_STRUCTURE_MARKER_STABLE_EARLY_STOP_MIN_CONFIDENCE = 70.0
+_STRUCTURE_MARKER_STABLE_EARLY_STOP_MIN_VOTE_MARGIN = 2.0
 
 
 @dataclass
@@ -69,6 +74,12 @@ class StructureOcrCandidate:
     text: str
     confidence: float | None
     votes: int
+
+
+@dataclass(frozen=True)
+class StructureOcrObservation:
+    text: str
+    confidence: float | None
 
 
 @dataclass(frozen=True)
@@ -255,19 +266,19 @@ def _is_structure_marker_candidate(
     return 90 <= top <= 680
 
 
-def _prepare_structure_marker_variants(image_bytes: bytes) -> list[Image.Image]:
+def _prepare_structure_marker_variants(image_bytes: bytes) -> list[tuple[str, Image.Image]]:
     image = Image.open(BytesIO(image_bytes)).convert("RGBA")
     background = Image.new("RGBA", image.size, "white")
     merged = Image.alpha_composite(background, image).convert("L")
     merged = ImageOps.autocontrast(merged)
 
-    variants: list[Image.Image] = []
+    variants: list[tuple[str, Image.Image]] = []
     for scale in _STRUCTURE_MARKER_OCR_SCALES:
         upscaled = merged.resize((max(merged.width * scale, 32), max(merged.height * scale, 32)))
-        variants.append(upscaled)
-        variants.append(upscaled.point(lambda p: 255 if p > 160 else 0))
-        variants.append(upscaled.point(lambda p: 255 if p > 200 else 0))
-        variants.append(upscaled.filter(ImageFilter.SHARPEN))
+        variants.append((f"scale-{scale}:gray", upscaled))
+        variants.append((f"scale-{scale}:threshold-160", upscaled.point(lambda p: 255 if p > 160 else 0)))
+        variants.append((f"scale-{scale}:threshold-200", upscaled.point(lambda p: 255 if p > 200 else 0)))
+        variants.append((f"scale-{scale}:sharpen", upscaled.filter(ImageFilter.SHARPEN)))
     return variants
 
 
@@ -277,51 +288,178 @@ def _normalize_structure_ocr_text(raw_parts: list[Any]) -> str:
     return re.sub(r"[^0-9.]", "", text)
 
 
-def _collect_structure_marker_candidates(image_bytes: bytes) -> list[StructureOcrCandidate]:
+def _mean_structure_ocr_confidence(raw_confidences: list[Any]) -> float | None:
+    confidences: list[float] = []
+    for raw_conf in raw_confidences:
+        try:
+            conf = float(raw_conf)
+        except Exception:  # noqa: BLE001
+            continue
+        if conf >= 0:
+            confidences.append(conf)
+    return round(sum(confidences) / len(confidences), 2) if confidences else None
+
+
+def _expected_structure_marker_from_context(
+    *,
+    parent_heading_index: str | None,
+    child_heading_index: str | None,
+) -> str | None:
+    expected = _expected_current_from_child(child_heading_index)
+    if expected is None:
+        return None
+    if expected.count(".") < 2:
+        return None
+    if parent_heading_index is not None and expected == parent_heading_index:
+        return None
+    return expected
+
+
+def _should_stop_structure_marker_ocr_early(
+    *,
+    observation: StructureOcrObservation,
+    expected_marker: str | None,
+) -> bool:
+    if expected_marker is None:
+        return False
+    if observation.confidence is None or observation.confidence < _STRUCTURE_MARKER_CONTEXT_EARLY_STOP_MIN_CONFIDENCE:
+        return False
+    return _candidate_matches_expected(observation.text, expected_marker)
+
+
+def _structure_ocr_payload_confidence(payload: dict[str, float]) -> float | None:
+    if payload["confidence_count"] <= 0:
+        return None
+    return round(payload["confidence_total"] / payload["confidence_count"], 2)
+
+
+def _build_structure_ocr_candidates(grouped: dict[str, dict[str, float]]) -> list[StructureOcrCandidate]:
+    candidates: list[StructureOcrCandidate] = []
+    for text, payload in grouped.items():
+        candidates.append(
+            StructureOcrCandidate(
+                text=text,
+                confidence=_structure_ocr_payload_confidence(payload),
+                votes=int(payload["votes"]),
+            )
+        )
+    candidates.sort(key=lambda item: (-item.votes, -(item.confidence or -1.0), item.text))
+    return candidates
+
+
+def _canonical_structure_marker_for_stability(
+    text: str,
+    *,
+    parent_heading_index: str | None,
+    expected_marker: str | None,
+) -> str | None:
+    if expected_marker is not None and _candidate_matches_expected(text, expected_marker):
+        return expected_marker
+    normalized = _normalize_structure_marker_from_context(text, parent_heading_index)
+    if normalized is not None:
+        return normalized
+    if re.fullmatch(r"\d+(?:\.\d+)+", text) and text.count(".") >= 2:
+        return text
+    return None
+
+
+def _should_stop_structure_marker_ocr_for_stable_candidate(
+    *,
+    grouped: dict[str, dict[str, float]],
+    observation_count: int,
+    parent_heading_index: str | None,
+    expected_marker: str | None,
+) -> bool:
+    if observation_count < _STRUCTURE_MARKER_STABLE_EARLY_STOP_MIN_OBSERVATIONS:
+        return False
+    canonical_groups: dict[str, dict[str, float]] = {}
+    for candidate in _build_structure_ocr_candidates(grouped):
+        canonical = _canonical_structure_marker_for_stability(
+            candidate.text,
+            parent_heading_index=parent_heading_index,
+            expected_marker=expected_marker,
+        )
+        if canonical is None:
+            continue
+        entry = canonical_groups.setdefault(canonical, {"votes": 0.0, "confidence_total": 0.0, "confidence_count": 0.0})
+        entry["votes"] += candidate.votes
+        if candidate.confidence is not None:
+            entry["confidence_total"] += candidate.confidence
+            entry["confidence_count"] += 1
+    if not canonical_groups:
+        return False
+    ranked = _build_structure_ocr_candidates(canonical_groups)
+    best = ranked[0]
+    if best.votes < _STRUCTURE_MARKER_STABLE_EARLY_STOP_MIN_VOTES:
+        return False
+    if best.confidence is None or best.confidence < _STRUCTURE_MARKER_STABLE_EARLY_STOP_MIN_CONFIDENCE:
+        return False
+    if len(ranked) > 1:
+        runner_up = ranked[1]
+        if runner_up.votes > 0 and best.votes < runner_up.votes * _STRUCTURE_MARKER_STABLE_EARLY_STOP_MIN_VOTE_MARGIN:
+            return False
+    return True
+
+
+def _collect_structure_marker_candidates(
+    image_bytes: bytes,
+    *,
+    parent_heading_index: str | None = None,
+    child_heading_index: str | None = None,
+    ocr_cache: dict[tuple[str, str, int], StructureOcrObservation] | None = None,
+) -> list[StructureOcrCandidate]:
     try:
         import pytesseract
     except Exception:  # noqa: BLE001
         return []
 
     try:
+        image_sha256 = hashlib.sha256(image_bytes).hexdigest()
+        expected_marker = _expected_structure_marker_from_context(
+            parent_heading_index=parent_heading_index,
+            child_heading_index=child_heading_index,
+        )
         grouped: dict[str, dict[str, float]] = {}
-        for image in _prepare_structure_marker_variants(image_bytes):
+        observation_count = 0
+        for variant_key, image in _prepare_structure_marker_variants(image_bytes):
             for psm in _STRUCTURE_MARKER_OCR_PSMS:
                 config = f"--psm {psm} -c tessedit_char_whitelist=0123456789."
                 # image_to_data already includes recognized text and confidence, so
                 # avoid a second Tesseract process launch via image_to_string.
-                data = pytesseract.image_to_data(image, config=config, output_type=pytesseract.Output.DICT)
-                text = _normalize_structure_ocr_text(data.get("text", []))
-                if not text:
-                    continue
-                confidences: list[float] = []
-                for raw_conf in data.get("conf", []):
-                    try:
-                        conf = float(raw_conf)
-                    except Exception:  # noqa: BLE001
-                        continue
-                    if conf >= 0:
-                        confidences.append(conf)
-                mean_conf = round(sum(confidences) / len(confidences), 2) if confidences else None
-                current = grouped.setdefault(text, {"votes": 0.0, "confidence_total": 0.0, "confidence_count": 0.0})
-                current["votes"] += 1
-                if mean_conf is not None:
-                    current["confidence_total"] += mean_conf
-                    current["confidence_count"] += 1
-        candidates: list[StructureOcrCandidate] = []
-        for text, payload in grouped.items():
-            confidence = None
-            if payload["confidence_count"] > 0:
-                confidence = round(payload["confidence_total"] / payload["confidence_count"], 2)
-            candidates.append(
-                StructureOcrCandidate(
-                    text=text,
-                    confidence=confidence,
-                    votes=int(payload["votes"]),
-                )
-            )
-        candidates.sort(key=lambda item: (-item.votes, -(item.confidence or -1.0), item.text))
-        return candidates
+                cache_key = (image_sha256, variant_key, psm)
+                observation = ocr_cache.get(cache_key) if ocr_cache is not None else None
+                if observation is None:
+                    data = pytesseract.image_to_data(image, config=config, output_type=pytesseract.Output.DICT)
+                    observation = StructureOcrObservation(
+                        text=_normalize_structure_ocr_text(data.get("text", [])),
+                        confidence=_mean_structure_ocr_confidence(data.get("conf", [])),
+                    )
+                    if ocr_cache is not None:
+                        ocr_cache[cache_key] = observation
+                observation_count += 1
+                text = observation.text
+                if text:
+                    current = grouped.setdefault(text, {"votes": 0.0, "confidence_total": 0.0, "confidence_count": 0.0})
+                    current["votes"] += 1
+                    if observation.confidence is not None:
+                        current["confidence_total"] += observation.confidence
+                        current["confidence_count"] += 1
+                    if _should_stop_structure_marker_ocr_early(
+                        observation=observation,
+                        expected_marker=expected_marker,
+                    ):
+                        break
+                if _should_stop_structure_marker_ocr_for_stable_candidate(
+                    grouped=grouped,
+                    observation_count=observation_count,
+                    parent_heading_index=parent_heading_index,
+                    expected_marker=expected_marker,
+                ):
+                    break
+            else:
+                continue
+            break
+        return _build_structure_ocr_candidates(grouped)
     except Exception:  # noqa: BLE001
         return []
 
@@ -791,6 +929,7 @@ def _handle_structure_marker_candidate(
     image_bytes: bytes,
     page_text_lines: dict[int, list[dict]],
     pending_structure_markers: dict[int, list[PendingStructureMarker]],
+    structure_ocr_cache: dict[tuple[str, str, int], StructureOcrObservation],
 ) -> bool:
     title_line = _find_structure_title(page_text_lines.get(page_number, []), bbox_payload)
     if not _is_structure_marker_candidate(
@@ -802,7 +941,12 @@ def _handle_structure_marker_candidate(
         return False
     parent_heading_index = _find_parent_heading_index(page_text_lines.get(page_number, []), title_line)
     child_heading_index = _find_child_heading_index(page_text_lines, page_number, title_line)
-    ocr_candidates = _collect_structure_marker_candidates(image_bytes)
+    ocr_candidates = _collect_structure_marker_candidates(
+        image_bytes,
+        parent_heading_index=parent_heading_index,
+        child_heading_index=child_heading_index,
+        ocr_cache=structure_ocr_cache,
+    )
     pending_structure_markers.setdefault(page_number, []).append(
         PendingStructureMarker(
             page=page_number,
@@ -1162,6 +1306,7 @@ def extract_images(
     hash_counter = Counter(item["sha256"] for item in hashed_candidates)
     pending_structure_markers: dict[int, list[PendingStructureMarker]] = {}
     canonical_paths_by_hash: dict[str, str] = {}
+    structure_ocr_cache: dict[tuple[str, str, int], StructureOcrObservation] = {}
 
     for candidate in hashed_candidates:
         page_number = int(candidate["page"])
@@ -1210,6 +1355,7 @@ def extract_images(
             image_bytes=image_bytes,
             page_text_lines=page_text_lines,
             pending_structure_markers=pending_structure_markers,
+            structure_ocr_cache=structure_ocr_cache,
         ):
             debug_payload["excluded"] = True
             debug_payload["exclude_reason"] = "STRUCTURE_MARKER_CANDIDATE"

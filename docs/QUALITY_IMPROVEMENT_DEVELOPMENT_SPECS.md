@@ -23,25 +23,6 @@
 
 ## 현재 Active Development Specs
 
-### Q81. Structure Marker OCR Early Stop And Cache
-
-#### 목표
-
-Q80 이후에도 실제 NVMe Key Value Command Set PDF에서 `image_extraction`이 70초 이상으로 남아 있다. 구조 마커 OCR의 정확도와 deterministic output을 유지하면서 OCR 후보 수집 호출 수를 더 줄인다.
-
-#### 구현 방향
-
-- parent/child heading context로 기대 가능한 section index가 있는 경우 high-confidence 후보에서 early stop한다.
-- 동일 image hash와 동일 OCR config 조합은 후보 결과를 재사용한다.
-- PSM/scale 조합 축소는 real corpus diff와 structure marker recovery count가 유지될 때만 적용한다.
-- stage duration은 기존 `summary.stage_durations_ms.image_extraction`으로 측정하고 새 public schema는 만들지 않는다.
-
-#### 검증
-
-- `tests/test_images.py`에 early stop/cache 단위 테스트 추가
-- local NVMe corpus 변환 전후 `document.md`, `retrieval_chunks_rag.jsonl` diff 확인
-- corpus eval 또는 release gate에서 pages/sec threshold 재측정
-
 ### Q82. Expected Table Fallback Severity Taxonomy
 
 #### 목표
@@ -81,4 +62,4 @@ NVMe real corpus에서 unresolved cross-ref false positive를 줄이고 RAG cita
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q80 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q81 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
