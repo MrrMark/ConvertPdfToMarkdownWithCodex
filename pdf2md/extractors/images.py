@@ -31,6 +31,9 @@ from pdf2md.utils.structure import classify_structure_line, extract_leading_head
 
 logger = logging.getLogger(__name__)
 
+_STRUCTURE_MARKER_OCR_SCALES = (8, 12, 16)
+_STRUCTURE_MARKER_OCR_PSMS = (6, 7, 8, 13)
+
 
 @dataclass
 class ImageBlock:
@@ -259,13 +262,19 @@ def _prepare_structure_marker_variants(image_bytes: bytes) -> list[Image.Image]:
     merged = ImageOps.autocontrast(merged)
 
     variants: list[Image.Image] = []
-    for scale in (8, 12, 16):
+    for scale in _STRUCTURE_MARKER_OCR_SCALES:
         upscaled = merged.resize((max(merged.width * scale, 32), max(merged.height * scale, 32)))
         variants.append(upscaled)
         variants.append(upscaled.point(lambda p: 255 if p > 160 else 0))
         variants.append(upscaled.point(lambda p: 255 if p > 200 else 0))
         variants.append(upscaled.filter(ImageFilter.SHARPEN))
     return variants
+
+
+def _normalize_structure_ocr_text(raw_parts: list[Any]) -> str:
+    text = "".join(str(part or "").strip() for part in raw_parts)
+    text = text.replace(" ", "")
+    return re.sub(r"[^0-9.]", "", text)
 
 
 def _collect_structure_marker_candidates(image_bytes: bytes) -> list[StructureOcrCandidate]:
@@ -277,14 +286,14 @@ def _collect_structure_marker_candidates(image_bytes: bytes) -> list[StructureOc
     try:
         grouped: dict[str, dict[str, float]] = {}
         for image in _prepare_structure_marker_variants(image_bytes):
-            for psm in (6, 7, 8, 13):
+            for psm in _STRUCTURE_MARKER_OCR_PSMS:
                 config = f"--psm {psm} -c tessedit_char_whitelist=0123456789."
-                text = (pytesseract.image_to_string(image, config=config) or "").strip()
-                text = text.replace(" ", "")
-                text = re.sub(r"[^0-9.]", "", text)
+                # image_to_data already includes recognized text and confidence, so
+                # avoid a second Tesseract process launch via image_to_string.
+                data = pytesseract.image_to_data(image, config=config, output_type=pytesseract.Output.DICT)
+                text = _normalize_structure_ocr_text(data.get("text", []))
                 if not text:
                     continue
-                data = pytesseract.image_to_data(image, config=config, output_type=pytesseract.Output.DICT)
                 confidences: list[float] = []
                 for raw_conf in data.get("conf", []):
                     try:

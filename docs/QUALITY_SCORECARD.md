@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-21 | Real corpus RAG/release validation + Q80 | 99/100 | +1 | 실제 local NVMe Key Value Command Set PDF로 corpus eval, `technical_spec_rag`+`nvme` RAG eval, RAG/core release gates를 수행했다. Q80으로 구조 마커 OCR 중복 Tesseract 호출을 제거해 동일 `document.md`/`retrieval_chunks_rag.jsonl` 기준 profile 변환 duration을 148.6s에서 73.4s로 줄였고, excluded figure provenance warning 26건을 0건으로 줄였다. RAG expected source/table/requirement coverage는 1.0으로 통과. 남은 100점 후보는 Q81-Q83 |
 | 2026-05-20 | RAG chunk/profile implementation | 98/100 | +1 | Q77 sibling text chunk merge, Q78 final chunk id relationship metadata, Q79 CLI/GUI purpose-specific RAG profiles를 구현했다. 기본 preserve 출력은 유지하고 opt-in/RAG optimized 경로에서 RAG ingest 효율과 downstream citation expansion 완성도를 높였다. 외부 RAG 서비스 호출 없이 local-only tests와 validators로 계약을 고정했으므로 1점 상향 |
 | 2026-05-20 | RAG chunk/profile active backlog | 97/100 | 0 | Q77-Q79 active backlog/spec 추가. Q77은 short sibling text chunk merge, Q78은 retrieval chunk relationship metadata, Q79는 purpose-specific RAG profiles를 구현 전 계약으로 정리했다. 계획 수립 단계이므로 core conversion 품질과 public schema 계약은 유지하며 점수는 보수적으로 유지 |
 | 2026-05-17 | GUI/CLI benchmark report | 97/100 | 0 | Q76. CLI/GUI Performance Benchmark Report 구현. `scripts/benchmark_gui_cli_parity.py`와 optional `gui-benchmark` release gate로 CLI/GUI headless elapsed ms, pages/sec, GUI duration ratio, output hash equality, advisory threshold policy를 기록. 변환 core output과 public schema는 유지하며 active quality backlog는 없다 |
@@ -70,6 +71,34 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-21 (Q80 구현 후)
+
+#### 총평
+
+이번 평가는 synthetic/golden만이 아니라 local `pdf/`의 실제 NVMe Key Value Command Set PDF를 기준으로 수행했다. 기본 corpus gate에서는 복잡 표 39개가 의도대로 HTML fallback 처리되어 `partial_success`가 유지되지만 `table_low_quality_count=0`이고, Q80 이후 `pages/sec`는 0.32~0.34까지 개선됐다.
+
+`technical_spec_rag --domain-adapter nvme` 출력에서는 RAG profile 효과가 확인됐다. retrieval chunk는 662개, merged chunk 74개, merged source chunk 270개, relationship metadata 529개, contextual embedding 187개를 생성했다. 6개 실제 질의 기반 RAG eval은 hit@k, MRR, expected source coverage, requirement coverage, table-field coverage 모두 1.0을 기록했고, release gate `rag`도 통과했다.
+
+가장 큰 병목은 구조 마커 OCR이 같은 variant/PSM마다 `image_to_string`과 `image_to_data`를 중복 호출하는 점이었다. Q80은 이를 `image_to_data` 단일 호출로 줄여 `document.md`와 `retrieval_chunks_rag.jsonl` byte-level diff 없이 `image_extraction`을 145.2s에서 70.6s로 낮췄다. 또한 `excluded_figure` self-reference를 provenance validator가 인식하게 해 warning 26건을 0건으로 줄였다.
+
+#### 항목별 점수
+
+| 항목 | 점수 | 근거 |
+|---|---:|---|
+| 핵심 변환 완성도 | 18/18 | 실제 PDF에서 Markdown, manifest, report, sidecar 생성과 partial success 보존이 확인됐다. |
+| 표 변환/RAG 대응 | 18/18 | 복잡 표는 HTML fallback으로 보수 처리되고, 실제 RAG eval source/table/requirement coverage가 1.0이다. |
+| 텍스트 구조 보존 | 16/16 | 구조 마커 복구 20건을 유지하고 출력 diff 없이 OCR 호출만 줄였다. |
+| 이미지/OCR 신뢰도 | 14/14 | referenced image와 excluded/structure marker provenance가 유지되고 validator warning이 0건이다. |
+| 성능/효율 | 11/12 | 실제 PDF duration은 약 2배 개선됐지만 `image_extraction`이 여전히 70초대로 dominant stage다. |
+| 테스트/결정성/CI | 12/12 | 전체 pytest 288개, CLI smoke, diff check, RAG/core release gates가 통과했다. |
+| 운영/릴리스 준비도 | 10/10 | schema/index/provenance/artifact release gate와 RAG release gate가 local-only로 통과했다. |
+
+#### 다음 개선 참조
+
+- Q81. Structure Marker OCR Early Stop And Cache
+- Q82. Expected Table Fallback Severity Taxonomy
+- Q83. Real Corpus Cross Reference Precision
 
 ### 2026-05-20 (Q77-Q79 구현 후)
 
