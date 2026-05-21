@@ -56,8 +56,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q83" in readme
-    assert "완료된 Q34-Q82" in readme
+    assert "현재 active quality backlog는 없습니다" in readme
+    assert "완료된 Q34-Q83" in readme
     assert "summary.actionable_warning_count" in readme
     assert "summary.advisory_warning_count" in readme
     assert "summary.table_expected_fallback_count" in readme
@@ -361,10 +361,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q70. GUI Profile And Support Bundle Failure Fixture" not in next_plan
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" not in next_plan
     assert "Tcl/Tk patchlevel" not in next_plan
-    assert "현재 남은 작업 없음." not in next_plan
+    assert "현재 남은 작업 없음." in next_plan
     assert "Q81. Structure Marker OCR Early Stop And Cache" not in next_plan
     assert "Q82. Expected Table Fallback Severity Taxonomy" not in next_plan
-    assert "Q83. Real Corpus Cross Reference Precision" in next_plan
+    assert "Q83. Real Corpus Cross Reference Precision" not in next_plan
     assert "Q77. RAG Sibling Chunk Merge" not in next_plan
     assert "Q78. RAG Chunk Relationship Metadata" not in next_plan
     assert "Q79. Purpose-Specific RAG Profiles" not in next_plan
@@ -376,10 +376,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "현재 Active Development Specs" in development_specs
-    assert "현재 active 개발 명세 없음." not in development_specs
+    assert "현재 active 개발 명세 없음." in development_specs
     assert "Q81. Structure Marker OCR Early Stop And Cache" not in development_specs
     assert "Q82. Expected Table Fallback Severity Taxonomy" not in development_specs
-    assert "Q83. Real Corpus Cross Reference Precision" in development_specs
+    assert "Q83. Real Corpus Cross Reference Precision" not in development_specs
     assert "Q77. RAG Sibling Chunk Merge" not in development_specs
     assert "Q78. RAG Chunk Relationship Metadata" not in development_specs
     assert "Q79. Purpose-Specific RAG Profiles" not in development_specs
@@ -420,7 +420,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q82" in development_specs
+    assert "완료된 Q34-Q83" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -431,6 +431,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q80. Real Corpus Structure Marker OCR And Provenance Hardening" in implemented_specs
     assert "Q81. Structure Marker OCR Early Stop And Cache" in implemented_specs
     assert "Q82. Expected Table Fallback Severity Taxonomy" in implemented_specs
+    assert "Q83. Real Corpus Cross Reference Precision" in implemented_specs
     assert "Q44. Domain Technical Table Coverage Expansion" in implemented_specs
     assert "Q47. Local Technical Corpus Evidence Pack" in implemented_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" in implemented_specs

@@ -23,24 +23,8 @@
 
 ## 현재 Active Development Specs
 
-### Q83. Real Corpus Cross Reference Precision
-
-#### 목표
-
-NVMe real corpus에서 unresolved cross-ref false positive를 줄이고 RAG citation/source coverage gate의 안정성을 높인다.
-
-#### 구현 방향
-
-- `Table of Figures`, `section defines`, generic `register level interface`처럼 target label이 부족한 문구를 cross-ref record로 만들지 않는 guardrail을 추가한다.
-- Figure/Table/Section 번호가 명확한 참조와 NVMe log page/feature/opcode/register 참조는 기존 resolution을 유지한다.
-- false positive 억제는 synthetic fixture로 고정하고, real corpus에서는 coverage 0.85 이상을 목표로 한다.
-
-#### 검증
-
-- `tests/test_rag_semantics.py` 또는 관련 cross-ref 테스트 추가
-- local NVMe RAG eval에서 `min_cross_ref_resolved_coverage >= 0.85`
-- `scripts/run_release_gates.py --gates rag` threshold 통과
+현재 active 개발 명세 없음.
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q82 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q83 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
