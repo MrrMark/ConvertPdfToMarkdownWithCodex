@@ -661,6 +661,7 @@ pdfs/
 - 페이지별 `status`
 - 페이지별 `reading_order_strategy`, `column_count_estimate`
 - 페이지별 `text_layer_char_count`, `ocr_attempted`, `ocr_reason`, `ocr_runtime_available`
+- OCR 실패/저신뢰 warning의 `details.reason`, `ocr_lang`, confidence metrics
 - 페이지별 `header_footer_suppressed_count`
 - `summary.page_status_counts`
 - `summary.table_mode_requested`

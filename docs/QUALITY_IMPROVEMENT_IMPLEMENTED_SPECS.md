@@ -778,6 +778,7 @@ Q40은 OCR 결과를 임의 교정하지 않는 원문 보존 정책과 confiden
 ### 검증 대상
 
 - `warnings[].code`: `OCR_RUNTIME_UNAVAILABLE`, `OCR_CONFIDENCE_WARN`, `OCR_CONFIDENCE_CRITICAL`, `OCR_EMPTY_RESULT`
+- `warnings[].details.reason`: `dependency_unavailable`, `tesseract_unavailable`, `pdf_open_failed`, `language_data_missing`, `empty_result`, `ocr_failed`
 - `page_results[].ocr_attempted`, `ocr_runtime_available`, `ocr_confidence_mean`, `low_conf_token_ratio`
 - OCR text가 spelling correction이나 paraphrase 없이 그대로 sidecar/Markdown에 들어가는지 확인
 

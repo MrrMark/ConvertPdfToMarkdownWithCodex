@@ -24,6 +24,10 @@ LANGUAGE_DATA_MISSING_PATTERN = re.compile(
     r"(?:failed loading language|error opening data file|could not initialize tesseract|traineddata)",
     re.IGNORECASE,
 )
+OCR_LOW_CONFIDENCE_MEAN_THRESHOLD = 75.0
+OCR_CRITICAL_CONFIDENCE_MEAN_THRESHOLD = 50.0
+OCR_LOW_CONFIDENCE_TOKEN_RATIO_THRESHOLD = 0.25
+OCR_CRITICAL_CONFIDENCE_TOKEN_RATIO_THRESHOLD = 0.5
 
 
 @dataclass
@@ -80,6 +84,16 @@ def _is_language_data_missing(exc: Exception) -> bool:
     return bool(LANGUAGE_DATA_MISSING_PATTERN.search(str(exc)))
 
 
+def _resolve_tesseract_cmd() -> str | None:
+    executable = shutil.which("tesseract")
+    if executable:
+        return executable
+    homebrew_tesseract = Path("/opt/homebrew/bin/tesseract")
+    if homebrew_tesseract.exists():
+        return str(homebrew_tesseract)
+    return None
+
+
 def run_ocr(
     pdf_path: Path,
     selected_pages: list[int],
@@ -109,30 +123,50 @@ def run_ocr(
             WarningEntry(
                 code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
                 message="OCR dependencies are unavailable. Install pytesseract and pypdfium2.",
+                details={
+                    "ocr_lang": ocr_lang,
+                    "reason": "dependency_unavailable",
+                    "attempted_pages": target_pages,
+                },
             )
         )
         return result
 
-    if shutil.which("tesseract") is None:
-        homebrew_tesseract = Path("/opt/homebrew/bin/tesseract")
-        if homebrew_tesseract.exists():
-            pytesseract.pytesseract.tesseract_cmd = str(homebrew_tesseract)
-        else:
-            result.warnings.append(
-                WarningEntry(
-                    code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
-                    message="Tesseract executable is unavailable. Install tesseract or add it to PATH.",
-                    details={"ocr_lang": ocr_lang},
-                )
+    tesseract_cmd = _resolve_tesseract_cmd()
+    if tesseract_cmd is None:
+        result.warnings.append(
+            WarningEntry(
+                code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
+                message="Tesseract executable is unavailable. Install tesseract or add it to PATH.",
+                details={
+                    "ocr_lang": ocr_lang,
+                    "reason": "tesseract_unavailable",
+                    "attempted_pages": target_pages,
+                },
             )
-            return result
+        )
+        return result
+    if shutil.which("tesseract") is None:
+        pytesseract_module = getattr(pytesseract, "pytesseract", None)
+        if pytesseract_module is not None:
+            pytesseract_module.tesseract_cmd = tesseract_cmd
     result.runtime_available = True
 
     try:
         document = pdfium.PdfDocument(str(pdf_path))
         result.pdf_open_count = 1
     except Exception as exc:  # noqa: BLE001
-        result.warnings.append(WarningEntry(code=WarningCode.OCR_FAILED, message=f"Failed to open PDF for OCR: {exc}"))
+        result.warnings.append(
+            WarningEntry(
+                code=WarningCode.OCR_FAILED,
+                message=f"Failed to open PDF for OCR: {exc}",
+                details={
+                    "ocr_lang": ocr_lang,
+                    "reason": "pdf_open_failed",
+                    "attempted_pages": target_pages,
+                },
+            )
+        )
         return result
 
     for page_number in target_pages:
@@ -145,31 +179,39 @@ def run_ocr(
             data = pytesseract.image_to_data(pil_image, lang=ocr_lang, output_type=pytesseract.Output.DICT)
 
             metrics = _extract_confidence_metrics(data)
+            result.metrics_by_page[page_number] = metrics
             if text:
                 result.page_texts[page_number] = text
                 result.ocr_pages.append(page_number)
                 result.used_ocr = True
-                result.metrics_by_page[page_number] = metrics
-                if metrics.mean < 50.0 or metrics.low_conf_token_ratio > 0.5:
+                if (
+                    metrics.mean < OCR_CRITICAL_CONFIDENCE_MEAN_THRESHOLD
+                    or metrics.low_conf_token_ratio > OCR_CRITICAL_CONFIDENCE_TOKEN_RATIO_THRESHOLD
+                ):
                     result.warnings.append(
                         WarningEntry(
                             code=WarningCode.OCR_CONFIDENCE_CRITICAL,
                             message=f"OCR confidence is critical (mean={metrics.mean}, low_ratio={metrics.low_conf_token_ratio}).",
                             page=page_number,
                             details={
+                                "ocr_lang": ocr_lang,
                                 "ocr_confidence_mean": metrics.mean,
                                 "ocr_confidence_median": metrics.median,
                                 "low_conf_token_ratio": metrics.low_conf_token_ratio,
                             },
                         )
                     )
-                elif metrics.mean < 75.0 or metrics.low_conf_token_ratio > 0.25:
+                elif (
+                    metrics.mean < OCR_LOW_CONFIDENCE_MEAN_THRESHOLD
+                    or metrics.low_conf_token_ratio > OCR_LOW_CONFIDENCE_TOKEN_RATIO_THRESHOLD
+                ):
                     result.warnings.append(
                         WarningEntry(
                             code=WarningCode.OCR_CONFIDENCE_WARN,
                             message=f"OCR confidence is degraded (mean={metrics.mean}, low_ratio={metrics.low_conf_token_ratio}).",
                             page=page_number,
                             details={
+                                "ocr_lang": ocr_lang,
                                 "ocr_confidence_mean": metrics.mean,
                                 "ocr_confidence_median": metrics.median,
                                 "low_conf_token_ratio": metrics.low_conf_token_ratio,
@@ -183,6 +225,8 @@ def run_ocr(
                         message="OCR returned empty text.",
                         page=page_number,
                         details={
+                            "ocr_lang": ocr_lang,
+                            "reason": "empty_result",
                             "ocr_confidence_mean": metrics.mean,
                             "ocr_confidence_median": metrics.median,
                             "low_conf_token_ratio": metrics.low_conf_token_ratio,
@@ -205,6 +249,7 @@ def run_ocr(
                     code=WarningCode.OCR_FAILED,
                     message=f"OCR failed on page {page_number}: {exc}",
                     page=page_number,
+                    details={"ocr_lang": ocr_lang, "reason": "ocr_failed"},
                 )
             )
         finally:
