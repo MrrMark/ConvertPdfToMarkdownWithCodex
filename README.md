@@ -837,12 +837,12 @@ RAG 검색 품질을 로컬 deterministic 방식으로 점검하려면 `retrieva
 
 ```bash
 ./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --top-k 5
-./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --top-k 5 --min-expected-source-coverage 0.9 --min-requirement-coverage 0.9 --min-table-field-coverage 0.85 --min-cross-ref-resolved-coverage 0.8 --max-chunk-token-p95 512 --max-conversion-duration-ms 10000 --fail-on-threshold
+./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --top-k 5 --min-expected-source-coverage 0.9 --min-requirement-coverage 0.9 --min-table-field-coverage 0.85 --min-cross-ref-resolved-coverage 0.8 --min-relationship-target-coverage 1.0 --max-chunk-token-p95 512 --max-conversion-duration-ms 10000 --fail-on-threshold
 ./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --chunk-token-target 512 --min-chunk-size-compliance 0.95 --min-source-ref-presence-coverage 1.0 --max-duplicate-source-ratio 0.0 --fail-on-threshold
 ./.venv311/bin/python scripts/run_rag_eval.py --output-dir output --eval-set rag_eval_queries.json --calibration-profile docs/rag_calibration_profile.example.json --fail-on-threshold
 ```
 
-Eval fixture에는 `expected_source_ids`와 `expected_source_types` 외에 `expected_requirement_source_ids`, `expected_table_field_source_ids`를 넣을 수 있으며 report에는 hit@k, MRR, citation coverage, expected source coverage, requirement coverage, table-field coverage, cross-reference resolved coverage, chunk count, merged chunk count, average source record count, chunk token 분포, source-ref presence, duplicate source ratio, table contextual embedding coverage, conversion duration이 기록됩니다.
+Eval fixture에는 `expected_source_ids`와 `expected_source_types` 외에 `expected_requirement_source_ids`, `expected_table_field_source_ids`를 넣을 수 있습니다. Requirement coverage는 기본적으로 `requirement`/`requirement_trace`, table-field coverage는 `table_row`/`technical_table_unit`/`domain_unit` source type만 인정하며, report에는 hit@k, MRR, citation coverage, expected source coverage, requirement coverage, table-field coverage, cross-reference resolved coverage, relationship target coverage, chunk count, merged chunk count, average source record count, chunk token 분포, source-ref presence, duplicate source ratio, table contextual embedding coverage, conversion duration이 기록됩니다.
 
 `rag_eval_report.json`에는 hit@k, MRR, expected source coverage, query별 retrieved chunk/source id, missing expected source id, threshold 통과/실패 정보가 기록됩니다.
 
@@ -924,7 +924,7 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
-- `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref coverage, chunk token 분포, threshold summary
+- `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref/relationship target coverage, chunk token 분포, threshold summary
 - `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, optional GUI/CLI benchmark gate, schema check, packaging smoke/wheel contract command/status summary
 - `wheel_contract_report.json`: wheel 내부 GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
 - `gui_cli_parity_report.json`: CLI와 GUI headless runner가 같은 synthetic PDF/옵션에서 생성한 Markdown, manifest, report, RAG sidecar의 normalized hash equality 결과

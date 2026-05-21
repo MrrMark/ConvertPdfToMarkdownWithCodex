@@ -12,6 +12,13 @@ TABLE_CONTEXT_CHUNK_TYPES = {"table_row", "technical_table", "domain_unit"}
 DEFAULT_CHUNK_TOKEN_TARGET = 512
 TEXT_CHUNK_MERGE_POLICY = "merged_sibling_text_blocks"
 TEXT_CHUNK_MERGE_REASON = "sibling_text_merge"
+DEFAULT_REQUIREMENT_SOURCE_TYPES = {"requirement", "requirement_trace"}
+DEFAULT_TABLE_FIELD_SOURCE_TYPES = {"table_row", "technical_table_unit", "domain_unit"}
+RELATIONSHIP_ID_FIELDS = (
+    "previous_chunk_id",
+    "next_chunk_id",
+    "section_anchor_chunk_id",
+)
 
 
 def _tokens(text: str) -> set[str]:
@@ -76,11 +83,24 @@ def _coverage_for_expected_ids(
     expected_ids: set[str],
     *,
     source_types: set[str] | None = None,
+    include_chunk_id: bool = True,
 ) -> set[str]:
     covered: set[str] = set()
     for chunk in retrieved:
-        covered.update(_source_ids(chunk, source_types=source_types) & expected_ids)
+        covered.update(_source_ids(chunk, source_types=source_types, include_chunk_id=include_chunk_id) & expected_ids)
     return covered
+
+
+def _relationship_targets(chunk: dict[str, Any]) -> list[str]:
+    targets: list[str] = []
+    for field in RELATIONSHIP_ID_FIELDS:
+        value = chunk.get(field)
+        if isinstance(value, str) and value:
+            targets.append(value)
+    related = chunk.get("related_chunk_ids")
+    if isinstance(related, list):
+        targets.extend(str(item) for item in related if isinstance(item, str) and item)
+    return targets
 
 
 def score_chunk(query: str, chunk: dict[str, Any]) -> float:
@@ -144,6 +164,15 @@ def intrinsic_chunk_metrics(
         int(chunk.get("source_record_count") or len(chunk.get("source_refs") or []))
         for chunk in chunks
     ]
+    chunk_ids = {str(chunk.get("chunk_id")) for chunk in chunks if chunk.get("chunk_id")}
+    relationship_target_count = 0
+    relationship_target_missing_count = 0
+    for chunk in chunks:
+        for target in _relationship_targets(chunk):
+            relationship_target_count += 1
+            if target not in chunk_ids:
+                relationship_target_missing_count += 1
+    relationship_resolved_count = relationship_target_count - relationship_target_missing_count
     return {
         "chunk_count": len(chunks),
         "chunk_token_max": max(token_lengths, default=0),
@@ -168,6 +197,11 @@ def intrinsic_chunk_metrics(
         else 0.0,
         "table_contextual_embedding_count": len(contextual_table_chunks),
         "table_contextual_embedding_total": len(table_chunks),
+        "relationship_target_coverage": round(relationship_resolved_count / relationship_target_count, 4)
+        if relationship_target_count
+        else 1.0,
+        "relationship_target_count": relationship_target_count,
+        "relationship_target_missing_count": relationship_target_missing_count,
     }
 
 
@@ -195,6 +229,12 @@ def evaluate_queries(
         expected_source_types = {str(item) for item in case.get("expected_source_types", [])}
         expected_requirement_ids = {str(item) for item in case.get("expected_requirement_source_ids", [])}
         expected_table_field_ids = {str(item) for item in case.get("expected_table_field_source_ids", [])}
+        expected_requirement_types = {
+            str(item) for item in case.get("expected_requirement_source_types", DEFAULT_REQUIREMENT_SOURCE_TYPES)
+        }
+        expected_table_field_types = {
+            str(item) for item in case.get("expected_table_field_source_types", DEFAULT_TABLE_FIELD_SOURCE_TYPES)
+        }
         retrieved = retrieve(query, chunks, top_k=top_k)
         first_rank: int | None = None
         covered: set[str] = set()
@@ -210,8 +250,18 @@ def evaluate_queries(
         reciprocal_rank_sum += (1.0 / first_rank) if first_rank else 0.0
         expected_total += len(expected_ids)
         covered_total += len(covered)
-        requirement_covered = _coverage_for_expected_ids(retrieved, expected_requirement_ids)
-        table_field_covered = _coverage_for_expected_ids(retrieved, expected_table_field_ids)
+        requirement_covered = _coverage_for_expected_ids(
+            retrieved,
+            expected_requirement_ids,
+            source_types=expected_requirement_types,
+            include_chunk_id=False,
+        )
+        table_field_covered = _coverage_for_expected_ids(
+            retrieved,
+            expected_table_field_ids,
+            source_types=expected_table_field_types,
+            include_chunk_id=False,
+        )
         requirement_expected_total += len(expected_requirement_ids)
         requirement_covered_total += len(requirement_covered)
         table_field_expected_total += len(expected_table_field_ids)
@@ -227,8 +277,14 @@ def evaluate_queries(
                 "covered_source_ids": sorted(covered),
                 "missing_expected_source_ids": sorted(expected_ids - covered),
                 "expected_requirement_source_ids": sorted(expected_requirement_ids),
+                "expected_requirement_source_types": sorted(expected_requirement_types)
+                if expected_requirement_ids
+                else [],
                 "covered_requirement_source_ids": sorted(requirement_covered),
                 "expected_table_field_source_ids": sorted(expected_table_field_ids),
+                "expected_table_field_source_types": sorted(expected_table_field_types)
+                if expected_table_field_ids
+                else [],
                 "covered_table_field_source_ids": sorted(table_field_covered),
                 "retrieved": [
                     {
@@ -362,6 +418,7 @@ def apply_calibration_gate(
         "chunk_size_compliance": "min_chunk_size_compliance",
         "source_ref_presence_coverage": "min_source_ref_presence_coverage",
         "table_contextual_embedding_coverage": "min_table_contextual_embedding_coverage",
+        "relationship_target_coverage": "min_relationship_target_coverage",
     }
     max_metrics = {
         "chunk_token_p95": "max_chunk_token_p95",
@@ -419,6 +476,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-chunk-size-compliance", type=float)
     parser.add_argument("--min-source-ref-presence-coverage", type=float)
     parser.add_argument("--min-table-contextual-embedding-coverage", type=float)
+    parser.add_argument("--min-relationship-target-coverage", type=float)
     parser.add_argument("--max-chunk-token-p95", type=float)
     parser.add_argument("--max-chunk-token-max", type=float)
     parser.add_argument("--max-duplicate-source-ratio", type=float)
@@ -449,6 +507,7 @@ def main(argv: list[str] | None = None) -> int:
                 "min_chunk_size_compliance": args.min_chunk_size_compliance,
                 "min_source_ref_presence_coverage": args.min_source_ref_presence_coverage,
                 "min_table_contextual_embedding_coverage": args.min_table_contextual_embedding_coverage,
+                "min_relationship_target_coverage": args.min_relationship_target_coverage,
                 "max_chunk_token_p95": args.max_chunk_token_p95,
                 "max_chunk_token_max": args.max_chunk_token_max,
                 "max_duplicate_source_ratio": args.max_duplicate_source_ratio,

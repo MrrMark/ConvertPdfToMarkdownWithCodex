@@ -547,6 +547,7 @@ Policy:
 - `targets` may include `openai`, `azure-ai-search`, `langchain`, and `llamaindex`.
 - `findings[]` are sorted deterministically by severity, file, line, field, and code.
 - `severity` is one of `error`, `warning`, or `info`.
+- The validator checks required field and type coverage for `retrieval_chunks_rag.jsonl`, `tables_rag.jsonl`, `technical_tables_rag.jsonl`, and `requirement_traceability_rag.jsonl` before external indexing.
 - The validator must not call external services or create embeddings.
 - Confidential-safe findings are advisory for metadata sharing. The validator does not redact source `text`.
 

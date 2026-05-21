@@ -19,7 +19,7 @@ def _chunk(chunk_id: str, text: str, source_id: str, priority: int = 50, source_
 
 def test_rag_eval_reports_hit_mrr_and_citation_coverage() -> None:
     chunks = [
-        _chunk("chunk-000001", "The controller shall return SUCCESS.", "page-0001-block-0001", 100),
+        _chunk("chunk-000001", "The controller shall return SUCCESS.", "req-trace-000001", 100, "requirement_trace"),
         _chunk("chunk-000002", "Unrelated namespace content.", "page-0001-block-0002"),
     ]
 
@@ -28,8 +28,8 @@ def test_rag_eval_reports_hit_mrr_and_citation_coverage() -> None:
         queries=[
             {
                 "query": "controller success",
-                "expected_source_ids": ["page-0001-block-0001"],
-                "expected_requirement_source_ids": ["page-0001-block-0001"],
+                "expected_source_ids": ["req-trace-000001"],
+                "expected_requirement_source_ids": ["req-trace-000001"],
             }
         ],
         top_k=1,
@@ -57,6 +57,9 @@ def test_rag_eval_reports_hit_mrr_and_citation_coverage() -> None:
         "table_contextual_embedding_coverage": 0.0,
         "table_contextual_embedding_count": 0,
         "table_contextual_embedding_total": 0,
+        "relationship_target_coverage": 1.0,
+        "relationship_target_count": 0,
+        "relationship_target_missing_count": 0,
     }
     assert report["results"][0]["retrieved"][0]["chunk_id"] == "chunk-000001"
 
@@ -119,6 +122,35 @@ def test_rag_eval_scores_optional_embedding_text_and_reports_intrinsic_metrics()
     assert report["metrics"]["duplicate_source_ratio"] == 0.0
 
 
+def test_rag_eval_requirement_and_table_field_coverage_require_matching_source_types() -> None:
+    chunks = [
+        _chunk("chunk-000001", "REQ-1 shall return status.", "req-trace-000001", 100, "text_block"),
+        _chunk("chunk-000002", "Field Status describes current state.", "tech-table-000001", 90, "text_block"),
+    ]
+
+    report = evaluate_queries(
+        chunks=chunks,
+        queries=[
+            {
+                "query": "return status field",
+                "expected_source_ids": ["req-trace-000001", "tech-table-000001"],
+                "expected_requirement_source_ids": ["req-trace-000001"],
+                "expected_table_field_source_ids": ["tech-table-000001"],
+            }
+        ],
+        top_k=2,
+    )
+
+    result = report["results"][0]
+    assert report["metrics"]["expected_source_coverage"] == 1.0
+    assert report["metrics"]["requirement_coverage"] == 0.0
+    assert report["metrics"]["table_field_coverage"] == 0.0
+    assert result["expected_requirement_source_types"] == ["requirement", "requirement_trace"]
+    assert result["expected_table_field_source_types"] == ["domain_unit", "table_row", "technical_table_unit"]
+    assert result["covered_requirement_source_ids"] == []
+    assert result["covered_table_field_source_ids"] == []
+
+
 def test_rag_eval_reports_merged_text_chunk_metrics() -> None:
     chunks = [
         _chunk("chunk-000001", "Alpha status.\n\nBeta status.", "page-0001-block-0001")
@@ -144,11 +176,33 @@ def test_rag_eval_reports_merged_text_chunk_metrics() -> None:
     assert report["metrics"]["average_source_record_count"] == 1.5
 
 
+def test_rag_eval_reports_relationship_target_coverage() -> None:
+    chunks = [
+        _chunk("chunk-000001", "Alpha status.", "page-0001-block-0001")
+        | {"next_chunk_id": "chunk-000002", "related_chunk_ids": ["chunk-000002", "chunk-missing"]},
+        _chunk("chunk-000002", "Beta status.", "page-0001-block-0002")
+        | {"previous_chunk_id": "chunk-000001"},
+    ]
+
+    report = evaluate_queries(chunks=chunks, queries=[], top_k=1)
+
+    assert report["metrics"]["relationship_target_count"] == 4
+    assert report["metrics"]["relationship_target_missing_count"] == 1
+    assert report["metrics"]["relationship_target_coverage"] == 0.75
+
+
 def test_rag_eval_cli_writes_report(tmp_path: Path) -> None:
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     (output_dir / "retrieval_chunks_rag.jsonl").write_text(
-        json.dumps(_chunk("chunk-000001", "Field Status describes current status.", "page-0001-table-0001-row-0001"))
+        json.dumps(
+            _chunk(
+                "chunk-000001",
+                "Field Status describes current status.",
+                "page-0001-table-0001-row-0001",
+                source_type="table_row",
+            )
+        )
         + "\n",
         encoding="utf-8",
     )
@@ -227,6 +281,8 @@ def test_rag_eval_calibration_gate_uses_thresholds_and_output_diagnostics(tmp_pa
             "1.0",
             "--min-cross-ref-resolved-coverage",
             "0.75",
+            "--min-relationship-target-coverage",
+            "1.0",
             "--max-conversion-duration-ms",
             "1000",
             "--fail-on-threshold",

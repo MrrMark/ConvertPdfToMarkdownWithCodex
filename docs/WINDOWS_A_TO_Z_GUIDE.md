@@ -636,7 +636,7 @@ python scripts\run_release_gates.py --output-dir .\release_gate_gui_benchmark --
 - 실제 PDF는 `pdf\` 같은 로컬 디렉터리에만 두고 repo에 커밋하지 않습니다.
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
-- `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref coverage, chunk token 분포, query별 retrieved chunk/source id와 missing expected source id
+- `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref/relationship target coverage, chunk token 분포, query별 retrieved chunk/source id와 missing expected source id
 - `ssd_rag_contract_report.json`: `retrieval_chunks_rag.jsonl`이 SSD 에이전트 `RagChunk/RagCitation` 계약으로 매핑 가능한지 검사한 결과. TCG는 `HIL/TCG` first-class spec_type으로 검증합니다.
 - `ssd_corpus_profile_report.json`: local-only NVMe/PCIe/OCP/TCG profile 변환, SSD 계약 검증, 선택적 RAG eval aggregate 집계
 - `local_corpus_evidence_pack.json`: 비공개 corpus 실패 패턴을 raw path, command, filename, query text 없이 공유하기 위한 redacted signature 집계
