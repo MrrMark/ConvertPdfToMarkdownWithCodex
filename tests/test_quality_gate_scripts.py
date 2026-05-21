@@ -262,6 +262,7 @@ def test_release_gate_runner_supports_optional_rag_calibration_gate(monkeypatch,
             rag_min_requirement_coverage=0.9,
             rag_min_table_field_coverage=0.85,
             rag_min_cross_ref_resolved_coverage=0.8,
+            rag_min_relationship_target_coverage=1.0,
             rag_max_chunk_token_p95=512,
             rag_max_conversion_duration_ms=10_000,
         )
@@ -274,6 +275,7 @@ def test_release_gate_runner_supports_optional_rag_calibration_gate(monkeypatch,
     assert "--fail-on-threshold" in command
     assert "--min-expected-source-coverage" in command
     assert "--min-requirement-coverage" in command
+    assert "--min-relationship-target-coverage" in command
     assert "--max-conversion-duration-ms" in command
 
 

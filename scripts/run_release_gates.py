@@ -55,6 +55,7 @@ class ReleaseGateConfig:
     rag_min_requirement_coverage: float | None = None
     rag_min_table_field_coverage: float | None = None
     rag_min_cross_ref_resolved_coverage: float | None = None
+    rag_min_relationship_target_coverage: float | None = None
     rag_max_chunk_token_p95: float | None = None
     rag_max_chunk_token_max: float | None = None
     rag_max_conversion_duration_ms: float | None = None
@@ -255,6 +256,7 @@ def _rag_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     _append_optional_arg(command, "--min-requirement-coverage", config.rag_min_requirement_coverage)
     _append_optional_arg(command, "--min-table-field-coverage", config.rag_min_table_field_coverage)
     _append_optional_arg(command, "--min-cross-ref-resolved-coverage", config.rag_min_cross_ref_resolved_coverage)
+    _append_optional_arg(command, "--min-relationship-target-coverage", config.rag_min_relationship_target_coverage)
     _append_optional_arg(command, "--max-chunk-token-p95", config.rag_max_chunk_token_p95)
     _append_optional_arg(command, "--max-chunk-token-max", config.rag_max_chunk_token_max)
     _append_optional_arg(command, "--max-conversion-duration-ms", config.rag_max_conversion_duration_ms)
@@ -579,6 +581,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rag-min-requirement-coverage", type=float)
     parser.add_argument("--rag-min-table-field-coverage", type=float)
     parser.add_argument("--rag-min-cross-ref-resolved-coverage", type=float)
+    parser.add_argument("--rag-min-relationship-target-coverage", type=float)
     parser.add_argument("--rag-max-chunk-token-p95", type=float)
     parser.add_argument("--rag-max-chunk-token-max", type=float)
     parser.add_argument("--rag-max-conversion-duration-ms", type=float)
@@ -634,6 +637,7 @@ def main(argv: list[str] | None = None) -> int:
             rag_min_requirement_coverage=args.rag_min_requirement_coverage,
             rag_min_table_field_coverage=args.rag_min_table_field_coverage,
             rag_min_cross_ref_resolved_coverage=args.rag_min_cross_ref_resolved_coverage,
+            rag_min_relationship_target_coverage=args.rag_min_relationship_target_coverage,
             rag_max_chunk_token_p95=args.rag_max_chunk_token_p95,
             rag_max_chunk_token_max=args.rag_max_chunk_token_max,
             rag_max_conversion_duration_ms=args.rag_max_conversion_duration_ms,

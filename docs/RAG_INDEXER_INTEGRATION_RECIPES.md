@@ -256,7 +256,8 @@ RAG smoke/eval fixture:
     {
       "query": "Which requirement controls reserved bits?",
       "expected_source_ids": ["req-trace-000002"],
-      "expected_requirement_source_ids": ["req-trace-000002"]
+      "expected_requirement_source_ids": ["req-trace-000002"],
+      "expected_requirement_source_types": ["requirement_trace"]
     }
   ]
 }
@@ -272,6 +273,7 @@ python scripts/run_rag_eval.py \
   --min-requirement-coverage 0.9 \
   --min-table-field-coverage 0.85 \
   --min-cross-ref-resolved-coverage 0.8 \
+  --min-relationship-target-coverage 1.0 \
   --chunk-token-target 512 \
   --min-chunk-size-compliance 0.95 \
   --min-source-ref-presence-coverage 1.0 \
@@ -301,10 +303,13 @@ python scripts/run_release_gates.py \
   --rag-eval-set rag_eval_queries.json \
   --rag-min-requirement-coverage 0.9 \
   --rag-min-table-field-coverage 0.85 \
-  --rag-min-cross-ref-resolved-coverage 0.8
+  --rag-min-cross-ref-resolved-coverage 0.8 \
+  --rag-min-relationship-target-coverage 1.0
 ```
 
 실제 NVMe/PCIe/OCP/TCG/customer-like corpus는 repo에 커밋하지 말고 로컬 profile과 sanitized eval fixture만 사용한다.
+
+Eval fixture의 requirement coverage는 기본적으로 `requirement`, `requirement_trace` source type만 인정한다. Table-field coverage는 기본적으로 `table_row`, `technical_table_unit`, `domain_unit` source type만 인정한다. 다른 source type을 의도적으로 허용해야 할 때만 `expected_requirement_source_types` 또는 `expected_table_field_source_types`를 명시한다. Relationship metadata coverage는 `previous_chunk_id`, `next_chunk_id`, `section_anchor_chunk_id`, `related_chunk_ids`가 같은 `retrieval_chunks_rag.jsonl` 내부 final chunk id로 해소되는지 local-only로 계산한다.
 
 ## Confidential Safe Mode Metadata
 

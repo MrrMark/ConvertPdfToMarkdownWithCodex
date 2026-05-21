@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from pdf2md.models import IndexContractReport
-from scripts.validate_index_contract import main, validate_index_contract
+from scripts.validate_index_contract import _metadata_for_target, main, validate_index_contract
 
 
 SOURCE_SHA256 = "a" * 64
@@ -50,6 +50,98 @@ def _valid_chunk(**overrides) -> dict:
     return chunk
 
 
+def _valid_table_row(**overrides) -> dict:
+    record = {
+        "table_id": "page-0001-table-0001",
+        "table_row_id": "page-0001-table-0001-row-0001",
+        "page": 1,
+        "table_index": 1,
+        "source_mode": "html",
+        "headers": ["Bits", "Field", "Description"],
+        "row_index": 1,
+        "cells": {"Bits": "07:00", "Field": "STATUS", "Description": "Status field"},
+        "row_text": "Bits = 07:00 | Field = STATUS | Description = Status field",
+        "bbox": [72.0, 92.0, 240.0, 122.0],
+        "quality_score": 0.91,
+        "fallback_reasons": ["AMBIGUOUS_GRID"],
+        "header_depth": 1,
+        "header_confidence": 0.86,
+        "rag_header_strategy": "single_header_row",
+    }
+    record.update(overrides)
+    return record
+
+
+def _valid_requirement_trace(**overrides) -> dict:
+    record = {
+        "trace_id": "req-trace-000001",
+        "trace_index": 1,
+        "requirement_id": "REQ-1",
+        "normative_strength": "required",
+        "text": "REQ-1 shall return GOOD when enabled.",
+        "condition": "when enabled",
+        "applicability": None,
+        "dependency_refs": ["Section 1.2"],
+        "exception_text": None,
+        "testability_hint": "directly_testable",
+        "page_range": [1, 1],
+        "bbox": [72.0, 92.0, 240.0, 122.0],
+        "heading_path": ["1 Requirements"],
+        "source_refs": [
+            {
+                "source_type": "requirement",
+                "source_id": "page-0001-sem-0001",
+                "page": 1,
+                "bbox": [72.0, 92.0, 240.0, 122.0],
+            }
+        ],
+        "classification_confidence": 0.9,
+        "classification_reasons": ["semantic_requirement"],
+    }
+    record.update(overrides)
+    return record
+
+
+def _valid_technical_table(**overrides) -> dict:
+    record = {
+        "technical_table_unit_id": "tech-table-000001",
+        "technical_table_unit_index": 1,
+        "unit_type": "bitfield",
+        "page": 1,
+        "table_id": "page-0001-table-0001",
+        "table_row_id": "page-0001-table-0001-row-0001",
+        "row_index": 1,
+        "text": "Bits = 07:00 | Field = STATUS | Description = Status field",
+        "raw_cells": {"Bits": "07:00", "Field": "STATUS", "Description": "Status field"},
+        "bit_range": "07:00",
+        "field_name": "STATUS",
+        "value": None,
+        "meaning": "Status field",
+        "reset_default": None,
+        "access": None,
+        "requirement_ref": None,
+        "opcode": None,
+        "command": None,
+        "log_identifier": None,
+        "feature_identifier": None,
+        "bbox": [72.0, 92.0, 240.0, 122.0],
+        "source_refs": [
+            {
+                "source_type": "table_row",
+                "source_id": "page-0001-table-0001-row-0001",
+                "page": 1,
+                "table_id": "page-0001-table-0001",
+                "row_index": 1,
+                "bbox": [72.0, 92.0, 240.0, 122.0],
+            }
+        ],
+        "classification_confidence": 0.9,
+        "classification_reasons": ["field_and_bits"],
+    }
+    record.update(overrides)
+    return record
+
+
 def test_index_contract_accepts_valid_retrieval_chunk_for_all_targets(tmp_path: Path) -> None:
     _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
 
@@ -62,6 +154,69 @@ def test_index_contract_accepts_valid_retrieval_chunk_for_all_targets(tmp_path: 
     assert validated.summary.checked_records == 1
     assert validated.findings == []
     assert validated.targets == ["openai", "azure-ai-search", "langchain", "llamaindex"]
+
+
+def test_index_contract_validates_core_sidecar_required_fields(tmp_path: Path) -> None:
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
+    _write_jsonl(tmp_path / "tables_rag.jsonl", [_valid_table_row()])
+    _write_jsonl(tmp_path / "requirement_traceability_rag.jsonl", [_valid_requirement_trace()])
+    _write_jsonl(tmp_path / "technical_tables_rag.jsonl", [_valid_technical_table()])
+
+    report = validate_index_contract(output_dir=tmp_path, target="all")
+
+    assert report["status"] == "passed"
+    assert report["summary"]["checked_files"] == 4
+    assert report["summary"]["checked_records"] == 4
+    assert report["findings"] == []
+
+
+def test_index_contract_reports_core_sidecar_schema_errors(tmp_path: Path) -> None:
+    broken_table = _valid_table_row(headers="Bits", cells=[], quality_score="good")
+    broken_trace = _valid_requirement_trace(trace_index="1", page_range=[2, 1], source_refs=[])
+    broken_technical = _valid_technical_table(raw_cells=[], classification_reasons="field_and_bits")
+    broken_technical.pop("unit_type")
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
+    _write_jsonl(tmp_path / "tables_rag.jsonl", [broken_table])
+    _write_jsonl(tmp_path / "requirement_traceability_rag.jsonl", [broken_trace])
+    _write_jsonl(tmp_path / "technical_tables_rag.jsonl", [broken_technical])
+
+    report = validate_index_contract(output_dir=tmp_path, target="openai")
+
+    codes = {finding["code"] for finding in report["findings"]}
+    assert report["status"] == "failed"
+    assert "missing_required_field" in codes
+    assert "invalid_string_list_field" in codes
+    assert "invalid_object_field" in codes
+    assert "invalid_number_field" in codes
+    assert "invalid_integer_field" in codes
+    assert "invalid_page_range" in codes
+    assert "missing_source_refs" in codes
+
+
+def test_index_contract_target_metadata_preserves_recipe_fields() -> None:
+    chunk = _valid_chunk(
+        embedding_token_estimate=12,
+        merged_source_chunk_ids=["chunk-000010", "chunk-000011"],
+        previous_chunk_id="chunk-000000",
+        next_chunk_id="chunk-000002",
+        section_anchor_chunk_id="chunk-000001",
+        related_chunk_ids=["chunk-000000", "chunk-000002"],
+        relationship_strategy="chunk_group_prev_next_section_anchor",
+    )
+
+    openai_metadata = _metadata_for_target(chunk, "openai")
+    azure_metadata = _metadata_for_target(chunk, "azure-ai-search")
+    langchain_metadata = _metadata_for_target(chunk, "langchain")
+    llamaindex_metadata = _metadata_for_target(chunk, "llamaindex")
+
+    assert openai_metadata["embedding_token_estimate"] == 12
+    assert openai_metadata["merged_source_chunk_ids"] == ["chunk-000010", "chunk-000011"]
+    assert azure_metadata["source_refs_json"].startswith("[")
+    assert azure_metadata["previous_chunk_id"] == "chunk-000000"
+    assert langchain_metadata["source_text"] == chunk["text"]
+    assert langchain_metadata["schema_version"] == "1.0"
+    assert llamaindex_metadata["source_refs"] == chunk["source_refs"]
+    assert llamaindex_metadata["source_sha256"] == SOURCE_SHA256
 
 
 def test_index_contract_reports_required_field_type_and_source_ref_errors(tmp_path: Path) -> None:

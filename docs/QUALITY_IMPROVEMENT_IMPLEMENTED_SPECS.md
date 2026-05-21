@@ -287,6 +287,7 @@ python scripts/validate_index_contract.py --output-dir output --target all --con
 
 - JSONL 각 줄은 유효한 JSON object여야 한다.
 - `retrieval_chunks_rag.jsonl` record는 `docs/OUTPUT_SCHEMA.md`의 required field를 포함해야 한다.
+- `tables_rag.jsonl`, `technical_tables_rag.jsonl`, `requirement_traceability_rag.jsonl`도 required field와 핵심 타입을 검사한다.
 - `chunk_id`, `chunk_index`, `chunk_type`, `text`, `source_refs`, `page_range`, `source_dedupe_key` 타입을 엄격히 검증한다.
 - `schema_version`과 `source_sha256`은 모든 retrieval chunk에 존재해야 한다.
 - `source_refs`는 비어 있으면 error다.
@@ -908,6 +909,8 @@ RAG 평가가 단순 keyword hit뿐 아니라 expected source id를 맞히는지
 ### 구현 결과
 
 - eval set query에 `expected_source_types`를 추가해 chunk id와 source_refs source type을 함께 검증할 수 있다.
+- requirement/table-field coverage는 기본 source type allowlist를 사용해 잘못된 source type의 우연한 id match를 막는다.
+- `relationship_target_coverage`로 relationship metadata가 같은 `retrieval_chunks_rag.jsonl` 내부 final chunk id를 가리키는지 검증한다.
 - `rag_eval_report.json` metrics에 `expected_source_coverage`, hit/total/miss count를 추가했다.
 - query별 결과에 `missing_expected_source_ids`를 기록해 golden source id 누락 원인을 바로 추적할 수 있다.
 - `scripts/run_release_gates.py`의 `rag` gate가 `--rag-min-expected-source-coverage` threshold를 전달한다.

@@ -72,12 +72,89 @@ SOURCE_REF_SIDECARS = {
     "domain_units_rag.jsonl": "domain_unit_id",
 }
 TEXT_BLOCK_FIELDS = ("block_id", "page", "block_index", "text")
-TABLE_ROW_FIELDS = ("table_id", "table_row_id", "page", "row_index")
+TABLE_ROW_REQUIRED_FIELDS = {
+    "table_id",
+    "table_row_id",
+    "page",
+    "table_index",
+    "source_mode",
+    "headers",
+    "row_index",
+    "cells",
+    "row_text",
+    "bbox",
+    "quality_score",
+    "fallback_reasons",
+    "header_depth",
+    "header_confidence",
+    "rag_header_strategy",
+}
+REQUIREMENT_TRACE_REQUIRED_FIELDS = {
+    "trace_id",
+    "trace_index",
+    "requirement_id",
+    "normative_strength",
+    "text",
+    "condition",
+    "applicability",
+    "dependency_refs",
+    "exception_text",
+    "testability_hint",
+    "page_range",
+    "bbox",
+    "heading_path",
+    "source_refs",
+    "classification_confidence",
+    "classification_reasons",
+}
+TECHNICAL_TABLE_REQUIRED_FIELDS = {
+    "technical_table_unit_id",
+    "technical_table_unit_index",
+    "unit_type",
+    "page",
+    "table_id",
+    "table_row_id",
+    "row_index",
+    "text",
+    "raw_cells",
+    "bit_range",
+    "field_name",
+    "value",
+    "meaning",
+    "reset_default",
+    "access",
+    "requirement_ref",
+    "opcode",
+    "command",
+    "log_identifier",
+    "feature_identifier",
+    "bbox",
+    "source_refs",
+    "classification_confidence",
+    "classification_reasons",
+}
 DEFAULT_METADATA_LIMITS = {
     "openai": 16 * 1024,
     "azure-ai-search": 32 * 1024,
     "langchain": 64 * 1024,
     "llamaindex": 64 * 1024,
+}
+NULLABLE_STRING_FIELDS = {
+    "requirement_id",
+    "condition",
+    "applicability",
+    "exception_text",
+    "bit_range",
+    "field_name",
+    "value",
+    "meaning",
+    "reset_default",
+    "access",
+    "requirement_ref",
+    "opcode",
+    "command",
+    "log_identifier",
+    "feature_identifier",
 }
 
 
@@ -252,6 +329,131 @@ def _validate_bbox(
             record_id=record_id,
             field=field,
             message=f"{field} must be a four-number list or null when optional.",
+        )
+
+
+def _validate_required_fields(
+    record: dict[str, Any],
+    *,
+    required_fields: set[str],
+    findings: list[dict[str, Any]],
+    file_name: str,
+    line: int,
+    record_id: str | None,
+) -> None:
+    missing = sorted(field for field in required_fields if field not in record)
+    if missing:
+        _add_finding(
+            findings,
+            severity="error",
+            code="missing_required_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field=",".join(missing),
+            message=f"Missing required {file_name} fields: {', '.join(missing)}.",
+        )
+
+
+def _validate_string_value(
+    value: Any,
+    *,
+    findings: list[dict[str, Any]],
+    file_name: str,
+    line: int,
+    record_id: str | None,
+    field: str,
+    required: bool = True,
+) -> None:
+    if value is None and not required:
+        return
+    if not isinstance(value, str) or (required and not value.strip()):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_string_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field=field,
+            message=f"{field} must be a {'non-empty ' if required else ''}string.",
+        )
+
+
+def _validate_string_list_value(
+    value: Any,
+    *,
+    findings: list[dict[str, Any]],
+    file_name: str,
+    line: int,
+    record_id: str | None,
+    field: str,
+) -> None:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_string_list_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field=field,
+            message=f"{field} must be a list of strings.",
+        )
+
+
+def _validate_int_value(
+    value: Any,
+    *,
+    findings: list[dict[str, Any]],
+    file_name: str,
+    line: int,
+    record_id: str | None,
+    field: str,
+    positive: bool = False,
+) -> None:
+    if not _is_int(value) or (positive and value < 1):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_integer_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field=field,
+            message=f"{field} must be {'a positive ' if positive else 'an '}integer.",
+        )
+
+
+def _validate_page_range_value(
+    value: Any,
+    *,
+    findings: list[dict[str, Any]],
+    file_name: str,
+    line: int,
+    record_id: str | None,
+    field: str = "page_range",
+) -> None:
+    if (
+        not isinstance(value, list)
+        or len(value) != 2
+        or not all(_is_int(page) and page >= 1 for page in value)
+        or (isinstance(value, list) and len(value) == 2 and value[0] > value[1])
+    ):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_page_range",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field=field,
+            message=f"{field} must be [start, end] positive integers with start <= end.",
         )
 
 
@@ -475,24 +677,13 @@ def _validate_retrieval_chunk_record(
             message="char_count does not match text length.",
         )
 
-    page_range = record.get("page_range")
-    if (
-        not isinstance(page_range, list)
-        or len(page_range) != 2
-        or not all(_is_int(page) and page >= 1 for page in page_range)
-        or (isinstance(page_range, list) and len(page_range) == 2 and page_range[0] > page_range[1])
-    ):
-        _add_finding(
-            findings,
-            severity="error",
-            code="invalid_page_range",
-            target="common",
-            file=file_name,
-            line=line,
-            record_id=record_id,
-            field="page_range",
-            message="page_range must be [start, end] positive integers with start <= end.",
-        )
+    _validate_page_range_value(
+        record.get("page_range"),
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+    )
 
     for field in ("heading_path", "semantic_types", "chunk_boundary_reasons"):
         value = record.get(field)
@@ -629,7 +820,9 @@ def _openai_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "semantic_types": record.get("semantic_types"),
         "retrieval_priority": record.get("retrieval_priority"),
         "token_estimate": record.get("token_estimate"),
+        "embedding_token_estimate": record.get("embedding_token_estimate"),
         "source_dedupe_key": record.get("source_dedupe_key"),
+        "merged_source_chunk_ids": record.get("merged_source_chunk_ids"),
         "previous_chunk_id": record.get("previous_chunk_id"),
         "next_chunk_id": record.get("next_chunk_id"),
         "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
@@ -655,6 +848,9 @@ def _azure_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "page_end": page_range[1] if len(page_range) == 2 else None,
         "retrieval_priority": record.get("retrieval_priority"),
         "token_estimate": record.get("token_estimate"),
+        "embedding_token_estimate": record.get("embedding_token_estimate"),
+        "source_dedupe_key": record.get("source_dedupe_key"),
+        "merged_source_chunk_ids": record.get("merged_source_chunk_ids"),
         "previous_chunk_id": record.get("previous_chunk_id"),
         "next_chunk_id": record.get("next_chunk_id"),
         "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
@@ -667,12 +863,19 @@ def _azure_metadata(record: dict[str, Any]) -> dict[str, Any]:
 def _document_metadata(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": record.get("chunk_id"),
+        "source_text": record.get("text"),
         "chunk_type": record.get("chunk_type"),
         "source_refs": record.get("source_refs"),
         "section_path": record.get("section_path"),
         "page_range": record.get("page_range"),
         "semantic_types": record.get("semantic_types"),
         "retrieval_priority": record.get("retrieval_priority"),
+        "token_estimate": record.get("token_estimate"),
+        "embedding_token_estimate": record.get("embedding_token_estimate"),
+        "source_dedupe_key": record.get("source_dedupe_key"),
+        "merged_source_chunk_ids": record.get("merged_source_chunk_ids"),
+        "schema_version": record.get("schema_version"),
+        "source_sha256": record.get("source_sha256"),
         "previous_chunk_id": record.get("previous_chunk_id"),
         "next_chunk_id": record.get("next_chunk_id"),
         "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
@@ -796,6 +999,307 @@ def _validate_target_mapping(
             )
 
 
+def _validate_table_row_record(
+    *,
+    file_name: str,
+    line: int,
+    record: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> None:
+    record_id = _record_id(record)
+    _validate_required_fields(
+        record,
+        required_fields=TABLE_ROW_REQUIRED_FIELDS,
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+    )
+    for field in ("table_id", "table_row_id", "source_mode", "row_text", "rag_header_strategy"):
+        if field in record:
+            _validate_string_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    for field in ("page", "table_index", "row_index", "header_depth"):
+        if field in record:
+            _validate_int_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+                positive=field != "header_depth",
+            )
+    if "headers" in record:
+        _validate_string_list_value(
+            record.get("headers"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="headers",
+        )
+    if "cells" in record and not isinstance(record.get("cells"), dict):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_object_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="cells",
+            message="cells must be an object keyed by table header.",
+        )
+    if "quality_score" in record and not _is_number(record.get("quality_score")):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_number_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="quality_score",
+            message="quality_score must be a number.",
+        )
+    if "header_confidence" in record and not _is_number(record.get("header_confidence")):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_number_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="header_confidence",
+            message="header_confidence must be a number.",
+        )
+    if "fallback_reasons" in record:
+        _validate_string_list_value(
+            record.get("fallback_reasons"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="fallback_reasons",
+        )
+    if "bbox" in record:
+        _validate_bbox(
+            record.get("bbox"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="bbox",
+            required=False,
+        )
+
+
+def _validate_requirement_trace_record(
+    *,
+    file_name: str,
+    line: int,
+    record: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> None:
+    record_id = _record_id(record)
+    _validate_required_fields(
+        record,
+        required_fields=REQUIREMENT_TRACE_REQUIRED_FIELDS,
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+    )
+    for field in ("trace_id", "normative_strength", "text", "testability_hint"):
+        if field in record:
+            _validate_string_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    for field in ("requirement_id", "condition", "applicability", "exception_text"):
+        if field in record:
+            _validate_string_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+                required=False,
+            )
+    if "trace_index" in record:
+        _validate_int_value(
+            record.get("trace_index"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="trace_index",
+            positive=True,
+        )
+    if "page_range" in record:
+        _validate_page_range_value(
+            record.get("page_range"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+        )
+    if "bbox" in record:
+        _validate_bbox(
+            record.get("bbox"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="bbox",
+            required=False,
+        )
+    for field in ("heading_path", "dependency_refs", "classification_reasons"):
+        if field in record:
+            _validate_string_list_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    if "classification_confidence" in record and not _is_number(record.get("classification_confidence")):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_number_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="classification_confidence",
+            message="classification_confidence must be a number.",
+        )
+    if "source_refs" in record:
+        _validate_source_refs(
+            record.get("source_refs"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+        )
+
+
+def _validate_technical_table_record(
+    *,
+    file_name: str,
+    line: int,
+    record: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> None:
+    record_id = _record_id(record)
+    _validate_required_fields(
+        record,
+        required_fields=TECHNICAL_TABLE_REQUIRED_FIELDS,
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+    )
+    for field in ("technical_table_unit_id", "unit_type", "table_id", "table_row_id", "text"):
+        if field in record:
+            _validate_string_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    for field in NULLABLE_STRING_FIELDS:
+        if field in record:
+            _validate_string_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+                required=False,
+            )
+    for field in ("technical_table_unit_index", "page", "row_index"):
+        if field in record:
+            _validate_int_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+                positive=True,
+            )
+    if "raw_cells" in record and not isinstance(record.get("raw_cells"), dict):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_object_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="raw_cells",
+            message="raw_cells must be an object preserving original table cells.",
+        )
+    if "bbox" in record:
+        _validate_bbox(
+            record.get("bbox"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="bbox",
+            required=False,
+        )
+    if "source_refs" in record:
+        _validate_source_refs(
+            record.get("source_refs"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+        )
+    if "classification_confidence" in record and not _is_number(record.get("classification_confidence")):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_number_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="classification_confidence",
+            message="classification_confidence must be a number.",
+        )
+    if "classification_reasons" in record:
+        _validate_string_list_value(
+            record.get("classification_reasons"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="classification_reasons",
+        )
+
+
 def _validate_optional_sidecar_record(
     *,
     file_name: str,
@@ -804,7 +1308,13 @@ def _validate_optional_sidecar_record(
     findings: list[dict[str, Any]],
 ) -> None:
     record_id = _record_id(record)
-    if file_name in SOURCE_REF_SIDECARS:
+    if file_name == "requirement_traceability_rag.jsonl":
+        _validate_requirement_trace_record(file_name=file_name, line=line, record=record, findings=findings)
+    elif file_name == "technical_tables_rag.jsonl":
+        _validate_technical_table_record(file_name=file_name, line=line, record=record, findings=findings)
+    elif file_name == "tables_rag.jsonl":
+        _validate_table_row_record(file_name=file_name, line=line, record=record, findings=findings)
+    elif file_name in SOURCE_REF_SIDECARS:
         id_field = SOURCE_REF_SIDECARS[file_name]
         if _is_missing(record.get(id_field)):
             _add_finding(
@@ -838,20 +1348,6 @@ def _validate_optional_sidecar_record(
                     record_id=record_id,
                     field=field,
                     message=f"text block records should include {field}.",
-                )
-    elif file_name == "tables_rag.jsonl":
-        for field in TABLE_ROW_FIELDS:
-            if _is_missing(record.get(field)):
-                _add_finding(
-                    findings,
-                    severity="warning",
-                    code="missing_table_row_provenance",
-                    target="common",
-                    file=file_name,
-                    line=line,
-                    record_id=record_id,
-                    field=field,
-                    message=f"table row records should include {field}.",
                 )
 
 
