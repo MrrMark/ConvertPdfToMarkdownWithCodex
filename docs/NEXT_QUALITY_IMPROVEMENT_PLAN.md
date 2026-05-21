@@ -23,12 +23,4 @@
 
 ## 남은 작업
 
-### Q83. Real Corpus Cross Reference Precision
-
-실제 NVMe profile 출력에서 `cross_ref_resolved_coverage=27/35=0.7714`다. 미해결 항목에는 `Table of Figures`, `section defines`, `register level interface`처럼 target label이 불명확하거나 참조가 아닌 문구가 섞여 있다. cross-ref classifier의 precision을 높여 불필요한 unresolved record를 줄이고 real technical spec 기준 coverage를 0.85 이상으로 끌어올린다.
-
-검증 기준:
-
-- 실제 NVMe local RAG eval에서 `min_cross_ref_resolved_coverage >= 0.85`
-- 명확한 Figure/Table/Section/technical ref resolution은 유지
-- false positive 억제 케이스를 synthetic fixture로 추가
+현재 남은 작업 없음.

@@ -169,6 +169,45 @@ def test_cross_refs_are_resolved_when_targets_exist_and_kept_when_unresolved() -
     assert len(reference_units) == 3
 
 
+def test_cross_ref_guardrails_skip_generic_unresolved_phrases() -> None:
+    result = build_semantic_layer(
+        text_block_records=[
+            _text_block("1 Overview", block_type="heading"),
+            _text_block("Table 1: Fields", block_id="page-0001-block-0002", block_index=2, block_type="caption"),
+            _text_block("Table of Figures", block_id="page-0001-block-0003", block_index=3),
+            _text_block(
+                "Relationships section of the NVM Express Base Specification.",
+                block_id="page-0001-block-0004",
+                block_index=4,
+            ),
+            _text_block(
+                "This section defines terms that are specific to this specification.",
+                block_id="page-0001-block-0005",
+                block_index=5,
+            ),
+            _text_block(
+                "The base specification defines a register level interface for host software.",
+                block_id="page-0001-block-0006",
+                block_index=6,
+            ),
+            _text_block(
+                "See Section 1 and Table 1 for details.",
+                block_id="page-0001-block-0007",
+                block_index=7,
+            ),
+        ],
+        rag_tables=[],
+    )
+
+    assert [(record["target_label"], record["resolved"]) for record in result.cross_refs] == [
+        ("Section 1", True),
+        ("Table 1", True),
+    ]
+    assert result.unresolved_cross_ref_count == 0
+    reference_units = [record for record in result.semantic_units if record["semantic_type"] == "reference"]
+    assert len(reference_units) == 2
+
+
 def test_technical_cross_refs_include_requirement_and_log_identifier_targets() -> None:
     rag_tables = normalize_rag_table_payload(
         [

@@ -66,6 +66,24 @@ REGISTER_REF_PATTERN = re.compile(
     r"\b(?:Register|Capability)\s+(?P<label>[A-Za-z][A-Za-z0-9 _/-]{1,80})",
     re.IGNORECASE,
 )
+REFERENCE_LABEL_STOPWORDS = {
+    "above",
+    "below",
+    "defines",
+    "describes",
+    "following",
+    "in",
+    "of",
+    "specifies",
+}
+GENERIC_REGISTER_REFERENCE_LABELS = {
+    "level interface",
+    "register level interface",
+}
+GENERIC_REGISTER_REFERENCE_HEADS = {
+    "interface",
+    "level",
+}
 NUMERIC_HEADING_PATTERN = re.compile(r"^(?P<label>\d+(?:\.\d+)*)\b")
 APPENDIX_HEADING_PATTERN = re.compile(r"^Appendix\s+(?P<label>[A-Za-z0-9]+)\b", re.IGNORECASE)
 TABLE_CAPTION_PATTERN = re.compile(r"\bTable\s+(?P<label>[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*)", re.IGNORECASE)
@@ -374,10 +392,47 @@ def _extra_reference_matches(text: str) -> list[tuple[re.Match[str], str, str]]:
             label = match.group("label").strip(" .,;:")
             if target_type == "register":
                 label = re.split(r"\s+(?:and|for|in|of|is|shall|must|should|may)\b", label, maxsplit=1)[0].strip()
+                if _is_generic_register_reference_label(label):
+                    continue
             if label:
                 matches.append((match, target_type, f"{label_prefix} {label}"))
     matches.sort(key=lambda item: item[0].start())
     return matches
+
+
+def _has_explicit_reference_label_shape(label: str) -> bool:
+    stripped = label.strip(" .,;:")
+    if not stripped:
+        return False
+    if any(character.isdigit() for character in stripped):
+        return True
+    return re.fullmatch(r"[A-Z]{1,4}(?:[.\-][A-Z0-9]{1,8})*", stripped) is not None
+
+
+def _should_skip_unresolved_reference_candidate(
+    *,
+    target_type: str,
+    target_label_value: str,
+    resolved: bool,
+) -> bool:
+    if resolved:
+        return False
+    normalized_label = target_label_value.strip(" .,;:").casefold()
+    if normalized_label in REFERENCE_LABEL_STOPWORDS:
+        return True
+    if target_type in {"section", "clause", "table", "figure"}:
+        return not _has_explicit_reference_label_shape(target_label_value)
+    return False
+
+
+def _is_generic_register_reference_label(label: str) -> bool:
+    normalized = re.sub(r"\s+", " ", label.strip(" .,;:").casefold())
+    if not normalized:
+        return True
+    if normalized in GENERIC_REGISTER_REFERENCE_LABELS:
+        return True
+    first_token = normalized.split(" ", 1)[0]
+    return first_token in GENERIC_REGISTER_REFERENCE_HEADS
 
 
 def _target_key_from_label(target_label: str) -> str:
@@ -645,6 +700,12 @@ def build_semantic_layer(
                 target_label_value,
             )
             resolved = target_ref is not None
+            if _should_skip_unresolved_reference_candidate(
+                target_type=target_type,
+                target_label_value=target_label_value,
+                resolved=resolved,
+            ):
+                continue
             target_label = f"{match.group('kind')} {target_label_value}"
             source_text = _reference_source_text(text, match.start(), match.end())
             cross_ref_recorder.add(
@@ -740,6 +801,12 @@ def build_semantic_layer(
                 target_label_value,
             )
             resolved = target_ref is not None
+            if _should_skip_unresolved_reference_candidate(
+                target_type=target_type,
+                target_label_value=target_label_value,
+                resolved=resolved,
+            ):
+                continue
             target_label = f"{match.group('kind')} {target_label_value}"
             source_text = _reference_source_text(row_text, match.start(), match.end())
             cross_ref_recorder.add(
