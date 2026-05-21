@@ -27,7 +27,7 @@ SIDECAR_SPECS = {
         "id_fields": ("technical_table_unit_id",),
     },
     "tables_rag.jsonl": {"source_types": ("table_row",), "id_fields": ("table_row_id",)},
-    "figures_rag.jsonl": {"source_types": ("figure",), "id_fields": ("figure_id",)},
+    "figures_rag.jsonl": {"source_types": ("figure", "excluded_figure"), "id_fields": ("figure_id",)},
     "domain_units_rag.jsonl": {"source_types": ("domain_unit",), "id_fields": ("domain_unit_id",)},
     "cross_refs_rag.jsonl": {"source_types": ("cross_ref",), "id_fields": ("ref_id",)},
     "retrieval_chunks_rag.jsonl": {"source_types": ("retrieval_chunk",), "id_fields": ("chunk_id",)},

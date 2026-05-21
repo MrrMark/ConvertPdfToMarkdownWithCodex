@@ -358,7 +358,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q70. GUI Profile And Support Bundle Failure Fixture" not in next_plan
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" not in next_plan
     assert "Tcl/Tk patchlevel" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
+    assert "현재 남은 작업 없음." not in next_plan
+    assert "Q81. Structure Marker OCR Early Stop And Cache" in next_plan
+    assert "Q82. Expected Table Fallback Severity Taxonomy" in next_plan
+    assert "Q83. Real Corpus Cross Reference Precision" in next_plan
     assert "Q77. RAG Sibling Chunk Merge" not in next_plan
     assert "Q78. RAG Chunk Relationship Metadata" not in next_plan
     assert "Q79. Purpose-Specific RAG Profiles" not in next_plan
@@ -370,7 +373,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "현재 Active Development Specs" in development_specs
-    assert "현재 active 개발 명세 없음." in development_specs
+    assert "현재 active 개발 명세 없음." not in development_specs
+    assert "Q81. Structure Marker OCR Early Stop And Cache" in development_specs
+    assert "Q82. Expected Table Fallback Severity Taxonomy" in development_specs
+    assert "Q83. Real Corpus Cross Reference Precision" in development_specs
     assert "Q77. RAG Sibling Chunk Merge" not in development_specs
     assert "Q78. RAG Chunk Relationship Metadata" not in development_specs
     assert "Q79. Purpose-Specific RAG Profiles" not in development_specs
@@ -411,7 +417,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q79" in development_specs
+    assert "완료된 Q34-Q80" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -419,6 +425,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q77. RAG Sibling Chunk Merge" in implemented_specs
     assert "Q78. RAG Chunk Relationship Metadata" in implemented_specs
     assert "Q79. Purpose-Specific RAG Profiles" in implemented_specs
+    assert "Q80. Real Corpus Structure Marker OCR And Provenance Hardening" in implemented_specs
     assert "Q44. Domain Technical Table Coverage Expansion" in implemented_specs
     assert "Q47. Local Technical Corpus Evidence Pack" in implemented_specs
     assert "Q48. Corpus Evidence Signature Analysis Report" in implemented_specs

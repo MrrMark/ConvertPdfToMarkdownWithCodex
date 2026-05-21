@@ -23,8 +23,62 @@
 
 ## 현재 Active Development Specs
 
-현재 active 개발 명세 없음.
+### Q81. Structure Marker OCR Early Stop And Cache
+
+#### 목표
+
+Q80 이후에도 실제 NVMe Key Value Command Set PDF에서 `image_extraction`이 70초 이상으로 남아 있다. 구조 마커 OCR의 정확도와 deterministic output을 유지하면서 OCR 후보 수집 호출 수를 더 줄인다.
+
+#### 구현 방향
+
+- parent/child heading context로 기대 가능한 section index가 있는 경우 high-confidence 후보에서 early stop한다.
+- 동일 image hash와 동일 OCR config 조합은 후보 결과를 재사용한다.
+- PSM/scale 조합 축소는 real corpus diff와 structure marker recovery count가 유지될 때만 적용한다.
+- stage duration은 기존 `summary.stage_durations_ms.image_extraction`으로 측정하고 새 public schema는 만들지 않는다.
+
+#### 검증
+
+- `tests/test_images.py`에 early stop/cache 단위 테스트 추가
+- local NVMe corpus 변환 전후 `document.md`, `retrieval_chunks_rag.jsonl` diff 확인
+- corpus eval 또는 release gate에서 pages/sec threshold 재측정
+
+### Q82. Expected Table Fallback Severity Taxonomy
+
+#### 목표
+
+의도된 HTML fallback warning과 실제 변환 실패를 분리해 real corpus gate의 partial success 신호를 더 유용하게 만든다.
+
+#### 구현 방향
+
+- `TABLE_COMPLEXITY_HTML_FALLBACK`을 expected/advisory fallback으로 분류할 수 있는 summary field 또는 status policy를 검토한다.
+- `table_low_quality_count`, extraction failure, unresolved table count는 계속 actionable signal로 유지한다.
+- Markdown warning comment와 report diagnostics는 삭제하지 않는다.
+- public schema 변경이 필요하면 `docs/OUTPUT_SCHEMA.md`와 schema export를 함께 갱신한다.
+
+#### 검증
+
+- 기존 golden table fallback output 유지
+- partial success 판정 테스트 보강
+- corpus eval에서 expected fallback이 gate threshold를 왜곡하지 않는지 확인
+
+### Q83. Real Corpus Cross Reference Precision
+
+#### 목표
+
+NVMe real corpus에서 unresolved cross-ref false positive를 줄이고 RAG citation/source coverage gate의 안정성을 높인다.
+
+#### 구현 방향
+
+- `Table of Figures`, `section defines`, generic `register level interface`처럼 target label이 부족한 문구를 cross-ref record로 만들지 않는 guardrail을 추가한다.
+- Figure/Table/Section 번호가 명확한 참조와 NVMe log page/feature/opcode/register 참조는 기존 resolution을 유지한다.
+- false positive 억제는 synthetic fixture로 고정하고, real corpus에서는 coverage 0.85 이상을 목표로 한다.
+
+#### 검증
+
+- `tests/test_rag_semantics.py` 또는 관련 cross-ref 테스트 추가
+- local NVMe RAG eval에서 `min_cross_ref_resolved_coverage >= 0.85`
+- `scripts/run_release_gates.py --gates rag` threshold 통과
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q79 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q80 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

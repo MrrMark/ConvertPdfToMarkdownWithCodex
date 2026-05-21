@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import sys
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image, ImageDraw
 
-from pdf2md.extractors.images import StructureOcrCandidate, _resolve_structure_marker_recovery, extract_images
+from pdf2md.extractors.images import (
+    StructureOcrCandidate,
+    _collect_structure_marker_candidates,
+    _resolve_structure_marker_recovery,
+    extract_images,
+)
 from pdf2md.models import ImageMode
 from pdf2md.utils.structure import is_caption_candidate
 
@@ -364,6 +370,37 @@ def test_structure_marker_recovery_uses_previous_sibling_context() -> None:
     assert decision.text == "4.1.7"
     assert decision.reason == "STRUCTURE_MARKER_RECOVERED_CONTEXT_VALIDATED"
     assert decision.recovery_strategy == "previous_sibling_context"
+
+
+def test_structure_marker_ocr_uses_data_for_text_and_confidence(monkeypatch) -> None:
+    calls = {"data": 0, "string": 0}
+
+    class _FakeOutput:
+        DICT = "dict"
+
+    def fake_image_to_data(image, *, config: str, output_type: str) -> dict:
+        calls["data"] += 1
+        assert output_type == _FakeOutput.DICT
+        assert "--psm 7" in config
+        return {"text": [" 2", ".", "2", ".", "1 "], "conf": ["90", "80", "-1"]}
+
+    def fake_image_to_string(image, *, config: str) -> str:
+        calls["string"] += 1
+        return "2.2.1"
+
+    fake_tesseract = SimpleNamespace(
+        Output=_FakeOutput,
+        image_to_data=fake_image_to_data,
+        image_to_string=fake_image_to_string,
+    )
+    monkeypatch.setitem(sys.modules, "pytesseract", fake_tesseract)
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_SCALES", (1,))
+    monkeypatch.setattr("pdf2md.extractors.images._STRUCTURE_MARKER_OCR_PSMS", (7,))
+
+    candidates = _collect_structure_marker_candidates(_png_bytes())
+
+    assert candidates == [StructureOcrCandidate(text="2.2.1", confidence=85.0, votes=4)]
+    assert calls == {"data": 4, "string": 0}
 
 
 def test_extract_images_suppresses_structure_marker_and_recovers_text(monkeypatch, sample_pdf: Path, tmp_path: Path) -> None:

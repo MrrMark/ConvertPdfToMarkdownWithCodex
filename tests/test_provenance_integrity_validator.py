@@ -164,6 +164,40 @@ def test_provenance_integrity_accepts_resolved_sidecars(tmp_path: Path) -> None:
     assert validated.findings == []
 
 
+def test_provenance_integrity_accepts_excluded_figure_self_refs(tmp_path: Path) -> None:
+    _write_jsonl(
+        tmp_path / "figures_rag.jsonl",
+        [
+            {
+                "figure_id": "page-0001-figure-0001",
+                "page": 1,
+                "record_type": "excluded_image",
+                "status": "excluded",
+                "bbox": [72.0, 92.0, 92.0, 100.0],
+                "source_refs": [
+                    {
+                        "source_type": "excluded_figure",
+                        "source_id": "page-0001-figure-0001",
+                        "page": 1,
+                        "bbox": [72.0, 92.0, 92.0, 100.0],
+                    }
+                ],
+            }
+        ],
+    )
+    (tmp_path / "report.json").write_text(
+        json.dumps({"summary": {"figure_rag_record_count": 1}}),
+        encoding="utf-8",
+    )
+
+    report = validate_provenance_integrity(output_dir=tmp_path)
+
+    assert report["status"] == "passed"
+    assert report["summary"]["checked_source_refs"] == 1
+    assert report["summary"]["resolved_source_refs"] == 1
+    assert report["findings"] == []
+
+
 def test_provenance_integrity_reports_unresolved_page_and_dedupe_mismatches(tmp_path: Path) -> None:
     _write_jsonl(
         tmp_path / "text_blocks_rag.jsonl",
