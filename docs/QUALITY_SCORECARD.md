@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-23 | Q84 release readiness sweep | 100/100 | 0 | 새 기능 없이 릴리스 후보를 재검증했다. 전체 local release gate는 OCR/corpus/benchmark/schema/packaging 8개 command 통과, RAG/index/provenance/artifact 4개 command 통과를 기록했다. 실제 NVMe `technical_spec_rag --domain-adapter nvme` 출력은 `status=success`, `actionable_warning_count=0`, `table_low_quality_count=0`, `pages_per_second=0.9166`, `image_extraction=24417ms`, RAG eval coverage 1.0을 유지했다. |
 | 2026-05-22 | Q83 real corpus cross reference precision | 100/100 | +1 | 실제 NVMe `technical_spec_rag --domain-adapter nvme` 출력에서 generic `Table of Figures`/`section defines`/`register level interface` false positive를 제거해 `cross_ref_record_count=27`, `unresolved_cross_ref_count=0`, `cross_ref_resolved_coverage=1.0`을 기록했다. RAG eval은 hit@k/MRR/source/table/requirement coverage 1.0과 `rag` release gate, index contract validator를 모두 통과했다. |
 | 2026-05-22 | Q82 expected table fallback taxonomy | 99/100 | 0 | 복잡 표 HTML fallback을 advisory/expected fallback으로 분리해 실제 NVMe corpus가 `warning_count=39`를 보존하면서도 `status=success`, `partial_success=false`, `actionable_warning_count=0`, `table_expected_fallback_count=39`, `table_low_quality_count=0`로 release gate `--max-partial-rate 0.0`을 통과했다. 남은 100점 후보는 Q83 |
 | 2026-05-22 | Q81 structure marker OCR cache/early stop | 99/100 | 0 | 실제 NVMe Key Value Command Set PDF에서 `document.md`와 `retrieval_chunks_rag.jsonl` SHA-256 동일성을 유지하면서 `image_extraction`을 75.99s에서 24.92s로 줄이고 `pages/sec=0.8951`을 기록했다. structure marker recovered 20/suppressed 0과 retrieval chunk 662개는 유지됐다. 남은 100점 후보는 Q82-Q83 |
@@ -74,6 +75,36 @@
 | 2026-05-11 | 범용 PDF to MD 변환툴 | 85/100 | - | 기본 변환, table/image/OCR/report 기반은 양호하나 schema/release/RAG semantic 계층은 미완 |
 
 ## 평가 히스토리
+
+### 2026-05-23 (Q84 Release Readiness Sweep)
+
+#### 총평
+
+Q84는 새 기능 없이 릴리스 후보 상태를 다시 검증한 작업이다. 현재 로컬 `main...origin/main` 상태에서 Q84 브랜치를 만들었고, 미추적 `pdf2md/nvme_cmds/` 산출물은 사용자 파일로 보고 건드리지 않았다.
+
+로컬 검증은 외부 RAG/indexing service 호출 없이 수행했다. 실제 NVMe PDF를 `technical_spec_rag --domain-adapter nvme`로 다시 변환해 `status=success`, expected HTML fallback warning 39건, actionable warning 0건, low-quality table 0건, `pages/sec=0.9166`, `image_extraction=24417ms`, `cross_ref_record_count=27`, `unresolved_cross_ref_count=0`을 확인했다.
+
+기본 release gate는 OCR/corpus/benchmark/schema/packaging 8개 command가 모두 통과했다. Corpus gate는 `partial_success_rate=0.0`, `low_quality_table_rate=0.0`, `pages_per_second_min=0.903`을 기록했고, benchmark gate는 synthetic 10/50/100 page에서 `pages_per_second=49.0158/49.4252/47.7763`과 regression 없음으로 통과했다. Packaging gate는 wheel build, wheel contract, CLI/GUI help를 모두 통과했고, dependency가 준비된 wheel smoke 환경에서도 `python -m pdf2md --help`, `pdf2md --help`, `pdf2md-gui --help`가 통과했다.
+
+RAG/integrity release gate는 RAG, index contract, provenance integrity, artifact integrity 4개 command가 모두 통과했다. RAG eval은 6개 query에서 hit@k, MRR, expected source, requirement, table-field, cross-ref resolved, relationship target coverage가 모두 1.0이고, `chunk_token_p95=140`, `chunk_token_max=510`, `conversion_duration_ms=27273`을 기록했다. Index/provenance/artifact validator는 warning/error 0건이다.
+
+초기 전체 pytest는 Q84를 active backlog/spec에 올린 중간 문서 상태 때문에 `tests/test_docs_examples.py::test_ci_and_next_plan_contracts_are_present` 1건이 실패했다. 이는 코드 결함이 아니라 문서/test contract 중간 상태 문제로 분류했고, Q84 완료 archive 반영 후 active backlog/spec를 다시 비워 최종 전체 pytest 302개가 통과했다. 완전 격리 no-deps wheel venv의 `pydantic` import 실패도 dependency wheelhouse가 없는 환경 한계로 분류한다.
+
+#### 항목별 점수
+
+| 항목 | 점수 | 근거 |
+|---|---:|---|
+| 핵심 변환 완성도 | 18/18 | 실제 NVMe 변환이 `status=success`, actionable warning 0으로 유지됐다. |
+| 표 변환/RAG 대응 | 18/18 | expected table fallback 39건은 advisory로 유지되고 RAG source/requirement/table-field coverage가 모두 1.0이다. |
+| 텍스트 구조 보존 | 16/16 | cross-ref 27건 모두 resolved이고 unresolved 0건을 유지했다. |
+| 이미지/OCR 신뢰도 | 14/14 | OCR preflight 통과, provenance/artifact validator warning/error 0건, asset/link 무결성 통과를 확인했다. |
+| 성능/효율 | 12/12 | 실제 NVMe `pages/sec=0.9166`, `image_extraction=24417ms`, benchmark regression 없음으로 Q81-Q83 수준을 유지했다. |
+| 테스트/결정성/CI | 12/12 | 전체 pytest 302개, schema check, release gates, RAG/index/provenance/artifact validators, wheel smoke가 local-only로 통과했다. |
+| 운영/릴리스 준비도 | 10/10 | packaging gate와 wheel contract/smoke가 통과했고, 발견 사항은 코드 결함 없이 환경/문서 중간 상태로 분류됐다. |
+
+#### 다음 개선 참조
+
+현재 active quality backlog는 없다. 완전 오프라인 fresh venv wheel smoke가 필요해지면 dependency wheelhouse 준비를 Q85+ packaging backlog로 분리한다.
 
 ### 2026-05-22 (Q83 구현 후)
 
