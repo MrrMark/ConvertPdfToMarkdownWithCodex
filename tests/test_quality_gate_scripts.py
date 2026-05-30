@@ -8,6 +8,7 @@ from scripts import benchmark_conversion
 from scripts import benchmark_gui_cli_parity
 from scripts import check_ocr_runtime
 from scripts import inspect_wheel_contract
+from scripts import run_preset_eval
 from scripts import run_gui_cli_parity
 from scripts import run_corpus_eval
 from scripts import run_release_gates
@@ -365,6 +366,157 @@ def test_release_gate_runner_supports_optional_artifact_integrity_gate(monkeypat
     assert "--fail-on-error" in command
     assert "--confidential-safe" in command
     assert "--fail-on-warning" in command
+
+
+def _clean_validation_report() -> dict:
+    return {"passed": True, "status": "passed", "summary": {"error_count": 0, "warning_count": 0}}
+
+
+def _rag_conversion_report() -> dict:
+    return {
+        "status": "success",
+        "duration_ms": 100,
+        "summary": {
+            "processed_pages": 2,
+            "warning_count": 0,
+            "actionable_warning_count": 0,
+            "retrieval_chunk_record_count": 4,
+            "retrieval_chunk_over_target_count": 0,
+            "retrieval_chunk_duplicate_source_ref_count": 0,
+            "rag_text_block_file_count": 1,
+            "semantic_unit_file_count": 1,
+            "retrieval_chunk_file_count": 1,
+            "rag_table_record_count": 2,
+            "requirement_record_count": 1,
+            "requirement_traceability_record_count": 1,
+            "technical_table_record_count": 1,
+            "figure_rag_record_count": 1,
+            "cross_ref_record_count": 2,
+            "unresolved_cross_ref_count": 0,
+            "pages_per_second": 10.0,
+        },
+    }
+
+
+def _technical_conversion_report() -> dict:
+    report = _rag_conversion_report()
+    report["summary"] = {
+        **report["summary"],
+        "domain_unit_record_count": 3,
+        "technical_table_record_count": 2,
+        "requirement_record_count": 2,
+        "requirement_traceability_record_count": 2,
+    }
+    return report
+
+
+def _rag_eval_report() -> dict:
+    return {
+        "metrics": {
+            "source_ref_presence_coverage": 1.0,
+            "duplicate_source_ratio": 0.0,
+            "cross_ref_resolved_coverage": 1.0,
+            "relationship_target_coverage": 1.0,
+        },
+        "passed_calibration_gate": True,
+    }
+
+
+def test_preset_eval_scores_rag_optimized_against_100_point_model() -> None:
+    result = run_preset_eval.score_preset_result(
+        preset="rag_optimized",
+        conversion_report=_rag_conversion_report(),
+        artifact_report=_clean_validation_report(),
+        index_report=_clean_validation_report(),
+        provenance_report=_clean_validation_report(),
+        rag_eval_report=_rag_eval_report(),
+    )
+
+    components = {component["code"]: component for component in result["components"]}
+    assert result["score"] == 100
+    assert result["gate"]["passed"] is True
+    assert components["integrity"]["earned"] == 20
+    assert components["chunk_token_compliance"]["earned"] == 15
+    assert components["sidecar_coverage"]["earned"] == 15
+
+
+def test_preset_eval_flags_missing_technical_domain_adapter() -> None:
+    result = run_preset_eval.score_preset_result(
+        preset="technical_spec_rag",
+        domain_adapter="none",
+        conversion_report=_technical_conversion_report(),
+        artifact_report=_clean_validation_report(),
+        index_report=_clean_validation_report(),
+        provenance_report=_clean_validation_report(),
+        rag_eval_report=_rag_eval_report(),
+    )
+
+    failed_codes = {condition["code"] for condition in result["gate"]["failed_conditions"]}
+    assert "technical_domain_adapter_present" in failed_codes
+    assert "ssd_contract_passed" in failed_codes
+    assert result["gate"]["passed"] is False
+
+
+def test_preset_eval_score_threshold_passes_and_fails() -> None:
+    passing = run_preset_eval.score_preset_result(
+        preset="rag_optimized",
+        conversion_report=_rag_conversion_report(),
+        artifact_report=_clean_validation_report(),
+        index_report=_clean_validation_report(),
+        provenance_report=_clean_validation_report(),
+        rag_eval_report=_rag_eval_report(),
+        min_score=90,
+    )
+    failing = run_preset_eval.score_preset_result(
+        preset="rag_optimized",
+        conversion_report=_rag_conversion_report(),
+        artifact_report=_clean_validation_report(),
+        index_report=_clean_validation_report(),
+        provenance_report=_clean_validation_report(),
+        rag_eval_report=_rag_eval_report(),
+        min_score=101,
+    )
+
+    assert passing["gate"]["passed"] is True
+    assert failing["gate"]["passed"] is False
+    assert failing["gate"]["failed_conditions"][-1]["code"] == "min_score"
+
+
+def test_release_gate_runner_supports_optional_preset_eval_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="Wrote preset_eval_report.json", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-preset-eval",
+            gates=["preset-eval"],
+            preset_eval_input_pdf=tmp_path / "NVMe_Base.pdf",
+            preset_eval_domain_adapter="nvme",
+            preset_eval_pages="1-2",
+            preset_eval_min_score=80,
+            rag_min_expected_source_coverage=0.9,
+            rag_min_source_ref_presence_coverage=1.0,
+            rag_max_chunk_token_p95=512,
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["gates"][0]["gate"] == "preset-eval"
+    command = calls[0]
+    assert any(str(part).endswith("run_preset_eval.py") for part in command)
+    assert "--fail-on-threshold" in command
+    assert "--domain-adapter" in command
+    assert "nvme" in command
+    assert "--pages" in command
+    assert "--min-score" in command
+    assert "--min-expected-source-coverage" in command
+    assert "--min-source-ref-presence-coverage" in command
+    assert "--max-chunk-token-p95" in command
 
 
 def test_release_gate_runner_supports_optional_gui_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001

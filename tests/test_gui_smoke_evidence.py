@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pdf2md.gui_runner import GuiDiagnostic, GuiDiagnosticReport
 from scripts import run_gui_smoke_evidence as smoke
+from scripts import run_preset_eval
 
 
 def test_gui_smoke_redaction_removes_local_absolute_roots(tmp_path: Path) -> None:
@@ -113,6 +114,61 @@ def test_gui_smoke_evidence_stores_only_sanitized_counts_and_labels(
             assert document["artifacts"]["manifest"]["exists"] is True
             assert document["artifacts"]["report"]["exists"] is True
             assert document["warning_codes"] == []
+
+
+def test_preset_artifact_comparison_does_not_store_raw_artifact_content() -> None:
+    raw_text = "NVMe controller register raw paragraph that must stay out of reports"
+    comparison = run_preset_eval.build_preset_artifact_comparison(
+        [
+            {
+                "preset": "rag_optimized",
+                "domain_adapter": "none",
+                "output_label": "rag_optimized",
+                "score": {
+                    "score": 92,
+                    "gate": {"passed": True},
+                    "metrics": {
+                        "retrieval_chunk_record_count": 10,
+                        "domain_unit_record_count": 0,
+                        "technical_table_record_count": 0,
+                    },
+                },
+                "artifacts": {
+                    "files": [
+                        {
+                            "file": "document.md",
+                            "exists": True,
+                            "bytes": len(raw_text),
+                            "record_count": 0,
+                            "content": raw_text,
+                        }
+                    ],
+                    "image_asset_count": 0,
+                },
+                "raw_document_text": raw_text,
+            },
+            {
+                "preset": "technical_spec_rag",
+                "domain_adapter": "nvme",
+                "output_label": "technical_spec_rag__nvme",
+                "score": {
+                    "score": 88,
+                    "gate": {"passed": True},
+                    "metrics": {
+                        "retrieval_chunk_record_count": 12,
+                        "domain_unit_record_count": 4,
+                        "technical_table_record_count": 3,
+                    },
+                },
+                "artifacts": {"files": [], "image_asset_count": 0},
+            },
+        ]
+    )
+    serialized = json.dumps(comparison, ensure_ascii=False, sort_keys=True)
+
+    assert raw_text not in serialized
+    assert "content" not in serialized
+    assert comparison["metric_deltas"]
 
 
 def test_gui_smoke_evidence_writer_uses_stable_json(tmp_path: Path) -> None:

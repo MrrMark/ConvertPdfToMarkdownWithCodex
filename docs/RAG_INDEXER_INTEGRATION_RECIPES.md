@@ -90,6 +90,38 @@ python scripts/validate_artifact_integrity.py --output-dir output --fail-on-erro
 - `--metadata-max-bytes`는 운영 profile의 보수적 guardrail로 지정한다. 실제 서비스 제한이 바뀔 수 있으므로 배포 profile에서 값을 명시하는 편이 안전하다.
 - index contract는 target별 mapping 가능성을, provenance integrity는 sidecar 내부 참조 무결성을, artifact integrity는 실제 파일 세트 소비 가능성을 검증한다. 운영 release gate에서는 셋을 함께 실행하는 편이 안전하다.
 
+## Preset Evaluation Score Gate
+
+GUI에서 `RAG 등록용(최적화)`와 `기술 스펙 RAG`를 비교한 결과를 반복 재현하려면 local-only preset evaluation runner를 사용한다. runner는 preset별 변환, artifact/index/provenance validation, 선택적 SSD contract/RAG eval, 100점 score를 한 번에 산출한다.
+
+```bash
+python scripts/run_preset_eval.py \
+  --input-pdf spec.pdf \
+  --output-root /tmp/pdf2md-preset-eval \
+  --presets rag_optimized,technical_spec_rag \
+  --domain-adapter nvme \
+  --fail-on-threshold
+```
+
+생성 파일:
+
+- `preset_eval_report.json`: preset별 score, gate condition, validator summary
+- `preset_artifact_comparison.json`: raw content 없이 artifact 존재/크기/record count와 주요 metric delta
+- `preset_scorecard.md`: 사람이 빠르게 보는 점수표
+
+`technical_spec_rag`는 `--domain-adapter nvme|pcie|ocp|tcg|spdm`를 함께 지정해야 domain unit, technical table, SSD contract gate가 의미 있게 동작한다. 실제 corpus 원문은 커밋하지 않고 위 세 파일처럼 sanitized summary만 공유한다.
+
+release gate에 포함:
+
+```bash
+python scripts/run_release_gates.py \
+  --output-dir /tmp/pdf2md-release-preset \
+  --gates preset-eval \
+  --preset-eval-input-pdf spec.pdf \
+  --preset-eval-domain-adapter nvme \
+  --preset-eval-min-score 80
+```
+
 ## OpenAI Vector Store / Generic Embedding Pipeline
 
 권장 payload:

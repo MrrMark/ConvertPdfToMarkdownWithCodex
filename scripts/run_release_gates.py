@@ -20,6 +20,7 @@ OPTIONAL_GATES = (
     "index-contract",
     "provenance-integrity",
     "artifact-integrity",
+    "preset-eval",
     "gui",
     "gui-parity",
     "gui-benchmark",
@@ -55,6 +56,7 @@ class ReleaseGateConfig:
     rag_min_requirement_coverage: float | None = None
     rag_min_table_field_coverage: float | None = None
     rag_min_cross_ref_resolved_coverage: float | None = None
+    rag_min_source_ref_presence_coverage: float | None = None
     rag_min_relationship_target_coverage: float | None = None
     rag_max_chunk_token_p95: float | None = None
     rag_max_chunk_token_max: float | None = None
@@ -69,6 +71,13 @@ class ReleaseGateConfig:
     artifact_integrity_output_dir: Path | None = None
     artifact_integrity_confidential_safe: bool = False
     artifact_integrity_fail_on_warning: bool = False
+    preset_eval_input_pdf: Path | None = None
+    preset_eval_output_root: Path | None = None
+    preset_eval_presets: str = "rag_optimized,technical_spec_rag"
+    preset_eval_domain_adapter: str = "none"
+    preset_eval_pages: str | None = None
+    preset_eval_rag_eval_set: Path | None = None
+    preset_eval_min_score: float | None = None
 
 
 def _split_gates(raw_gates: str) -> list[str]:
@@ -256,6 +265,7 @@ def _rag_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     _append_optional_arg(command, "--min-requirement-coverage", config.rag_min_requirement_coverage)
     _append_optional_arg(command, "--min-table-field-coverage", config.rag_min_table_field_coverage)
     _append_optional_arg(command, "--min-cross-ref-resolved-coverage", config.rag_min_cross_ref_resolved_coverage)
+    _append_optional_arg(command, "--min-source-ref-presence-coverage", config.rag_min_source_ref_presence_coverage)
     _append_optional_arg(command, "--min-relationship-target-coverage", config.rag_min_relationship_target_coverage)
     _append_optional_arg(command, "--max-chunk-token-p95", config.rag_max_chunk_token_p95)
     _append_optional_arg(command, "--max-chunk-token-max", config.rag_max_chunk_token_max)
@@ -352,6 +362,52 @@ def _artifact_integrity_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     if config.artifact_integrity_fail_on_warning:
         command.append("--fail-on-warning")
     return [_run_command(gate="artifact-integrity", command=command, report_path=report_path)]
+
+
+def _preset_eval_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    output_root = config.preset_eval_output_root or (config.output_dir / "preset-eval")
+    report_path = output_root / "preset_eval_report.json"
+    if config.preset_eval_input_pdf is None:
+        return [
+            {
+                "gate": "preset-eval",
+                "command": [],
+                "exit_code": 2,
+                "status": "failed",
+                "report_path": str(report_path),
+                "stdout_tail": "",
+                "stderr_tail": "--preset-eval-input-pdf is required when --gates includes preset-eval.",
+            }
+        ]
+    command = [
+        sys.executable,
+        "scripts/run_preset_eval.py",
+        "--input-pdf",
+        str(config.preset_eval_input_pdf),
+        "--output-root",
+        str(output_root),
+        "--presets",
+        config.preset_eval_presets,
+        "--domain-adapter",
+        config.preset_eval_domain_adapter,
+        "--fail-on-threshold",
+    ]
+    _append_optional_arg(command, "--pages", config.preset_eval_pages)
+    _append_optional_arg(command, "--rag-eval-set", config.preset_eval_rag_eval_set)
+    _append_optional_arg(command, "--rag-top-k", config.rag_top_k)
+    _append_optional_arg(command, "--min-score", config.preset_eval_min_score)
+    _append_optional_arg(command, "--min-hit-at-k", config.rag_min_hit_at_k)
+    _append_optional_arg(command, "--min-mrr", config.rag_min_mrr)
+    _append_optional_arg(command, "--min-expected-source-coverage", config.rag_min_expected_source_coverage)
+    _append_optional_arg(command, "--min-requirement-coverage", config.rag_min_requirement_coverage)
+    _append_optional_arg(command, "--min-table-field-coverage", config.rag_min_table_field_coverage)
+    _append_optional_arg(command, "--min-cross-ref-resolved-coverage", config.rag_min_cross_ref_resolved_coverage)
+    _append_optional_arg(command, "--min-source-ref-presence-coverage", config.rag_min_source_ref_presence_coverage)
+    _append_optional_arg(command, "--min-relationship-target-coverage", config.rag_min_relationship_target_coverage)
+    _append_optional_arg(command, "--max-chunk-token-p95", config.rag_max_chunk_token_p95)
+    _append_optional_arg(command, "--max-chunk-token-max", config.rag_max_chunk_token_max)
+    _append_optional_arg(command, "--max-conversion-duration-ms", config.rag_max_conversion_duration_ms)
+    return [_run_command(gate="preset-eval", command=command, report_path=report_path)]
 
 
 def _gui_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
@@ -518,6 +574,8 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
             records.extend(_provenance_integrity_gate(config))
         elif gate == "artifact-integrity":
             records.extend(_artifact_integrity_gate(config))
+        elif gate == "preset-eval":
+            records.extend(_preset_eval_gate(config))
         elif gate == "gui":
             records.extend(_gui_gate(config))
         elif gate == "gui-parity":
@@ -554,7 +612,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Comma-separated gates: "
             "ocr,corpus,benchmark,schema,packaging,rag,index-contract,provenance-integrity,"
-            "artifact-integrity,gui,gui-parity,gui-benchmark."
+            "artifact-integrity,preset-eval,gui,gui-parity,gui-benchmark."
         ),
     )
     parser.add_argument("--ocr-lang", default="eng")
@@ -581,6 +639,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rag-min-requirement-coverage", type=float)
     parser.add_argument("--rag-min-table-field-coverage", type=float)
     parser.add_argument("--rag-min-cross-ref-resolved-coverage", type=float)
+    parser.add_argument("--rag-min-source-ref-presence-coverage", type=float)
     parser.add_argument("--rag-min-relationship-target-coverage", type=float)
     parser.add_argument("--rag-max-chunk-token-p95", type=float)
     parser.add_argument("--rag-max-chunk-token-max", type=float)
@@ -599,6 +658,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--artifact-integrity-output-dir", type=Path)
     parser.add_argument("--artifact-integrity-confidential-safe", action="store_true")
     parser.add_argument("--artifact-integrity-fail-on-warning", action="store_true")
+    parser.add_argument("--preset-eval-input-pdf", type=Path)
+    parser.add_argument("--preset-eval-output-root", type=Path)
+    parser.add_argument("--preset-eval-presets", default="rag_optimized,technical_spec_rag")
+    parser.add_argument(
+        "--preset-eval-domain-adapter",
+        default="none",
+        choices=("none", "nvme", "pcie", "ocp", "tcg", "spdm", "customer-requirements"),
+    )
+    parser.add_argument("--preset-eval-pages")
+    parser.add_argument("--preset-eval-rag-eval-set", type=Path)
+    parser.add_argument("--preset-eval-min-score", type=float)
     return parser
 
 
@@ -637,6 +707,7 @@ def main(argv: list[str] | None = None) -> int:
             rag_min_requirement_coverage=args.rag_min_requirement_coverage,
             rag_min_table_field_coverage=args.rag_min_table_field_coverage,
             rag_min_cross_ref_resolved_coverage=args.rag_min_cross_ref_resolved_coverage,
+            rag_min_source_ref_presence_coverage=args.rag_min_source_ref_presence_coverage,
             rag_min_relationship_target_coverage=args.rag_min_relationship_target_coverage,
             rag_max_chunk_token_p95=args.rag_max_chunk_token_p95,
             rag_max_chunk_token_max=args.rag_max_chunk_token_max,
@@ -651,6 +722,13 @@ def main(argv: list[str] | None = None) -> int:
             artifact_integrity_output_dir=args.artifact_integrity_output_dir,
             artifact_integrity_confidential_safe=args.artifact_integrity_confidential_safe,
             artifact_integrity_fail_on_warning=args.artifact_integrity_fail_on_warning,
+            preset_eval_input_pdf=args.preset_eval_input_pdf,
+            preset_eval_output_root=args.preset_eval_output_root,
+            preset_eval_presets=args.preset_eval_presets,
+            preset_eval_domain_adapter=args.preset_eval_domain_adapter,
+            preset_eval_pages=args.preset_eval_pages,
+            preset_eval_rag_eval_set=args.preset_eval_rag_eval_set,
+            preset_eval_min_score=args.preset_eval_min_score,
         )
     )
     print(f"Wrote {args.output_dir / 'release_gate_report.json'}")
