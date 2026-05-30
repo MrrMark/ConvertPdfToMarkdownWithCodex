@@ -309,7 +309,23 @@ python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui-benchma
 
 `gui_cli_benchmark_report.json`은 elapsed ms, pages/sec, GUI duration ratio, output hash equality, optional threshold/advisory policy 결과를 저장한다. 기본 threshold는 advisory이며, 명시 threshold와 fail 옵션이 함께 있을 때만 성능 회귀를 실패로 처리한다.
 
-## 12) 배포 방식 메모
+## 12) Preset 비교 scorecard
+
+`RAG 등록용(최적화)`와 `기술 스펙 RAG`의 산출물 차이를 반복 비교하려면 GUI를 직접 누르는 대신 같은 preset matrix를 쓰는 local-only runner를 실행한다.
+
+```bash
+python scripts/run_preset_eval.py --input-pdf spec.pdf --output-root /tmp/pdf2md-preset-eval --presets rag_optimized,technical_spec_rag --domain-adapter nvme
+```
+
+생성되는 `preset_eval_report.json`, `preset_artifact_comparison.json`, `preset_scorecard.md`는 score, gate condition, artifact 존재/크기/record count, warning/code count만 저장한다. 원문 PDF 텍스트, 표 본문, 이미지 내용은 비교 report에 복사하지 않는다.
+
+릴리스 전 자동 점검에 포함하려면:
+
+```bash
+python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-preset --gates preset-eval --preset-eval-input-pdf spec.pdf --preset-eval-domain-adapter nvme --preset-eval-min-score 80
+```
+
+## 13) 배포 방식 메모
 
 현재 비개발자 기본 경로는 source/ZIP + venv setup + `python -m pdf2md.gui` 실행이다.
 
