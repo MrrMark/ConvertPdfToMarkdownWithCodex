@@ -30,7 +30,7 @@ CLI와 GUI preset은 같은 local-only profile matrix를 사용한다.
 | --- | --- | --- |
 | `preserve` | 기본 원문 보존 | RAG table sidecar와 chunk 보강 옵션을 보수적으로 끔 |
 | `rag_optimized` | 일반 RAG ingest | RAG table both, page marker, header/footer removal, hyphen repair, contextual embedding text, sibling merge, relationship metadata |
-| `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg`와 함께 사용 |
+| `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg|spdm`와 함께 사용 |
 | `confidential_rag` | 공유/evidence pack | confidential-safe mode, JSONL table sidecar, chunk 보강, sanitized report |
 | `preserve_with_sidecars` | Markdown 원문 보존 + sidecar ingest | 본문 변화 가능성이 있는 header/footer/hyphen repair는 끄고 JSONL sidecar와 relationship metadata만 추가 |
 
@@ -131,8 +131,9 @@ Profile mapping:
 | `pcie` | `HIL` | `PCIe` |
 | `ocp` | `HIL` | `OCP` |
 | `tcg` | `HIL` | `TCG` |
+| `spdm` | `HIL` | `SPDM` |
 
-`TCG`는 first-class `spec_type`으로 취급한다. `CustomerRequirement + feature_name=TCG` fallback은 사용하지 않는다.
+`TCG`와 `SPDM`은 first-class `spec_type`으로 취급한다. `CustomerRequirement + feature_name=TCG/SPDM` fallback은 사용하지 않는다.
 
 RagChunk/RagCitation mapping:
 
@@ -152,13 +153,14 @@ Local validation:
 ```bash
 python scripts/validate_ssd_rag_contract.py --output-dir output/nvme --ssd-agent-domain HIL --ssd-agent-spec-type NVMe --domain-adapter nvme
 python scripts/validate_ssd_rag_contract.py --output-dir output/tcg --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
+python scripts/validate_ssd_rag_contract.py --output-dir output/spdm --ssd-agent-domain HIL --ssd-agent-spec-type SPDM --domain-adapter spdm
 python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error
 python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error --evidence-pack
 python scripts/analyze_corpus_evidence_pack.py --evidence-pack local_corpus_evidence_pack.json
 python scripts/compare_corpus_evidence_packs.py --baseline old_evidence_pack.json --current local_corpus_evidence_pack.json --fail-on-new-signature
 ```
 
-운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
+운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg|spdm`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
 
 ## Azure AI Search
 
@@ -307,7 +309,7 @@ python scripts/run_release_gates.py \
   --rag-min-relationship-target-coverage 1.0
 ```
 
-실제 NVMe/PCIe/OCP/TCG/customer-like corpus는 repo에 커밋하지 말고 로컬 profile과 sanitized eval fixture만 사용한다.
+실제 NVMe/PCIe/OCP/TCG/SPDM/customer-like corpus는 repo에 커밋하지 말고 로컬 profile과 sanitized eval fixture만 사용한다.
 
 Eval fixture의 requirement coverage는 기본적으로 `requirement`, `requirement_trace` source type만 인정한다. Table-field coverage는 기본적으로 `table_row`, `technical_table_unit`, `domain_unit` source type만 인정한다. 다른 source type을 의도적으로 허용해야 할 때만 `expected_requirement_source_types` 또는 `expected_table_field_source_types`를 명시한다. Relationship metadata coverage는 `previous_chunk_id`, `next_chunk_id`, `section_anchor_chunk_id`, `related_chunk_ids`가 같은 `retrieval_chunks_rag.jsonl` 내부 final chunk id로 해소되는지 local-only로 계산한다.
 

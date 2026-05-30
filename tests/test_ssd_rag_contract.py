@@ -91,6 +91,89 @@ def test_ssd_rag_contract_accepts_tcg_first_class_spec_type(tmp_path: Path) -> N
     assert report["sample_mapped_chunk"]["metadata"]["source_sha256"] == source_sha256
 
 
+def test_ssd_rag_contract_accepts_spdm_first_class_spec_type(tmp_path: Path) -> None:
+    source_sha256 = "b" * 64
+    _write_jsonl(
+        tmp_path / "retrieval_chunks_rag.jsonl",
+        [
+            {
+                "chunk_id": "chunk-000001",
+                "schema_version": "1.0",
+                "chunk_index": 1,
+                "chunk_type": "domain_unit",
+                "text": "Message = GET_VERSION | Message Code = 0x84 | Description = Request version",
+                "source_sha256": source_sha256,
+                "source_refs": [{"source_type": "domain_unit", "source_id": "domain-spdm-000001", "page": 1}],
+                "page_range": [1, 1],
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+                "heading_path": ["SPDM Messages"],
+                "semantic_types": ["spdm_message"],
+                "normative_strength": None,
+                "retrieval_priority": 96,
+                "char_count": 78,
+                "token_estimate": 20,
+                "section_path": "SPDM Messages",
+                "chunk_group_id": "domain-spdm",
+                "source_record_count": 1,
+                "source_dedupe_key": "domain-spdm-000001",
+                "chunk_boundary_policy": "source_record",
+                "chunk_boundary_reasons": ["domain_unit_boundary"],
+            }
+        ],
+    )
+    _write_jsonl(tmp_path / "requirements_rag.jsonl", [])
+    _write_jsonl(
+        tmp_path / "technical_tables_rag.jsonl",
+        [
+            {
+                "technical_table_unit_id": "tech-table-000001",
+                "unit_type": "spdm_message",
+                "page": 1,
+                "table_id": "page-0001-table-0001",
+                "table_row_id": "page-0001-table-0001-row-0001",
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "tables_rag.jsonl",
+        [
+            {
+                "table_row_id": "page-0001-table-0001-row-0001",
+                "table_id": "page-0001-table-0001",
+                "page": 1,
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "domain_units_rag.jsonl",
+        [
+            {
+                "domain_unit_id": "domain-spdm-000001",
+                "domain": "spdm",
+                "unit_type": "spdm_message",
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0001-row-0001"}],
+            }
+        ],
+    )
+    _write_jsonl(tmp_path / "cross_refs_rag.jsonl", [])
+    _write_jsonl(tmp_path / "figures_rag.jsonl", [])
+
+    report = validate_ssd_rag_contract(
+        output_dir=tmp_path,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="SPDM",
+        domain_adapter="spdm",
+        document_id="SPDM_DOC",
+        source_sha256=source_sha256,
+    )
+
+    assert report["passed"] is True
+    assert report["sample_mapped_chunk"]["citation"]["document_id"] == "SPDM_DOC"
+    assert report["sample_mapped_chunk"]["metadata"]["semantic_types"] == ["spdm_message"]
+
+
 def test_ssd_rag_contract_rejects_adapter_spec_type_mismatch(tmp_path: Path) -> None:
     _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [])
 

@@ -622,7 +622,7 @@ def build_retrieval_chunks(
             heading_path=_heading_path(record),
             semantic_types=[str(record.get("unit_type") or "domain_unit")],
             normative_strength=None,
-            retrieval_priority=90,
+            retrieval_priority=96,
             boundary_reasons=["domain_unit_boundary"],
             chunk_group_id=f"domain-{record.get('domain') or 'unknown'}",
         )

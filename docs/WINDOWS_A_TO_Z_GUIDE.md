@@ -324,7 +324,7 @@ python -m pdf2md .\sample.pdf -o .\output --domain-adapter nvme --rag-table-outp
 ```
 
 - 기본값은 `none`입니다.
-- `nvme`, `pcie`, `ocp`, `tcg`, `customer-requirements` adapter는 명확한 표 header가 있는 command/opcode/register field/bitfield/log page/requirement/security method/security object/security authority/security field만 `domain_units_rag.jsonl`로 생성합니다.
+- `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements` adapter는 명확한 표 header가 있는 command/opcode/register field/bitfield/log page/requirement/security method/security object/security authority/SPDM message/measurement/certificate/algorithm field만 `domain_units_rag.jsonl`로 생성합니다.
 
 고객 대외비 스펙을 공유 가능한 metadata로 점검해야 하면:
 
@@ -642,8 +642,8 @@ python scripts\run_release_gates.py --output-dir .\release_gate_gui_benchmark --
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
 - `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref/relationship target coverage, chunk token 분포, query별 retrieved chunk/source id와 missing expected source id
-- `ssd_rag_contract_report.json`: `retrieval_chunks_rag.jsonl`이 SSD 에이전트 `RagChunk/RagCitation` 계약으로 매핑 가능한지 검사한 결과. TCG는 `HIL/TCG` first-class spec_type으로 검증합니다.
-- `ssd_corpus_profile_report.json`: local-only NVMe/PCIe/OCP/TCG profile 변환, SSD 계약 검증, 선택적 RAG eval aggregate 집계
+- `ssd_rag_contract_report.json`: `retrieval_chunks_rag.jsonl`이 SSD 에이전트 `RagChunk/RagCitation` 계약으로 매핑 가능한지 검사한 결과. TCG와 SPDM은 `HIL/TCG`, `HIL/SPDM` first-class spec_type으로 검증합니다.
+- `ssd_corpus_profile_report.json`: local-only NVMe/PCIe/OCP/TCG/SPDM profile 변환, SSD 계약 검증, 선택적 RAG eval aggregate 집계
 - `local_corpus_evidence_pack.json`: 비공개 corpus 실패 패턴을 raw path, command, filename, query text 없이 공유하기 위한 redacted signature 집계
 - `corpus_evidence_analysis_report.json`: redacted evidence pack의 category/domain/spec hotspot과 follow-up hint
 - `corpus_evidence_trend_report.json`: baseline/current evidence pack의 added/persisting/resolved signature 비교와 신규 error gate

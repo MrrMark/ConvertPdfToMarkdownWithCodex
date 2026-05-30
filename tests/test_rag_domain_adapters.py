@@ -237,6 +237,230 @@ def test_tcg_domain_adapter_extracts_security_method_authority_object_and_field_
     assert all(record["source_refs"][1]["source_type"] == "technical_table_unit" for record in records)
 
 
+def test_tcg_domain_adapter_extracts_expanded_security_units() -> None:
+    tcg_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "headers": ["Security Provider", "UID", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Security Provider", "UID", "Description"],
+                    "cells": {
+                        "Security Provider": "LockingSP",
+                        "UID": "0002h",
+                        "Description": "Locking security provider",
+                    },
+                    "row_text": (
+                        "Security Provider = LockingSP | UID = 0002h | "
+                        "Description = Locking security provider"
+                    ),
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 2,
+            "headers": ["Locking Range", "Bits", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 2,
+                    "row_index": 1,
+                    "headers": ["Locking Range", "Bits", "Description"],
+                    "cells": {"Locking Range": "Range 1", "Bits": "7:0", "Description": "User data range"},
+                    "row_text": "Locking Range = Range 1 | Bits = 7:0 | Description = User data range",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 3,
+            "headers": ["Key Management", "UID", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 3,
+                    "row_index": 1,
+                    "headers": ["Key Management", "UID", "Description"],
+                    "cells": {"Key Management": "Media Encryption Key", "UID": "0003h", "Description": "MEK control"},
+                    "row_text": (
+                        "Key Management = Media Encryption Key | UID = 0003h | Description = MEK control"
+                    ),
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 4,
+            "headers": ["Session State", "Value", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 4,
+                    "row_index": 1,
+                    "headers": ["Session State", "Value", "Description"],
+                    "cells": {"Session State": "Authenticated", "Value": "01h", "Description": "Session is active"},
+                    "row_text": "Session State = Authenticated | Value = 01h | Description = Session is active",
+                }
+            ],
+        },
+    ]
+
+    records = build_domain_units(domain_adapter=DomainAdapterMode.TCG, rag_tables=tcg_tables)
+
+    assert [record["unit_type"] for record in records] == [
+        "security_provider",
+        "locking_range",
+        "key_management",
+        "session_state",
+    ]
+    assert records[0]["normalized_fields"]["security_provider"] == "LockingSP"
+    assert records[2]["normalized_fields"]["key_name"] == "Media Encryption Key"
+
+
+def test_spdm_domain_adapter_extracts_security_protocol_units_and_chunks() -> None:
+    spdm_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "headers": ["Message", "Message Code", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Message", "Message Code", "Description"],
+                    "cells": {"Message": "GET_VERSION", "Message Code": "0x84", "Description": "Request version"},
+                    "row_text": "Message = GET_VERSION | Message Code = 0x84 | Description = Request version",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 2,
+            "headers": ["Request", "Response", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 2,
+                    "row_index": 1,
+                    "headers": ["Request", "Response", "Description"],
+                    "cells": {"Request": "GET_DIGESTS", "Response": "DIGESTS", "Description": "Digest exchange"},
+                    "row_text": "Request = GET_DIGESTS | Response = DIGESTS | Description = Digest exchange",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 3,
+            "headers": ["Measurement Index", "Value", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 3,
+                    "row_index": 1,
+                    "headers": ["Measurement Index", "Value", "Description"],
+                    "cells": {"Measurement Index": "0", "Value": "TCB", "Description": "TCB measurement block"},
+                    "row_text": "Measurement Index = 0 | Value = TCB | Description = TCB measurement block",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 4,
+            "headers": ["Certificate Slot", "Value", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 4,
+                    "row_index": 1,
+                    "headers": ["Certificate Slot", "Value", "Description"],
+                    "cells": {"Certificate Slot": "Slot 0", "Value": "Leaf", "Description": "Certificate chain slot"},
+                    "row_text": "Certificate Slot = Slot 0 | Value = Leaf | Description = Certificate chain slot",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 5,
+            "headers": ["Algorithm Type", "Value", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 5,
+                    "row_index": 1,
+                    "headers": ["Algorithm Type", "Value", "Description"],
+                    "cells": {"Algorithm Type": "BaseAsymAlgo", "Value": "TPM_ALG_ECDSA_ECC_NIST_P384", "Description": "Asymmetric algorithm"},
+                    "row_text": (
+                        "Algorithm Type = BaseAsymAlgo | Value = TPM_ALG_ECDSA_ECC_NIST_P384 | "
+                        "Description = Asymmetric algorithm"
+                    ),
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 6,
+            "headers": ["Key Exchange", "Value", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 6,
+                    "row_index": 1,
+                    "headers": ["Key Exchange", "Value", "Description"],
+                    "cells": {"Key Exchange": "DHE", "Value": "secp384r1", "Description": "DHE named group"},
+                    "row_text": "Key Exchange = DHE | Value = secp384r1 | Description = DHE named group",
+                }
+            ],
+        },
+        {
+            "page": 1,
+            "table_index": 7,
+            "headers": ["Session State", "Value", "Description"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 7,
+                    "row_index": 1,
+                    "headers": ["Session State", "Value", "Description"],
+                    "cells": {"Session State": "Secured", "Value": "01h", "Description": "Encrypted session active"},
+                    "row_text": "Session State = Secured | Value = 01h | Description = Encrypted session active",
+                }
+            ],
+        },
+    ]
+
+    records = build_domain_units(domain_adapter=DomainAdapterMode.SPDM, rag_tables=spdm_tables)
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        domain_units=records,
+    )
+
+    assert [record["unit_type"] for record in records] == [
+        "spdm_message",
+        "spdm_request_response",
+        "spdm_measurement",
+        "spdm_certificate",
+        "spdm_algorithm",
+        "spdm_key_exchange",
+        "spdm_session",
+    ]
+    assert records[0]["domain_unit_id"] == "domain-spdm-000001"
+    assert records[0]["normalized_fields"]["message_code"] == "0x84"
+    assert records[1]["normalized_fields"]["request"] == "GET_DIGESTS"
+    assert json.loads(serialize_domain_units_jsonl(records).splitlines()[0])["domain"] == "spdm"
+    assert chunks[0]["chunk_type"] == "domain_unit"
+    assert chunks[0]["retrieval_priority"] == 96
+    assert chunks[0]["source_refs"][-1]["source_id"] == "domain-spdm-000001"
+
+
 def test_domain_adapter_deep_fixtures_cover_storage_pcie_ocp_tcg_and_customer_shapes() -> None:
     nvme_tables = [
         {

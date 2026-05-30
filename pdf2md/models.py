@@ -54,6 +54,7 @@ class DomainAdapterMode(str, Enum):
     PCIE = "pcie"
     OCP = "ocp"
     TCG = "tcg"
+    SPDM = "spdm"
     CUSTOMER_REQUIREMENTS = "customer-requirements"
 
 

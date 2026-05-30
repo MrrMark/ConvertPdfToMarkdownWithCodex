@@ -64,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--domain-adapter",
         choices=[m.value for m in DomainAdapterMode],
         default=None,
-        help="Optional domain-specific RAG adapter: nvme, pcie, ocp, tcg, or customer-requirements.",
+        help="Optional domain-specific RAG adapter: nvme, pcie, ocp, tcg, spdm, or customer-requirements.",
     )
     parser.add_argument(
         "--require-domain-adapter-for-technical-profile",
