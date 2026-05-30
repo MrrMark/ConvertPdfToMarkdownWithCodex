@@ -57,7 +57,7 @@ python -m pdf2md.gui --doctor --doctor-format json
 
 - `기본 모드(원본 유지)`: 원문 보존을 우선하는 보수적 기본값이다.
 - `RAG 등록용(최적화)`: Markdown 원문을 임의로 바꾸지 않고 RAG table sidecar, page marker, header/footer 보정, hyphenation 보정, table context `embedding_text`, sibling chunk merge, relationship metadata 같은 RAG 친화 옵션을 켠다.
-- `기술 스펙 RAG`: storage/PCIe/security spec ingest를 위해 RAG sidecar와 chunk 보강 옵션을 켠다. NVMe/PCIe/OCP/TCG 같은 도메인 adapter는 필요에 따라 별도로 선택한다.
+- `기술 스펙 RAG`: storage/PCIe/security spec ingest를 위해 RAG sidecar와 chunk 보강 옵션을 켠다. NVMe/PCIe/OCP/TCG/SPDM 같은 도메인 adapter는 필요에 따라 별도로 선택한다.
 - `민감정보 보호 RAG`: confidential-safe mode와 sanitized report를 켜고, 공유용 RAG JSONL sidecar 중심으로 산출한다.
 - `원본 유지 + sidecar`: Markdown 본문 변화 가능성이 있는 보정은 끄고 RAG JSONL sidecar와 relationship metadata만 추가한다.
 - `Optimize Options(유저 선택)`: image/table/RAG/domain과 상세 flag를 직접 고른다.

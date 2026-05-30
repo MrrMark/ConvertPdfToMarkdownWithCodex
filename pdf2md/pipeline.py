@@ -374,7 +374,7 @@ def _technical_profile_domain_adapter_warning(config: Config, domain_adapter: Do
         details={
             "rag_profile": config.rag_profile,
             "domain_adapter": domain_adapter.value,
-            "recommended_domain_adapters": ["nvme", "pcie", "ocp", "tcg", "customer-requirements"],
+            "recommended_domain_adapters": ["nvme", "pcie", "ocp", "tcg", "spdm", "customer-requirements"],
         },
     )
 

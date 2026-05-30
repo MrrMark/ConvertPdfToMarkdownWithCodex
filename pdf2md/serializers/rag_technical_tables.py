@@ -14,30 +14,46 @@ REQ_ID_PATTERN = re.compile(r"\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-\d+\b")
 TECHNICAL_HEADER_HINTS = {
     "access",
     "address",
+    "algorithm",
     "bit",
     "bits",
     "byte",
+    "certificate",
     "command",
+    "code",
     "default",
     "description",
     "dword",
     "field",
     "feature",
     "identifier",
+    "key",
+    "keyexchange",
+    "locking",
     "log",
+    "management",
     "meaning",
+    "measurement",
+    "message",
     "method",
     "name",
     "object",
     "opcode",
     "parameter",
     "protocolid",
+    "provider",
+    "range",
     "register",
+    "request",
+    "response",
     "reset",
     "security",
     "securityfield",
     "securitydescription",
+    "session",
+    "slot",
     "status",
+    "state",
     "uid",
     "value",
 }
@@ -92,17 +108,52 @@ def _unit_type(headers: list[Any], cells: dict[str, Any], row_text: str) -> tupl
     register = _cell(cells, "Register", "Register Name")
     method = _cell(cells, "Method", "Method ID")
     security_object = _cell(cells, "Object", "Object ID")
+    security_provider = _cell(cells, "Security Provider", "SP", "Provider")
+    locking_range = _cell(cells, "Locking Range", "Range")
+    key_name = _cell(cells, "Key", "Key Name", "Key Management")
+    session_state = _cell(cells, "Session State", "Session", "State")
     authority = _cell(cells, "Authority")
     uid = _cell(cells, "UID", "Protocol ID", "ProtocolID")
     security_field = _cell(cells, "Security Field")
     value = _cell(cells, "Value", "Status", "Code")
+    message = _cell(cells, "Message", "Message Name", "Command")
+    message_code = _cell(cells, "Message Code", "Code", "Request Code", "Response Code")
+    request = _cell(cells, "Request", "Request Message")
+    response = _cell(cells, "Response", "Response Message")
+    measurement = _cell(cells, "Measurement", "Measurement Index", "Measurement Block", "Measurement Type")
+    certificate = _cell(cells, "Certificate", "Certificate Slot", "Slot")
+    algorithm = _cell(cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm")
+    key_exchange = _cell(cells, "Key Exchange", "KeyExchange", "Key Exchange Parameter")
+    session = _cell(cells, "Session", "Session State", "State")
 
     if command and opcode:
         return "command_opcode", reasons + ["command_and_opcode"]
     if opcode:
         return "opcode", reasons + ["opcode"]
+    if message and message_code and {"message", "code"} & hints:
+        return "spdm_message", reasons + ["spdm_message_code_header"]
+    if request and response:
+        return "spdm_request_response", reasons + ["spdm_request_response_header"]
+    if measurement and "measurement" in hints:
+        return "spdm_measurement", reasons + ["spdm_measurement_header"]
+    if certificate and {"certificate", "slot"} & hints:
+        return "spdm_certificate", reasons + ["spdm_certificate_header"]
+    if algorithm and "algorithm" in hints:
+        return "spdm_algorithm", reasons + ["spdm_algorithm_header"]
+    if key_exchange and {"keyexchange", "key"} & hints:
+        return "spdm_key_exchange", reasons + ["spdm_key_exchange_header"]
     if method and {"method", "uid", "protocolid"} & hints:
         return "security_method", reasons + ["security_method_header"]
+    if security_provider and {"security", "provider", "object", "uid"} & hints:
+        return "security_provider", reasons + ["security_provider_header"]
+    if locking_range and {"locking", "range", "security", "field", "bits"} & hints:
+        return "locking_range", reasons + ["locking_range_header"]
+    if key_name and {"key", "management", "security"} & hints:
+        return "key_management", reasons + ["key_management_header"]
+    if session_state and {"session", "state", "security"} & hints:
+        return "session_state", reasons + ["session_state_header"]
+    if session and {"session", "state"} & hints:
+        return "session_state", reasons + ["session_state_header"]
     if security_object and {"object", "uid", "protocolid"} & hints:
         return "security_object", reasons + ["security_object_header"]
     if authority and {"authority", "uid"} & hints:
@@ -192,6 +243,17 @@ def build_technical_table_records(rag_tables: list[dict[str, Any]]) -> list[dict
                 "security_object",
                 "security_authority",
                 "security_field",
+                "security_provider",
+                "locking_range",
+                "key_management",
+                "session_state",
+                "spdm_message",
+                "spdm_request_response",
+                "spdm_measurement",
+                "spdm_certificate",
+                "spdm_algorithm",
+                "spdm_key_exchange",
+                "spdm_session",
             }
             else 0.84,
             "classification_reasons": sorted(dict.fromkeys(reasons)),

@@ -43,12 +43,38 @@ TCG_HEADER_TOKENS = {
     "bytes",
     "description",
     "field",
+    "key",
+    "keymanagement",
+    "lockingrange",
     "method",
     "object",
     "protocolid",
     "securitydescription",
     "securityfield",
+    "securityprovider",
+    "session",
+    "sessionstate",
     "uid",
+    "value",
+}
+SPDM_HEADER_TOKENS = {
+    "algorithm",
+    "algorithmtype",
+    "certificate",
+    "certificateslot",
+    "code",
+    "description",
+    "keyexchange",
+    "message",
+    "messagecode",
+    "measurement",
+    "measurementindex",
+    "request",
+    "response",
+    "session",
+    "sessionstate",
+    "slot",
+    "state",
     "value",
 }
 
@@ -101,15 +127,36 @@ def _unit_from_row(
     capability = _cell_value(cells, "Capability", "Register", "Register Name")
     method = _cell_value(cells, "Method", "Method ID")
     security_object = _cell_value(cells, "Object", "Object ID")
+    security_provider = _cell_value(cells, "Security Provider", "SP", "Provider")
+    locking_range = _cell_value(cells, "Locking Range", "Range")
+    key_name = _cell_value(cells, "Key", "Key Name", "Key Management")
+    session_state = _cell_value(cells, "Session State", "Session", "State")
     authority = _cell_value(cells, "Authority")
     uid = _cell_value(cells, "UID", "Protocol ID", "ProtocolID")
     security_field = _cell_value(cells, "Security Field", "Field", "Parameter")
+    message = _cell_value(cells, "Message", "Message Name", "Command")
+    message_code = _cell_value(cells, "Message Code", "Code", "Request Code", "Response Code", "Opcode")
+    request = _cell_value(cells, "Request", "Request Message")
+    response = _cell_value(cells, "Response", "Response Message")
+    measurement = _cell_value(cells, "Measurement", "Measurement Index", "Measurement Block", "Measurement Type")
+    certificate = _cell_value(cells, "Certificate", "Certificate Slot", "Slot")
+    algorithm = _cell_value(cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm")
+    key_exchange = _cell_value(cells, "Key Exchange", "KeyExchange", "Key Exchange Parameter")
+    spdm_session = _cell_value(cells, "Session", "Session State", "State")
 
     if domain_adapter in {DomainAdapterMode.OCP, DomainAdapterMode.CUSTOMER_REQUIREMENTS} and requirement_id:
         return "requirement", requirement_id, requirement_id, description, [f"{prefix}_requirement_id_row"]
     if domain_adapter is DomainAdapterMode.TCG:
         if method:
             return "security_method", method, value or uid or opcode, description, [f"{prefix}_security_method_row"]
+        if security_provider:
+            return "security_provider", security_provider, uid or value or opcode, description, [f"{prefix}_security_provider_row"]
+        if locking_range:
+            return "locking_range", locking_range, bits or value or uid, description, [f"{prefix}_locking_range_row"]
+        if key_name:
+            return "key_management", key_name, value or uid or opcode, description, [f"{prefix}_key_management_row"]
+        if session_state:
+            return "session_state", session_state, value or uid or opcode, description, [f"{prefix}_session_state_row"]
         if security_object:
             return "security_object", security_object, uid or value or opcode, description, [f"{prefix}_security_object_row"]
         if authority:
@@ -118,6 +165,21 @@ def _unit_from_row(
             return "security_object", uid, uid, description, [f"{prefix}_security_uid_row"]
         if security_field and description:
             return "security_field", security_field, bits or value or uid, description, [f"{prefix}_security_field_row"]
+    if domain_adapter is DomainAdapterMode.SPDM:
+        if message and message_code:
+            return "spdm_message", message, message_code, description, [f"{prefix}_message_code_row"]
+        if request and response:
+            return "spdm_request_response", f"{request} -> {response}", response, description, [f"{prefix}_request_response_row"]
+        if measurement:
+            return "spdm_measurement", measurement, value or bits or message_code, description, [f"{prefix}_measurement_row"]
+        if certificate:
+            return "spdm_certificate", certificate, value or message_code, description, [f"{prefix}_certificate_row"]
+        if algorithm:
+            return "spdm_algorithm", algorithm, value or message_code, description, [f"{prefix}_algorithm_row"]
+        if key_exchange:
+            return "spdm_key_exchange", key_exchange, value or message_code, description, [f"{prefix}_key_exchange_row"]
+        if spdm_session:
+            return "spdm_session", spdm_session, value or message_code, description, [f"{prefix}_session_row"]
     if domain_adapter is DomainAdapterMode.PCIE and (capability or field):
         return "register_field", capability or field or "", bits or value, description, [f"{prefix}_register_or_capability_row"]
 
@@ -143,6 +205,8 @@ def _domain_tokens(domain_adapter: DomainAdapterMode) -> set[str]:
         return OCP_HEADER_TOKENS
     if domain_adapter is DomainAdapterMode.TCG:
         return TCG_HEADER_TOKENS
+    if domain_adapter is DomainAdapterMode.SPDM:
+        return SPDM_HEADER_TOKENS
     if domain_adapter is DomainAdapterMode.CUSTOMER_REQUIREMENTS:
         return OCP_HEADER_TOKENS | {"id", "reqid", "shall", "must"}
     return set()
@@ -188,11 +252,23 @@ def _unit_from_technical_record(
     if domain_adapter is DomainAdapterMode.TCG:
         method = _cell_value(raw_cells, "Method", "Method ID")
         security_object = _cell_value(raw_cells, "Object", "Object ID")
+        security_provider = _cell_value(raw_cells, "Security Provider", "SP", "Provider")
+        locking_range = _cell_value(raw_cells, "Locking Range", "Range")
+        key_name = _cell_value(raw_cells, "Key", "Key Name", "Key Management")
+        session_state = _cell_value(raw_cells, "Session State", "Session", "State")
         authority = _cell_value(raw_cells, "Authority")
         uid = _cell_value(raw_cells, "UID", "Protocol ID", "ProtocolID")
         security_field = _cell_value(raw_cells, "Security Field", "Field", "Parameter") or field
         if method or unit_type == "security_method":
             return "security_method", method or field, uid or value or None, description, ["tcg_security_method_row"]
+        if security_provider or unit_type == "security_provider":
+            return "security_provider", security_provider or field, uid or value or None, description, ["tcg_security_provider_row"]
+        if locking_range or unit_type == "locking_range":
+            return "locking_range", locking_range or field, uid or value or None, description, ["tcg_locking_range_row"]
+        if key_name or unit_type == "key_management":
+            return "key_management", key_name or field, uid or value or None, description, ["tcg_key_management_row"]
+        if session_state or unit_type == "session_state":
+            return "session_state", session_state or field, uid or value or None, description, ["tcg_session_state_row"]
         if security_object or unit_type == "security_object":
             return "security_object", security_object or uid or field, uid or value or None, description, ["tcg_security_object_row"]
         if authority or unit_type == "security_authority":
@@ -201,6 +277,32 @@ def _unit_from_technical_record(
             return "security_object", uid, uid, description, ["tcg_security_uid_row"]
         if unit_type in {"bitfield", "register_field", "technical_parameter", "security_method", "security_field"} and security_field:
             return "security_field", security_field, uid or value or None, description, ["tcg_security_field_row"]
+
+    if domain_adapter is DomainAdapterMode.SPDM:
+        message = _cell_value(raw_cells, "Message", "Message Name", "Command") or field or command
+        message_code = _cell_value(raw_cells, "Message Code", "Code", "Request Code", "Response Code") or value
+        request = _cell_value(raw_cells, "Request", "Request Message")
+        response = _cell_value(raw_cells, "Response", "Response Message")
+        measurement = _cell_value(raw_cells, "Measurement", "Measurement Index", "Measurement Block", "Measurement Type")
+        certificate = _cell_value(raw_cells, "Certificate", "Certificate Slot", "Slot")
+        algorithm = _cell_value(raw_cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm")
+        key_exchange = _cell_value(raw_cells, "Key Exchange", "KeyExchange", "Key Exchange Parameter")
+        spdm_session = _cell_value(raw_cells, "Session", "Session State", "State")
+        if unit_type == "spdm_message" and message:
+            return "spdm_message", message, message_code or None, description, ["spdm_message_code_row"]
+        if unit_type == "spdm_request_response" and (request or response):
+            name = f"{request or message} -> {response or message_code}".strip()
+            return "spdm_request_response", name, response or message_code or None, description, ["spdm_request_response_row"]
+        if unit_type == "spdm_measurement" and measurement:
+            return "spdm_measurement", measurement, message_code or None, description, ["spdm_measurement_row"]
+        if unit_type == "spdm_certificate" and certificate:
+            return "spdm_certificate", certificate, message_code or None, description, ["spdm_certificate_row"]
+        if unit_type == "spdm_algorithm" and algorithm:
+            return "spdm_algorithm", algorithm, message_code or None, description, ["spdm_algorithm_row"]
+        if unit_type == "spdm_key_exchange" and key_exchange:
+            return "spdm_key_exchange", key_exchange, message_code or None, description, ["spdm_key_exchange_row"]
+        if unit_type in {"spdm_session", "session_state"} and spdm_session:
+            return "spdm_session", spdm_session, message_code or None, description, ["spdm_session_row"]
 
     if domain_adapter is DomainAdapterMode.CUSTOMER_REQUIREMENTS:
         req_id = requirement_ref or _cell_value(raw_cells, "Requirement ID", "Req ID", "ID", "Requirement")
@@ -220,6 +322,58 @@ def _page(record: dict[str, Any]) -> int:
 def _heading_path(record: dict[str, Any]) -> list[str]:
     value = record.get("heading_path")
     return [str(item) for item in value] if isinstance(value, list) else []
+
+
+def _without_empty_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in payload.items() if value not in {None, ""}}
+
+
+def _normalized_domain_fields(
+    *,
+    cells: dict[str, Any],
+    domain_adapter: DomainAdapterMode,
+    unit_type: str,
+    name: str,
+    value: str | None,
+    base_fields: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    fields = dict(base_fields or {})
+    fields.update(
+        {
+            "unit_type": unit_type,
+            "name": name,
+            "value": value,
+        }
+    )
+    if domain_adapter is DomainAdapterMode.TCG:
+        fields.update(
+            {
+                "method": _cell_value(cells, "Method", "Method ID"),
+                "security_object": _cell_value(cells, "Object", "Object ID"),
+                "security_provider": _cell_value(cells, "Security Provider", "SP", "Provider"),
+                "locking_range": _cell_value(cells, "Locking Range", "Range"),
+                "key_name": _cell_value(cells, "Key", "Key Name", "Key Management"),
+                "session_state": _cell_value(cells, "Session State", "Session", "State"),
+                "authority": _cell_value(cells, "Authority"),
+                "uid": _cell_value(cells, "UID", "Protocol ID", "ProtocolID"),
+                "security_field": _cell_value(cells, "Security Field", "Field", "Parameter"),
+            }
+        )
+    if domain_adapter is DomainAdapterMode.SPDM:
+        fields.update(
+            {
+                "message": _cell_value(cells, "Message", "Message Name", "Command"),
+                "message_code": _cell_value(cells, "Message Code", "Code", "Request Code", "Response Code"),
+                "request": _cell_value(cells, "Request", "Request Message"),
+                "response": _cell_value(cells, "Response", "Response Message"),
+                "measurement": _cell_value(cells, "Measurement", "Measurement Index", "Measurement Block", "Measurement Type"),
+                "certificate": _cell_value(cells, "Certificate", "Certificate Slot", "Slot"),
+                "algorithm": _cell_value(cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm"),
+                "key_exchange": _cell_value(cells, "Key Exchange", "KeyExchange", "Key Exchange Parameter"),
+                "session_state": _cell_value(cells, "Session", "Session State", "State"),
+            }
+        )
+    return _without_empty_fields(fields)
 
 
 def build_domain_units(
@@ -266,15 +420,22 @@ def build_domain_units(
                 "value": value,
                 "description": description,
                 "text": str(technical_record.get("text") or "").strip(),
-                "normalized_fields": {
-                    "bit_range": technical_record.get("bit_range"),
-                    "opcode": technical_record.get("opcode"),
-                    "log_identifier": technical_record.get("log_identifier"),
-                    "feature_identifier": technical_record.get("feature_identifier"),
-                    "requirement_ref": technical_record.get("requirement_ref"),
-                    "access": technical_record.get("access"),
-                    "reset_default": technical_record.get("reset_default"),
-                },
+                "normalized_fields": _normalized_domain_fields(
+                    cells=technical_record.get("raw_cells") if isinstance(technical_record.get("raw_cells"), dict) else {},
+                    domain_adapter=domain_adapter,
+                    unit_type=unit_type,
+                    name=name,
+                    value=value,
+                    base_fields={
+                        "bit_range": technical_record.get("bit_range"),
+                        "opcode": technical_record.get("opcode"),
+                        "log_identifier": technical_record.get("log_identifier"),
+                        "feature_identifier": technical_record.get("feature_identifier"),
+                        "requirement_ref": technical_record.get("requirement_ref"),
+                        "access": technical_record.get("access"),
+                        "reset_default": technical_record.get("reset_default"),
+                    },
+                ),
                 "source_refs": source_refs,
                 "page_range": [page, page],
                 "bbox": technical_record.get("bbox"),
@@ -305,7 +466,13 @@ def build_domain_units(
                 "value": value,
                 "description": description,
                 "text": str(table_row.get("row_text") or "").strip(),
-                "normalized_fields": {},
+                "normalized_fields": _normalized_domain_fields(
+                    cells=table_row.get("cells") if isinstance(table_row.get("cells"), dict) else {},
+                    domain_adapter=domain_adapter,
+                    unit_type=unit_type,
+                    name=name,
+                    value=value,
+                ),
                 "source_refs": [
                     {
                         "source_type": "table_row",

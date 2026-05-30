@@ -457,8 +457,9 @@ Required per JSONL record:
 Policy:
 
 - Default adapter is `none`, so this file is only written when a domain adapter is explicitly selected.
-- Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, and `customer-requirements`.
-- TCG domain units may use `security_method`, `security_object`, `security_authority`, or `security_field`; TCG is expected to map to SSD `HIL/TCG` without a CustomerRequirement fallback.
+- Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, and `customer-requirements`.
+- TCG domain units may use `security_method`, `security_object`, `security_authority`, `security_field`, `security_provider`, `locking_range`, `key_management`, or `session_state`; TCG is expected to map to SSD `HIL/TCG` without a CustomerRequirement fallback.
+- SPDM domain units may use `spdm_message`, `spdm_request_response`, `spdm_measurement`, `spdm_certificate`, `spdm_algorithm`, `spdm_key_exchange`, or `spdm_session`; SPDM maps to SSD `HIL/SPDM`.
 - Adapter profiles consume the typed technical table sidecar where possible and keep domain heuristics out of the default conversion path.
 
 ## corpus_manifest.json

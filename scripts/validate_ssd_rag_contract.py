@@ -10,7 +10,7 @@ from typing import Any
 SCHEMA_VERSION = "1.0"
 REPORT_FILENAME = "ssd_rag_contract_report.json"
 HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-ALLOWED_HIL_SPEC_TYPES = {"NVMe", "PCIe", "OCP", "TCG", "CustomerRequirement"}
+ALLOWED_HIL_SPEC_TYPES = {"NVMe", "PCIe", "OCP", "TCG", "SPDM", "CustomerRequirement"}
 ALLOWED_FTL_SPEC_TYPES = {
     "BMS",
     "ReadDisturb",
@@ -27,6 +27,7 @@ DOMAIN_ADAPTER_TO_SPEC_TYPE = {
     "pcie": "PCIe",
     "ocp": "OCP",
     "tcg": "TCG",
+    "spdm": "SPDM",
     "customer-requirements": "CustomerRequirement",
 }
 REQUIRED_CHUNK_FIELDS = {
@@ -54,7 +55,25 @@ SSD_METADATA_FIELDS = {
     "schema_version",
     "source_sha256",
 }
-TCG_DOMAIN_UNIT_TYPES = {"security_method", "security_object", "security_authority", "security_field"}
+TCG_DOMAIN_UNIT_TYPES = {
+    "security_method",
+    "security_object",
+    "security_authority",
+    "security_field",
+    "security_provider",
+    "locking_range",
+    "key_management",
+    "session_state",
+}
+SPDM_DOMAIN_UNIT_TYPES = {
+    "spdm_message",
+    "spdm_request_response",
+    "spdm_measurement",
+    "spdm_certificate",
+    "spdm_algorithm",
+    "spdm_key_exchange",
+    "spdm_session",
+}
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -266,6 +285,13 @@ def validate_ssd_rag_contract(
                 path="domain_units_rag.jsonl",
                 code="missing_tcg_security_unit",
                 message="TCG domain output must include at least one security unit.",
+            )
+        if adapter == "spdm" and domain_units and not any(record.get("unit_type") in SPDM_DOMAIN_UNIT_TYPES for record in domain_units):
+            _add_issue(
+                errors,
+                path="domain_units_rag.jsonl",
+                code="missing_spdm_security_unit",
+                message="SPDM domain output must include at least one SPDM security unit.",
             )
 
     return {
