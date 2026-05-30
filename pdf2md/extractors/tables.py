@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import logging
 import math
+import re
 from difflib import SequenceMatcher
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +37,31 @@ TABLE_STRATEGIES: list[tuple[str, dict[str, Any] | None]] = [
     ),
 ]
 logger = logging.getLogger(__name__)
+TECHNICAL_HEADER_KEYWORDS = frozenset(
+    {
+        "access",
+        "address",
+        "bit",
+        "bits",
+        "byte",
+        "bytes",
+        "code",
+        "command",
+        "default",
+        "description",
+        "dword",
+        "field",
+        "identifier",
+        "log",
+        "meaning",
+        "name",
+        "opcode",
+        "register",
+        "reset",
+        "status",
+        "value",
+    }
+)
 
 
 @dataclass
@@ -48,6 +74,7 @@ class TableQualityMetrics:
     quality_score: float
     data_density: float
     header_fill_ratio: float
+    header_rows_promoted: int = 0
 
 
 @dataclass
@@ -379,6 +406,33 @@ def _realign_header_columns(rows: list[list[str]]) -> tuple[list[list[str]], int
     return realigned, shifts
 
 
+def _technical_header_hint_count(row: list[str]) -> int:
+    hints: set[str] = set()
+    for cell in row:
+        for token in re.findall(r"[A-Za-z]+", cell.lower()):
+            if token in TECHNICAL_HEADER_KEYWORDS:
+                hints.add(token)
+    return len(hints)
+
+
+def _promote_descriptor_header_row(rows: list[list[str]]) -> tuple[list[list[str]], int]:
+    if len(rows) < 3 or not rows[0]:
+        return rows, 0
+    if any(cell.strip() for cell in rows[0]):
+        return rows, 0
+    candidate_header = rows[1]
+    width = len(rows[0])
+    candidate_fill = sum(1 for cell in candidate_header if cell.strip()) / max(width, 1)
+    if candidate_fill < 0.5:
+        return rows, 0
+    if _technical_header_hint_count(candidate_header) < 2:
+        return rows, 0
+    body_density = _data_density([candidate_header] + rows[2:])
+    if body_density < 0.35:
+        return rows, 0
+    return [candidate_header[:]] + [row[:] for row in rows[2:]], 1
+
+
 def _split_notes(rows: list[list[str]]) -> tuple[list[list[str]], list[str], int]:
     if len(rows) < 2:
         return rows, [], 0
@@ -670,7 +724,7 @@ def _is_redundant_text_fragment(
 
 def _candidate_debug_payload(candidate: TableExtractionCandidate, *, accepted: bool, reason: str | None = None) -> dict[str, Any]:
     width = len(candidate.rows[0]) if candidate.rows and candidate.rows[0] else 0
-    return {
+    payload = {
         "bbox": list(candidate.bbox),
         "selected_strategy": candidate.metrics.selected_strategy,
         "quality_score": candidate.metrics.quality_score,
@@ -685,6 +739,9 @@ def _candidate_debug_payload(candidate: TableExtractionCandidate, *, accepted: b
         "stub_column_count": candidate.diagnostics.stub_column_count,
         "rag_header_strategy": candidate.diagnostics.rag_header_strategy,
     }
+    if candidate.metrics.header_rows_promoted:
+        payload["header_rows_promoted"] = candidate.metrics.header_rows_promoted
+    return payload
 
 
 def _process_rows(raw_rows: list[list[str]], strategy: str) -> tuple[list[list[str]], list[str], TableQualityMetrics]:
@@ -704,6 +761,7 @@ def _process_rows(raw_rows: list[list[str]], strategy: str) -> tuple[list[list[s
 
     rows, compacted = _compact_columns(rows)
     rows, header_shifts = _realign_header_columns(rows)
+    rows, header_rows_promoted = _promote_descriptor_header_row(rows)
     rows, merged = _merge_columns(rows)
     rows, notes, removed_rows = _split_notes(rows)
     rows, extra_compacted = _compact_columns(rows)
@@ -718,6 +776,7 @@ def _process_rows(raw_rows: list[list[str]], strategy: str) -> tuple[list[list[s
         quality_score=round(_quality_score(rows, removed_rows, compacted, merged), 4),
         data_density=round(_data_density(rows), 4),
         header_fill_ratio=round(_header_fill_ratio(rows), 4),
+        header_rows_promoted=header_rows_promoted,
     )
     return rows, notes, metrics
 
@@ -1021,6 +1080,8 @@ def _build_table_grid(rows: list[list[str]], notes: list[str], metrics: TableQua
     confidence = _header_confidence(rows, header_depth)
     headers = _flatten_multi_row_headers(rows) if header_depth == 2 else _unique_headers(rows[0] if rows else [])
     rag_header_strategy = "multi_row_flattened" if header_depth == 2 else "single_row"
+    if metrics.header_rows_promoted:
+        rag_header_strategy = "promoted_header_row"
     reasons: set[str] = set()
     if header_depth == 2:
         reasons.add(TableReason.MULTI_ROW_HEADER)
@@ -1488,33 +1549,34 @@ def _materialize_page_table_candidates(
                 caption_position=caption_position,
             )
         )
-        result.table_quality.append(
-            {
-                "page": page_number,
-                "table_index": index,
-                "selected_strategy": candidate.metrics.selected_strategy,
-                "empty_cell_ratio": candidate.metrics.empty_cell_ratio,
-                "all_empty_rows_removed": candidate.metrics.all_empty_rows_removed,
-                "columns_compacted": candidate.metrics.columns_compacted,
-                "columns_merged": candidate.metrics.columns_merged,
-                "quality_score": candidate.metrics.quality_score,
-                "data_density": candidate.metrics.data_density,
-                "header_fill_ratio": candidate.metrics.header_fill_ratio,
-                "reasons": candidate.decision.reasons,
-                "unresolved": candidate.decision.unresolved,
-                "mode": asset_mode,
-                "caption_text": caption_text,
-                "caption_distance": caption_distance,
-                "caption_position": caption_position,
-                "caption_source": "nearby_table_caption" if caption_text else None,
-                "header_depth": candidate.diagnostics.header_depth,
-                "header_confidence": candidate.diagnostics.header_confidence,
-                "stub_column_count": candidate.diagnostics.stub_column_count,
-                "footnote_row_count": candidate.diagnostics.footnote_row_count,
-                "merged_cell_suspected": candidate.diagnostics.merged_cell_suspected,
-                "rag_header_strategy": candidate.diagnostics.rag_header_strategy,
-            }
-        )
+        table_quality_item = {
+            "page": page_number,
+            "table_index": index,
+            "selected_strategy": candidate.metrics.selected_strategy,
+            "empty_cell_ratio": candidate.metrics.empty_cell_ratio,
+            "all_empty_rows_removed": candidate.metrics.all_empty_rows_removed,
+            "columns_compacted": candidate.metrics.columns_compacted,
+            "columns_merged": candidate.metrics.columns_merged,
+            "quality_score": candidate.metrics.quality_score,
+            "data_density": candidate.metrics.data_density,
+            "header_fill_ratio": candidate.metrics.header_fill_ratio,
+            "reasons": candidate.decision.reasons,
+            "unresolved": candidate.decision.unresolved,
+            "mode": asset_mode,
+            "caption_text": caption_text,
+            "caption_distance": caption_distance,
+            "caption_position": caption_position,
+            "caption_source": "nearby_table_caption" if caption_text else None,
+            "header_depth": candidate.diagnostics.header_depth,
+            "header_confidence": candidate.diagnostics.header_confidence,
+            "stub_column_count": candidate.diagnostics.stub_column_count,
+            "footnote_row_count": candidate.diagnostics.footnote_row_count,
+            "merged_cell_suspected": candidate.diagnostics.merged_cell_suspected,
+            "rag_header_strategy": candidate.diagnostics.rag_header_strategy,
+        }
+        if candidate.metrics.header_rows_promoted:
+            table_quality_item["header_rows_promoted"] = candidate.metrics.header_rows_promoted
+        result.table_quality.append(table_quality_item)
 
         result.table_counts["table_total"] += 1
         if asset_mode == TableModeEmission.GFM:

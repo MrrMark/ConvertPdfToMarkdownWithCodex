@@ -503,6 +503,82 @@ def test_actionable_low_quality_table_keeps_partial_status(sample_pdf: Path, tmp
     assert report["summary"]["table_advisory_low_quality_count"] == 0
 
 
+def test_debug_table_quality_review_pack_records_low_quality_evidence(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def fake_extract_tables(*args, **kwargs) -> TableExtractionResult:
+        return TableExtractionResult(
+            rag_tables=[
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "source_mode": "html",
+                    "headers": ["Bits", "Field", "Description"],
+                    "bbox": [10.0, 20.0, 120.0, 80.0],
+                    "quality_score": 0.42,
+                    "records": [
+                        {
+                            "page": 1,
+                            "table_index": 1,
+                            "source_mode": "html",
+                            "headers": ["Bits", "Field", "Description"],
+                            "row_index": 1,
+                            "cells": {
+                                "Bits": "0",
+                                "Field": "CAP",
+                                "Description": "Controller capabilities",
+                            },
+                            "row_text": "Bits = 0 | Field = CAP | Description = Controller capabilities",
+                            "bbox": [10.0, 20.0, 120.0, 80.0],
+                            "quality_score": 0.42,
+                        }
+                    ],
+                }
+            ],
+            table_quality=[
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "quality_score": 0.42,
+                    "mode": "html",
+                    "reasons": ["LOW_HEADER_CONFIDENCE"],
+                    "rag_header_strategy": "fallback_low_confidence",
+                    "header_confidence": 0.4,
+                    "empty_cell_ratio": 0.5,
+                }
+            ],
+            fallbacks=[
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "mode": "html",
+                    "reasons": ["LOW_HEADER_CONFIDENCE"],
+                }
+            ],
+            table_counts={"table_total": 1, "table_html_count": 1},
+        )
+
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", fake_extract_tables)
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+
+    output_dir = tmp_path / "table-quality-debug"
+    result = run_conversion(Config(input_pdf=sample_pdf, output_dir=output_dir, pages="1", debug=True))
+
+    assert result.exit_code == EXIT_SUCCESS
+    pack = json.loads((output_dir / "debug" / "table-quality-review-pack.json").read_text(encoding="utf-8"))
+    assert pack["low_quality_count"] == 1
+    assert pack["triage_counts"] == {"actionable": 0, "advisory": 1}
+    item = pack["items"][0]
+    assert item["table_id"] == "page-0001-table-0001"
+    assert item["row_count"] == 1
+    assert item["technical_table_unit_count"] == 1
+    assert item["sample_row_text_sha256"]
+    assert "Controller capabilities" in item["sample_row_text_preview"]
+
+
 def test_pipeline_records_ocr_confidence_matrix_in_report(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
     def fake_run_ocr(*args, **kwargs) -> OcrResult:  # noqa: ANN001
         return OcrResult(

@@ -75,6 +75,7 @@ def test_pipeline_writes_debug_artifacts(sample_pdf: Path, tmp_path: Path) -> No
     assert (debug_dir / "page-0001-normalized-lines.json").exists()
     assert (debug_dir / "page-0001-table-candidates.json").exists()
     assert (debug_dir / "page-0001-image-candidates.json").exists()
+    assert (debug_dir / "table-quality-review-pack.json").exists()
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["options"]["debug"] is True
 
