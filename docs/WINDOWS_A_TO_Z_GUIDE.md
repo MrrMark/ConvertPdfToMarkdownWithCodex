@@ -381,7 +381,7 @@ python -m pdf2md --input-dir .\pdfs
 - `pdfs\output\alpha\alpha.md`
 - `pdfs\output\alpha\alpha_manifest.json`
 - `pdfs\output\alpha\alpha_report.json`
-- `pdfs\output\alpha\alpha_assets\images\...`
+- `pdfs\output\alpha\assets\images\...`
 - `pdfs\output\batch_report.json`
 - `pdfs\output\corpus_manifest.json`
 - `pdfs\output\corpus_diff_report.json` (`--previous-corpus-manifest` 사용 시)
