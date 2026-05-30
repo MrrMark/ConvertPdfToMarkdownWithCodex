@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import json
 
-from pdf2md.serializers.rag_semantics import build_semantic_layer, serialize_semantic_units_jsonl
+from pypdf import PdfReader, PdfWriter
+
+from pdf2md.serializers.rag_semantics import (
+    build_semantic_layer,
+    extract_pdf_outline_reference_targets,
+    serialize_semantic_units_jsonl,
+)
 from pdf2md.serializers.rag_tables import normalize_rag_table_payload
 
 
@@ -169,6 +175,106 @@ def test_cross_refs_are_resolved_when_targets_exist_and_kept_when_unresolved() -
     assert len(reference_units) == 3
 
 
+def test_cross_refs_resolve_missing_sections_from_pdf_outline_targets() -> None:
+    result = build_semantic_layer(
+        text_block_records=[
+            _text_block(
+                "See Section 3.6.1 for controller behavior.",
+                block_id="page-0001-block-0001",
+                block_index=1,
+            )
+        ],
+        rag_tables=[],
+        pdf_outline_targets=[
+            {
+                "target_type": "section",
+                "target_label": "3.6.1",
+                "target_ref": "pdf-outline-section-3-6-1-page-0042",
+                "page": 42,
+                "title": "3.6.1 Controller Behavior",
+            }
+        ],
+    )
+
+    assert [(record["target_label"], record["resolved"]) for record in result.cross_refs] == [
+        ("Section 3.6.1", True)
+    ]
+    assert result.cross_refs[0]["target_ref"] == "pdf-outline-section-3-6-1-page-0042"
+    assert "target_source_pdf_outline" in result.cross_refs[0]["classification_reasons"]
+    assert result.unresolved_cross_ref_count == 0
+
+
+def test_pdf_outline_targets_extract_numeric_sections_and_respect_selected_pages(tmp_path) -> None:
+    pdf_path = tmp_path / "outline.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.add_blank_page(width=200, height=200)
+    writer.add_outline_item("3.6.1 Controller Behavior", 0)
+    writer.add_outline_item("Appendix B External References", 1)
+    with pdf_path.open("wb") as fp:
+        writer.write(fp)
+
+    reader = PdfReader(str(pdf_path))
+
+    targets = extract_pdf_outline_reference_targets(reader, selected_pages={1, 2})
+    assert [(target["target_type"], target["target_label"], target["page"]) for target in targets] == [
+        ("appendix", "B", 2),
+        ("section", "3.6.1", 1),
+    ]
+    assert extract_pdf_outline_reference_targets(reader, selected_pages={1}) == [targets[1]]
+
+
+def test_cross_refs_resolve_figures_from_list_entries_without_using_them_as_sources() -> None:
+    result = build_semantic_layer(
+        text_block_records=[
+            _text_block("List of Figures", block_id="page-0001-block-0001", block_index=1),
+            _text_block(
+                "Figure 29: Queue arbitration flow ................ 123",
+                block_id="page-0001-block-0002",
+                block_index=2,
+            ),
+            _text_block(
+                "See Figure 29 for the queue arbitration state machine.",
+                block_id="page-0002-block-0001",
+                block_index=1,
+            )
+            | {"page": 2},
+        ],
+        rag_tables=[],
+    )
+
+    assert [(record["target_label"], record["resolved"]) for record in result.cross_refs] == [
+        ("Figure 29", True)
+    ]
+    assert result.cross_refs[0]["target_ref"] == "pdf-list-figure-29-page-0123"
+    assert "target_source_pdf_list" in result.cross_refs[0]["classification_reasons"]
+    assert result.unresolved_cross_ref_count == 0
+
+
+def test_cross_ref_normalization_splits_plural_sections_and_attached_figure_labels() -> None:
+    result = build_semantic_layer(
+        text_block_records=[
+            _text_block("3.6.1 First Target", block_id="page-0001-block-0001", block_index=1, block_type="heading"),
+            _text_block("3.6.2 Second Target", block_id="page-0001-block-0002", block_index=2, block_type="heading"),
+            _text_block("Figure 23: Completion flow", block_id="page-0001-block-0003", block_index=3, block_type="caption"),
+            _text_block(
+                "See sections 3.6.1 and 3.6.2. Figure 23Figure 23 shows the completion flow. "
+                "Figure 551determines is extraction noise.",
+                block_id="page-0001-block-0004",
+                block_index=4,
+            ),
+        ],
+        rag_tables=[],
+    )
+
+    assert [(record["target_label"], record["resolved"]) for record in result.cross_refs] == [
+        ("Section 3.6.1", True),
+        ("Section 3.6.2", True),
+        ("Figure 23", True),
+    ]
+    assert result.unresolved_cross_ref_count == 0
+
+
 def test_cross_ref_guardrails_skip_generic_unresolved_phrases() -> None:
     result = build_semantic_layer(
         text_block_records=[
@@ -206,6 +312,56 @@ def test_cross_ref_guardrails_skip_generic_unresolved_phrases() -> None:
     assert result.unresolved_cross_ref_count == 0
     reference_units = [record for record in result.semantic_units if record["semantic_type"] == "reference"]
     assert len(reference_units) == 2
+
+
+def test_cross_ref_guardrails_skip_external_appendix_table_terms_and_generic_registers() -> None:
+    result = build_semantic_layer(
+        text_block_records=[
+            _text_block(
+                "The Register command shall complete. RFC 9562 Appendix B defines UUID text. "
+                "MSI-X Table BIR describes the BAR indicator register. "
+                "Section 2.12 of RFC 7296 gives external IKE guidance.",
+            )
+        ],
+        rag_tables=[],
+    )
+
+    assert result.cross_refs == []
+    assert result.unresolved_cross_ref_count == 0
+
+
+def test_register_cross_refs_are_kept_only_for_real_identifier_targets() -> None:
+    rag_tables = normalize_rag_table_payload(
+        [
+            {
+                "page": 1,
+                "table_index": 1,
+                "headers": ["Field", "Bits", "Description"],
+                "records": [
+                    {
+                        "page": 1,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Field", "Bits", "Description"],
+                        "cells": {"Field": "CAP.NSSRS", "Bits": "36", "Description": "NVM Subsystem Reset Supported"},
+                        "row_text": "Field = CAP.NSSRS | Bits = 36 | Description = NVM Subsystem Reset Supported",
+                    }
+                ],
+            }
+        ]
+    )
+
+    result = build_semantic_layer(
+        text_block_records=[
+            _text_block("Register CAP.NSSRS shall be set when subsystem reset is supported.")
+        ],
+        rag_tables=rag_tables,
+    )
+
+    assert [(record["target_type"], record["target_label"], record["resolved"]) for record in result.cross_refs] == [
+        ("register", "Register CAP.NSSRS", True)
+    ]
+    assert result.unresolved_cross_ref_count == 0
 
 
 def test_technical_cross_refs_include_requirement_and_log_identifier_targets() -> None:

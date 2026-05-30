@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 import json
 import re
 from typing import Any
@@ -42,7 +43,13 @@ NOTE_PATTERN = re.compile(r"^\s*NOTE(?:\s+\d+)?\s*[:.-]\s+\S", re.IGNORECASE)
 WARNING_PATTERN = re.compile(r"^\s*(?:WARNING|CAUTION|DANGER|IMPORTANT)\s*[:.-]\s+\S", re.IGNORECASE)
 LIST_MARKER_PATTERN = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 REFERENCE_PATTERN = re.compile(
-    r"\b(?P<kind>Section|Clause|Table|Figure|Appendix)\s+(?P<label>[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*)",
+    r"\b(?P<kind>Sections?|Clauses?|Tables?|Figures?|Appendix|Appendices)\s+"
+    r"(?P<label>[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*)",
+    re.IGNORECASE,
+)
+MULTI_SECTION_REFERENCE_PATTERN = re.compile(
+    r"\b(?P<kind>Sections?|Clauses?)\s+"
+    r"(?P<labels>\d+(?:\.\d+)*(?:\s*(?:,|and|or)\s*\d+(?:\.\d+)*)+)",
     re.IGNORECASE,
 )
 REQUIREMENT_REF_PATTERN = re.compile(
@@ -63,9 +70,22 @@ OPCODE_REF_PATTERN = re.compile(
     re.IGNORECASE,
 )
 REGISTER_REF_PATTERN = re.compile(
-    r"\b(?:Register|Capability)\s+(?P<label>[A-Za-z][A-Za-z0-9 _/-]{1,80})",
+    r"\b(?:Register|Capability)\s+(?P<label>[A-Za-z][A-Za-z0-9 ._/-]{1,80})",
     re.IGNORECASE,
 )
+LIST_FIGURE_ENTRY_PATTERN = re.compile(
+    r"^\s*Figure\s+(?P<label>\d+(?:[.\-]\d+)*)(?P<trailer>[:.\s-].*?)"
+    r"(?:\.{2,}|\s{3,})\s*(?P<page>\d+)\s*$",
+    re.IGNORECASE,
+)
+LIST_TABLE_ENTRY_PATTERN = re.compile(
+    r"^\s*Table\s+(?P<label>\d+(?:[.\-]\d+)*)(?P<trailer>[:.\s-].*?)"
+    r"(?:\.{2,}|\s{3,})\s*(?P<page>\d+)\s*$",
+    re.IGNORECASE,
+)
+REGISTER_IDENTIFIER_SHAPE_PATTERN = re.compile(r"^[A-Z]{2,6}(?:\.[A-Z0-9]{1,12})+$")
+EXTERNAL_REFERENCE_PREFIX_PATTERN = re.compile(r"\b(?:RFC|ISO|IEC|PCI(?:e)?|MSI-X)\s+\d*", re.IGNORECASE)
+EXTERNAL_REFERENCE_SUFFIX_PATTERN = re.compile(r"\b(?:of|in)\s+(?:RFC|ISO|IEC)\s+\d+", re.IGNORECASE)
 REFERENCE_LABEL_STOPWORDS = {
     "above",
     "below",
@@ -109,6 +129,15 @@ class SemanticLayerBuildResult:
     semantic_low_confidence_count: int = 0
     unresolved_cross_ref_count: int = 0
     normative_requirement_count: int = 0
+
+
+@dataclass(frozen=True)
+class ReferenceCandidate:
+    kind: str
+    target_type: str
+    label: str
+    start: int
+    end: int
 
 
 class _SemanticRecorder:
@@ -294,7 +323,9 @@ def _definition_term(text: str) -> str | None:
 
 
 def _target_type_for_kind(kind: str) -> str:
-    normalized = kind.lower()
+    normalized = kind.lower().rstrip("s")
+    if normalized == "appendice":
+        normalized = "appendix"
     if normalized in {"section", "clause"}:
         return "section"
     if normalized in {"table", "figure", "appendix"}:
@@ -302,9 +333,122 @@ def _target_type_for_kind(kind: str) -> str:
     return "unknown"
 
 
+def _target_ref_slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-") or "unknown"
+
+
+def _outline_target_ref(target_type: str, label: str, page: int | None) -> str:
+    page_suffix = f"-page-{page:04d}" if page else ""
+    return f"pdf-outline-{target_type}-{_target_ref_slug(label)}{page_suffix}"
+
+
+def _list_target_ref(target_type: str, label: str, page: int | None) -> str:
+    page_suffix = f"-page-{page:04d}" if page else ""
+    return f"pdf-list-{target_type}-{_target_ref_slug(label)}{page_suffix}"
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 1 else None
+
+
+def extract_pdf_outline_reference_targets(
+    reader: Any,
+    *,
+    selected_pages: set[int] | None = None,
+) -> list[dict[str, Any]]:
+    """Return deterministic local reference targets from PDF outline/bookmarks."""
+    outline = getattr(reader, "outline", None)
+    if outline is None:
+        outline = getattr(reader, "outlines", None)
+    if not outline:
+        return []
+
+    targets: list[dict[str, Any]] = []
+
+    def walk(items: Any) -> None:
+        if isinstance(items, (list, tuple)):
+            for item in items:
+                walk(item)
+            return
+        title = str(getattr(items, "title", "") or "").strip()
+        if not title and isinstance(items, dict):
+            title = str(items.get("/Title") or items.get("title") or "").strip()
+        if not title:
+            return
+        page: int | None = None
+        try:
+            page_index = reader.get_destination_page_number(items)
+            if page_index is not None and int(page_index) >= 0:
+                page = int(page_index) + 1
+        except Exception:  # noqa: BLE001
+            page = None
+        if selected_pages is not None and page is not None and page not in selected_pages:
+            return
+
+        numeric = NUMERIC_HEADING_PATTERN.search(title)
+        if numeric is not None:
+            label = numeric.group("label")
+            targets.append(
+                {
+                    "target_type": "section",
+                    "target_label": label,
+                    "target_ref": _outline_target_ref("section", label, page),
+                    "page": page,
+                    "title": title,
+                }
+            )
+        appendix = APPENDIX_HEADING_PATTERN.search(title)
+        if appendix is not None:
+            label = appendix.group("label")
+            targets.append(
+                {
+                    "target_type": "appendix",
+                    "target_label": label,
+                    "target_ref": _outline_target_ref("appendix", label, page),
+                    "page": page,
+                    "title": title,
+                }
+            )
+
+    walk(outline)
+    deduped: dict[tuple[str, str], dict[str, Any]] = {}
+    for target in targets:
+        key = (str(target["target_type"]), str(target["target_label"]))
+        deduped.setdefault(key, target)
+    return [deduped[key] for key in sorted(deduped)]
+
+
+def _merge_pdf_outline_targets(
+    targets: dict[str, dict[str, str]],
+    pdf_outline_targets: list[dict[str, Any]] | None,
+) -> None:
+    for item in pdf_outline_targets or []:
+        target_type = str(item.get("target_type") or "")
+        label = str(item.get("target_label") or "").strip()
+        if target_type not in targets or not label:
+            continue
+        target_ref = str(item.get("target_ref") or _outline_target_ref(target_type, label, _int_or_none(item.get("page"))))
+        targets[target_type].setdefault(label, target_ref)
+
+
+def _merge_list_entry_targets(targets: dict[str, dict[str, str]], text: str) -> None:
+    for pattern, target_type in ((LIST_FIGURE_ENTRY_PATTERN, "figure"), (LIST_TABLE_ENTRY_PATTERN, "table")):
+        match = pattern.search(text)
+        if match is None:
+            continue
+        label = match.group("label")
+        page = _int_or_none(match.group("page"))
+        targets[target_type].setdefault(label, _list_target_ref(target_type, label, page))
+
+
 def _build_reference_targets(
     text_block_records: list[dict[str, Any]],
     rag_tables: list[dict[str, Any]],
+    pdf_outline_targets: list[dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, str]]:
     targets: dict[str, dict[str, str]] = {
         "section": {},
@@ -322,6 +466,7 @@ def _build_reference_targets(
         block_id = str(record.get("block_id") or "")
         if not text or not block_id:
             continue
+        _merge_list_entry_targets(targets, text)
         if record.get("block_type") == "heading":
             numeric = NUMERIC_HEADING_PATTERN.search(text)
             if numeric is not None:
@@ -376,10 +521,121 @@ def _build_reference_targets(
             ):
                 for match in pattern.finditer(row_text):
                     targets[target_type][match.group("label")] = row_id
+    _merge_pdf_outline_targets(targets, pdf_outline_targets)
     return targets
 
 
-def _extra_reference_matches(text: str) -> list[tuple[re.Match[str], str, str]]:
+def _canonical_reference_kind(kind: str) -> str:
+    normalized = kind.lower()
+    if normalized.startswith("section"):
+        return "Section"
+    if normalized.startswith("clause"):
+        return "Clause"
+    if normalized.startswith("table"):
+        return "Table"
+    if normalized.startswith("figure"):
+        return "Figure"
+    if normalized.startswith("append"):
+        return "Appendix"
+    return kind.title()
+
+
+def _normalize_reference_label(kind: str, label: str) -> str | None:
+    stripped = label.strip(" .,;:")
+    if not stripped:
+        return None
+    attached = re.fullmatch(r"(?P<base>\d+(?:[.\-]\d+)*)(?P<suffix>[A-Za-z]{3,}.*)", stripped)
+    if attached is not None:
+        suffix = attached.group("suffix")
+        if suffix.lower().startswith(_canonical_reference_kind(kind).lower()):
+            return attached.group("base")
+        if suffix[:1].islower():
+            return None
+    return stripped
+
+
+def _spans_overlap(span: tuple[int, int], existing_spans: list[tuple[int, int]]) -> bool:
+    start, end = span
+    return any(start < existing_end and existing_start < end for existing_start, existing_end in existing_spans)
+
+
+def _reference_candidates(text: str) -> list[ReferenceCandidate]:
+    candidates: list[ReferenceCandidate] = []
+    multi_spans: list[tuple[int, int]] = []
+    for match in MULTI_SECTION_REFERENCE_PATTERN.finditer(text):
+        kind = _canonical_reference_kind(match.group("kind"))
+        target_type = _target_type_for_kind(kind)
+        labels = re.findall(r"\d+(?:\.\d+)*", match.group("labels"))
+        for label in labels:
+            candidates.append(
+                ReferenceCandidate(kind=kind, target_type=target_type, label=label, start=match.start(), end=match.end())
+            )
+        multi_spans.append((match.start(), match.end()))
+
+    for match in REFERENCE_PATTERN.finditer(text):
+        if _spans_overlap((match.start(), match.end()), multi_spans):
+            continue
+        kind = _canonical_reference_kind(match.group("kind"))
+        label = _normalize_reference_label(kind, match.group("label"))
+        if label is None:
+            continue
+        candidates.append(
+            ReferenceCandidate(
+                kind=kind,
+                target_type=_target_type_for_kind(kind),
+                label=label,
+                start=match.start(),
+                end=match.end(),
+            )
+        )
+    return sorted(candidates, key=lambda item: (item.start, item.end))
+
+
+def _is_external_or_terminology_reference(text: str, candidate: ReferenceCandidate) -> bool:
+    prefix = text[max(0, candidate.start - 40) : candidate.start]
+    suffix = text[candidate.end : min(len(text), candidate.end + 40)]
+    source_window = text[max(0, candidate.start - 40) : min(len(text), candidate.end + 40)]
+    if candidate.target_type in {"appendix", "section"} and (
+        EXTERNAL_REFERENCE_PREFIX_PATTERN.search(prefix) or EXTERNAL_REFERENCE_SUFFIX_PATTERN.search(suffix)
+    ):
+        return True
+    if candidate.target_type == "table" and not any(char.isdigit() for char in candidate.label):
+        return EXTERNAL_REFERENCE_PREFIX_PATTERN.search(source_window) is not None
+    return False
+
+
+def _target_source_reasons(target_ref: str | None) -> list[str]:
+    if not target_ref:
+        return []
+    if target_ref.startswith("pdf-outline-"):
+        return ["target_source_pdf_outline"]
+    if target_ref.startswith("pdf-list-"):
+        return ["target_source_pdf_list"]
+    return []
+
+
+def _is_register_identifier_label(label: str) -> bool:
+    return REGISTER_IDENTIFIER_SHAPE_PATTERN.fullmatch(label.strip(" .,;:")) is not None
+
+
+def _register_target_exists(targets: dict[str, dict[str, str]], label: str) -> bool:
+    target_ref, _, _, _ = _lookup_reference_target(targets, "register", label)
+    return target_ref is not None
+
+
+def _register_reference_label(label: str, targets: dict[str, dict[str, str]]) -> str | None:
+    identifier = re.search(r"\b[A-Z]{2,6}(?:\.[A-Z0-9]{1,12})+\b", label)
+    if identifier is not None:
+        return identifier.group(0)
+    trimmed = re.split(r"\s+(?:and|for|in|of|is|shall|must|should|may)\b", label, maxsplit=1)[0].strip()
+    if _is_generic_register_reference_label(trimmed):
+        return None
+    if _is_register_identifier_label(trimmed) or _register_target_exists(targets, trimmed):
+        return trimmed
+    return None
+
+
+def _extra_reference_matches(text: str, targets: dict[str, dict[str, str]]) -> list[tuple[re.Match[str], str, str]]:
     matches: list[tuple[re.Match[str], str, str]] = []
     for pattern, target_type, label_prefix in (
         (REQUIREMENT_REF_PATTERN, "requirement", "Requirement"),
@@ -391,9 +647,10 @@ def _extra_reference_matches(text: str) -> list[tuple[re.Match[str], str, str]]:
         for match in pattern.finditer(text):
             label = match.group("label").strip(" .,;:")
             if target_type == "register":
-                label = re.split(r"\s+(?:and|for|in|of|is|shall|must|should|may)\b", label, maxsplit=1)[0].strip()
-                if _is_generic_register_reference_label(label):
+                register_label = _register_reference_label(label, targets)
+                if register_label is None:
                     continue
+                label = register_label
             if label:
                 matches.append((match, target_type, f"{label_prefix} {label}"))
     matches.sort(key=lambda item: item[0].start())
@@ -419,6 +676,8 @@ def _should_skip_unresolved_reference_candidate(
         return False
     normalized_label = target_label_value.strip(" .,;:").casefold()
     if normalized_label in REFERENCE_LABEL_STOPWORDS:
+        return True
+    if target_type in {"table", "figure"} and not any(character.isdigit() for character in normalized_label):
         return True
     if target_type in {"section", "clause", "table", "figure"}:
         return not _has_explicit_reference_label_shape(target_label_value)
@@ -465,6 +724,7 @@ def _strip_target_prefixes(value: str) -> str:
     return text
 
 
+@lru_cache(maxsize=32768)
 def _normalize_ref_key(value: str) -> str:
     text = _strip_target_prefixes(value)
     hex_match = re.fullmatch(r"(?:0x(?P<prefix_hex>[0-9a-fA-F]+)|(?P<suffix_hex>[0-9a-fA-F]+)h|(?P<alpha_hex>[0-9a-fA-F]*[a-fA-F][0-9a-fA-F]*))", text.strip())
@@ -474,7 +734,8 @@ def _normalize_ref_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", text.lower())
 
 
-def _normalized_ref_variants(value: str) -> set[str]:
+@lru_cache(maxsize=32768)
+def _normalized_ref_variants(value: str) -> frozenset[str]:
     text = _strip_target_prefixes(value)
     variants = {_normalize_ref_key(text)}
     trimmed = re.sub(r"\b(?:register|capability|field)\b", " ", text, flags=re.IGNORECASE).strip()
@@ -483,7 +744,7 @@ def _normalized_ref_variants(value: str) -> set[str]:
     compact = re.sub(r"\s+", " ", text).strip()
     if compact:
         variants.add(_normalize_ref_key(compact))
-    return {variant for variant in variants if variant}
+    return frozenset(variant for variant in variants if variant)
 
 
 def _lookup_reference_target(
@@ -551,6 +812,7 @@ def build_semantic_layer(
     *,
     text_block_records: list[dict[str, Any]],
     rag_tables: list[dict[str, Any]],
+    pdf_outline_targets: list[dict[str, Any]] | None = None,
 ) -> SemanticLayerBuildResult:
     """Build deterministic, non-generative semantic sidecars for spec RAG."""
     sorted_text_blocks = sorted(
@@ -559,7 +821,7 @@ def build_semantic_layer(
     )
     normalized_tables = normalize_rag_table_payload(rag_tables)
     table_records = flatten_rag_table_records(normalized_tables)
-    targets = _build_reference_targets(sorted_text_blocks, normalized_tables)
+    targets = _build_reference_targets(sorted_text_blocks, normalized_tables, pdf_outline_targets)
     result = SemanticLayerBuildResult()
     semantic_recorder = _SemanticRecorder()
     cross_ref_recorder = _CrossRefRecorder()
@@ -691,9 +953,11 @@ def build_semantic_layer(
                     reasons=["list_item"],
                 )
 
-        for match in REFERENCE_PATTERN.finditer(text):
-            target_type = _target_type_for_kind(match.group("kind"))
-            target_label_value = match.group("label")
+        for candidate in _reference_candidates(text):
+            if _is_external_or_terminology_reference(text, candidate):
+                continue
+            target_type = candidate.target_type
+            target_label_value = candidate.label
             target_ref, normalized_target_key, candidate_count, unresolved_reason = _lookup_reference_target(
                 targets,
                 target_type,
@@ -706,8 +970,9 @@ def build_semantic_layer(
                 resolved=resolved,
             ):
                 continue
-            target_label = f"{match.group('kind')} {target_label_value}"
-            source_text = _reference_source_text(text, match.start(), match.end())
+            target_label = f"{candidate.kind} {target_label_value}"
+            source_text = _reference_source_text(text, candidate.start, candidate.end)
+            resolved_reasons = _target_source_reasons(target_ref)
             cross_ref_recorder.add(
                 page=page,
                 source_refs=source_refs,
@@ -718,7 +983,9 @@ def build_semantic_layer(
                 resolved=resolved,
                 heading_path=heading_path,
                 confidence=0.85 if resolved else 0.65,
-                reasons=["reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
+                reasons=["reference_pattern"]
+                + (["resolved_target"] if resolved else ["unresolved_target"])
+                + resolved_reasons,
                 target_key=target_label_value,
                 normalized_target_key=normalized_target_key,
                 candidate_count=candidate_count,
@@ -737,10 +1004,12 @@ def build_semantic_layer(
                 canonical_key=_canonical_key(target_label),
                 normative_strength="informative",
                 confidence=0.8 if resolved else 0.65,
-                reasons=["reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
+                reasons=["reference_pattern"]
+                + (["resolved_target"] if resolved else ["unresolved_target"])
+                + resolved_reasons,
             )
 
-        for match, target_type, target_label in _extra_reference_matches(text):
+        for match, target_type, target_label in _extra_reference_matches(text, targets):
             target_key = _target_key_from_label(target_label)
             target_ref, normalized_target_key, candidate_count, unresolved_reason = _lookup_reference_target(
                 targets,
@@ -792,9 +1061,11 @@ def build_semantic_layer(
                 reasons=["table_parameter_headers"],
             )
 
-        for match in REFERENCE_PATTERN.finditer(row_text):
-            target_type = _target_type_for_kind(match.group("kind"))
-            target_label_value = match.group("label")
+        for candidate in _reference_candidates(row_text):
+            if _is_external_or_terminology_reference(row_text, candidate):
+                continue
+            target_type = candidate.target_type
+            target_label_value = candidate.label
             target_ref, normalized_target_key, candidate_count, unresolved_reason = _lookup_reference_target(
                 targets,
                 target_type,
@@ -807,8 +1078,9 @@ def build_semantic_layer(
                 resolved=resolved,
             ):
                 continue
-            target_label = f"{match.group('kind')} {target_label_value}"
-            source_text = _reference_source_text(row_text, match.start(), match.end())
+            target_label = f"{candidate.kind} {target_label_value}"
+            source_text = _reference_source_text(row_text, candidate.start, candidate.end)
+            resolved_reasons = _target_source_reasons(target_ref)
             cross_ref_recorder.add(
                 page=page,
                 source_refs=source_refs,
@@ -819,7 +1091,9 @@ def build_semantic_layer(
                 resolved=resolved,
                 heading_path=_heading_path_of(record),
                 confidence=0.85 if resolved else 0.65,
-                reasons=["reference_pattern"] + (["resolved_target"] if resolved else ["unresolved_target"]),
+                reasons=["reference_pattern"]
+                + (["resolved_target"] if resolved else ["unresolved_target"])
+                + resolved_reasons,
                 target_key=target_label_value,
                 normalized_target_key=normalized_target_key,
                 candidate_count=candidate_count,
@@ -827,7 +1101,7 @@ def build_semantic_layer(
             )
             result.unresolved_cross_ref_count += int(not resolved)
 
-        for match, target_type, target_label in _extra_reference_matches(row_text):
+        for match, target_type, target_label in _extra_reference_matches(row_text, targets):
             target_key = _target_key_from_label(target_label)
             target_ref, normalized_target_key, candidate_count, unresolved_reason = _lookup_reference_target(
                 targets,

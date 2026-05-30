@@ -58,6 +58,7 @@ from pdf2md.serializers.rag_tables import (
 )
 from pdf2md.serializers.rag_semantics import (
     build_semantic_layer,
+    extract_pdf_outline_reference_targets,
     serialize_cross_refs_jsonl,
     serialize_requirements_jsonl,
     serialize_semantic_units_jsonl,
@@ -1163,9 +1164,11 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     finish_stage("rag_figures", figure_rag_started)
 
     semantic_started = stage_start()
+    pdf_outline_targets = extract_pdf_outline_reference_targets(reader, selected_pages=set(selected_pages))
     semantic_result = build_semantic_layer(
         text_block_records=text_block_result.records,
         rag_tables=contextual_rag_tables,
+        pdf_outline_targets=pdf_outline_targets,
     )
     (
         semantic_unit_record_count,
