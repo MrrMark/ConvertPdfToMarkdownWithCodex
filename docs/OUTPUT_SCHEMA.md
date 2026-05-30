@@ -273,6 +273,9 @@ Required per JSONL record:
 Policy:
 
 - `target_type` may include `section`, `table`, `figure`, `appendix`, `requirement`, `log_page`, `feature`, `opcode`, `register`, or `unknown`.
+- `target_ref` normally points to an extracted heading, caption, table, or table row target. When a reference is resolved by a deterministic fallback target rather than an extracted block, `target_ref` may start with `pdf-outline-` or `pdf-list-`.
+- Fallback-resolved records identify their source through `classification_reasons` such as `target_source_pdf_outline` or `target_source_pdf_list`; these are provenance hints only and do not add generated text to `document.md`.
+- External document references and terminology labels that are not local targets may be skipped instead of being emitted as unresolved local cross-references.
 - Unresolved references are preserved with `resolved: false`, `unresolved_reason`, `normalized_target_key`, and `candidate_count` for downstream diagnostics.
 
 ## requirement_traceability_rag.jsonl
