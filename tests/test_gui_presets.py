@@ -8,7 +8,7 @@ from pdf2md.gui_presets import (
     preset_editable_fields,
 )
 from pdf2md.gui_runner import GuiConversionOptions
-from pdf2md.models import ImageMode, RagTableOutputMode, TableMode
+from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
 
 
 def test_gui_preset_display_names_are_localized() -> None:
@@ -41,6 +41,7 @@ def test_preserve_preset_is_conservative_and_keeps_document_inputs() -> None:
     assert options.image_mode == ImageMode.REFERENCED.value
     assert options.table_mode == TableMode.AUTO.value
     assert options.rag_table_output == RagTableOutputMode.NONE.value
+    assert options.rag_profile == "preserve"
     assert options.confidential_safe_mode is False
     assert options.force_ocr is False
     assert options.keep_page_markers is False
@@ -56,7 +57,13 @@ def test_preserve_preset_is_conservative_and_keeps_document_inputs() -> None:
 
 
 def test_rag_optimized_preset_enables_sidecar_options_without_force_ocr() -> None:
-    current = GuiConversionOptions(pages="2", password="pw", ocr_lang="eng", force_ocr=True)
+    current = GuiConversionOptions(
+        pages="2",
+        password="pw",
+        ocr_lang="eng",
+        force_ocr=True,
+        domain_adapter=DomainAdapterMode.NVME.value,
+    )
 
     options = apply_preset_to_options("rag_optimized", current)
 
@@ -66,6 +73,8 @@ def test_rag_optimized_preset_enables_sidecar_options_without_force_ocr() -> Non
     assert options.image_mode == ImageMode.REFERENCED.value
     assert options.table_mode == TableMode.AUTO.value
     assert options.rag_table_output == RagTableOutputMode.BOTH.value
+    assert options.rag_profile == "rag_optimized"
+    assert options.domain_adapter == DomainAdapterMode.NONE.value
     assert options.keep_page_markers is True
     assert options.remove_header_footer is True
     assert options.repair_hyphenation is True
@@ -79,11 +88,16 @@ def test_rag_optimized_preset_enables_sidecar_options_without_force_ocr() -> Non
 
 
 def test_purpose_specific_rag_presets_apply_expected_option_matrix() -> None:
-    technical = apply_preset_to_options("technical_spec_rag", GuiConversionOptions(force_ocr=True))
+    technical = apply_preset_to_options(
+        "technical_spec_rag",
+        GuiConversionOptions(force_ocr=True, domain_adapter=DomainAdapterMode.NVME.value),
+    )
     confidential = apply_preset_to_options("confidential_rag", GuiConversionOptions())
     sidecar = apply_preset_to_options("preserve_with_sidecars", GuiConversionOptions(remove_header_footer=True))
 
+    assert technical.rag_profile == "technical_spec_rag"
     assert technical.rag_table_output == RagTableOutputMode.BOTH.value
+    assert technical.domain_adapter == DomainAdapterMode.NVME.value
     assert technical.force_ocr is False
     assert technical.remove_header_footer is True
     assert technical.repair_hyphenation is True
@@ -93,11 +107,13 @@ def test_purpose_specific_rag_presets_apply_expected_option_matrix() -> None:
     assert technical.rag_chunk_relationship_metadata is True
 
     assert confidential.confidential_safe_mode is True
+    assert confidential.rag_profile == "confidential_rag"
     assert confidential.rag_table_output == RagTableOutputMode.JSONL.value
     assert confidential.retrieval_tokenizer == "regex"
     assert confidential.rag_chunk_relationship_metadata is True
 
     assert sidecar.rag_table_output == RagTableOutputMode.JSONL.value
+    assert sidecar.rag_profile == "preserve_with_sidecars"
     assert sidecar.remove_header_footer is False
     assert sidecar.repair_hyphenation is False
     assert sidecar.rag_contextual_embedding_text is False
@@ -133,7 +149,9 @@ def test_preset_editable_fields_lock_advanced_options_headlessly() -> None:
     assert rag_fields["rag_merge_sibling_text_chunks"] is False
     assert rag_fields["rag_chunk_relationship_metadata"] is False
     assert rag_fields["remove_header_footer"] is False
+    assert rag_fields["domain_adapter"] is False
     assert preset_editable_fields("technical_spec_rag")["retrieval_tokenizer"] is False
+    assert preset_editable_fields("technical_spec_rag")["domain_adapter"] is True
     assert custom_fields["image_mode"] is True
     assert custom_fields["page_workers"] is True
     assert custom_fields["retrieval_tokenizer"] is True

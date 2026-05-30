@@ -67,6 +67,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional domain-specific RAG adapter: nvme, pcie, ocp, tcg, or customer-requirements.",
     )
     parser.add_argument(
+        "--require-domain-adapter-for-technical-profile",
+        action="store_true",
+        default=False,
+        help="Fail fast when --rag-profile technical_spec_rag is used without --domain-adapter.",
+    )
+    parser.add_argument(
         "--confidential-safe-mode",
         action="store_true",
         default=None,
@@ -159,6 +165,7 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         image_mode=ImageMode(_option_value(args.image_mode, profile_options.image_mode)),
         table_mode=TableMode(_option_value(args.table_mode, profile_options.table_mode)),
         rag_table_output=RagTableOutputMode(_option_value(args.rag_table_output, profile_options.rag_table_output)),
+        rag_profile=args.rag_profile,
         domain_adapter=DomainAdapterMode(_option_value(args.domain_adapter, profile_options.domain_adapter)),
         confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),
         force_ocr=_option_value(args.force_ocr, profile_options.force_ocr),
@@ -200,6 +207,7 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
         image_mode=ImageMode(_option_value(args.image_mode, profile_options.image_mode)),
         table_mode=TableMode(_option_value(args.table_mode, profile_options.table_mode)),
         rag_table_output=RagTableOutputMode(_option_value(args.rag_table_output, profile_options.rag_table_output)),
+        rag_profile=args.rag_profile,
         domain_adapter=DomainAdapterMode(_option_value(args.domain_adapter, profile_options.domain_adapter)),
         confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),
         force_ocr=_option_value(args.force_ocr, profile_options.force_ocr),
@@ -236,6 +244,20 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
     return run_shared_batch_conversion(input_dir=Path(args.input_dir), options=options).exit_code
 
 
+def _selected_domain_adapter(args: argparse.Namespace) -> DomainAdapterMode:
+    profile_options = rag_profile_options(args.rag_profile)
+    return DomainAdapterMode(_option_value(args.domain_adapter, profile_options.domain_adapter))
+
+
+def _validate_profile_contract(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if (
+        args.require_domain_adapter_for_technical_profile
+        and args.rag_profile == "technical_spec_rag"
+        and _selected_domain_adapter(args) is DomainAdapterMode.NONE
+    ):
+        parser.error("--rag-profile technical_spec_rag requires --domain-adapter when strict domain validation is enabled.")
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -249,6 +271,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error("--previous-corpus-manifest is only supported with --input-dir batch mode.")
     if args.reuse_unchanged and args.previous_corpus_manifest is None:
         parser.error("--reuse-unchanged requires --previous-corpus-manifest.")
+    _validate_profile_contract(args, parser)
 
     if args.input_dir:
         if args.output_dir is not None:

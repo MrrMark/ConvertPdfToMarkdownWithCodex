@@ -601,6 +601,11 @@
           "title": "Table Unresolved Count",
           "type": "integer"
         },
+        "technical_profile_domain_adapter_missing": {
+          "default": false,
+          "title": "Technical Profile Domain Adapter Missing",
+          "type": "boolean"
+        },
         "technical_table_file_count": {
           "default": 0,
           "title": "Technical Table File Count",

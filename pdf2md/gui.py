@@ -37,7 +37,9 @@ from pdf2md.gui_layout import (
 from pdf2md.gui_presets import (
     GuiOptionPreset,
     apply_preset_to_options,
+    normalize_preset,
     preset_allows_custom_options,
+    preset_editable_fields,
 )
 from pdf2md.gui_state import (
     GuiRecentState,
@@ -94,6 +96,7 @@ class Pdf2MdGuiApp:
         self.localized_widgets: dict[str, list[object]] = {}
         self.localized_headings: dict[str, str] = {}
         self.advanced_option_widgets: list[object] = []
+        self.advanced_option_widgets_by_field: dict[str, object] = {}
         self.wrapping_text_keys = set(gui_wrapping_text_keys())
         self.scroll_canvas = None
         self.scroll_window_id: int | None = None
@@ -257,7 +260,15 @@ class Pdf2MdGuiApp:
         self._add_labeled_combo(options, "image", self.image_mode, [mode.value for mode in ImageMode], 3, 0)
         self._add_labeled_combo(options, "table", self.table_mode, [mode.value for mode in TableMode], 4, 0)
         self._add_labeled_combo(options, "rag_tables", self.rag_table_output, [mode.value for mode in RagTableOutputMode], 5, 0)
-        self._add_labeled_combo(options, "domain", self.domain_adapter, [mode.value for mode in DomainAdapterMode], 6, 0)
+        self._add_labeled_combo(
+            options,
+            "domain",
+            self.domain_adapter,
+            [mode.value for mode in DomainAdapterMode],
+            6,
+            0,
+            option_field="domain_adapter",
+        )
         self._track_text("previous_corpus_manifest", ttk.Label(options, text=self._t("previous_corpus_manifest"))).grid(
             row=7,
             column=0,
@@ -512,7 +523,17 @@ class Pdf2MdGuiApp:
         entry.grid(row=row, column=col + 1, sticky="ew", padx=(0, 8), pady=3)
         return entry
 
-    def _add_labeled_combo(self, parent, label_key: str, variable, values: list[str], row: int, col: int) -> None:  # noqa: ANN001
+    def _add_labeled_combo(  # noqa: ANN001
+        self,
+        parent,
+        label_key: str,
+        variable,
+        values: list[str],
+        row: int,
+        col: int,
+        *,
+        option_field: str | None = None,
+    ) -> None:
         from tkinter import ttk
 
         self._track_text(label_key, ttk.Label(parent, text=self._t(label_key))).grid(
@@ -531,6 +552,8 @@ class Pdf2MdGuiApp:
             pady=3,
         )
         self.advanced_option_widgets.append(combo)
+        if option_field is not None:
+            self.advanced_option_widgets_by_field[option_field] = combo
 
     def _set_status(self, key: str, **values: object) -> None:
         self.status_key = key
@@ -602,6 +625,10 @@ class Pdf2MdGuiApp:
         for widget in self.advanced_option_widgets:
             normal_state = "readonly" if getattr(widget, "winfo_class", lambda: "")() == "TCombobox" else "normal"
             widget.configure(state=normal_state if editable else "disabled")
+        editable_fields = preset_editable_fields(self.option_preset.get())
+        for field, widget in self.advanced_option_widgets_by_field.items():
+            normal_state = "readonly" if getattr(widget, "winfo_class", lambda: "")() == "TCombobox" else "normal"
+            widget.configure(state=normal_state if editable_fields.get(field, editable) else "disabled")
 
     def _restore_recent_paths(self) -> None:
         recent_file = first_existing_path(self.recent_state.recent_input_files)
@@ -701,6 +728,9 @@ class Pdf2MdGuiApp:
             image_mode=self.image_mode.get(),
             table_mode=self.table_mode.get(),
             rag_table_output=self.rag_table_output.get(),
+            rag_profile=(
+                self.option_preset.get() if normalize_preset(self.option_preset.get()) != "custom" else "preserve"
+            ),
             domain_adapter=self.domain_adapter.get(),
             confidential_safe_mode=self.confidential_safe_mode.get(),
             force_ocr=self.force_ocr.get(),

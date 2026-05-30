@@ -360,6 +360,25 @@ def _annotate_ocr_warning_context(
         warning.details.setdefault("page_image_count", len(page_image_boxes.get(warning.page, [])))
 
 
+def _technical_profile_domain_adapter_missing(config: Config, domain_adapter: DomainAdapterMode) -> bool:
+    return config.rag_profile == "technical_spec_rag" and domain_adapter is DomainAdapterMode.NONE
+
+
+def _technical_profile_domain_adapter_warning(config: Config, domain_adapter: DomainAdapterMode) -> WarningEntry:
+    return WarningEntry(
+        code=WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING,
+        message=(
+            "technical_spec_rag was selected without a domain adapter; "
+            "domain_units_rag.jsonl and domain_unit retrieval chunks will not be generated."
+        ),
+        details={
+            "rag_profile": config.rag_profile,
+            "domain_adapter": domain_adapter.value,
+            "recommended_domain_adapters": ["nvme", "pcie", "ocp", "tcg", "customer-requirements"],
+        },
+    )
+
+
 def _safe_review_preview(value: object, *, max_chars: int = 160) -> str:
     text = " ".join(str(value or "").split())
     if len(text) <= max_chars:
@@ -676,6 +695,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         stage_durations_ms[name] = stage_durations_ms.get(name, 0) + elapsed_ms
 
     warnings: list[WarningEntry] = []
+    if _technical_profile_domain_adapter_missing(config, domain_adapter):
+        warnings.append(_technical_profile_domain_adapter_warning(config, domain_adapter))
     page_results_map: dict[int, PageResult] = {}
     failed_pages: list[int] = []
     heading_count = 0
@@ -1291,6 +1312,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             "page_parallel_enabled": page_parallel_enabled,
             "rag_table_output": rag_table_output.value,
             "domain_adapter": domain_adapter.value,
+            **({"rag_profile": config.rag_profile} if config.rag_profile != "preserve" else {}),
             "confidential_safe_mode": config.confidential_safe_mode,
             "local_only_processing": True,
             "external_llm_calls": False,

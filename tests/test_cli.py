@@ -60,6 +60,7 @@ def test_cli_rag_profile_applies_purpose_specific_option_bundle(sample_pdf: Path
 
     assert completed.returncode == 0
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["rag_profile"] == "confidential_rag"
     assert manifest["options"]["confidential_safe_mode"] is True
     assert manifest["options"]["rag_table_output"] == "jsonl"
     assert manifest["options"]["retrieval_tokenizer"] == "regex"
@@ -67,6 +68,63 @@ def test_cli_rag_profile_applies_purpose_specific_option_bundle(sample_pdf: Path
     assert manifest["options"]["rag_merge_sibling_text_chunks"] is True
     assert manifest["options"]["rag_chunk_relationship_metadata"] is True
     assert (output_dir / "sanitized_report.json").exists()
+
+
+def test_cli_technical_spec_profile_without_domain_adapter_emits_advisory(
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "cli-technical-missing-domain"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--pages",
+        "1",
+        "--rag-profile",
+        "technical_spec_rag",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["rag_profile"] == "technical_spec_rag"
+    assert manifest["options"]["domain_adapter"] == "none"
+    assert report["status"] == "success"
+    assert report["warnings"][0]["code"] == "TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING"
+    assert report["summary"]["technical_profile_domain_adapter_missing"] is True
+    assert report["summary"]["actionable_warning_count"] == 0
+    assert report["summary"]["advisory_warning_count"] == 1
+
+
+def test_cli_technical_spec_profile_strict_mode_requires_domain_adapter(
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "cli-technical-strict-missing-domain"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--pages",
+        "1",
+        "--rag-profile",
+        "technical_spec_rag",
+        "--require-domain-adapter-for-technical-profile",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 2
+    assert "requires --domain-adapter" in completed.stderr
 
 
 def test_cli_uses_default_output_dir_when_output_dir_is_omitted(sample_pdf: Path) -> None:
@@ -240,6 +298,8 @@ def test_cli_accepts_domain_adapter_option(sample_pdf: Path, tmp_path: Path) -> 
         str(sample_pdf),
         "-o",
         str(output_dir),
+        "--rag-profile",
+        "technical_spec_rag",
         "--domain-adapter",
         "nvme",
     ]
@@ -249,9 +309,11 @@ def test_cli_accepts_domain_adapter_option(sample_pdf: Path, tmp_path: Path) -> 
     assert completed.returncode == 0
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
     report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["rag_profile"] == "technical_spec_rag"
     assert manifest["options"]["domain_adapter"] == "nvme"
     assert manifest["options"]["domain_units_jsonl_filename"] == "domain_units_rag.jsonl"
     assert report["summary"]["domain_unit_file_count"] == 1
+    assert report["summary"]["technical_profile_domain_adapter_missing"] is False
     assert (output_dir / "domain_units_rag.jsonl").exists()
 
 

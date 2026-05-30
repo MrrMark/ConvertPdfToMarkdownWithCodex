@@ -7,6 +7,7 @@ from pathlib import Path
 import pdf2md.pipeline as pipeline_module
 from fixtures.pdf_builder import build_image_only_pdf
 from pdf2md.config import Config
+from pdf2md.constants import WarningCode
 from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrMetrics, OcrResult
 from pdf2md.extractors.tables import TableExtractionResult
@@ -443,6 +444,20 @@ def test_empty_ocr_blank_page_warning_is_advisory_for_status() -> None:
             "existing_text_char_count": 0,
             "page_image_count": 0,
         },
+    )
+
+    status, exit_code = determine_conversion_status([warning], [])
+
+    assert is_advisory_warning(warning) is True
+    assert status.value == "success"
+    assert exit_code == EXIT_SUCCESS
+
+
+def test_technical_profile_missing_domain_warning_is_advisory_for_status() -> None:
+    warning = WarningEntry(
+        code=WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING,
+        message="missing domain",
+        details={"rag_profile": "technical_spec_rag", "domain_adapter": "none"},
     )
 
     status, exit_code = determine_conversion_status([warning], [])
