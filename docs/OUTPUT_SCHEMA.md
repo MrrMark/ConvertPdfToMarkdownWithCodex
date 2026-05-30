@@ -122,6 +122,27 @@ Stable summary fields:
 - `confidential_safe_mode`
 - `font_heading_candidate_count`, `footnote_candidate_count`, `structure_low_confidence_count`
 
+## debug/table-quality-review-pack.json
+
+Optional local-only artifact written when `--debug` is enabled.
+
+Fields:
+
+- `schema_version`
+- `item_count`, `low_quality_count`
+- `triage_counts.actionable`, `triage_counts.advisory`
+- `items[].page`, `table_id`, `table_index`, `bbox`, `mode`, `quality_score`
+- `items[].fallback_reasons`, `header_strategy`, `header_confidence`
+- `items[].row_count`, `empty_cell_ratio`, `column_placeholder_header_ratio`
+- `items[].technical_table_unit_count`, `domain_unit_count`
+- `items[].sample_row_text_sha256`, `sample_row_text_preview`
+- `items[].triage_status`, `triage_reasons`
+
+Policy:
+
+- The pack is for local quality triage and is not written by default.
+- `sample_row_text_preview` is truncated; full source text remains in the normal local outputs.
+
 ## text_blocks_rag.jsonl
 
 Default JSONL output for RAG ingestion of normal document text.

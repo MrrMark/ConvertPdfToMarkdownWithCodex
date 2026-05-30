@@ -357,6 +357,33 @@ def test_extract_tables_flattens_multi_row_headers_for_rag(monkeypatch) -> None:
     assert result.rag_tables[0]["records"][0]["cells"]["Latency / Max"] == "3"
 
 
+def test_extract_tables_promotes_blank_descriptor_header_row_for_rag(monkeypatch) -> None:
+    rows = [
+        ["", "", ""],
+        ["Bytes", "Field", "Description"],
+        ["0", "CAP", "Controller capabilities"],
+        ["1", "VS", "Version"],
+    ]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    quality = result.table_quality[0]
+    assert quality["header_rows_promoted"] == 1
+    assert quality["rag_header_strategy"] == "promoted_header_row"
+    assert result.rag_tables[0]["headers"] == ["Bytes", "Field", "Description"]
+    assert result.rag_tables[0]["records"][0]["cells"] == {
+        "Bytes": "0",
+        "Field": "CAP",
+        "Description": "Controller capabilities",
+    }
+
+
 def test_extract_tables_auto_falls_back_for_complex_accuracy_pack(monkeypatch) -> None:
     rows = [
         ["", "Latency", "Latency", "Latency"],
