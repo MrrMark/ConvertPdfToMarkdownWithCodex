@@ -156,6 +156,8 @@ class GuiDocumentSummary:
     report_path: Path | None = None
     assets_dir: Path | None = None
     warning_count: int = 0
+    actionable_warning_count: int = 0
+    advisory_warning_count: int = 0
     warning_codes: tuple[str, ...] = ()
     duration_ms: int = 0
     processed_pages: int = 0
@@ -259,8 +261,15 @@ def format_gui_summary(summary: GuiConversionSummary) -> str:
     ]
     for document in summary.documents:
         warning_text = f", warnings={document.warning_count}" if document.warning_count else ""
+        warning_parts: list[str] = []
+        if document.actionable_warning_count or document.advisory_warning_count:
+            warning_parts.append(
+                f"actionable={document.actionable_warning_count}, advisory={document.advisory_warning_count}"
+            )
         if document.warning_codes:
-            warning_text += f" ({', '.join(document.warning_codes)})"
+            warning_parts.append(", ".join(document.warning_codes))
+        if warning_parts:
+            warning_text += f" ({'; '.join(warning_parts)})"
         retry_text = ", retry_candidate=true" if document.retry_candidate else ""
         lines.append(
             f"- {document.input_pdf.name}: status={document.status}{warning_text}, "
@@ -1094,6 +1103,8 @@ def _document_summary_from_result(
         report_path=result.report_path or _report_path(config),
         assets_dir=_assets_dir(config),
         warning_count=len(result.warnings),
+        actionable_warning_count=report.summary.actionable_warning_count if report is not None else 0,
+        advisory_warning_count=report.summary.advisory_warning_count if report is not None else 0,
         warning_codes=warning_codes_for_display(result.warnings),
         duration_ms=report.duration_ms if report is not None else 0,
         processed_pages=report.summary.processed_pages if report is not None else 0,

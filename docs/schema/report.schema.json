@@ -270,6 +270,16 @@
           "title": "Normative Requirement Count",
           "type": "integer"
         },
+        "ocr_actionable_warning_count": {
+          "default": 0,
+          "title": "Ocr Actionable Warning Count",
+          "type": "integer"
+        },
+        "ocr_advisory_warning_count": {
+          "default": 0,
+          "title": "Ocr Advisory Warning Count",
+          "type": "integer"
+        },
         "ocr_confidence_by_page": {
           "additionalProperties": {
             "additionalProperties": {
@@ -482,6 +492,16 @@
         "table_actionable_fallback_count": {
           "default": 0,
           "title": "Table Actionable Fallback Count",
+          "type": "integer"
+        },
+        "table_actionable_low_quality_count": {
+          "default": 0,
+          "title": "Table Actionable Low Quality Count",
+          "type": "integer"
+        },
+        "table_advisory_low_quality_count": {
+          "default": 0,
+          "title": "Table Advisory Low Quality Count",
           "type": "integer"
         },
         "table_caption_linked_count": {

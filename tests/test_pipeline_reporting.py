@@ -13,6 +13,7 @@ from pdf2md.extractors.tables import TableExtractionResult
 from pdf2md.extractors.text import PageLayoutMetadata, TextLayoutResult, TextLine
 from pdf2md.models import ImageMode, TableAsset, TableMode, WarningEntry
 from pdf2md.pipeline import EXIT_PARTIAL, EXIT_SUCCESS, run_conversion
+from pdf2md.reporting import determine_conversion_status, is_advisory_warning
 
 
 class _FixedDateTime(datetime):
@@ -90,6 +91,10 @@ def test_pipeline_report_schema_and_partial_status(sample_pdf: Path, tmp_path: P
     assert report["summary"]["table_actionable_fallback_count"] == 0
     assert report["summary"]["advisory_warning_count"] == 1
     assert report["summary"]["actionable_warning_count"] == 1
+    assert report["summary"]["ocr_actionable_warning_count"] == 1
+    assert report["summary"]["ocr_advisory_warning_count"] == 0
+    assert report["summary"]["table_actionable_low_quality_count"] == 0
+    assert report["summary"]["table_advisory_low_quality_count"] == 0
     assert report["summary"]["table_mode_requested"] == "auto"
     assert report["summary"]["page_status_counts"]["partial_success"] == 1
     assert report["summary"]["page_status_counts"]["success"] == 1
@@ -173,6 +178,8 @@ def test_expected_table_fallback_warning_is_advisory_for_status(sample_pdf: Path
     assert report["summary"]["table_expected_fallback_count"] == 1
     assert report["summary"]["table_actionable_fallback_count"] == 0
     assert report["summary"]["table_low_quality_count"] == 0
+    assert report["summary"]["table_actionable_low_quality_count"] == 0
+    assert report["summary"]["table_advisory_low_quality_count"] == 0
     assert report["summary"]["page_status_counts"]["partial_success"] == 0
     assert report["summary"]["page_status_counts"]["success"] == 2
     page_one = next(page for page in report["page_results"] if page["page"] == 1)
@@ -421,6 +428,79 @@ def test_pipeline_records_empty_ocr_confidence_metrics_in_report(
     assert page_result["low_conf_token_ratio"] == 1.0
     assert report["summary"]["low_confidence_pages"] == [1]
     assert report["warnings"][0]["details"]["reason"] == "empty_result"
+    assert report["summary"]["ocr_actionable_warning_count"] == 1
+    assert report["summary"]["ocr_advisory_warning_count"] == 0
+
+
+def test_empty_ocr_blank_page_warning_is_advisory_for_status() -> None:
+    warning = WarningEntry(
+        code="OCR_EMPTY_RESULT",
+        message="empty",
+        page=24,
+        details={
+            "force_ocr": False,
+            "attempt_reason": "empty_text_layer",
+            "existing_text_char_count": 0,
+            "page_image_count": 0,
+        },
+    )
+
+    status, exit_code = determine_conversion_status([warning], [])
+
+    assert is_advisory_warning(warning) is True
+    assert status.value == "success"
+    assert exit_code == EXIT_SUCCESS
+
+
+def test_empty_ocr_scanned_page_warning_remains_actionable() -> None:
+    warning = WarningEntry(
+        code="OCR_EMPTY_RESULT",
+        message="empty",
+        page=1,
+        details={
+            "force_ocr": False,
+            "attempt_reason": "empty_text_layer",
+            "existing_text_char_count": 0,
+            "page_image_count": 1,
+        },
+    )
+
+    status, exit_code = determine_conversion_status([warning], [])
+
+    assert is_advisory_warning(warning) is False
+    assert status.value == "partial_success"
+    assert exit_code == EXIT_PARTIAL
+
+
+def test_actionable_low_quality_table_keeps_partial_status(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
+    def fake_extract_tables(*args, **kwargs) -> TableExtractionResult:
+        return TableExtractionResult(
+            table_quality=[
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "quality_score": 0.42,
+                    "mode": "gfm",
+                    "unresolved": True,
+                    "reasons": [],
+                }
+            ],
+            table_counts={"table_total": 1, "table_gfm_count": 1},
+        )
+
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", fake_extract_tables)
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+
+    output_dir = tmp_path / "actionable-low-quality-table"
+    result = run_conversion(Config(input_pdf=sample_pdf, output_dir=output_dir, pages="1"))
+
+    assert result.exit_code == EXIT_PARTIAL
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert report["status"] == "partial_success"
+    assert report["summary"]["table_low_quality_count"] == 1
+    assert report["summary"]["table_actionable_low_quality_count"] == 1
+    assert report["summary"]["table_advisory_low_quality_count"] == 0
 
 
 def test_pipeline_records_ocr_confidence_matrix_in_report(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:

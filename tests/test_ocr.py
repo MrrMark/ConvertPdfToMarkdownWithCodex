@@ -120,6 +120,9 @@ def test_run_ocr_reports_empty_result_with_confidence_metrics(sample_pdf, monkey
         "ocr_confidence_mean": 0.0,
         "ocr_confidence_median": 0.0,
         "low_conf_token_ratio": 1.0,
+        "force_ocr": False,
+        "attempt_reason": "empty_text_layer",
+        "existing_text_char_count": 0,
     }
 
 

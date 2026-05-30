@@ -159,6 +159,8 @@ def _summary_payload(summary: GuiConversionSummary, *, roots: Iterable[Path]) ->
                 "status": document.status,
                 "exit_code": document.exit_code,
                 "warning_count": document.warning_count,
+                "actionable_warning_count": document.actionable_warning_count,
+                "advisory_warning_count": document.advisory_warning_count,
                 "warning_codes": list(document.warning_codes),
                 "retry_candidate": document.retry_candidate,
                 "skipped": document.skipped,
@@ -183,6 +185,8 @@ def _summary_payload(summary: GuiConversionSummary, *, roots: Iterable[Path]) ->
             "cancelled": summary.cancelled_count,
         },
         "warning_count": sum(document.warning_count for document in summary.documents),
+        "actionable_warning_count": sum(document.actionable_warning_count for document in summary.documents),
+        "advisory_warning_count": sum(document.advisory_warning_count for document in summary.documents),
         "warning_codes": sorted({code for document in summary.documents for code in document.warning_codes}),
         "documents": documents,
     }

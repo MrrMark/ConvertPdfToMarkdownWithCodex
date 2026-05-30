@@ -13,8 +13,10 @@ from pdf2md import gui_help
 from pdf2md.gui import gui_user_guide_path
 from pdf2md.gui_runner import (
     GuiDiagnosticError,
+    GuiConversionSummary,
     GuiConversionOptions,
     GuiConversionRequest,
+    GuiDocumentSummary,
     GuiPageProgress,
     build_batch_config,
     build_single_config,
@@ -880,3 +882,28 @@ def test_gui_summary_uses_structured_warning_counts(monkeypatch: pytest.MonkeyPa
     text = format_gui_summary(summary)
     assert "warnings=3 (OCR_LOW_CONFIDENCE, TABLE_FALLBACK)" in text
     assert "table fallback duplicate" not in text
+
+
+def test_gui_summary_separates_actionable_and_advisory_warning_counts(tmp_path: Path) -> None:
+    summary = GuiConversionSummary(
+        input_mode="file",
+        input_path=tmp_path / "input.pdf",
+        output_root=tmp_path / "out",
+        documents=[
+            GuiDocumentSummary(
+                input_pdf=tmp_path / "input.pdf",
+                output_dir=tmp_path / "out",
+                status="success",
+                exit_code=0,
+                warning_count=3,
+                actionable_warning_count=1,
+                advisory_warning_count=2,
+                warning_codes=("OCR_EMPTY_RESULT", "TABLE_COMPLEXITY_HTML_FALLBACK"),
+            )
+        ],
+        exit_code=0,
+    )
+
+    text = format_gui_summary(summary)
+
+    assert "warnings=3 (actionable=1, advisory=2; OCR_EMPTY_RESULT, TABLE_COMPLEXITY_HTML_FALLBACK)" in text
