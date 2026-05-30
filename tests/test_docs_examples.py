@@ -56,7 +56,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 없습니다" in readme
+    assert "현재 active quality backlog는 Q90 cross-reference target index expansion입니다" in readme
     assert "완료된 Q34-Q89" in readme
     assert "summary.actionable_warning_count" in readme
     assert "summary.advisory_warning_count" in readme
@@ -361,7 +361,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q70. GUI Profile And Support Bundle Failure Fixture" not in next_plan
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" not in next_plan
     assert "Tcl/Tk patchlevel" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
+    assert "Q90. Cross Reference Target Index Expansion" in next_plan
+    assert "PDF outline/bookmark" in next_plan
+    assert "List of Figures" in next_plan
+    assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in next_plan
@@ -382,7 +385,11 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "현재 Active Development Specs" in development_specs
-    assert "현재 active 개발 명세 없음." in development_specs
+    assert "Q90. Cross Reference Target Index Expansion" in development_specs
+    assert "cross_ref_resolved_coverage >= 0.90" in development_specs
+    assert "PDF outline/bookmark section fallback" in development_specs
+    assert "Register/capability false-positive suppression" in development_specs
+    assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in development_specs
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in development_specs
@@ -397,7 +404,6 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q79. Purpose-Specific RAG Profiles" not in development_specs
     assert "merge_sibling_text_chunks" not in development_specs
     assert "previous_chunk_id" not in development_specs
-    assert "technical_spec_rag" not in development_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
