@@ -160,6 +160,10 @@ class ReportSummary(BaseModel):
     table_expected_fallback_reason_counts: dict[str, int] = Field(default_factory=dict)
     table_actionable_fallback_count: int = 0
     table_low_quality_count: int = 0
+    table_actionable_low_quality_count: int = 0
+    table_advisory_low_quality_count: int = 0
+    ocr_actionable_warning_count: int = 0
+    ocr_advisory_warning_count: int = 0
     table_caption_linked_count: int = 0
     page_cache_hits: int = 0
     page_cache_misses: int = 0

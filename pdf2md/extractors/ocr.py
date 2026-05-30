@@ -180,6 +180,11 @@ def run_ocr(
 
             metrics = _extract_confidence_metrics(data)
             result.metrics_by_page[page_number] = metrics
+            ocr_context = {
+                "force_ocr": force_ocr,
+                "attempt_reason": result.reasons_by_page.get(page_number),
+                "existing_text_char_count": len(existing_page_texts.get(page_number, "").strip()),
+            }
             if text:
                 result.page_texts[page_number] = text
                 result.ocr_pages.append(page_number)
@@ -198,6 +203,7 @@ def run_ocr(
                                 "ocr_confidence_mean": metrics.mean,
                                 "ocr_confidence_median": metrics.median,
                                 "low_conf_token_ratio": metrics.low_conf_token_ratio,
+                                **ocr_context,
                             },
                         )
                     )
@@ -215,6 +221,7 @@ def run_ocr(
                                 "ocr_confidence_mean": metrics.mean,
                                 "ocr_confidence_median": metrics.median,
                                 "low_conf_token_ratio": metrics.low_conf_token_ratio,
+                                **ocr_context,
                             },
                         )
                     )
@@ -230,6 +237,7 @@ def run_ocr(
                             "ocr_confidence_mean": metrics.mean,
                             "ocr_confidence_median": metrics.median,
                             "low_conf_token_ratio": metrics.low_conf_token_ratio,
+                            **ocr_context,
                         },
                     )
                 )

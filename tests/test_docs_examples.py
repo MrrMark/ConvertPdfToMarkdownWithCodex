@@ -361,7 +361,12 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q70. GUI Profile And Support Bundle Failure Fixture" not in next_plan
     assert "Q71. Quality Scorecard Refresh And Next Backlog Reassessment" not in next_plan
     assert "Tcl/Tk patchlevel" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
+    assert "현재 남은 작업 없음." not in next_plan
+    assert "Q85. RAG Preset Status And Warning Severity Calibration" in next_plan
+    assert "Q86. Full Technical Spec Table Quality Triage And Recovery" in next_plan
+    assert "Q87. Technical Spec RAG Preset Domain Profile UX" in next_plan
+    assert "Q88. Storage And Security Domain Adapter Expansion" in next_plan
+    assert "Q89. Real Corpus Preset Evaluation And Score Gate" in next_plan
     assert "Q81. Structure Marker OCR Early Stop And Cache" not in next_plan
     assert "Q82. Expected Table Fallback Severity Taxonomy" not in next_plan
     assert "Q83. Real Corpus Cross Reference Precision" not in next_plan
@@ -377,7 +382,12 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q01. 실문서 Corpus 품질 게이트 고도화" not in next_plan
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "현재 Active Development Specs" in development_specs
-    assert "현재 active 개발 명세 없음." in development_specs
+    assert "현재 active 개발 명세 없음." not in development_specs
+    assert "Q85. RAG Preset Status And Warning Severity Calibration" in development_specs
+    assert "Q86. Full Technical Spec Table Quality Triage And Recovery" in development_specs
+    assert "Q87. Technical Spec RAG Preset Domain Profile UX" in development_specs
+    assert "Q88. Storage And Security Domain Adapter Expansion" in development_specs
+    assert "Q89. Real Corpus Preset Evaluation And Score Gate" in development_specs
     assert "Q81. Structure Marker OCR Early Stop And Cache" not in development_specs
     assert "Q82. Expected Table Fallback Severity Taxonomy" not in development_specs
     assert "Q83. Real Corpus Cross Reference Precision" not in development_specs
@@ -387,7 +397,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q79. Purpose-Specific RAG Profiles" not in development_specs
     assert "merge_sibling_text_chunks" not in development_specs
     assert "previous_chunk_id" not in development_specs
-    assert "technical_spec_rag" not in development_specs
+    assert "technical_spec_rag" in development_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs

@@ -7,6 +7,15 @@ from pdf2md.constants import StructureRecoveryReason, WarningCode
 from pdf2md.models import ConversionStatus, PageResult, PageStatus, Report, ReportSummary, WarningEntry
 
 ADVISORY_WARNING_CODES = frozenset({WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK})
+OCR_WARNING_PREFIX = "OCR_"
+ADVISORY_EMPTY_OCR_REASONS = frozenset({"empty_text_layer", "low_text_density"})
+
+
+def _optional_int(value: object) -> int | None:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
 
 
 def count_structure_marker_reasons(excluded_assets: Iterable[object]) -> dict[str, int]:
@@ -24,7 +33,23 @@ def count_structure_marker_reasons(excluded_assets: Iterable[object]) -> dict[st
 
 
 def is_advisory_warning(warning: WarningEntry) -> bool:
-    return warning.code in ADVISORY_WARNING_CODES
+    if warning.code in ADVISORY_WARNING_CODES:
+        return True
+    if warning.code == WarningCode.OCR_EMPTY_RESULT:
+        details = warning.details
+        if details.get("force_ocr") is True:
+            return False
+        attempt_reason = str(details.get("attempt_reason") or "")
+        if attempt_reason not in ADVISORY_EMPTY_OCR_REASONS:
+            return False
+        existing_chars = _optional_int(
+            details.get("existing_text_char_count", details.get("text_layer_char_count"))
+        )
+        image_count = _optional_int(details.get("page_image_count"))
+        if attempt_reason == "low_text_density":
+            return existing_chars is not None and existing_chars < 3
+        return existing_chars == 0 and image_count == 0
+    return False
 
 
 def is_actionable_warning(warning: WarningEntry) -> bool:
@@ -37,6 +62,22 @@ def count_actionable_warnings(warnings: Iterable[WarningEntry]) -> int:
 
 def count_advisory_warnings(warnings: Iterable[WarningEntry]) -> int:
     return sum(1 for warning in warnings if is_advisory_warning(warning))
+
+
+def count_ocr_actionable_warnings(warnings: Iterable[WarningEntry]) -> int:
+    return sum(
+        1
+        for warning in warnings
+        if warning.code.startswith(OCR_WARNING_PREFIX) and is_actionable_warning(warning)
+    )
+
+
+def count_ocr_advisory_warnings(warnings: Iterable[WarningEntry]) -> int:
+    return sum(
+        1
+        for warning in warnings
+        if warning.code.startswith(OCR_WARNING_PREFIX) and is_advisory_warning(warning)
+    )
 
 
 def count_expected_table_fallback_warnings(warnings: Iterable[WarningEntry]) -> tuple[int, dict[str, int]]:
@@ -75,7 +116,10 @@ def finalize_page_statuses(
         page_result.warning_count = warning_count_by_page.get(page_result.page, 0)
         if (
             page_result.status is not PageStatus.FAILED
-            and (actionable_warning_count_by_page.get(page_result.page, 0) > 0 or page_result.page in actionable_page_set)
+            and (
+                actionable_warning_count_by_page.get(page_result.page, 0) > 0
+                or page_result.page in actionable_page_set
+            )
         ):
             page_result.status = PageStatus.PARTIAL_SUCCESS
         page_status_counts[page_result.status.value] += 1
@@ -86,11 +130,11 @@ def determine_conversion_status(
     warnings: list[WarningEntry],
     failed_pages: list[int],
     *,
-    table_low_quality_count: int = 0,
+    table_actionable_low_quality_count: int = 0,
 ) -> tuple[ConversionStatus, int]:
     if failed_pages or any(warning.code.endswith("_FAILED") for warning in warnings):
         return ConversionStatus.PARTIAL_SUCCESS, 2
-    if table_low_quality_count > 0:
+    if table_actionable_low_quality_count > 0:
         return ConversionStatus.PARTIAL_SUCCESS, 2
     if any(
         is_actionable_warning(warning)
@@ -135,6 +179,8 @@ def build_report(
     rag_table_file_count: int = 0,
     table_fallback_reason_counts: dict[str, int] | None = None,
     table_low_quality_count: int = 0,
+    table_actionable_low_quality_count: int = 0,
+    table_advisory_low_quality_count: int = 0,
     table_caption_linked_count: int = 0,
     page_cache_hits: int = 0,
     page_cache_misses: int = 0,
@@ -248,6 +294,10 @@ def build_report(
         table_expected_fallback_reason_counts=expected_table_fallback_reason_counts,
         table_actionable_fallback_count=max(len(table_fallbacks) - expected_table_fallback_count, 0),
         table_low_quality_count=table_low_quality_count,
+        table_actionable_low_quality_count=table_actionable_low_quality_count,
+        table_advisory_low_quality_count=table_advisory_low_quality_count,
+        ocr_actionable_warning_count=count_ocr_actionable_warnings(warnings),
+        ocr_advisory_warning_count=count_ocr_advisory_warnings(warnings),
         table_caption_linked_count=table_caption_linked_count,
         page_cache_hits=page_cache_hits,
         page_cache_misses=page_cache_misses,

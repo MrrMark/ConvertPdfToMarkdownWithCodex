@@ -73,6 +73,16 @@ EXIT_SUCCESS = 0
 EXIT_FATAL = 1
 EXIT_PARTIAL = 2
 LOW_TABLE_QUALITY_THRESHOLD = 0.55
+ACTIONABLE_TABLE_LOW_QUALITY_REASONS = frozenset(
+    {
+        "CELL_ALIGNMENT_FAILED",
+        "HEADER_ALIGNMENT_FAILED",
+        "MISSING_SOURCE_REFS",
+        "RAG_SIDECAR_MISMATCH",
+        "ROW_SPLIT_SUSPECTED",
+        "SOURCE_REF_MISSING",
+    }
+)
 logger = logging.getLogger(__name__)
 
 
@@ -257,19 +267,93 @@ def _count_low_quality_tables(table_quality: list[dict]) -> int:
     return len(_low_quality_table_pages(table_quality, unique=False))
 
 
-def _low_quality_table_pages(table_quality: list[dict], *, unique: bool = True) -> list[int]:
+def _table_quality_score(item: dict) -> float | None:
+    try:
+        return float(item.get("quality_score", 1.0))
+    except (TypeError, ValueError):
+        return None
+
+
+def _table_quality_key(item: dict) -> tuple[int, int] | None:
+    try:
+        return (int(item.get("page")), int(item.get("table_index")))
+    except (TypeError, ValueError):
+        return None
+
+
+def _table_fallback_keys(table_fallbacks: list[dict]) -> set[tuple[int, int]]:
+    keys: set[tuple[int, int]] = set()
+    for fallback in table_fallbacks:
+        key = _table_quality_key(fallback)
+        if key is not None:
+            keys.add(key)
+    return keys
+
+
+def _is_low_quality_table(item: dict) -> bool:
+    score = _table_quality_score(item)
+    return score is not None and score < LOW_TABLE_QUALITY_THRESHOLD
+
+
+def _is_actionable_low_quality_table(item: dict, fallback_keys: set[tuple[int, int]]) -> bool:
+    if not _is_low_quality_table(item):
+        return False
+    if item.get("actionable") is True:
+        return True
+    if item.get("missing_source_refs") or item.get("sidecar_mismatch"):
+        return True
+    reasons = {str(reason) for reason in item.get("reasons", [])}
+    if reasons & ACTIONABLE_TABLE_LOW_QUALITY_REASONS:
+        return True
+    mode = str(item.get("mode") or item.get("source_mode") or "").lower()
+    if mode == "html" or _table_quality_key(item) in fallback_keys:
+        return False
+    return item.get("unresolved") is True
+
+
+def _count_actionable_low_quality_tables(
+    table_quality: list[dict],
+    table_fallbacks: list[dict],
+) -> int:
+    fallback_keys = _table_fallback_keys(table_fallbacks)
+    return sum(1 for item in table_quality if _is_actionable_low_quality_table(item, fallback_keys))
+
+
+def _low_quality_table_pages(
+    table_quality: list[dict],
+    *,
+    unique: bool = True,
+    actionable_only: bool = False,
+    table_fallbacks: list[dict] | None = None,
+) -> list[int]:
     pages: list[int] = []
+    fallback_keys = _table_fallback_keys(table_fallbacks or []) if actionable_only else set()
     for item in table_quality:
+        if actionable_only:
+            if not _is_actionable_low_quality_table(item, fallback_keys):
+                continue
+        elif not _is_low_quality_table(item):
+            continue
         try:
-            score = float(item.get("quality_score", 1.0))
+            pages.append(int(item.get("page")))
         except (TypeError, ValueError):
             continue
-        if score < LOW_TABLE_QUALITY_THRESHOLD:
-            try:
-                pages.append(int(item.get("page")))
-            except (TypeError, ValueError):
-                continue
     return sorted(set(pages)) if unique else pages
+
+
+def _annotate_ocr_warning_context(
+    warnings: list[WarningEntry],
+    page_results: dict[int, PageResult],
+    page_image_boxes: dict[int, list[object]],
+) -> None:
+    for warning in warnings:
+        if warning.code != WarningCode.OCR_EMPTY_RESULT or warning.page is None:
+            continue
+        page_result = page_results.get(warning.page)
+        if page_result is not None:
+            warning.details.setdefault("text_layer_char_count", page_result.text_layer_char_count)
+            warning.details.setdefault("existing_text_char_count", page_result.text_layer_char_count)
+        warning.details.setdefault("page_image_count", len(page_image_boxes.get(warning.page, [])))
 
 
 def _count_caption_linked_tables(table_quality: list[dict]) -> int:
@@ -736,6 +820,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     finish_stage("image_extraction", image_started)
     engine_usage["tables"] = len(table_result.assets) > 0
     engine_usage["images"] = len(image_result.assets) > 0
+    _annotate_ocr_warning_context(warnings, page_results_map, page_image_boxes)
     warnings.extend(_order_warnings_by_selected_page(page_worker_table_warnings + table_result.warnings, selected_pages))
     warnings.extend(image_result.warnings)
     structure_marker_counts = count_structure_marker_reasons(image_result.excluded_assets)
@@ -1070,12 +1155,21 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     page_results = [page_results_map[page] for page in sorted(page_results_map)]
     table_fallback_reason_counts = _count_table_fallback_reasons(table_result.fallbacks)
     table_low_quality_count = _count_low_quality_tables(table_result.table_quality)
-    table_low_quality_pages = _low_quality_table_pages(table_result.table_quality)
+    table_actionable_low_quality_count = _count_actionable_low_quality_tables(
+        table_result.table_quality,
+        table_result.fallbacks,
+    )
+    table_advisory_low_quality_count = max(table_low_quality_count - table_actionable_low_quality_count, 0)
+    table_actionable_low_quality_pages = _low_quality_table_pages(
+        table_result.table_quality,
+        table_fallbacks=table_result.fallbacks,
+        actionable_only=True,
+    )
     table_caption_linked_count = _count_caption_linked_tables(table_result.table_quality)
     page_results, page_status_counts = finalize_page_statuses(
         page_results,
         warnings,
-        actionable_pages=table_low_quality_pages,
+        actionable_pages=table_actionable_low_quality_pages,
     )
     ocr_confidence_by_page = {}
     low_conf_pages: list[int] = []
@@ -1096,7 +1190,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     status, exit_code = determine_conversion_status(
         warnings,
         failed_pages,
-        table_low_quality_count=table_low_quality_count,
+        table_actionable_low_quality_count=table_actionable_low_quality_count,
     )
     reporting_started = stage_start()
     elapsed_seconds = (finished_at - started_at).total_seconds()
@@ -1135,6 +1229,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         rag_table_file_count=rag_table_file_count,
         table_fallback_reason_counts=table_fallback_reason_counts,
         table_low_quality_count=table_low_quality_count,
+        table_actionable_low_quality_count=table_actionable_low_quality_count,
+        table_advisory_low_quality_count=table_advisory_low_quality_count,
         table_caption_linked_count=table_caption_linked_count,
         page_cache_hits=pdf_context.page_cache_hits,
         page_cache_misses=pdf_context.page_cache_misses,
