@@ -823,7 +823,7 @@ python3 -m pdf2md input.pdf -o output/ --rag-profile preserve_with_sidecars
 - `text_blocks_rag.jsonl`: 본문 heading/paragraph/list/code/footnote/caption 블록을 page/bbox/heading_path와 함께 기록하는 기본 RAG sidecar입니다.
 - `semantic_units_rag.jsonl`: section/requirement/definition/parameter/procedure_step/note/warning/reference를 원문과 provenance 중심으로 기록합니다.
 - `requirements_rag.jsonl`: `semantic_units_rag.jsonl` 중 명확한 normative keyword가 있는 requirement만 별도 제공하는 filtered view입니다.
-- `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix와 requirement/log page/feature/opcode/register 참조의 resolved/unresolved 상태를 기록하며, technical ref는 normalized key, candidate count, unresolved reason을 함께 남깁니다.
+- `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix와 requirement/log page/feature/opcode/register 참조의 resolved/unresolved 상태를 기록하며, technical ref는 normalized key, candidate count, unresolved reason을 함께 남깁니다. PDF outline/list fallback으로 해석한 참조는 `target_ref`가 `pdf-outline-` 또는 `pdf-list-`로 시작할 수 있고, `classification_reasons`에 `target_source_pdf_outline`/`target_source_pdf_list`를 남깁니다.
 - `requirement_traceability_rag.jsonl`: Requirement ID, condition, dependency, exception, testability hint를 원문 기반으로 기록합니다.
 - `technical_tables_rag.jsonl`: register, bitfield, command/opcode, log page, feature identifier, enum/value table row를 typed sidecar로 기록합니다.
 - `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록하며, 각 chunk에 `schema_version`과 원본 PDF `source_sha256`를 포함합니다. 긴 chunk는 token budget 기준으로 deterministic split되고 `parent_chunk_id`, `chunk_part_index`, `chunk_part_count`가 보존됩니다. RAG 최적화 옵션에서는 table-like chunk에 optional `embedding_text`를 추가해 section/caption/header context를 embedding 대상에만 보강하고, 같은 page/section/heading context의 짧은 인접 `text_block`은 token budget 안에서만 병합합니다. 관계 metadata 옵션을 켜면 최종 chunk id 기준 `previous_chunk_id`, `next_chunk_id`, `section_anchor_chunk_id`, `related_chunk_ids`를 추가해 citation expansion과 UI drilldown을 돕습니다. 원문 기준 `text`는 재서술하지 않고 source 순서대로만 결합됩니다.
@@ -955,7 +955,7 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 없습니다. 완료된 Q34-Q90 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 없습니다. 완료된 Q34-Q91 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 
