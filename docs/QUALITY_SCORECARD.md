@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-05-30 | Q85-Q89 preset/domain evaluation hardening | 100/100 | 0 | RAG warning severity, technical table triage, technical profile domain UX, SPDM adapter, preset evaluation score gate를 순차 구현했다. `scripts/run_preset_eval.py`와 optional `preset-eval` release gate로 `rag_optimized`/`technical_spec_rag` score, artifact/index/provenance, SSD contract, sanitized comparison을 반복 검증할 수 있고, GitHub CI `test (3.11)`, `test (3.14)`가 통과했다. 현재 active quality backlog는 없다. |
 | 2026-05-23 | Q84 release readiness sweep | 100/100 | 0 | 새 기능 없이 릴리스 후보를 재검증했다. 전체 local release gate는 OCR/corpus/benchmark/schema/packaging 8개 command 통과, RAG/index/provenance/artifact 4개 command 통과를 기록했다. 실제 NVMe `technical_spec_rag --domain-adapter nvme` 출력은 `status=success`, `actionable_warning_count=0`, `table_low_quality_count=0`, `pages_per_second=0.9166`, `image_extraction=24417ms`, RAG eval coverage 1.0을 유지했다. |
 | 2026-05-22 | Q83 real corpus cross reference precision | 100/100 | +1 | 실제 NVMe `technical_spec_rag --domain-adapter nvme` 출력에서 generic `Table of Figures`/`section defines`/`register level interface` false positive를 제거해 `cross_ref_record_count=27`, `unresolved_cross_ref_count=0`, `cross_ref_resolved_coverage=1.0`을 기록했다. RAG eval은 hit@k/MRR/source/table/requirement coverage 1.0과 `rag` release gate, index contract validator를 모두 통과했다. |
 | 2026-05-22 | Q82 expected table fallback taxonomy | 99/100 | 0 | 복잡 표 HTML fallback을 advisory/expected fallback으로 분리해 실제 NVMe corpus가 `warning_count=39`를 보존하면서도 `status=success`, `partial_success=false`, `actionable_warning_count=0`, `table_expected_fallback_count=39`, `table_low_quality_count=0`로 release gate `--max-partial-rate 0.0`을 통과했다. 남은 100점 후보는 Q83 |
@@ -104,7 +105,7 @@ RAG/integrity release gate는 RAG, index contract, provenance integrity, artifac
 
 #### 다음 개선 참조
 
-현재 active quality backlog는 없다. 완전 오프라인 fresh venv wheel smoke가 필요해지면 dependency wheelhouse 준비를 Q85+ packaging backlog로 분리한다.
+현재 active quality backlog는 없다. 완전 오프라인 fresh venv wheel smoke가 필요해지면 dependency wheelhouse 준비를 별도 packaging backlog로 분리한다.
 
 ### 2026-05-22 (Q83 구현 후)
 
