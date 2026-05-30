@@ -329,7 +329,7 @@ def test_cli_batch_mode_generates_per_pdf_outputs(
     assert (output_root / "alpha" / "alpha.md").exists()
     assert (output_root / "alpha" / "alpha_manifest.json").exists()
     assert (output_root / "alpha" / "alpha_report.json").exists()
-    assert (output_root / "alpha" / "alpha_assets" / "images").exists()
+    assert (output_root / "alpha" / "assets" / "images").exists()
     assert (output_root / "beta" / "beta_report.json").exists()
     batch_report = json.loads((output_root / "batch_report.json").read_text(encoding="utf-8"))
     assert batch_report["schema_version"] == "1.0"

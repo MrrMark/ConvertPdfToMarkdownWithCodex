@@ -148,7 +148,7 @@ def build_batch_config(pdf_path: Path, output_root: Path, options: BatchConversi
         markdown_filename=f"{stem}.md",
         manifest_filename=f"{stem}_manifest.json",
         report_filename=f"{stem}_report.json",
-        assets_dirname=f"{stem}_assets",
+        assets_dirname="assets",
     )
 
 

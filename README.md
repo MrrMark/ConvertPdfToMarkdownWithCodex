@@ -347,7 +347,7 @@ python3 -m pdf2md --input-dir ./pdfs
 - `./pdfs/output/<pdf_stem>/<pdf_stem>.md`
 - `./pdfs/output/<pdf_stem>/<pdf_stem>_manifest.json`
 - `./pdfs/output/<pdf_stem>/<pdf_stem>_report.json`
-- `./pdfs/output/<pdf_stem>/<pdf_stem>_assets/images/...`
+- `./pdfs/output/<pdf_stem>/assets/images/...`
 - `./pdfs/output/batch_report.json`
 - `./pdfs/output/corpus_manifest.json`
 - `./pdfs/output/corpus_diff_report.json` # `--previous-corpus-manifest` 사용 시
@@ -594,13 +594,13 @@ pdfs/
       a.md
       a_manifest.json
       a_report.json
-      a_assets/
+      assets/
         images/
     b/
       b.md
       b_manifest.json
       b_report.json
-      b_assets/
+      assets/
         images/
     batch_report.json
     corpus_manifest.json
