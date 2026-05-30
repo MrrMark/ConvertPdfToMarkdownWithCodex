@@ -64,7 +64,7 @@ Required:
 
 Stable nested fields:
 
-- `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_text_blocks_output`, `options.semantic_layer_output`, `options.ocr_lang`
+- `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_profile` when a non-default RAG profile was selected, `options.rag_text_blocks_output`, `options.semantic_layer_output`, `options.ocr_lang`
 - `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
 - `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
 - `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
@@ -102,6 +102,7 @@ Stable summary fields:
 - `table_fallback_reason_counts`, `table_expected_fallback_count`, `table_expected_fallback_reason_counts`, `table_actionable_fallback_count`
 - `table_low_quality_count`, `table_actionable_low_quality_count`, `table_advisory_low_quality_count`, `table_quality`
 - `ocr_actionable_warning_count`, `ocr_advisory_warning_count`
+- `technical_profile_domain_adapter_missing`
 - `stage_durations_ms`, `pdf_open_count`, `pages_per_second`
 - `page_worker_count`, `page_worker_effective_count`, `page_parallel_enabled`
 - `page_cache_hits`, `page_cache_misses`, `text_line_extract_count`

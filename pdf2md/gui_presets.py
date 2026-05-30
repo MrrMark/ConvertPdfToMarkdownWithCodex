@@ -66,12 +66,16 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
     figure_crop_fallback = (
         current.figure_crop_fallback if normalized == "rag_optimized" else profile_options.figure_crop_fallback
     )
+    domain_adapter = (
+        current.domain_adapter if normalized == "technical_spec_rag" else profile_options.domain_adapter
+    )
     return replace(
         current,
         image_mode=profile_options.image_mode,
         table_mode=profile_options.table_mode,
         rag_table_output=profile_options.rag_table_output,
-        domain_adapter=profile_options.domain_adapter,
+        rag_profile=normalized,
+        domain_adapter=domain_adapter,
         confidential_safe_mode=profile_options.confidential_safe_mode,
         force_ocr=profile_options.force_ocr,
         keep_page_markers=profile_options.keep_page_markers,
@@ -97,4 +101,6 @@ def preset_editable_fields(preset: GuiOptionPreset | str) -> dict[str, bool]:
     advanced_editable = preset_allows_custom_options(preset)
     editable = {field: True for field in GUI_ALWAYS_EDITABLE_OPTION_FIELDS}
     editable.update({field: advanced_editable for field in GUI_PRESET_LOCKED_OPTION_FIELDS})
+    if normalize_preset(str(preset)) == "technical_spec_rag":
+        editable["domain_adapter"] = True
     return editable

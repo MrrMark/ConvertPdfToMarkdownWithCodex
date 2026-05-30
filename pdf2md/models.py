@@ -164,6 +164,7 @@ class ReportSummary(BaseModel):
     table_advisory_low_quality_count: int = 0
     ocr_actionable_warning_count: int = 0
     ocr_advisory_warning_count: int = 0
+    technical_profile_domain_adapter_missing: bool = False
     table_caption_linked_count: int = 0
     page_cache_hits: int = 0
     page_cache_misses: int = 0

@@ -6,6 +6,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
+from pdf2md.rag_profiles import DEFAULT_RAG_PURPOSE_PROFILE, SUPPORTED_RAG_PURPOSE_PROFILES
 from pdf2md.utils.page_range import parse_page_range
 
 SUPPORTED_RETRIEVAL_TOKENIZERS = ("char", "regex", "tiktoken-cl100k")
@@ -21,6 +22,7 @@ class Config(BaseModel):
     image_mode: ImageMode = ImageMode.REFERENCED
     table_mode: TableMode = TableMode.AUTO
     rag_table_output: RagTableOutputMode = RagTableOutputMode.NONE
+    rag_profile: str = DEFAULT_RAG_PURPOSE_PROFILE
     domain_adapter: DomainAdapterMode = DomainAdapterMode.NONE
     confidential_safe_mode: bool = False
     force_ocr: bool = False
@@ -79,6 +81,13 @@ class Config(BaseModel):
     def _validate_retrieval_tokenizer(cls, value: str) -> str:
         if value not in SUPPORTED_RETRIEVAL_TOKENIZERS:
             raise ValueError(f"retrieval_tokenizer must be one of: {', '.join(SUPPORTED_RETRIEVAL_TOKENIZERS)}")
+        return value
+
+    @field_validator("rag_profile")
+    @classmethod
+    def _validate_rag_profile(cls, value: str) -> str:
+        if value not in SUPPORTED_RAG_PURPOSE_PROFILES:
+            raise ValueError(f"rag_profile must be one of: {', '.join(SUPPORTED_RAG_PURPOSE_PROFILES)}")
         return value
 
 

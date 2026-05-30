@@ -27,6 +27,7 @@ from pdf2md.config import Config, default_output_dir_for_input
 from pdf2md.gui_help import gui_user_guide_path
 from pdf2md.models import ConversionStatus, DomainAdapterMode, ImageMode, RagTableOutputMode, Report, TableMode, WarningEntry
 from pdf2md.pipeline import EXIT_FATAL, EXIT_PARTIAL, ConversionProgressEvent, ConversionResult, run_conversion
+from pdf2md.rag_profiles import DEFAULT_RAG_PURPOSE_PROFILE, normalize_rag_profile
 
 
 ProgressCallback = Callable[[str], None]
@@ -90,6 +91,7 @@ class GuiConversionOptions:
     image_mode: str = ImageMode.REFERENCED.value
     table_mode: str = TableMode.AUTO.value
     rag_table_output: str = RagTableOutputMode.NONE.value
+    rag_profile: str = DEFAULT_RAG_PURPOSE_PROFILE
     domain_adapter: str = DomainAdapterMode.NONE.value
     confidential_safe_mode: bool = False
     force_ocr: bool = False
@@ -965,6 +967,7 @@ def _coerce_options(options: GuiConversionOptions) -> dict:
         "image_mode": ImageMode(options.image_mode),
         "table_mode": TableMode(options.table_mode),
         "rag_table_output": RagTableOutputMode(options.rag_table_output),
+        "rag_profile": normalize_rag_profile(options.rag_profile),
         "domain_adapter": DomainAdapterMode(options.domain_adapter),
         "confidential_safe_mode": options.confidential_safe_mode,
         "force_ocr": options.force_ocr,
@@ -993,6 +996,7 @@ def _batch_options_from_gui(options: GuiConversionOptions) -> BatchConversionOpt
         image_mode=ImageMode(options.image_mode),
         table_mode=TableMode(options.table_mode),
         rag_table_output=RagTableOutputMode(options.rag_table_output),
+        rag_profile=normalize_rag_profile(options.rag_profile),
         domain_adapter=DomainAdapterMode(options.domain_adapter),
         confidential_safe_mode=options.confidential_safe_mode,
         force_ocr=options.force_ocr,
@@ -1022,6 +1026,7 @@ def _batch_options_from_request(request: GuiConversionRequest) -> BatchConversio
         image_mode=options.image_mode,
         table_mode=options.table_mode,
         rag_table_output=options.rag_table_output,
+        rag_profile=options.rag_profile,
         domain_adapter=options.domain_adapter,
         confidential_safe_mode=options.confidential_safe_mode,
         force_ocr=options.force_ocr,

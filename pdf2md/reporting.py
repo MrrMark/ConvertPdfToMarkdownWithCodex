@@ -6,7 +6,12 @@ from datetime import datetime
 from pdf2md.constants import StructureRecoveryReason, WarningCode
 from pdf2md.models import ConversionStatus, PageResult, PageStatus, Report, ReportSummary, WarningEntry
 
-ADVISORY_WARNING_CODES = frozenset({WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK})
+ADVISORY_WARNING_CODES = frozenset(
+    {
+        WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK,
+        WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING,
+    }
+)
 OCR_WARNING_PREFIX = "OCR_"
 ADVISORY_EMPTY_OCR_REASONS = frozenset({"empty_text_layer", "low_text_density"})
 
@@ -298,6 +303,9 @@ def build_report(
         table_advisory_low_quality_count=table_advisory_low_quality_count,
         ocr_actionable_warning_count=count_ocr_actionable_warnings(warnings),
         ocr_advisory_warning_count=count_ocr_advisory_warnings(warnings),
+        technical_profile_domain_adapter_missing=any(
+            warning.code == WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING for warning in warnings
+        ),
         table_caption_linked_count=table_caption_linked_count,
         page_cache_hits=page_cache_hits,
         page_cache_misses=page_cache_misses,
