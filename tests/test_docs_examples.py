@@ -56,7 +56,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 없습니다" in readme
+    assert "현재 active quality backlog는 Q92-Q97입니다" in readme
     assert "완료된 Q34-Q91" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
@@ -102,10 +102,26 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "PyInstaller/native bundle" in readme
     assert "GUI 화면의 `Help` 버튼" in readme
     assert "previous corpus manifest path" in readme
+    assert "로컬 변환 산출물은 `output/`, `<pdf_stem>_output/`, `pdf/`, 또는 `/tmp`" in readme
+    assert "`pdf2md/` 패키지 트리 아래에는 full conversion artifact를 만들지 않습니다" in readme
     assert "pdf/v10" not in readme
     assert "프로젝트 scaffold 생성" not in readme
     assert "metadata.py" not in readme
     assert "html_table.py" not in readme
+
+
+def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
+    gitignore = Path(".gitignore").read_text(encoding="utf-8")
+    tasks = Path("tasks.md").read_text(encoding="utf-8")
+
+    assert "output/" in gitignore
+    assert "*_output/" in gitignore
+    assert "pdf2md/nvme_cmds/" in gitignore
+    assert "M01은 Q93에서 다룬다" in tasks
+    assert "M02는 Q94에서 다룬다" in tasks
+    assert "M03은 Q92와 Q95에서 다룬다" in tasks
+    assert "M04는 Q92에서 다룬다" in tasks
+    assert "M05는 Q95와 Q96에서 다룬다" in tasks
 
 
 def test_windows_guide_matches_cli_policy() -> None:
@@ -366,7 +382,13 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q90. Cross Reference Target Index Expansion" not in next_plan
     assert "PDF outline/bookmark" not in next_plan
     assert "List of Figures" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
+    assert "Q92. Active Backlog And Local Artifact Hygiene" in next_plan
+    assert "Q93. Pipeline Stage And Output Responsibility Split" in next_plan
+    assert "Q94. Warning And Reason Taxonomy Contract" in next_plan
+    assert "Q95. Lightweight CI And Release Gate Coverage" in next_plan
+    assert "Q96. Korean, OCR, And Image-Only Golden Promotion" in next_plan
+    assert "Q97. Modern Python Tooling And Packaging Readiness" in next_plan
+    assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in next_plan
@@ -388,10 +410,16 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "현재 Active Development Specs" in development_specs
     assert "Q90. Cross Reference Target Index Expansion" not in development_specs
+    assert "Q92. Active Backlog And Local Artifact Hygiene" in development_specs
+    assert "Q93. Pipeline Stage And Output Responsibility Split" in development_specs
+    assert "Q94. Warning And Reason Taxonomy Contract" in development_specs
+    assert "Q95. Lightweight CI And Release Gate Coverage" in development_specs
+    assert "Q96. Korean, OCR, And Image-Only Golden Promotion" in development_specs
+    assert "Q97. Modern Python Tooling And Packaging Readiness" in development_specs
     assert "cross_ref_resolved_coverage >= 0.90" not in development_specs
     assert "PDF outline/bookmark section fallback" not in development_specs
     assert "Register/capability false-positive suppression" not in development_specs
-    assert "현재 active 개발 명세 없음." in development_specs
+    assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in development_specs
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in development_specs
