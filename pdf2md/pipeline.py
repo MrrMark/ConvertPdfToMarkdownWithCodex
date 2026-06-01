@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import hashlib
 import logging
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional
+from typing import Callable, Literal, Optional
 
 from pdf2md.config import Config
 from pdf2md.constants import WarningCode
@@ -33,6 +33,17 @@ from pdf2md.models import (
     TableMode,
     WarningEntry,
 )
+from pdf2md.output_writers import (
+    write_debug_artifacts,
+    write_domain_unit_output,
+    write_figure_rag_output,
+    write_rag_table_outputs,
+    write_rag_text_block_output,
+    write_requirement_traceability_output,
+    write_retrieval_chunk_output,
+    write_semantic_layer_outputs,
+    write_technical_table_output,
+)
 from pdf2md.reporting import build_report, count_structure_marker_reasons, determine_conversion_status, finalize_page_statuses
 from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown_blocks_result
@@ -40,32 +51,29 @@ from pdf2md.serializers.rag_chunks import (
     build_retrieval_chunk_diagnostics,
     build_retrieval_chunks,
     make_token_counter,
-    serialize_retrieval_chunks_jsonl,
 )
-from pdf2md.serializers.rag_domain_adapters import build_domain_units, serialize_domain_units_jsonl
-from pdf2md.serializers.rag_figures import build_figure_records, serialize_figures_jsonl
-from pdf2md.serializers.rag_requirements import (
-    build_requirement_traceability_records,
-    serialize_requirement_traceability_jsonl,
-)
+from pdf2md.serializers.rag_domain_adapters import build_domain_units
+from pdf2md.serializers.rag_figures import build_figure_records
+from pdf2md.serializers.rag_requirements import build_requirement_traceability_records
 from pdf2md.serializers.rag_tables import (
     annotate_rag_tables_with_heading_context,
-    flatten_rag_table_records,
     normalize_rag_table_payload,
-    serialize_rag_tables_jsonl,
-    serialize_rag_tables_markdown,
-    stable_table_id,
 )
 from pdf2md.serializers.rag_semantics import (
     build_semantic_layer,
     extract_pdf_outline_reference_targets,
-    serialize_cross_refs_jsonl,
-    serialize_requirements_jsonl,
-    serialize_semantic_units_jsonl,
 )
-from pdf2md.serializers.rag_text_blocks import build_text_blocks, serialize_text_blocks_jsonl
-from pdf2md.serializers.rag_technical_tables import build_technical_table_records, serialize_technical_tables_jsonl
+from pdf2md.serializers.rag_text_blocks import build_text_blocks
+from pdf2md.serializers.rag_technical_tables import build_technical_table_records
 from pdf2md.serializers.report import serialize_report
+from pdf2md.table_quality import (
+    build_table_quality_review_pack,
+    count_actionable_low_quality_tables,
+    count_caption_linked_tables,
+    count_low_quality_tables,
+    count_table_fallback_reasons,
+    low_quality_table_pages,
+)
 from pdf2md.utils.io import ensure_output_dirs, write_json, write_text
 from pdf2md.utils.page_executor import effective_page_worker_count, run_page_workers
 from pdf2md.utils.pdf import PdfDocumentContext, PdfOpenError
@@ -74,17 +82,6 @@ from pdf2md.utils.pdf import PdfDocumentContext, PdfOpenError
 EXIT_SUCCESS = 0
 EXIT_FATAL = 1
 EXIT_PARTIAL = 2
-LOW_TABLE_QUALITY_THRESHOLD = 0.55
-ACTIONABLE_TABLE_LOW_QUALITY_REASONS = frozenset(
-    {
-        "CELL_ALIGNMENT_FAILED",
-        "HEADER_ALIGNMENT_FAILED",
-        "MISSING_SOURCE_REFS",
-        "RAG_SIDECAR_MISMATCH",
-        "ROW_SPLIT_SUSPECTED",
-        "SOURCE_REF_MISSING",
-    }
-)
 logger = logging.getLogger(__name__)
 
 
@@ -184,168 +181,6 @@ def _apply_structure_recoveries(
     return updated
 
 
-def _text_line_payload(line: TextLine) -> dict:
-    return {
-        "text": line.text,
-        "top": line.top,
-        "bottom": line.bottom,
-        "x0": line.x0,
-        "x1": line.x1,
-        "font_size": line.font_size,
-        "font_family": line.font_family,
-        "font_style_hint": line.font_style_hint,
-        "line_height": line.line_height,
-        "left_indent": line.left_indent,
-        "right_indent": line.right_indent,
-        "y_band": line.y_band,
-    }
-
-
-def _write_debug_artifacts(
-    *,
-    config: Config,
-    selected_pages: list[int],
-    raw_lines_by_page: dict[int, list[dict]],
-    ordered_lines_by_page: dict[int, list[TextLine]],
-    normalized_lines_by_page: dict[int, list[dict]],
-    text_metadata_by_page: dict[int, PageLayoutMetadata],
-    table_candidates_by_page: dict[int, list[dict]],
-    image_candidates_by_page: dict[int, list[dict]],
-    table_quality_review_pack: dict[str, Any] | None = None,
-) -> None:
-    debug_root = config.output_dir / "debug"
-    debug_root.mkdir(parents=True, exist_ok=True)
-    for page in selected_pages:
-        prefix = f"page-{page:04d}"
-        metadata = text_metadata_by_page.get(page)
-        write_json(
-            debug_root / f"{prefix}-raw-lines.json",
-            {
-                "page": page,
-                "metadata": metadata.model_dump(mode="json") if hasattr(metadata, "model_dump") else (
-                    metadata.__dict__ if metadata else {}
-                ),
-                "lines": raw_lines_by_page.get(page, []),
-            },
-        )
-        write_json(
-            debug_root / f"{prefix}-ordered-lines.json",
-            {
-                "page": page,
-                "lines": [_text_line_payload(line) for line in ordered_lines_by_page.get(page, [])],
-            },
-        )
-        write_json(
-            debug_root / f"{prefix}-normalized-lines.json",
-            {
-                "page": page,
-                "lines": normalized_lines_by_page.get(page, []),
-            },
-        )
-        write_json(
-            debug_root / f"{prefix}-table-candidates.json",
-            {
-                "page": page,
-                "candidates": table_candidates_by_page.get(page, []),
-            },
-        )
-        write_json(
-            debug_root / f"{prefix}-image-candidates.json",
-            {
-                "page": page,
-                "candidates": image_candidates_by_page.get(page, []),
-            },
-        )
-    if table_quality_review_pack is not None:
-        write_json(debug_root / "table-quality-review-pack.json", table_quality_review_pack)
-
-
-def _count_table_fallback_reasons(table_fallbacks: list[dict]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for fallback in table_fallbacks:
-        for reason in fallback.get("reasons", []):
-            counts[str(reason)] = counts.get(str(reason), 0) + 1
-    return dict(sorted(counts.items()))
-
-
-def _count_low_quality_tables(table_quality: list[dict]) -> int:
-    return len(_low_quality_table_pages(table_quality, unique=False))
-
-
-def _table_quality_score(item: dict) -> float | None:
-    try:
-        return float(item.get("quality_score", 1.0))
-    except (TypeError, ValueError):
-        return None
-
-
-def _table_quality_key(item: dict) -> tuple[int, int] | None:
-    try:
-        return (int(item.get("page")), int(item.get("table_index")))
-    except (TypeError, ValueError):
-        return None
-
-
-def _table_fallback_keys(table_fallbacks: list[dict]) -> set[tuple[int, int]]:
-    keys: set[tuple[int, int]] = set()
-    for fallback in table_fallbacks:
-        key = _table_quality_key(fallback)
-        if key is not None:
-            keys.add(key)
-    return keys
-
-
-def _is_low_quality_table(item: dict) -> bool:
-    score = _table_quality_score(item)
-    return score is not None and score < LOW_TABLE_QUALITY_THRESHOLD
-
-
-def _is_actionable_low_quality_table(item: dict, fallback_keys: set[tuple[int, int]]) -> bool:
-    if not _is_low_quality_table(item):
-        return False
-    if item.get("actionable") is True:
-        return True
-    if item.get("missing_source_refs") or item.get("sidecar_mismatch"):
-        return True
-    reasons = {str(reason) for reason in item.get("reasons", [])}
-    if reasons & ACTIONABLE_TABLE_LOW_QUALITY_REASONS:
-        return True
-    mode = str(item.get("mode") or item.get("source_mode") or "").lower()
-    if mode == "html" or _table_quality_key(item) in fallback_keys:
-        return False
-    return item.get("unresolved") is True
-
-
-def _count_actionable_low_quality_tables(
-    table_quality: list[dict],
-    table_fallbacks: list[dict],
-) -> int:
-    fallback_keys = _table_fallback_keys(table_fallbacks)
-    return sum(1 for item in table_quality if _is_actionable_low_quality_table(item, fallback_keys))
-
-
-def _low_quality_table_pages(
-    table_quality: list[dict],
-    *,
-    unique: bool = True,
-    actionable_only: bool = False,
-    table_fallbacks: list[dict] | None = None,
-) -> list[int]:
-    pages: list[int] = []
-    fallback_keys = _table_fallback_keys(table_fallbacks or []) if actionable_only else set()
-    for item in table_quality:
-        if actionable_only:
-            if not _is_actionable_low_quality_table(item, fallback_keys):
-                continue
-        elif not _is_low_quality_table(item):
-            continue
-        try:
-            pages.append(int(item.get("page")))
-        except (TypeError, ValueError):
-            continue
-    return sorted(set(pages)) if unique else pages
-
-
 def _annotate_ocr_warning_context(
     warnings: list[WarningEntry],
     page_results: dict[int, PageResult],
@@ -380,180 +215,6 @@ def _technical_profile_domain_adapter_warning(config: Config, domain_adapter: Do
     )
 
 
-def _safe_review_preview(value: object, *, max_chars: int = 160) -> str:
-    text = " ".join(str(value or "").split())
-    if len(text) <= max_chars:
-        return text
-    return text[: max_chars - 3].rstrip() + "..."
-
-
-def _sha256_text(value: object) -> str | None:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def _column_placeholder_header_ratio(headers: list[object]) -> float:
-    if not headers:
-        return 0.0
-    placeholder_count = 0
-    for header in headers:
-        text = str(header).strip().lower()
-        if text.startswith("column ") and text.removeprefix("column ").strip().isdigit():
-            placeholder_count += 1
-    return round(placeholder_count / len(headers), 4)
-
-
-def _table_id_from_quality_item(item: dict[str, Any]) -> str | None:
-    key = _table_quality_key(item)
-    if key is None:
-        return None
-    return stable_table_id(*key)
-
-
-def _records_by_table_id(rag_tables: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    records: dict[str, list[dict[str, Any]]] = {}
-    for table in normalize_rag_table_payload(rag_tables):
-        table_id = str(table.get("table_id") or "")
-        records[table_id] = [dict(record) for record in table.get("records", [])]
-    return records
-
-
-def _headers_by_table_id(rag_tables: list[dict[str, Any]]) -> dict[str, list[object]]:
-    headers: dict[str, list[object]] = {}
-    for table in normalize_rag_table_payload(rag_tables):
-        table_id = str(table.get("table_id") or "")
-        value = table.get("headers")
-        headers[table_id] = list(value) if isinstance(value, list) else []
-    return headers
-
-
-def _record_count_by_table_id(records: list[dict[str, Any]], id_key: str) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for record in records:
-        table_id = str(record.get(id_key) or "")
-        if not table_id:
-            continue
-        counts[table_id] = counts.get(table_id, 0) + 1
-    return counts
-
-
-def _domain_count_by_table_id(domain_units: list[dict[str, Any]]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for record in domain_units:
-        for source_ref in record.get("source_refs", []):
-            if not isinstance(source_ref, dict):
-                continue
-            table_id = str(source_ref.get("table_id") or "")
-            if not table_id:
-                continue
-            counts[table_id] = counts.get(table_id, 0) + 1
-    return counts
-
-
-def _table_quality_triage_reasons(
-    *,
-    item: dict[str, Any],
-    row_count: int,
-    placeholder_ratio: float,
-    technical_unit_count: int,
-    domain_unit_count: int,
-) -> list[str]:
-    reasons: list[str] = []
-    if row_count == 0:
-        reasons.append("no_rag_rows")
-    elif row_count >= 2:
-        reasons.append("rag_rows_available")
-    if placeholder_ratio >= 0.5:
-        reasons.append("placeholder_headers")
-    if technical_unit_count:
-        reasons.append("technical_units_present")
-    if domain_unit_count:
-        reasons.append("domain_units_present")
-    if item.get("header_rows_promoted"):
-        reasons.append("header_row_promoted")
-    for reason in item.get("reasons", []):
-        text = str(reason)
-        if text in {"LOW_HEADER_CONFIDENCE", "HEADER_FRAGMENTED", "MERGED_CELL_SUSPECTED"}:
-            reasons.append(text.lower())
-    return sorted(dict.fromkeys(reasons))
-
-
-def _build_table_quality_review_pack(
-    *,
-    table_quality: list[dict[str, Any]],
-    rag_tables: list[dict[str, Any]],
-    technical_table_records: list[dict[str, Any]],
-    domain_units: list[dict[str, Any]],
-    table_fallbacks: list[dict[str, Any]],
-) -> dict[str, Any]:
-    records_by_table = _records_by_table_id(rag_tables)
-    headers_by_table = _headers_by_table_id(rag_tables)
-    technical_counts = _record_count_by_table_id(technical_table_records, "table_id")
-    domain_counts = _domain_count_by_table_id(domain_units)
-    fallback_keys = _table_fallback_keys(table_fallbacks)
-    items: list[dict[str, Any]] = []
-    triage_counts: dict[str, int] = {"actionable": 0, "advisory": 0}
-
-    for quality_item in table_quality:
-        if not _is_low_quality_table(quality_item):
-            continue
-        table_id = _table_id_from_quality_item(quality_item)
-        if table_id is None:
-            continue
-        records = records_by_table.get(table_id, [])
-        headers = headers_by_table.get(table_id, [])
-        sample_row = records[0] if records else {}
-        sample_text = sample_row.get("row_text")
-        placeholder_ratio = _column_placeholder_header_ratio(headers)
-        technical_unit_count = technical_counts.get(table_id, 0)
-        domain_unit_count = domain_counts.get(table_id, 0)
-        triage_status = "actionable" if _is_actionable_low_quality_table(quality_item, fallback_keys) else "advisory"
-        triage_counts[triage_status] += 1
-        bbox = quality_item.get("bbox") or sample_row.get("bbox")
-        items.append(
-            {
-                "page": quality_item.get("page"),
-                "table_id": table_id,
-                "table_index": quality_item.get("table_index"),
-                "bbox": bbox,
-                "mode": quality_item.get("mode"),
-                "quality_score": quality_item.get("quality_score"),
-                "fallback_reasons": quality_item.get("reasons", []),
-                "header_strategy": quality_item.get("rag_header_strategy"),
-                "header_confidence": quality_item.get("header_confidence"),
-                "row_count": len(records),
-                "empty_cell_ratio": quality_item.get("empty_cell_ratio"),
-                "column_placeholder_header_ratio": placeholder_ratio,
-                "technical_table_unit_count": technical_unit_count,
-                "domain_unit_count": domain_unit_count,
-                "sample_row_text_sha256": _sha256_text(sample_text),
-                "sample_row_text_preview": _safe_review_preview(sample_text),
-                "triage_status": triage_status,
-                "triage_reasons": _table_quality_triage_reasons(
-                    item=quality_item,
-                    row_count=len(records),
-                    placeholder_ratio=placeholder_ratio,
-                    technical_unit_count=technical_unit_count,
-                    domain_unit_count=domain_unit_count,
-                ),
-            }
-        )
-
-    return {
-        "schema_version": "1.0",
-        "item_count": len(items),
-        "low_quality_count": len(items),
-        "triage_counts": triage_counts,
-        "items": items,
-    }
-
-
-def _count_caption_linked_tables(table_quality: list[dict]) -> int:
-    return sum(1 for item in table_quality if str(item.get("caption_text") or "").strip())
-
-
 def _order_warnings_by_selected_page(
     warning_entries: list[WarningEntry],
     selected_pages: list[int],
@@ -566,29 +227,6 @@ def _order_warnings_by_selected_page(
             key=lambda item: (page_order.get(item[1].page, len(page_order)), item[0]),
         )
     ]
-
-
-def _write_rag_table_outputs(
-    *,
-    config: Config,
-    output_mode: RagTableOutputMode,
-    rag_tables: list[dict],
-) -> tuple[int, int]:
-    if output_mode is RagTableOutputMode.NONE:
-        return 0, 0
-
-    record_count = len(flatten_rag_table_records(rag_tables))
-    file_count = 0
-    if output_mode.writes_markdown():
-        write_text(
-            config.output_dir / config.rag_tables_markdown_filename,
-            serialize_rag_tables_markdown(rag_tables),
-        )
-        file_count += 1
-    if output_mode.writes_jsonl():
-        write_text(config.output_dir / config.rag_tables_jsonl_filename, serialize_rag_tables_jsonl(rag_tables))
-        file_count += 1
-    return record_count, file_count
 
 
 def _repair_hyphenated_normalized_lines(lines: list[NormalizedLine]) -> tuple[list[NormalizedLine], int]:
@@ -621,52 +259,6 @@ def _repair_hyphenated_normalized_lines(lines: list[NormalizedLine]) -> tuple[li
         repaired.append(current)
         idx += 1
     return repaired, repair_count
-
-
-def _write_rag_text_block_output(config: Config, records: list[dict]) -> tuple[int, int]:
-    write_text(config.output_dir / config.rag_text_blocks_jsonl_filename, serialize_text_blocks_jsonl(records))
-    return len(records), 1
-
-
-def _write_semantic_layer_outputs(
-    config: Config,
-    *,
-    semantic_units: list[dict],
-    requirements: list[dict],
-    cross_refs: list[dict],
-) -> tuple[int, int, int, int, int, int]:
-    write_text(config.output_dir / config.semantic_units_jsonl_filename, serialize_semantic_units_jsonl(semantic_units))
-    write_text(config.output_dir / config.requirements_jsonl_filename, serialize_requirements_jsonl(requirements))
-    write_text(config.output_dir / config.cross_refs_jsonl_filename, serialize_cross_refs_jsonl(cross_refs))
-    return len(semantic_units), 1, len(requirements), 1, len(cross_refs), 1
-
-
-def _write_retrieval_chunk_output(config: Config, records: list[dict]) -> tuple[int, int]:
-    write_text(config.output_dir / config.retrieval_chunks_jsonl_filename, serialize_retrieval_chunks_jsonl(records))
-    return len(records), 1
-
-
-def _write_figure_rag_output(config: Config, records: list[dict]) -> tuple[int, int]:
-    write_text(config.output_dir / config.figures_rag_jsonl_filename, serialize_figures_jsonl(records))
-    return len(records), 1
-
-
-def _write_domain_unit_output(config: Config, records: list[dict]) -> tuple[int, int]:
-    write_text(config.output_dir / config.domain_units_jsonl_filename, serialize_domain_units_jsonl(records))
-    return len(records), 1
-
-
-def _write_requirement_traceability_output(config: Config, records: list[dict]) -> tuple[int, int]:
-    write_text(
-        config.output_dir / config.requirement_traceability_jsonl_filename,
-        serialize_requirement_traceability_jsonl(records),
-    )
-    return len(records), 1
-
-
-def _write_technical_table_output(config: Config, records: list[dict]) -> tuple[int, int]:
-    write_text(config.output_dir / config.technical_tables_jsonl_filename, serialize_technical_tables_jsonl(records))
-    return len(records), 1
 
 
 def run_conversion(config: Config, *, progress: ConversionProgressCallback | None = None) -> ConversionResult:
@@ -1141,7 +733,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
 
     rag_text_started = stage_start()
     text_block_result = build_text_blocks(normalized_lines_by_page_for_blocks)
-    rag_text_block_record_count, rag_text_block_file_count = _write_rag_text_block_output(
+    rag_text_block_record_count, rag_text_block_file_count = write_rag_text_block_output(
         config,
         text_block_result.records,
     )
@@ -1160,7 +752,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         excluded_images=image_result.excluded_assets,
         text_block_records=text_block_result.records,
     )
-    figure_rag_record_count, figure_rag_file_count = _write_figure_rag_output(config, figure_records)
+    figure_rag_record_count, figure_rag_file_count = write_figure_rag_output(config, figure_records)
     finish_stage("rag_figures", figure_rag_started)
 
     semantic_started = stage_start()
@@ -1177,7 +769,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         requirement_file_count,
         cross_ref_record_count,
         cross_ref_file_count,
-    ) = _write_semantic_layer_outputs(
+    ) = write_semantic_layer_outputs(
         config,
         semantic_units=semantic_result.semantic_units,
         requirements=semantic_result.requirements,
@@ -1193,7 +785,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         requirements=semantic_result.requirements,
         rag_tables=contextual_rag_tables,
     )
-    requirement_traceability_record_count, requirement_traceability_file_count = _write_requirement_traceability_output(
+    requirement_traceability_record_count, requirement_traceability_file_count = write_requirement_traceability_output(
         config,
         requirement_traceability_records,
     )
@@ -1201,7 +793,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
 
     technical_tables_started = stage_start()
     technical_table_records = build_technical_table_records(contextual_rag_tables)
-    technical_table_record_count, technical_table_file_count = _write_technical_table_output(
+    technical_table_record_count, technical_table_file_count = write_technical_table_output(
         config,
         technical_table_records,
     )
@@ -1215,7 +807,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             rag_tables=contextual_rag_tables,
             technical_table_records=technical_table_records,
         )
-        domain_unit_record_count, domain_unit_file_count = _write_domain_unit_output(config, domain_units)
+        domain_unit_record_count, domain_unit_file_count = write_domain_unit_output(config, domain_units)
         finish_stage("rag_domain_adapter", domain_started)
 
     retrieval_started = stage_start()
@@ -1241,7 +833,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         retrieval_chunks,
         target_tokens=config.retrieval_chunk_max_tokens,
     )
-    retrieval_chunk_record_count, retrieval_chunk_file_count = _write_retrieval_chunk_output(
+    retrieval_chunk_record_count, retrieval_chunk_file_count = write_retrieval_chunk_output(
         config,
         retrieval_chunks,
     )
@@ -1266,7 +858,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     finish_stage("markdown_serialization", markdown_started)
 
     rag_started = stage_start()
-    rag_table_record_count, rag_table_file_count = _write_rag_table_outputs(
+    rag_table_record_count, rag_table_file_count = write_rag_table_outputs(
         config=config,
         output_mode=rag_table_output,
         rag_tables=table_result.rag_tables,
@@ -1276,7 +868,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     if config.debug:
         debug_started = stage_start()
         logger.info("Writing debug artifacts")
-        _write_debug_artifacts(
+        write_debug_artifacts(
             config=config,
             selected_pages=selected_pages,
             raw_lines_by_page=raw_lines_by_page,
@@ -1285,7 +877,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             text_metadata_by_page=text_metadata_by_page,
             table_candidates_by_page=table_result.debug_candidates_by_page,
             image_candidates_by_page=image_result.debug_candidates_by_page,
-            table_quality_review_pack=_build_table_quality_review_pack(
+            table_quality_review_pack=build_table_quality_review_pack(
                 table_quality=table_result.table_quality,
                 rag_tables=contextual_rag_tables,
                 technical_table_records=technical_table_records,
@@ -1359,19 +951,19 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
 
     finished_at = datetime.now(timezone.utc)
     page_results = [page_results_map[page] for page in sorted(page_results_map)]
-    table_fallback_reason_counts = _count_table_fallback_reasons(table_result.fallbacks)
-    table_low_quality_count = _count_low_quality_tables(table_result.table_quality)
-    table_actionable_low_quality_count = _count_actionable_low_quality_tables(
+    table_fallback_reason_counts = count_table_fallback_reasons(table_result.fallbacks)
+    table_low_quality_count = count_low_quality_tables(table_result.table_quality)
+    table_actionable_low_quality_count = count_actionable_low_quality_tables(
         table_result.table_quality,
         table_result.fallbacks,
     )
     table_advisory_low_quality_count = max(table_low_quality_count - table_actionable_low_quality_count, 0)
-    table_actionable_low_quality_pages = _low_quality_table_pages(
+    table_actionable_low_quality_pages = low_quality_table_pages(
         table_result.table_quality,
         table_fallbacks=table_result.fallbacks,
         actionable_only=True,
     )
-    table_caption_linked_count = _count_caption_linked_tables(table_result.table_quality)
+    table_caption_linked_count = count_caption_linked_tables(table_result.table_quality)
     page_results, page_status_counts = finalize_page_statuses(
         page_results,
         warnings,

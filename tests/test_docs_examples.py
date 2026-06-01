@@ -56,8 +56,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q92-Q97입니다" in readme
-    assert "완료된 Q34-Q91" in readme
+    assert "현재 active quality backlog는 Q94-Q97입니다" in readme
+    assert "완료된 Q34-Q93" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
     assert "summary.actionable_warning_count" in readme
@@ -117,10 +117,10 @@ def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
     assert "output/" in gitignore
     assert "*_output/" in gitignore
     assert "pdf2md/nvme_cmds/" in gitignore
-    assert "M01은 Q93에서 다룬다" in tasks
+    assert "M01은 Q93에서 1차 완료했다" in tasks
     assert "M02는 Q94에서 다룬다" in tasks
-    assert "M03은 Q92와 Q95에서 다룬다" in tasks
-    assert "M04는 Q92에서 다룬다" in tasks
+    assert "M03은 Q92에서 local artifact hygiene을 완료했고" in tasks
+    assert "M04는 Q92에서 active backlog와 문서 정합성 1차 정리를 완료했다" in tasks
     assert "M05는 Q95와 Q96에서 다룬다" in tasks
 
 
@@ -382,8 +382,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q90. Cross Reference Target Index Expansion" not in next_plan
     assert "PDF outline/bookmark" not in next_plan
     assert "List of Figures" not in next_plan
-    assert "Q92. Active Backlog And Local Artifact Hygiene" in next_plan
-    assert "Q93. Pipeline Stage And Output Responsibility Split" in next_plan
+    assert "Q92. Active Backlog And Local Artifact Hygiene" not in next_plan
+    assert "Q93. Pipeline Stage And Output Responsibility Split" not in next_plan
     assert "Q94. Warning And Reason Taxonomy Contract" in next_plan
     assert "Q95. Lightweight CI And Release Gate Coverage" in next_plan
     assert "Q96. Korean, OCR, And Image-Only Golden Promotion" in next_plan
@@ -410,8 +410,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q05. OCR Runtime/Language 사전 점검" not in next_plan
     assert "현재 Active Development Specs" in development_specs
     assert "Q90. Cross Reference Target Index Expansion" not in development_specs
-    assert "Q92. Active Backlog And Local Artifact Hygiene" in development_specs
-    assert "Q93. Pipeline Stage And Output Responsibility Split" in development_specs
+    assert "Q92. Active Backlog And Local Artifact Hygiene" not in development_specs
+    assert "Q93. Pipeline Stage And Output Responsibility Split" not in development_specs
     assert "Q94. Warning And Reason Taxonomy Contract" in development_specs
     assert "Q95. Lightweight CI And Release Gate Coverage" in development_specs
     assert "Q96. Korean, OCR, And Image-Only Golden Promotion" in development_specs
@@ -468,7 +468,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q91" in development_specs
+    assert "완료된 Q34-Q93" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -489,6 +489,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q90. Cross Reference Target Index Expansion" in implemented_specs
     assert "cross_ref_resolved_coverage=0.9923" in implemented_specs
     assert "Q91. Q90 Output Schema Contract Alignment" in implemented_specs
+    assert "Q92. Active Backlog And Local Artifact Hygiene" in implemented_specs
+    assert "Q93. Pipeline Stage And Output Responsibility Split" in implemented_specs
     assert "pdf-outline-" in implemented_specs
     assert "scripts/run_preset_eval.py" in implemented_specs
     assert "--gates preset-eval" in implemented_specs
