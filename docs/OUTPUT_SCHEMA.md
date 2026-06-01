@@ -123,6 +123,13 @@ Stable summary fields:
 - `confidential_safe_mode`
 - `font_heading_candidate_count`, `footnote_candidate_count`, `structure_low_confidence_count`
 
+Warning taxonomy policy:
+
+- Known warning codes have a stable domain and default severity in code.
+- `actionable_warning_count` and `advisory_warning_count` are derived from that taxonomy plus limited context-sensitive rules, such as blank-page `OCR_EMPTY_RESULT`.
+- Advisory warnings, including expected complex table HTML fallback, do not by themselves set `partial_success` or exit code `2`.
+- Actionable OCR/table/image warnings and failed-page signals may set `partial_success` and exit code `2`.
+
 ## debug/table-quality-review-pack.json
 
 Optional local-only artifact written when `--debug` is enabled.

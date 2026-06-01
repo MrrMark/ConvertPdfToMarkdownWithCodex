@@ -3,17 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 
-from pdf2md.constants import StructureRecoveryReason, WarningCode
+from pdf2md.constants import StructureRecoveryReason, WarningCode, WarningDomain, WarningSeverity, warning_code_spec
 from pdf2md.models import ConversionStatus, PageResult, PageStatus, Report, ReportSummary, WarningEntry
 
-ADVISORY_WARNING_CODES = frozenset(
-    {
-        WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK,
-        WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING,
-    }
-)
-OCR_WARNING_PREFIX = "OCR_"
 ADVISORY_EMPTY_OCR_REASONS = frozenset({"empty_text_layer", "low_text_density"})
+EXIT_CODE_WARNING_DOMAINS = frozenset({WarningDomain.OCR, WarningDomain.TABLE, WarningDomain.IMAGE})
 
 
 def _optional_int(value: object) -> int | None:
@@ -38,7 +32,8 @@ def count_structure_marker_reasons(excluded_assets: Iterable[object]) -> dict[st
 
 
 def is_advisory_warning(warning: WarningEntry) -> bool:
-    if warning.code in ADVISORY_WARNING_CODES:
+    spec = warning_code_spec(warning.code)
+    if spec.default_severity == WarningSeverity.ADVISORY:
         return True
     if warning.code == WarningCode.OCR_EMPTY_RESULT:
         details = warning.details
@@ -61,6 +56,16 @@ def is_actionable_warning(warning: WarningEntry) -> bool:
     return not is_advisory_warning(warning)
 
 
+def warning_affects_exit_code(warning: WarningEntry) -> bool:
+    """Return whether this warning should turn a successful conversion into partial success."""
+    if is_advisory_warning(warning):
+        return False
+    if warning.code.endswith("_FAILED"):
+        return True
+    spec = warning_code_spec(warning.code)
+    return spec.affects_exit_code and spec.domain in EXIT_CODE_WARNING_DOMAINS
+
+
 def count_actionable_warnings(warnings: Iterable[WarningEntry]) -> int:
     return sum(1 for warning in warnings if is_actionable_warning(warning))
 
@@ -73,7 +78,7 @@ def count_ocr_actionable_warnings(warnings: Iterable[WarningEntry]) -> int:
     return sum(
         1
         for warning in warnings
-        if warning.code.startswith(OCR_WARNING_PREFIX) and is_actionable_warning(warning)
+        if warning_code_spec(warning.code).domain == WarningDomain.OCR and is_actionable_warning(warning)
     )
 
 
@@ -81,7 +86,7 @@ def count_ocr_advisory_warnings(warnings: Iterable[WarningEntry]) -> int:
     return sum(
         1
         for warning in warnings
-        if warning.code.startswith(OCR_WARNING_PREFIX) and is_advisory_warning(warning)
+        if warning_code_spec(warning.code).domain == WarningDomain.OCR and is_advisory_warning(warning)
     )
 
 
@@ -141,11 +146,7 @@ def determine_conversion_status(
         return ConversionStatus.PARTIAL_SUCCESS, 2
     if table_actionable_low_quality_count > 0:
         return ConversionStatus.PARTIAL_SUCCESS, 2
-    if any(
-        is_actionable_warning(warning)
-        and (warning.code.startswith("OCR_") or warning.code.startswith("TABLE_") or warning.code.startswith("IMAGE_"))
-        for warning in warnings
-    ):
+    if any(warning_affects_exit_code(warning) for warning in warnings):
         return ConversionStatus.PARTIAL_SUCCESS, 2
     return ConversionStatus.SUCCESS, 0
 

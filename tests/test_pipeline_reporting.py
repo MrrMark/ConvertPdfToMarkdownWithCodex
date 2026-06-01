@@ -7,14 +7,14 @@ from pathlib import Path
 import pdf2md.pipeline as pipeline_module
 from fixtures.pdf_builder import build_image_only_pdf
 from pdf2md.config import Config
-from pdf2md.constants import WarningCode
+from pdf2md.constants import WarningCode, WarningDomain, WarningSeverity, warning_code_spec
 from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrMetrics, OcrResult
 from pdf2md.extractors.tables import TableExtractionResult
 from pdf2md.extractors.text import PageLayoutMetadata, TextLayoutResult, TextLine
 from pdf2md.models import ImageMode, TableAsset, TableMode, WarningEntry
 from pdf2md.pipeline import EXIT_PARTIAL, EXIT_SUCCESS, run_conversion
-from pdf2md.reporting import determine_conversion_status, is_advisory_warning
+from pdf2md.reporting import determine_conversion_status, is_advisory_warning, warning_affects_exit_code
 
 
 class _FixedDateTime(datetime):
@@ -451,6 +451,26 @@ def test_empty_ocr_blank_page_warning_is_advisory_for_status() -> None:
     assert is_advisory_warning(warning) is True
     assert status.value == "success"
     assert exit_code == EXIT_SUCCESS
+
+
+def test_warning_taxonomy_registry_drives_severity_and_exit_policy() -> None:
+    table_fallback = WarningEntry(code=WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK, message="fallback", page=1)
+    ocr_warning = WarningEntry(code=WarningCode.OCR_CONFIDENCE_WARN, message="ocr", page=1)
+    unknown_warning = WarningEntry(code="CUSTOM_WARNING", message="custom", page=1)
+
+    table_spec = warning_code_spec(table_fallback.code)
+    ocr_spec = warning_code_spec(ocr_warning.code)
+    unknown_spec = warning_code_spec(unknown_warning.code)
+
+    assert table_spec.domain == WarningDomain.TABLE
+    assert table_spec.default_severity == WarningSeverity.ADVISORY
+    assert table_spec.affects_exit_code is False
+    assert ocr_spec.domain == WarningDomain.OCR
+    assert is_advisory_warning(table_fallback) is True
+    assert warning_affects_exit_code(table_fallback) is False
+    assert warning_affects_exit_code(ocr_warning) is True
+    assert unknown_spec.domain == WarningDomain.UNKNOWN
+    assert warning_affects_exit_code(unknown_warning) is False
 
 
 def test_technical_profile_missing_domain_warning_is_advisory_for_status() -> None:

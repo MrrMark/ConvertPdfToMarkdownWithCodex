@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 
 class WarningCode:
     PDF_OPEN_FAILED = "PDF_OPEN_FAILED"
@@ -18,6 +20,74 @@ class WarningCode:
     TABLE_COMPLEXITY_HTML_FALLBACK = "TABLE_COMPLEXITY_HTML_FALLBACK"
     TABLE_COMPLEXITY_MARKDOWN_COERCED = "TABLE_COMPLEXITY_MARKDOWN_COERCED"
     TABLE_EXTRACTION_FAILED = "TABLE_EXTRACTION_FAILED"
+
+
+class WarningDomain:
+    PDF = "pdf"
+    PAGE = "page"
+    TEXT = "text"
+    OCR = "ocr"
+    IMAGE = "image"
+    TABLE = "table"
+    TECHNICAL_PROFILE = "technical_profile"
+    UNKNOWN = "unknown"
+
+
+class WarningSeverity:
+    ACTIONABLE = "actionable"
+    ADVISORY = "advisory"
+
+
+@dataclass(frozen=True)
+class WarningCodeSpec:
+    code: str
+    domain: str
+    default_severity: str = WarningSeverity.ACTIONABLE
+    affects_exit_code: bool = True
+
+
+WARNING_CODE_REGISTRY: dict[str, WarningCodeSpec] = {
+    WarningCode.PDF_OPEN_FAILED: WarningCodeSpec(WarningCode.PDF_OPEN_FAILED, WarningDomain.PDF),
+    WarningCode.INVALID_PAGE_RANGE: WarningCodeSpec(WarningCode.INVALID_PAGE_RANGE, WarningDomain.PAGE),
+    WarningCode.TEXT_EXTRACTION_FAILED: WarningCodeSpec(WarningCode.TEXT_EXTRACTION_FAILED, WarningDomain.TEXT),
+    WarningCode.OCR_RUNTIME_UNAVAILABLE: WarningCodeSpec(WarningCode.OCR_RUNTIME_UNAVAILABLE, WarningDomain.OCR),
+    WarningCode.OCR_FAILED: WarningCodeSpec(WarningCode.OCR_FAILED, WarningDomain.OCR),
+    WarningCode.OCR_CONFIDENCE_CRITICAL: WarningCodeSpec(WarningCode.OCR_CONFIDENCE_CRITICAL, WarningDomain.OCR),
+    WarningCode.OCR_CONFIDENCE_WARN: WarningCodeSpec(WarningCode.OCR_CONFIDENCE_WARN, WarningDomain.OCR),
+    WarningCode.OCR_EMPTY_RESULT: WarningCodeSpec(WarningCode.OCR_EMPTY_RESULT, WarningDomain.OCR),
+    WarningCode.IMAGE_POSITION_MAPPING_FAILED: WarningCodeSpec(
+        WarningCode.IMAGE_POSITION_MAPPING_FAILED,
+        WarningDomain.IMAGE,
+    ),
+    WarningCode.IMAGE_EXTRACTION_FAILED: WarningCodeSpec(WarningCode.IMAGE_EXTRACTION_FAILED, WarningDomain.IMAGE),
+    WarningCode.IMAGE_CROP_REJECTED: WarningCodeSpec(WarningCode.IMAGE_CROP_REJECTED, WarningDomain.IMAGE),
+    WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING: WarningCodeSpec(
+        WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING,
+        WarningDomain.TECHNICAL_PROFILE,
+        default_severity=WarningSeverity.ADVISORY,
+        affects_exit_code=False,
+    ),
+    WarningCode.TABLE_GFM_UNSAFE_FALLBACK_HTML: WarningCodeSpec(
+        WarningCode.TABLE_GFM_UNSAFE_FALLBACK_HTML,
+        WarningDomain.TABLE,
+    ),
+    WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK: WarningCodeSpec(
+        WarningCode.TABLE_COMPLEXITY_HTML_FALLBACK,
+        WarningDomain.TABLE,
+        default_severity=WarningSeverity.ADVISORY,
+        affects_exit_code=False,
+    ),
+    WarningCode.TABLE_COMPLEXITY_MARKDOWN_COERCED: WarningCodeSpec(
+        WarningCode.TABLE_COMPLEXITY_MARKDOWN_COERCED,
+        WarningDomain.TABLE,
+    ),
+    WarningCode.TABLE_EXTRACTION_FAILED: WarningCodeSpec(WarningCode.TABLE_EXTRACTION_FAILED, WarningDomain.TABLE),
+}
+
+
+def warning_code_spec(code: str) -> WarningCodeSpec:
+    """Return warning metadata, defaulting unknown codes to actionable non-domain warnings."""
+    return WARNING_CODE_REGISTRY.get(code, WarningCodeSpec(code=code, domain=WarningDomain.UNKNOWN))
 
 
 class StructureRecoveryReason:
