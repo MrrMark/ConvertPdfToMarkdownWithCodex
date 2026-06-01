@@ -1,0 +1,10 @@
+# Changelog
+
+All notable project changes are tracked through PRs and this changelog. The project still keeps detailed
+quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`.
+
+## Unreleased
+
+- Add conservative ruff lint smoke configuration for Python 3.11+.
+- Add `pdf2md/py.typed` packaging contract and wheel inspection coverage.
+- Add advisory dependency audit release gate support.

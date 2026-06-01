@@ -34,6 +34,9 @@ jobs:
       - name: Docs/output contract
         run: python -m pytest tests/test_docs_examples.py tests/test_output_schema_contract.py -q
 
+      - name: Lint smoke
+        run: python -m ruff check .
+
       - name: Test
         run: python -m pytest
 

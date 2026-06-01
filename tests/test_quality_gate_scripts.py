@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tomllib
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +13,21 @@ from scripts import run_preset_eval
 from scripts import run_gui_cli_parity
 from scripts import run_corpus_eval
 from scripts import run_release_gates
+
+
+def test_pyproject_declares_modern_tooling_and_typed_package_contract() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+
+    dev_dependencies = pyproject["project"]["optional-dependencies"]["dev"]
+    assert "ruff>=0.8.0" in dev_dependencies
+    assert "build>=1.2.0" in dev_dependencies
+    assert "pip-audit>=2.7.0" in dev_dependencies
+    assert "wheel>=0.43.0" in dev_dependencies
+    assert pyproject["tool"]["ruff"]["target-version"] == "py311"
+    assert pyproject["tool"]["ruff"]["line-length"] == 120
+    assert pyproject["tool"]["ruff"]["lint"]["select"] == ["E9", "F63", "F7", "F82"]
+    assert pyproject["tool"]["setuptools"]["package-data"]["pdf2md"] == ["py.typed"]
+    assert Path("pdf2md/py.typed").is_file()
 
 
 def test_corpus_quality_gate_records_baseline_and_threshold_regressions(tmp_path: Path) -> None:
@@ -241,10 +257,59 @@ def test_release_gate_runner_supports_lightweight_ci_gate(monkeypatch, tmp_path:
         "ci-lightweight:schema",
         "ci-lightweight:docs-output-contract",
         "ci-lightweight:cli-smoke",
+        "ci-lightweight:lint-smoke",
     ]
     assert any(any(str(part).endswith("export_output_schema.py") for part in command) for command in calls)
     assert any("tests/test_docs_examples.py" in command for command in calls)
     assert any(command[1:] == ["-m", "pdf2md", "--help"] for command in calls)
+    assert any(command[1:] == ["-m", "ruff", "check", "."] for command in calls)
+
+
+def test_release_gate_runner_records_dependency_audit_as_advisory(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=1, stdout="", stderr="dependency audit warning")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "dependency-audit",
+            gates=["dependency-audit"],
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["summary"]["failed_count"] == 0
+    assert payload["gates"] == [
+        {
+            "gate": "dependency-audit",
+            "command": [
+                run_release_gates.sys.executable,
+                "-m",
+                "pip_audit",
+                "--format",
+                "json",
+                "--output",
+                str(tmp_path / "dependency-audit" / "dependency_audit_report.json"),
+                "--cache-dir",
+                str(tmp_path / "dependency-audit" / "pip-audit-cache"),
+                "--progress-spinner",
+                "off",
+            ],
+            "exit_code": 1,
+            "status": "passed",
+            "report_path": str(tmp_path / "dependency-audit" / "dependency_audit_report.json"),
+            "stdout_tail": "",
+            "stderr_tail": "dependency audit warning",
+            "advisory": True,
+            "advisory_exit_code": 1,
+            "advisory_status": "failed",
+        }
+    ]
+    assert any(command[1:3] == ["-m", "pip_audit"] for command in calls)
 
 
 def test_release_gate_runner_fails_when_any_gate_command_fails(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
@@ -724,6 +789,7 @@ def test_wheel_contract_inspector_accepts_gui_resource_and_entry_points(tmp_path
 
     assert payload["status"] == "passed"
     assert payload["summary"]["failed_count"] == 0
+    assert any(check["name"] == "wheel_member:pdf2md/py.typed" for check in payload["checks"])
     assert any(check["name"] == "wheel_member:pdf2md/resources/GUI_USER_GUIDE.md" for check in payload["checks"])
     assert any(check["name"] == "console_script:pdf2md-gui" for check in payload["checks"])
 

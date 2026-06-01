@@ -19,7 +19,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "build>=1.2.0",
+  "pip-audit>=2.7.0",
   "pytest>=8.0.0",
+  "ruff>=0.8.0",
+  "wheel>=0.43.0",
 ]
 
 [project.scripts]
@@ -30,8 +34,37 @@ pdf2md-gui = "pdf2md.gui:main"
 packages = ["pdf2md", "pdf2md.extractors", "pdf2md.serializers", "pdf2md.utils", "pdf2md.detectors", "pdf2md.resources"]
 
 [tool.setuptools.package-data]
+"pdf2md" = ["py.typed"]
 "pdf2md.resources" = ["GUI_USER_GUIDE.md"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = [
+  ".venv",
+  ".venv311",
+  ".venv314",
+  "build",
+  "dist",
+  "output",
+  "*_output",
+  "pdf",
+]
+
+[tool.ruff.lint]
+select = [
+  "E9",
+  "F63",
+  "F7",
+  "F82",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
