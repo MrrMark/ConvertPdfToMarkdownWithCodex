@@ -23,24 +23,6 @@
 
 ## 남은 작업
 
-### P0 / Q94. Warning And Reason Taxonomy Contract
-
-목표: warning code, severity, exit-code 영향, reason code를 강타입 계약으로 정리해 CLI/GUI/report/release gate가 같은 정책을 보게 한다.
-
-범위:
-
-- warning code prefix/string suffix 기반 판정을 줄이고 registry 또는 enum 기반 metadata를 도입한다.
-- table/image/OCR/structure reason code의 public/private 경계를 문서화한다.
-- advisory/actionable/expected fallback 정책을 테스트로 고정한다.
-- 기존 `report.json`과 `manifest.json`의 public field는 backward-compatible하게 유지한다.
-
-검증:
-
-- reporting unit tests
-- output schema contract tests
-- representative warning fixture tests
-- GUI summary warning code/count tests
-
 ### P1 / Q95. Lightweight CI And Release Gate Coverage
 
 목표: 기존 release gate 자산 중 PR마다 돌릴 수 있는 가벼운 검증을 CI 또는 별도 workflow에 올려 문서/schema/package 회귀를 더 빨리 잡는다.

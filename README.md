@@ -777,6 +777,8 @@ multi-page table continuation 후보는 `continuation_reasons`,
 - `2`: 부분 성공
 
 `2`는 실패가 아니라, actionable warning이나 저품질 표 진단이 포함된 성공 실행일 수 있습니다.
+warning severity와 exit-code 영향은 코드의 warning taxonomy registry를 기준으로 계산되며,
+동일 warning code는 CLI, GUI summary, `report.json`, release gate에서 같은 기본 정책을 사용합니다.
 복잡 표가 의도적으로 HTML fallback으로 직렬화된 경우 `TABLE_COMPLEXITY_HTML_FALLBACK`은
 `summary.table_expected_fallback_count`와 `summary.advisory_warning_count`에 남지만,
 그 자체만으로 `partial_success`가 되지는 않습니다.
@@ -957,8 +959,8 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q94-Q97입니다. 개발 순서는 warning taxonomy, lightweight CI gate, 한글/OCR/image-only golden 승격, Python tooling/package readiness 순서입니다.
-- 완료된 Q34-Q93 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q95-Q97입니다. 개발 순서는 lightweight CI gate, 한글/OCR/image-only golden 승격, Python tooling/package readiness 순서입니다.
+- 완료된 Q34-Q94 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 
