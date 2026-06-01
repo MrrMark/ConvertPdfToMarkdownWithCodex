@@ -381,6 +381,11 @@ def test_pipeline_routes_image_only_scanned_pdf_through_ocr_without_correction(
     assert page_result["ocr_runtime_available"] is True
     assert page_result["used_ocr"] is True
     assert page_result["ocr_confidence_mean"] == 72.0
+    assert report["warnings"][0]["code"] == "OCR_CONFIDENCE_WARN"
+    assert report["summary"]["actionable_warning_count"] == 1
+    assert report["summary"]["advisory_warning_count"] == 0
+    assert report["summary"]["ocr_actionable_warning_count"] == 1
+    assert report["summary"]["ocr_advisory_warning_count"] == 0
     assert report["summary"]["low_confidence_pages"] == [1]
     assert manifest["ocr_pages"] == [1]
 
