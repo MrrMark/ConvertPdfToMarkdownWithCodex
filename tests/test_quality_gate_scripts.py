@@ -220,6 +220,33 @@ def test_release_gate_runner_writes_success_summary(monkeypatch, tmp_path: Path)
     assert "--page-workers" in benchmark_command
 
 
+def test_release_gate_runner_supports_lightweight_ci_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "ci-lightweight",
+            gates=["ci-lightweight"],
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert [record["gate"] for record in payload["gates"]] == [
+        "ci-lightweight:schema",
+        "ci-lightweight:docs-output-contract",
+        "ci-lightweight:cli-smoke",
+    ]
+    assert any(any(str(part).endswith("export_output_schema.py") for part in command) for command in calls)
+    assert any("tests/test_docs_examples.py" in command for command in calls)
+    assert any(command[1:] == ["-m", "pdf2md", "--help"] for command in calls)
+
+
 def test_release_gate_runner_fails_when_any_gate_command_fails(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
     def fake_run(command, **kwargs):  # noqa: ANN001
         returncode = 1 if any(str(part).endswith("benchmark_conversion.py") for part in command) else 0

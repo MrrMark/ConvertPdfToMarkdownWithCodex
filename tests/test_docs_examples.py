@@ -56,8 +56,8 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q95-Q97입니다" in readme
-    assert "완료된 Q34-Q94" in readme
+    assert "현재 active quality backlog는 Q96-Q97입니다" in readme
+    assert "완료된 Q34-Q95" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
     assert "summary.actionable_warning_count" in readme
@@ -89,6 +89,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "--json-only" in readme
     assert "--gates gui-parity" in readme
     assert "--gates gui-benchmark" in readme
+    assert "--gates ci-lightweight" in readme
     assert "runtime diagnostic code/message/action" in readme
     assert "변환 warning message" in readme
     assert "문서 경계 취소" in readme
@@ -120,9 +121,9 @@ def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
     assert "pdf2md/nvme_cmds/" in gitignore
     assert "M01은 Q93에서 1차 완료했다" in tasks
     assert "M02는 Q94에서 warning taxonomy registry 1차 정리를 완료했다" in tasks
-    assert "M03은 Q92에서 local artifact hygiene을 완료했고" in tasks
+    assert "M03은 Q92에서 local artifact hygiene을 완료했고, Q95에서 CI/release gate 편의성 1차 정리를 완료했다" in tasks
     assert "M04는 Q92에서 active backlog와 문서 정합성 1차 정리를 완료했다" in tasks
-    assert "M05는 Q95와 Q96에서 다룬다" in tasks
+    assert "M05는 Q95에서 lightweight CI gate를 보강했고, Q96에서 fixture/golden 승격을 이어서 다룬다" in tasks
 
 
 def test_windows_guide_matches_cli_policy() -> None:
@@ -326,6 +327,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "python-version" in workflow
     assert '"3.11"' in workflow
     assert "python -m pytest" in workflow
+    assert "python scripts/export_output_schema.py --check" in workflow
+    assert "tests/test_docs_examples.py tests/test_output_schema_contract.py" in workflow
     assert "python -m pdf2md --help" in workflow
     assert "앞으로 작업할 항목만" in next_plan
     assert "작업이 완료되고 테스트 통과 및 PR merge까지 끝나면" in next_plan
@@ -386,7 +389,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q92. Active Backlog And Local Artifact Hygiene" not in next_plan
     assert "Q93. Pipeline Stage And Output Responsibility Split" not in next_plan
     assert "Q94. Warning And Reason Taxonomy Contract" not in next_plan
-    assert "Q95. Lightweight CI And Release Gate Coverage" in next_plan
+    assert "Q95. Lightweight CI And Release Gate Coverage" not in next_plan
     assert "Q96. Korean, OCR, And Image-Only Golden Promotion" in next_plan
     assert "Q97. Modern Python Tooling And Packaging Readiness" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
@@ -414,7 +417,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q92. Active Backlog And Local Artifact Hygiene" not in development_specs
     assert "Q93. Pipeline Stage And Output Responsibility Split" not in development_specs
     assert "Q94. Warning And Reason Taxonomy Contract" not in development_specs
-    assert "Q95. Lightweight CI And Release Gate Coverage" in development_specs
+    assert "Q95. Lightweight CI And Release Gate Coverage" not in development_specs
     assert "Q96. Korean, OCR, And Image-Only Golden Promotion" in development_specs
     assert "Q97. Modern Python Tooling And Packaging Readiness" in development_specs
     assert "cross_ref_resolved_coverage >= 0.90" not in development_specs
@@ -469,7 +472,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q94" in development_specs
+    assert "완료된 Q34-Q95" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -493,6 +496,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q92. Active Backlog And Local Artifact Hygiene" in implemented_specs
     assert "Q93. Pipeline Stage And Output Responsibility Split" in implemented_specs
     assert "Q94. Warning And Reason Taxonomy Contract" in implemented_specs
+    assert "Q95. Lightweight CI And Release Gate Coverage" in implemented_specs
     assert "pdf-outline-" in implemented_specs
     assert "scripts/run_preset_eval.py" in implemented_specs
     assert "--gates preset-eval" in implemented_specs

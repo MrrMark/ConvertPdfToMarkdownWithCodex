@@ -16,6 +16,7 @@ from pdf2md.utils.io import write_json
 
 DEFAULT_GATES = ("ocr", "corpus", "benchmark", "schema", "packaging")
 OPTIONAL_GATES = (
+    "ci-lightweight",
     "rag",
     "index-contract",
     "provenance-integrity",
@@ -513,6 +514,33 @@ def _schema_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     ]
 
 
+def _ci_lightweight_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    return [
+        _run_command(
+            gate="ci-lightweight:schema",
+            command=[sys.executable, "scripts/export_output_schema.py", "--check"],
+            report_path=Path("docs/schema"),
+        ),
+        _run_command(
+            gate="ci-lightweight:docs-output-contract",
+            command=[
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests/test_docs_examples.py",
+                "tests/test_output_schema_contract.py",
+                "-q",
+            ],
+            report_path=None,
+        ),
+        _run_command(
+            gate="ci-lightweight:cli-smoke",
+            command=[sys.executable, "-m", "pdf2md", "--help"],
+            report_path=None,
+        ),
+    ]
+
+
 def _packaging_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     dist_dir = config.output_dir / "dist"
     return [
@@ -582,6 +610,8 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
             records.extend(_gui_parity_gate(config))
         elif gate == "gui-benchmark":
             records.extend(_gui_benchmark_gate(config))
+        elif gate == "ci-lightweight":
+            records.extend(_ci_lightweight_gate(config))
         elif gate == "schema":
             records.extend(_schema_gate(config))
         elif gate == "packaging":
@@ -611,7 +641,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=",".join(DEFAULT_GATES),
         help=(
             "Comma-separated gates: "
-            "ocr,corpus,benchmark,schema,packaging,rag,index-contract,provenance-integrity,"
+            "ocr,corpus,benchmark,schema,packaging,ci-lightweight,rag,index-contract,provenance-integrity,"
             "artifact-integrity,preset-eval,gui,gui-parity,gui-benchmark."
         ),
     )
