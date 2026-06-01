@@ -17,6 +17,7 @@ from pdf2md.utils.io import write_json
 DEFAULT_GATES = ("ocr", "corpus", "benchmark", "schema", "packaging")
 OPTIONAL_GATES = (
     "ci-lightweight",
+    "dependency-audit",
     "rag",
     "index-contract",
     "provenance-integrity",
@@ -123,6 +124,16 @@ def _run_command(
         "report_path": str(report_path) if report_path is not None else None,
         "stdout_tail": _tail(completed.stdout or ""),
         "stderr_tail": _tail(completed.stderr or ""),
+    }
+
+
+def _as_advisory_record(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **record,
+        "status": "passed",
+        "advisory": True,
+        "advisory_exit_code": record["exit_code"],
+        "advisory_status": record["status"],
     }
 
 
@@ -538,7 +549,35 @@ def _ci_lightweight_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
             command=[sys.executable, "-m", "pdf2md", "--help"],
             report_path=None,
         ),
+        _run_command(
+            gate="ci-lightweight:lint-smoke",
+            command=[sys.executable, "-m", "ruff", "check", "."],
+            report_path=None,
+        ),
     ]
+
+
+def _dependency_audit_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    report_path = config.output_dir / "dependency_audit_report.json"
+    cache_dir = config.output_dir / "pip-audit-cache"
+    record = _run_command(
+        gate="dependency-audit",
+        command=[
+            sys.executable,
+            "-m",
+            "pip_audit",
+            "--format",
+            "json",
+            "--output",
+            str(report_path),
+            "--cache-dir",
+            str(cache_dir),
+            "--progress-spinner",
+            "off",
+        ],
+        report_path=report_path,
+    )
+    return [_as_advisory_record(record)]
 
 
 def _packaging_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
@@ -612,6 +651,8 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
             records.extend(_gui_benchmark_gate(config))
         elif gate == "ci-lightweight":
             records.extend(_ci_lightweight_gate(config))
+        elif gate == "dependency-audit":
+            records.extend(_dependency_audit_gate(config))
         elif gate == "schema":
             records.extend(_schema_gate(config))
         elif gate == "packaging":
@@ -641,7 +682,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=",".join(DEFAULT_GATES),
         help=(
             "Comma-separated gates: "
-            "ocr,corpus,benchmark,schema,packaging,ci-lightweight,rag,index-contract,provenance-integrity,"
+            "ocr,corpus,benchmark,schema,packaging,ci-lightweight,dependency-audit,rag,index-contract,provenance-integrity,"
             "artifact-integrity,preset-eval,gui,gui-parity,gui-benchmark."
         ),
     )

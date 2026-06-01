@@ -23,22 +23,6 @@
 
 ## 남은 작업
 
-### P2 / Q97. Modern Python Tooling And Packaging Readiness
-
-목표: Python 3.11+ 프로젝트 표준에 맞춰 lint/type/package/audit 기반을 단계적으로 도입하되, core conversion 품질 변경과 분리한다.
-
-범위:
-
-- `ruff` check/format 정책을 pyproject에 추가한다.
-- type check 도입 범위와 strictness를 단계적으로 정의한다.
-- `py.typed`, license/changelog/release note, wheel/sdist smoke 후보를 정리한다.
-- dependency audit은 advisory gate로 시작한다.
-
-검증:
-
-- lint command smoke
-- package build smoke
-- wheel contract smoke
-- 문서 예시와 CI command 동기화
+현재 남은 작업 없음.
 
 새 개선 과제가 발견되면 이 섹션에 신규 Q 항목을 추가하고, 구현 전 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에 대응 active 개발 명세를 작성한다.

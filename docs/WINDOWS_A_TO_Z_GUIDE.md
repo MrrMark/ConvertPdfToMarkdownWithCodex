@@ -629,6 +629,8 @@ python scripts\run_ssd_corpus_profile.py --profile .\local_ssd_corpus_profile.js
 python scripts\analyze_corpus_evidence_pack.py --evidence-pack .\local_corpus_evidence_pack.json
 python scripts\compare_corpus_evidence_packs.py --baseline .\old_evidence_pack.json --current .\local_corpus_evidence_pack.json --fail-on-new-signature
 python scripts\build_requirement_impact_review_pack.py --impact-report .\output\requirement_change_impact_report.json
+python scripts\run_release_gates.py --output-dir .\release_gate_ci_lightweight --gates ci-lightweight
+python scripts\run_release_gates.py --output-dir .\release_gate_dependency_audit --gates dependency-audit
 python scripts\run_release_gates.py --output-dir .\release_gate_output --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf\baseline\corpus_eval_report.json --benchmark-baseline-report .\benchmark_baseline\benchmark_report.json
 python scripts\run_release_gates.py --output-dir .\release_gate_rag --gates rag --rag-output-dir .\output --rag-eval-set .\rag_eval_queries.json --rag-min-expected-source-coverage 0.9 --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
 python scripts\run_release_gates.py --output-dir .\release_gate_gui --gates gui
@@ -648,13 +650,13 @@ python scripts\run_release_gates.py --output-dir .\release_gate_gui_benchmark --
 - `corpus_evidence_analysis_report.json`: redacted evidence pack의 category/domain/spec hotspot과 follow-up hint
 - `corpus_evidence_trend_report.json`: baseline/current evidence pack의 added/persisting/resolved signature 비교와 신규 error gate
 - `requirement_impact_review_pack.json` / `.md`: requirement change impact를 리뷰어/AI Agent가 바로 확인할 수 있게 정리한 provenance 중심 요약
-- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, optional GUI/CLI benchmark gate, schema check, packaging smoke/wheel contract command/status summary
-- `wheel_contract_report.json`: wheel 내부 GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
+- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, lightweight CI gate, advisory dependency audit gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, optional GUI/CLI benchmark gate, schema check, packaging smoke/wheel contract command/status summary
+- `wheel_contract_report.json`: wheel 내부 typed package marker, GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
 - `gui_cli_parity_report.json`: CLI와 GUI headless runner가 같은 synthetic PDF/옵션에서 생성한 Markdown, manifest, report, RAG sidecar의 normalized hash equality 결과
 - `gui_cli_benchmark_report.json`: CLI와 GUI headless runner의 elapsed ms, pages/sec, GUI duration ratio, output hash equality, optional threshold/advisory policy 결과
 - benchmark는 수동/릴리스 전 검증용이며 기본 테스트에 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
-- GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
+- GitHub Actions CI는 PR/push마다 schema/docs contract, `python -m ruff check .`, `python -m pytest`, `python -m pdf2md --help`를 실행합니다.
 - 향후 작업 backlog는 `docs\NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 새 작업만 남기고, 완료된 항목은 제거합니다.
 - active 개발 명세는 `docs\QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에 작성하고, 완료된 명세는 `docs\QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관합니다.
 
