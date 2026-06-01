@@ -73,10 +73,10 @@ P0 안정화 후 구현:
 이 섹션은 유지보수 관점의 상위 분류로 유지하고, 실제 active 작업은
 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`와 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`의 Q 번호로 관리한다.
 
-- M01은 Q93에서 다룬다.
+- M01은 Q93에서 1차 완료했다.
 - M02는 Q94에서 다룬다.
-- M03은 Q92와 Q95에서 다룬다.
-- M04는 Q92에서 다룬다.
+- M03은 Q92에서 local artifact hygiene을 완료했고, Q95에서 CI/release gate 편의성을 이어서 다룬다.
+- M04는 Q92에서 active backlog와 문서 정합성 1차 정리를 완료했다.
 - M05는 Q95와 Q96에서 다룬다.
 
 ### M01. pipeline/report 집계 책임 분리

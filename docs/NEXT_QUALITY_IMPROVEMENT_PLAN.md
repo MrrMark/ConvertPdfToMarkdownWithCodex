@@ -23,41 +23,6 @@
 
 ## 남은 작업
 
-### P0 / Q92. Active Backlog And Local Artifact Hygiene
-
-목표: `tasks.md`의 M01-M05 유지보수 백로그와 이 living backlog의 상태를 다시 맞추고, 패키지 디렉터리 아래에 생긴 local conversion artifact가 검색/패키징/리뷰 노이즈가 되지 않게 정리한다.
-
-범위:
-
-- `tasks.md` M01-M05를 Q92-Q97 active backlog와 명확히 매핑한다.
-- `pdf2md/` 패키지 아래 local output이 생기지 않도록 문서와 ignore 정책을 보강한다.
-- 현재 미추적 local artifact의 처리 정책을 문서화한다.
-- README의 active backlog 상태 문구를 현재 계획과 맞춘다.
-
-검증:
-
-- 문서 계약 테스트
-- `git status --short --ignored=matching` 기반 local artifact 위치 확인
-- `git diff --check`
-
-### P0 / Q93. Pipeline Stage And Output Responsibility Split
-
-목표: `pdf2md.pipeline`에 집중된 conversion stage, RAG sidecar 생성, artifact write, report metric 계산 책임을 작게 나누어 다음 기능 변경의 회귀 위험을 낮춘다.
-
-범위:
-
-- core conversion orchestration은 유지하되 stage별 helper/module 경계를 만든다.
-- Markdown/manifest/report write와 RAG sidecar write 책임을 분리한다.
-- stage duration, page status, warning aggregation 계산 흐름을 유지하면서 테스트 가능한 단위로 이동한다.
-- public output schema와 deterministic output은 변경하지 않는다.
-
-검증:
-
-- 전체 unit/integration/golden tests
-- `python -m pdf2md --help`
-- synthetic golden corpus normalized diff
-- `scripts/export_output_schema.py --check`
-
 ### P0 / Q94. Warning And Reason Taxonomy Contract
 
 목표: warning code, severity, exit-code 영향, reason code를 강타입 계약으로 정리해 CLI/GUI/report/release gate가 같은 정책을 보게 한다.

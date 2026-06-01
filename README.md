@@ -957,8 +957,8 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q92-Q97입니다. 개발 순서는 backlog/document 정합성, pipeline 책임 분리, warning taxonomy, lightweight CI gate, 한글/OCR/image-only golden 승격, Python tooling/package readiness 순서입니다.
-- 완료된 Q34-Q91 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q94-Q97입니다. 개발 순서는 warning taxonomy, lightweight CI gate, 한글/OCR/image-only golden 승격, Python tooling/package readiness 순서입니다.
+- 완료된 Q34-Q93 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 
