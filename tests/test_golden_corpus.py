@@ -113,6 +113,7 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         ),
         "repeated_image": (build_repeated_image_pdf, {"dedupe_images": True}),
         "structured_text": (build_structured_text_pdf, {"repair_hyphenation": True}),
+        "korean": (build_korean_text_pdf, {}),
         "font_heading": (build_font_heading_pdf, {}),
         "uppercase_body": (build_uppercase_body_pdf, {}),
         "grouped_list": (build_grouped_list_pdf, {}),

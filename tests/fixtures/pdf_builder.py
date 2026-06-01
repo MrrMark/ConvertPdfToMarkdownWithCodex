@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from pypdf import PdfWriter
-from pypdf.generic import DictionaryObject, NameObject, NumberObject, StreamObject
+from pypdf.generic import ArrayObject, DictionaryObject, NameObject, NumberObject, StreamObject, TextStringObject
 
 
 PAGE_WIDTH = 595
@@ -47,8 +47,38 @@ def _text_operand(text: str) -> str:
     return f"<{encoded}>"
 
 
+def _unicode_text_operand(text: str) -> str:
+    encoded = text.encode("utf-16-be").hex().upper()
+    return f"<{encoded}>"
+
+
 def _text_command(item: PositionedText) -> str:
-    return f"BT /{item.font_resource} {item.size} Tf {item.x:.2f} {item.y:.2f} Td {_text_operand(item.text)} Tj ET"
+    operand = _unicode_text_operand(item.text) if item.font_resource == "F3" else _text_operand(item.text)
+    return f"BT /{item.font_resource} {item.size} Tf {item.x:.2f} {item.y:.2f} Td {operand} Tj ET"
+
+
+def _to_unicode_cmap() -> StreamObject:
+    cmap = """\
+/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /pdf2md-fixture-unicode def
+/CMapType 2 def
+1 begincodespacerange
+<0000> <FFFF>
+endcodespacerange
+1 beginbfrange
+<0000> <FFFF> <0000>
+endbfrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+"""
+    stream = StreamObject()
+    stream._data = cmap.encode("ascii")  # noqa: SLF001
+    return stream
 
 
 def _table_commands(table: TableSpec) -> list[str]:
@@ -104,6 +134,51 @@ def write_pdf(path: Path, pages: list[PageSpec], password: str | None = None) ->
     )
     helvetica_ref = writer._add_object(helvetica)  # noqa: SLF001
     courier_ref = writer._add_object(courier)  # noqa: SLF001
+    to_unicode_ref = writer._add_object(_to_unicode_cmap())  # noqa: SLF001
+    cid_system_info = DictionaryObject(
+        {
+            NameObject("/Registry"): TextStringObject("Adobe"),
+            NameObject("/Ordering"): TextStringObject("Identity"),
+            NameObject("/Supplement"): NumberObject(0),
+        }
+    )
+    unicode_font_descriptor = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/FontDescriptor"),
+            NameObject("/FontName"): NameObject("/Helvetica"),
+            NameObject("/Flags"): NumberObject(4),
+            NameObject("/FontBBox"): ArrayObject(
+                [NumberObject(0), NumberObject(-200), NumberObject(1000), NumberObject(900)]
+            ),
+            NameObject("/ItalicAngle"): NumberObject(0),
+            NameObject("/Ascent"): NumberObject(900),
+            NameObject("/Descent"): NumberObject(-200),
+            NameObject("/CapHeight"): NumberObject(700),
+            NameObject("/StemV"): NumberObject(80),
+        }
+    )
+    unicode_font_descriptor_ref = writer._add_object(unicode_font_descriptor)  # noqa: SLF001
+    unicode_descendant = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/CIDFontType0"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+            NameObject("/CIDSystemInfo"): cid_system_info,
+            NameObject("/FontDescriptor"): unicode_font_descriptor_ref,
+        }
+    )
+    unicode_descendant_ref = writer._add_object(unicode_descendant)  # noqa: SLF001
+    unicode_font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type0"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+            NameObject("/Encoding"): NameObject("/Identity-H"),
+            NameObject("/DescendantFonts"): ArrayObject([unicode_descendant_ref]),
+            NameObject("/ToUnicode"): to_unicode_ref,
+        }
+    )
+    unicode_ref = writer._add_object(unicode_font)  # noqa: SLF001
     image_ref = writer._add_object(_image_stream()) if any(spec.repeated_image for spec in pages) else None
 
     for spec in pages:
@@ -114,6 +189,7 @@ def write_pdf(path: Path, pages: list[PageSpec], password: str | None = None) ->
                     {
                         NameObject("/F1"): helvetica_ref,
                         NameObject("/F2"): courier_ref,
+                        NameObject("/F3"): unicode_ref,
                     }
                 )
             }
@@ -438,7 +514,7 @@ def build_image_only_pdf(path: Path) -> None:
 
 
 def build_korean_text_pdf(path: Path) -> None:
-    write_pdf(path, [PageSpec(texts=[PositionedText("한글 텍스트 원문", 72, 760)])])
+    write_pdf(path, [PageSpec(texts=[PositionedText("한글 텍스트 원문", 72, 760, font_resource="F3")])])
 
 
 def build_structured_text_pdf(path: Path) -> None:

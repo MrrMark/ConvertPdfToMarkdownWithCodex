@@ -77,7 +77,7 @@ P0 안정화 후 구현:
 - M02는 Q94에서 warning taxonomy registry 1차 정리를 완료했다.
 - M03은 Q92에서 local artifact hygiene을 완료했고, Q95에서 CI/release gate 편의성 1차 정리를 완료했다.
 - M04는 Q92에서 active backlog와 문서 정합성 1차 정리를 완료했다.
-- M05는 Q95에서 lightweight CI gate를 보강했고, Q96에서 fixture/golden 승격을 이어서 다룬다.
+- M05는 Q95에서 lightweight CI gate를 보강했고, Q96에서 한글/OCR fixture 회귀 방어를 보강했다.
 
 ### M01. pipeline/report 집계 책임 분리
 

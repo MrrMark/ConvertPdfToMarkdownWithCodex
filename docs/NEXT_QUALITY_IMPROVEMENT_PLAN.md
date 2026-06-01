@@ -23,24 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q96. Korean, OCR, And Image-Only Golden Promotion
-
-목표: PRD fixture 우선순위에 맞춰 한글, image-only/OCR, 스캔성 문서 케이스를 단순 builder 존재 여부가 아니라 golden regression 대상으로 승격한다.
-
-범위:
-
-- `korean`, `image_only`, OCR warning/actionable fixture를 golden comparison에 포함할지 평가한다.
-- OCR runtime 의존 테스트와 deterministic mock-based golden을 분리한다.
-- 한글 원문 보존, OCR 무교정, image-only partial success/report warning 정책을 고정한다.
-- 필요 시 fixture 이름과 golden output 구조를 public schema와 맞춘다.
-
-검증:
-
-- golden corpus tests
-- OCR unit tests
-- Markdown/report/manifest normalized diff
-- `scripts/check_ocr_runtime.py --ocr-lang kor+eng`는 runtime smoke로만 분리
-
 ### P2 / Q97. Modern Python Tooling And Packaging Readiness
 
 목표: Python 3.11+ 프로젝트 표준에 맞춰 lint/type/package/audit 기반을 단계적으로 도입하되, core conversion 품질 변경과 분리한다.
