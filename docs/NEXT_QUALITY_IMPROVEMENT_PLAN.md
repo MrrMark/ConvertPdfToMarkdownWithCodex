@@ -23,23 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q95. Lightweight CI And Release Gate Coverage
-
-목표: 기존 release gate 자산 중 PR마다 돌릴 수 있는 가벼운 검증을 CI 또는 별도 workflow에 올려 문서/schema/package 회귀를 더 빨리 잡는다.
-
-범위:
-
-- schema check, docs contract, CLI smoke, lightweight golden/integrity check 후보를 분리한다.
-- 무거운 real corpus/RAG benchmark gate는 수동 또는 release-only 경로로 유지한다.
-- CI runtime과 optional dependency 부담을 명확히 문서화한다.
-- release gate report가 실패 원인을 짧고 구조적으로 남기도록 확인한다.
-
-검증:
-
-- GitHub Actions workflow syntax review
-- local equivalent command smoke
-- `scripts/run_release_gates.py` targeted gate tests
-
 ### P1 / Q96. Korean, OCR, And Image-Only Golden Promotion
 
 목표: PRD fixture 우선순위에 맞춰 한글, image-only/OCR, 스캔성 문서 케이스를 단순 builder 존재 여부가 아니라 golden regression 대상으로 승격한다.

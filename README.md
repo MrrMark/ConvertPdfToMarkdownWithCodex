@@ -921,6 +921,7 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 ./.venv311/bin/python scripts/run_corpus_eval.py --input-dir pdf --output-dir pdf/eval_output --baseline-report pdf/baseline/corpus_eval_report.json --max-partial-rate 0.1 --max-low-quality-table-rate 0.05 --min-pages-per-second 1.0 --fail-on-regression
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100 --baseline-report /tmp/pdf2md-baseline/benchmark_report.json --max-duration-regression 0.2 --max-memory-regression 0.2 --min-pages-per-second 1.0 --fail-on-regression
+./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-ci-lightweight --gates ci-lightweight
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gates --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf/baseline/corpus_eval_report.json --benchmark-baseline-report /tmp/pdf2md-baseline/benchmark_report.json
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-rag --gates rag --rag-output-dir output --rag-eval-set rag_eval_queries.json --rag-min-expected-source-coverage 0.9 --rag-min-requirement-coverage 0.9 --rag-min-table-field-coverage 0.85 --rag-min-cross-ref-resolved-coverage 0.8
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui --gates gui
@@ -933,7 +934,7 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
 - `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref/relationship target coverage, chunk token 분포, threshold summary
-- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, optional GUI/CLI benchmark gate, schema check, packaging smoke/wheel contract command/status summary
+- `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, lightweight CI gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, optional GUI/CLI benchmark gate, schema check, packaging smoke/wheel contract command/status summary
 - `wheel_contract_report.json`: wheel 내부 GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
 - `gui_cli_parity_report.json`: CLI와 GUI headless runner가 같은 synthetic PDF/옵션에서 생성한 Markdown, manifest, report, RAG sidecar의 normalized hash equality 결과
 - `gui_cli_benchmark_report.json`: CLI와 GUI headless runner의 elapsed ms, pages/sec, GUI duration ratio, output hash equality, optional threshold/advisory policy 결과
@@ -941,7 +942,7 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 - `.gitignore`는 local output root와 실수로 패키지 트리 아래 생성된 `pdf2md/nvme_cmds/` 같은 산출물을 무시합니다. 기존 local artifact는 사용자 작업물로 보고 자동 삭제/이동하지 않습니다.
 - benchmark는 수동/릴리스 전 검증용이며 기본 CI 테스트에는 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
-- GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
+- GitHub Actions CI는 PR/push마다 schema contract, docs/output contract, `python -m pytest`, `python -m pdf2md --help`를 실행합니다.
 - 향후 작업 backlog는 [docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md](docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md)에 새 작업만 남기고, 완료된 항목은 제거합니다.
 - active 개발 명세는 [docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md](docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md)에 작성하고, 완료된 명세는 [docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md](docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md)에 보관합니다.
 
@@ -959,8 +960,8 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q95-Q97입니다. 개발 순서는 lightweight CI gate, 한글/OCR/image-only golden 승격, Python tooling/package readiness 순서입니다.
-- 완료된 Q34-Q94 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q96-Q97입니다. 개발 순서는 한글/OCR/image-only golden 승격, Python tooling/package readiness 순서입니다.
+- 완료된 Q34-Q95 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 
