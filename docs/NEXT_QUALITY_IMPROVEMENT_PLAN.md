@@ -23,6 +23,110 @@
 
 ## 남은 작업
 
-현재 남은 작업 없음.
+### P0 / Q92. Active Backlog And Local Artifact Hygiene
+
+목표: `tasks.md`의 M01-M05 유지보수 백로그와 이 living backlog의 상태를 다시 맞추고, 패키지 디렉터리 아래에 생긴 local conversion artifact가 검색/패키징/리뷰 노이즈가 되지 않게 정리한다.
+
+범위:
+
+- `tasks.md` M01-M05를 Q92-Q97 active backlog와 명확히 매핑한다.
+- `pdf2md/` 패키지 아래 local output이 생기지 않도록 문서와 ignore 정책을 보강한다.
+- 현재 미추적 local artifact의 처리 정책을 문서화한다.
+- README의 active backlog 상태 문구를 현재 계획과 맞춘다.
+
+검증:
+
+- 문서 계약 테스트
+- `git status --short --ignored=matching` 기반 local artifact 위치 확인
+- `git diff --check`
+
+### P0 / Q93. Pipeline Stage And Output Responsibility Split
+
+목표: `pdf2md.pipeline`에 집중된 conversion stage, RAG sidecar 생성, artifact write, report metric 계산 책임을 작게 나누어 다음 기능 변경의 회귀 위험을 낮춘다.
+
+범위:
+
+- core conversion orchestration은 유지하되 stage별 helper/module 경계를 만든다.
+- Markdown/manifest/report write와 RAG sidecar write 책임을 분리한다.
+- stage duration, page status, warning aggregation 계산 흐름을 유지하면서 테스트 가능한 단위로 이동한다.
+- public output schema와 deterministic output은 변경하지 않는다.
+
+검증:
+
+- 전체 unit/integration/golden tests
+- `python -m pdf2md --help`
+- synthetic golden corpus normalized diff
+- `scripts/export_output_schema.py --check`
+
+### P0 / Q94. Warning And Reason Taxonomy Contract
+
+목표: warning code, severity, exit-code 영향, reason code를 강타입 계약으로 정리해 CLI/GUI/report/release gate가 같은 정책을 보게 한다.
+
+범위:
+
+- warning code prefix/string suffix 기반 판정을 줄이고 registry 또는 enum 기반 metadata를 도입한다.
+- table/image/OCR/structure reason code의 public/private 경계를 문서화한다.
+- advisory/actionable/expected fallback 정책을 테스트로 고정한다.
+- 기존 `report.json`과 `manifest.json`의 public field는 backward-compatible하게 유지한다.
+
+검증:
+
+- reporting unit tests
+- output schema contract tests
+- representative warning fixture tests
+- GUI summary warning code/count tests
+
+### P1 / Q95. Lightweight CI And Release Gate Coverage
+
+목표: 기존 release gate 자산 중 PR마다 돌릴 수 있는 가벼운 검증을 CI 또는 별도 workflow에 올려 문서/schema/package 회귀를 더 빨리 잡는다.
+
+범위:
+
+- schema check, docs contract, CLI smoke, lightweight golden/integrity check 후보를 분리한다.
+- 무거운 real corpus/RAG benchmark gate는 수동 또는 release-only 경로로 유지한다.
+- CI runtime과 optional dependency 부담을 명확히 문서화한다.
+- release gate report가 실패 원인을 짧고 구조적으로 남기도록 확인한다.
+
+검증:
+
+- GitHub Actions workflow syntax review
+- local equivalent command smoke
+- `scripts/run_release_gates.py` targeted gate tests
+
+### P1 / Q96. Korean, OCR, And Image-Only Golden Promotion
+
+목표: PRD fixture 우선순위에 맞춰 한글, image-only/OCR, 스캔성 문서 케이스를 단순 builder 존재 여부가 아니라 golden regression 대상으로 승격한다.
+
+범위:
+
+- `korean`, `image_only`, OCR warning/actionable fixture를 golden comparison에 포함할지 평가한다.
+- OCR runtime 의존 테스트와 deterministic mock-based golden을 분리한다.
+- 한글 원문 보존, OCR 무교정, image-only partial success/report warning 정책을 고정한다.
+- 필요 시 fixture 이름과 golden output 구조를 public schema와 맞춘다.
+
+검증:
+
+- golden corpus tests
+- OCR unit tests
+- Markdown/report/manifest normalized diff
+- `scripts/check_ocr_runtime.py --ocr-lang kor+eng`는 runtime smoke로만 분리
+
+### P2 / Q97. Modern Python Tooling And Packaging Readiness
+
+목표: Python 3.11+ 프로젝트 표준에 맞춰 lint/type/package/audit 기반을 단계적으로 도입하되, core conversion 품질 변경과 분리한다.
+
+범위:
+
+- `ruff` check/format 정책을 pyproject에 추가한다.
+- type check 도입 범위와 strictness를 단계적으로 정의한다.
+- `py.typed`, license/changelog/release note, wheel/sdist smoke 후보를 정리한다.
+- dependency audit은 advisory gate로 시작한다.
+
+검증:
+
+- lint command smoke
+- package build smoke
+- wheel contract smoke
+- 문서 예시와 CI command 동기화
 
 새 개선 과제가 발견되면 이 섹션에 신규 Q 항목을 추가하고, 구현 전 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에 대응 active 개발 명세를 작성한다.

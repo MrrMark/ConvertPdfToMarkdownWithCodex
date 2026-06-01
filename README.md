@@ -935,6 +935,8 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 - `wheel_contract_report.json`: wheel 내부 GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
 - `gui_cli_parity_report.json`: CLI와 GUI headless runner가 같은 synthetic PDF/옵션에서 생성한 Markdown, manifest, report, RAG sidecar의 normalized hash equality 결과
 - `gui_cli_benchmark_report.json`: CLI와 GUI headless runner의 elapsed ms, pages/sec, GUI duration ratio, output hash equality, optional threshold/advisory policy 결과
+- 로컬 변환 산출물은 `output/`, `<pdf_stem>_output/`, `pdf/`, 또는 `/tmp` 계열 디렉터리에 둡니다. `pdf2md/` 패키지 트리 아래에는 full conversion artifact를 만들지 않습니다.
+- `.gitignore`는 local output root와 실수로 패키지 트리 아래 생성된 `pdf2md/nvme_cmds/` 같은 산출물을 무시합니다. 기존 local artifact는 사용자 작업물로 보고 자동 삭제/이동하지 않습니다.
 - benchmark는 수동/릴리스 전 검증용이며 기본 CI 테스트에는 포함하지 않습니다.
 - 패키징 smoke는 릴리스 전에 `python -m build`, wheel 설치 후 `python -m pdf2md --help`, `pdf2md --help` 순서로 확인합니다.
 - GitHub Actions CI는 PR/push마다 `python -m pytest`와 `python -m pdf2md --help`를 실행합니다.
@@ -955,7 +957,8 @@ ruff format .
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 없습니다. 완료된 Q34-Q91 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q92-Q97입니다. 개발 순서는 backlog/document 정합성, pipeline 책임 분리, warning taxonomy, lightweight CI gate, 한글/OCR/image-only golden 승격, Python tooling/package readiness 순서입니다.
+- 완료된 Q34-Q91 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 
