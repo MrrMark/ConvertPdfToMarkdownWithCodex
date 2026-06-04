@@ -61,7 +61,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 없습니다" in readme
+    assert "현재 active quality backlog는 Q107" in readme
     assert "--rag-figure-text-chunks" in readme
     assert "chunk_type=\"figure_text\"" in readme
     assert "이미지 업로드 불가 RAG 대응" in readme
@@ -432,7 +432,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q104. Docling Benchmark Harness And Comparison Pack" not in next_plan
     assert "Q105. Docling-Informed OCR And Layout Extension Design" not in next_plan
     assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
+    assert "Q107. Assetless Figure Visual Semantics Layer" in next_plan
+    assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in next_plan
@@ -472,9 +473,14 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q104. Docling Benchmark Harness And Comparison Pack" not in development_specs
     assert "Q105. Docling-Informed OCR And Layout Extension Design" not in development_specs
     assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" not in development_specs
+    assert "Q107. Assetless Figure Visual Semantics Layer" in development_specs
+    assert "figure_descriptions_rag.jsonl" in development_specs
+    assert "figure_structures_rag.jsonl" in development_specs
+    assert "--rag-generated-figure-descriptions" in development_specs
+    assert "generated_text=true" in development_specs
     assert "placeholder + figure_text chunk" not in development_specs
     assert "다중 OCR backend" not in development_specs
-    assert "현재 active 개발 명세 없음." in development_specs
+    assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in development_specs
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in development_specs
@@ -729,6 +735,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q84 Release Readiness Sweep" in quality_scorecard
     assert "Q104-Q105 Docling benchmark/design closure" in quality_scorecard
     assert "Q106 GUI assetless RAG/manual domain adapter" in quality_scorecard
+    assert "Q107 assetless figure visual semantics planning" in quality_scorecard
     assert "이미지 업로드 불가 RAG 대응" in quality_scorecard
     assert "Docling 미설치 advisory skip" in quality_scorecard
     assert "Q91 Q90 output schema contract alignment" in quality_scorecard

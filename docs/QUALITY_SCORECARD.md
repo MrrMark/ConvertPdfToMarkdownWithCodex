@@ -31,6 +31,7 @@
 
 | 평가일 | 평가 관점 | 총점 | 이전 대비 | 핵심 근거 |
 |---|---|---:|---:|---|
+| 2026-06-05 | Q107 assetless figure visual semantics planning | 100/100 | 0 | 회로도, 파형, 블록다이어그램처럼 이미지 자체에 의미가 있는 figure의 검색성 개선을 위해 Q107 active backlog와 개발 명세를 등록했다. 기존 `figure_text`는 관측 텍스트 전용으로 유지하고, region OCR, generated figure description, figure structure extraction은 모두 opt-in 보강 계층으로 분리한다. |
 | 2026-06-05 | Q106 GUI assetless RAG/manual domain adapter | 100/100 | 0 | GUI에 `이미지 업로드 불가 RAG 대응` preset을 추가해 `technical_spec_rag + placeholder + figure_text chunk` 조합을 바로 선택할 수 있게 했다. `manual` domain adapter와 label/keywords 입력을 CLI/GUI/batch/manifest/report/domain unit 경로에 연결했고, manual unit text/name/value/description은 관측된 table provenance에서만 복사한다. active quality backlog 없음 |
 | 2026-06-04 | Q104-Q105 Docling benchmark/design closure | 100/100 | 0 | Q104로 local-only Docling comparison harness와 sanitized schema/report 계약을 추가했고, Q105로 Docling-informed OCR/layout extension design을 정리했다. 현 환경에서는 Docling 미설치 advisory skip만 확인되어 기본 변환 경로에 새 backend/description 기능을 승격하지 않았다. active quality backlog 없음 |
 | 2026-05-30 | Q91 Q90 output schema contract alignment | 100/100 | 0 | Q90 구현 후 문서/산출물 계약을 재점검해 `cross_refs_rag.jsonl`의 fallback `target_ref` 계약을 `docs/OUTPUT_SCHEMA.md`와 README에 보강했다. `pdf-outline-`/`pdf-list-` target id, `target_source_pdf_outline`/`target_source_pdf_list` classification reason, 외부/용어성 reference skip 정책을 명시해 구현과 public 문서의 차이를 해소했다. 현재 active quality backlog는 없다. |

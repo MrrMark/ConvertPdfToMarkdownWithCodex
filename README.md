@@ -1007,13 +1007,13 @@ lint / format / packaging tooling 예시:
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 없습니다.
+- 현재 active quality backlog는 Q107 `Assetless Figure Visual Semantics Layer`입니다.
 - 완료된 Q34-Q106 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 - Docling-informed OCR/layout 확장 판단은 `docs/DOCLING_INFORMED_EXTENSION_DESIGN.md`에서 확인합니다.
 
 ### 이후 후보
 
-- Docling-installed benchmark evidence로 검증된 이미지 설명 생성 옵션
+- Q107 구현 결과와 Docling-installed benchmark evidence로 검증된 이미지 설명 생성 옵션
 - Docling-installed benchmark evidence로 검증된 backend adapter 확장
 - appendix/comment/json 기반 추가 출력 모드
 
