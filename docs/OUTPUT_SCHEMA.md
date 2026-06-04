@@ -25,6 +25,7 @@
 - `docs/schema/artifact_integrity_report.schema.json`
 - `docs/schema/docling_benchmark_report.schema.json`
 - `docs/schema/docling_artifact_comparison.schema.json`
+- `docs/schema/ocr_backend_probe_report.schema.json`
 - `docs/schema/local_corpus_evidence_pack.schema.json`
 - `docs/schema/corpus_evidence_analysis_report.schema.json`
 - `docs/schema/corpus_evidence_trend_report.schema.json`
@@ -273,6 +274,53 @@ Policy:
 
 - current-tool artifacts are represented by existence, byte size, and SHA-256 for committed-safe filenames only.
 - Docling Markdown/dict exports are not written as raw files by the harness; only virtual artifact hash and size are recorded.
+
+## ocr_backend_probe_report.json
+
+Optional local-only OCR backend readiness probe written by `scripts/probe_ocr_backends.py`.
+
+Required:
+
+- `schema_version`
+- `purpose="multi_ocr_backend_probe"`
+- `ocr_lang`
+- `local_only=true`
+- `raw_content_included=false`
+- `image_bytes_included=false`
+- `customer_paths_included=false`
+- `summary`
+- `backends[]`
+
+Stable summary fields:
+
+- `total_backend_count`
+- `available_backend_count`
+- `ready_backend_count`
+- `requested_languages`
+- `ready_backends`
+- `unavailable_backends`
+- `recommended_backend`
+- `require_ready`
+
+Stable backend fields:
+
+- `backend`: `tesseract`, `tesseract-cli`, `rapidocr`, `easyocr`, `ocrmac`, or `docling`
+- `status`: `ready`, `available`, or `unavailable`
+- `ready`
+- `module`, `module_available`
+- `executable`, `executable_available`
+- `platform_supported`
+- `confidence_normalization`
+- `language_data`
+- `dependencies[]`
+- `hints[]`
+
+Policy:
+
+- The probe never runs OCR on document content and does not include PDF text, image bytes, or customer paths.
+- Tesseract language data is checked when the backend uses the Tesseract runtime.
+- Non-Tesseract backend language support is recorded as unchecked until a backend adapter normalizes it.
+- Confidence values are not compared across backends until normalized into the reported `normalized_unit`.
 - metric deltas compare numeric values only and leave non-numeric or nested values with `delta=null`.
 
 ## text_blocks_rag.jsonl

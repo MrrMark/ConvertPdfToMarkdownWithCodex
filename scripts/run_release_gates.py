@@ -18,6 +18,7 @@ DEFAULT_GATES = ("ocr", "corpus", "benchmark", "schema", "packaging")
 OPTIONAL_GATES = (
     "ci-lightweight",
     "dependency-audit",
+    "ocr-backends",
     "rag",
     "index-contract",
     "provenance-integrity",
@@ -36,6 +37,8 @@ class ReleaseGateConfig:
     output_dir: Path
     gates: list[str]
     ocr_lang: str = "eng"
+    ocr_backend_probe_backends: str = "all"
+    ocr_backend_probe_require_ready: bool = True
     corpus_input_dir: Path = Path("pdf")
     corpus_baseline_report: Path | None = None
     benchmark_baseline_report: Path | None = None
@@ -192,6 +195,24 @@ def _ocr_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     )
     _write_ocr_report(record, report_path)
     return [record]
+
+
+def _ocr_backends_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    report_path = config.output_dir / "ocr_backend_probe_report.json"
+    command = [
+        sys.executable,
+        "scripts/probe_ocr_backends.py",
+        "--ocr-lang",
+        config.ocr_lang,
+        "--backends",
+        config.ocr_backend_probe_backends,
+        "--report-file",
+        str(report_path),
+        "--json",
+    ]
+    if config.ocr_backend_probe_require_ready:
+        command.append("--require-ready")
+    return [_run_command(gate="ocr-backends", command=command, report_path=report_path)]
 
 
 def _corpus_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
@@ -671,6 +692,8 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
     for gate in config.gates:
         if gate == "ocr":
             records.extend(_ocr_gate(config))
+        elif gate == "ocr-backends":
+            records.extend(_ocr_backends_gate(config))
         elif gate == "corpus":
             records.extend(_corpus_gate(config))
         elif gate == "benchmark":
@@ -726,11 +749,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=",".join(DEFAULT_GATES),
         help=(
             "Comma-separated gates: "
-            "ocr,corpus,benchmark,schema,packaging,ci-lightweight,dependency-audit,rag,index-contract,provenance-integrity,"
+            "ocr,corpus,benchmark,schema,packaging,ci-lightweight,dependency-audit,ocr-backends,rag,index-contract,provenance-integrity,"
             "artifact-integrity,preset-eval,docling,gui,gui-parity,gui-benchmark."
         ),
     )
     parser.add_argument("--ocr-lang", default="eng")
+    parser.add_argument("--ocr-backend-probe-backends", default="all")
+    parser.add_argument("--ocr-backend-probe-no-require-ready", action="store_true")
     parser.add_argument("--corpus-input-dir", type=Path, default=Path("pdf"))
     parser.add_argument("--corpus-baseline-report", type=Path)
     parser.add_argument("--benchmark-baseline-report", type=Path)
@@ -808,6 +833,8 @@ def main(argv: list[str] | None = None) -> int:
             output_dir=args.output_dir,
             gates=gates,
             ocr_lang=args.ocr_lang,
+            ocr_backend_probe_backends=args.ocr_backend_probe_backends,
+            ocr_backend_probe_require_ready=not args.ocr_backend_probe_no_require_ready,
             corpus_input_dir=args.corpus_input_dir,
             corpus_baseline_report=args.corpus_baseline_report,
             benchmark_baseline_report=args.benchmark_baseline_report,

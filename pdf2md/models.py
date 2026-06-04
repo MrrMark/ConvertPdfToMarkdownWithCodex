@@ -678,6 +678,59 @@ class DoclingArtifactComparisonReport(BaseModel):
     findings: list[DoclingBenchmarkFinding] = Field(default_factory=list)
 
 
+class OCRBackendDependency(BaseModel):
+    name: str
+    kind: str
+    available: bool
+    detail: Optional[str] = None
+
+
+class OCRBackendLanguageData(BaseModel):
+    checked: bool = False
+    requested: list[str] = Field(default_factory=list)
+    available: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+    error: Optional[str] = None
+
+
+class OCRBackendProbe(BaseModel):
+    backend: str
+    status: str
+    ready: bool
+    module: Optional[str] = None
+    module_available: Optional[bool] = None
+    executable: Optional[str] = None
+    executable_available: Optional[bool] = None
+    platform_supported: bool = True
+    confidence_normalization: dict[str, Any] = Field(default_factory=dict)
+    language_data: OCRBackendLanguageData = Field(default_factory=OCRBackendLanguageData)
+    dependencies: list[OCRBackendDependency] = Field(default_factory=list)
+    hints: list[str] = Field(default_factory=list)
+
+
+class OCRBackendProbeSummary(BaseModel):
+    total_backend_count: int = 0
+    available_backend_count: int = 0
+    ready_backend_count: int = 0
+    requested_languages: list[str] = Field(default_factory=list)
+    ready_backends: list[str] = Field(default_factory=list)
+    unavailable_backends: list[str] = Field(default_factory=list)
+    recommended_backend: Optional[str] = None
+    require_ready: bool = False
+
+
+class OCRBackendProbeReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "multi_ocr_backend_probe"
+    ocr_lang: str = "eng"
+    local_only: bool = True
+    raw_content_included: bool = False
+    image_bytes_included: bool = False
+    customer_paths_included: bool = False
+    summary: OCRBackendProbeSummary = Field(default_factory=OCRBackendProbeSummary)
+    backends: list[OCRBackendProbe] = Field(default_factory=list)
+
+
 class LocalCorpusEvidenceRedactionPolicy(BaseModel):
     raw_paths_included: bool = False
     commands_included: bool = False

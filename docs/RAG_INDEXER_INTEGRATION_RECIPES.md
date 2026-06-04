@@ -221,6 +221,33 @@ python scripts/run_release_gates.py \
 - `--require-docling` 또는 release gate `--gates docling`은 Docling 미설치를 실패로 처리한다.
 - Q105 확장 설계는 `docs/DOCLING_INFORMED_EXTENSION_DESIGN.md`에서 관리하며, 이 comparison pack에서 확인된 metric/finding을 근거로 adapter/opt-in 후보를 정한다.
 
+## Multi OCR Backend Probe
+
+OCR backend adapter를 도입하기 전에는 backend별 설치 상태와 confidence 단위를 먼저 local-only probe로 확인한다.
+
+```bash
+python scripts/probe_ocr_backends.py \
+  --ocr-lang kor+eng \
+  --backends all \
+  --report-file /tmp/pdf2md-ocr-backends/ocr_backend_probe_report.json \
+  --json
+```
+
+릴리스 전 optional gate로도 실행할 수 있다.
+
+```bash
+python scripts/run_release_gates.py \
+  --output-dir /tmp/pdf2md-release-ocr-backends \
+  --gates ocr-backends \
+  --ocr-backend-probe-backends all
+```
+
+운영 정책:
+
+- probe는 OCR을 문서에 적용하지 않고 module, executable, language data, platform support만 기록한다.
+- `ocr_backend_probe_report.json`에는 raw PDF text, image bytes, customer path를 넣지 않는다.
+- Tesseract 계열은 language data를 확인하고, RapidOCR/EasyOCR/OCRmac/Docling은 adapter 구현 전까지 availability와 confidence normalization hint만 기록한다.
+
 ## OpenAI Vector Store / Generic Embedding Pipeline
 
 권장 payload:

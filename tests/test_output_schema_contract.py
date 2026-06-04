@@ -64,6 +64,7 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "artifact_integrity_report.schema.json",
         "docling_benchmark_report.schema.json",
         "docling_artifact_comparison.schema.json",
+        "ocr_backend_probe_report.schema.json",
         "local_corpus_evidence_pack.schema.json",
         "corpus_evidence_analysis_report.schema.json",
         "corpus_evidence_trend_report.schema.json",
@@ -93,6 +94,8 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         (output_dir / "docling_artifact_comparison.schema.json").read_text(encoding="utf-8")
     )
     assert docling_comparison_schema["properties"]["purpose"]["default"] == "docling_sanitized_artifact_comparison"
+    ocr_probe_schema = json.loads((output_dir / "ocr_backend_probe_report.schema.json").read_text(encoding="utf-8"))
+    assert ocr_probe_schema["properties"]["purpose"]["default"] == "multi_ocr_backend_probe"
     evidence_schema = json.loads((output_dir / "local_corpus_evidence_pack.schema.json").read_text(encoding="utf-8"))
     assert evidence_schema["properties"]["purpose"]["default"] == "local_technical_corpus_evidence_pack"
     analysis_schema = json.loads(
