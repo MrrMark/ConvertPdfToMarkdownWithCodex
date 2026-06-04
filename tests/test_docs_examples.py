@@ -49,6 +49,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/schema/manifest.schema.json" in readme
     assert "docs/schema/corpus_evidence_analysis_report.schema.json" in readme
     assert "scripts/benchmark_docling_comparison.py" in readme
+    assert "scripts/run_latest_nvme_command_set_eval.py" in readme
     assert "docling_benchmark_report.json" in readme
     assert "docling_artifact_comparison.json" in readme
     assert "scripts/analyze_corpus_evidence_pack.py" in readme
@@ -61,12 +62,12 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q107" in readme
+    assert "현재 active quality backlog는 없습니다." in readme
     assert "--rag-figure-text-chunks" in readme
     assert "chunk_type=\"figure_text\"" in readme
     assert "이미지 업로드 불가 RAG 대응" in readme
     assert "--manual-domain-adapter-keywords" in readme
-    assert "완료된 Q34-Q106" in readme
+    assert "완료된 Q34-Q108" in readme
     assert "docs/DOCLING_INFORMED_EXTENSION_DESIGN.md" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
@@ -433,6 +434,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q105. Docling-Informed OCR And Layout Extension Design" not in next_plan
     assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" not in next_plan
     assert "Q107. Assetless Figure Visual Semantics Layer" not in next_plan
+    assert "Q108. Latest NVMe Command Set Benchmark Evidence Path" not in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
@@ -474,6 +476,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q105. Docling-Informed OCR And Layout Extension Design" not in development_specs
     assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" not in development_specs
     assert "Q107. Assetless Figure Visual Semantics Layer" not in development_specs
+    assert "Q108. Latest NVMe Command Set Benchmark Evidence Path" not in development_specs
     assert "figure_descriptions_rag.jsonl" not in development_specs
     assert "figure_structures_rag.jsonl" not in development_specs
     assert "--rag-generated-figure-descriptions" not in development_specs
@@ -530,8 +533,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
     assert "현재 없음." in development_specs
-    assert "완료된 Q34-Q107" in development_specs
+    assert "완료된 Q34-Q108" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q108. Latest NVMe Command Set Benchmark Evidence Path" in implemented_specs
+    assert "run_latest_nvme_command_set_eval.py" in implemented_specs
     assert "Q107. Assetless Figure Visual Semantics Layer" in implemented_specs
     assert "figure_descriptions_rag.jsonl" in implemented_specs
     assert "figure_structures_rag.jsonl" in implemented_specs
@@ -741,6 +746,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q104-Q105 Docling benchmark/design closure" in quality_scorecard
     assert "Q106 GUI assetless RAG/manual domain adapter" in quality_scorecard
     assert "Q107 assetless figure visual semantics planning" in quality_scorecard
+    assert "Q108 latest NVMe command set benchmark evidence path" in quality_scorecard
+    assert "latest_nvme_command_set_scorecard.md" in quality_scorecard
     assert "이미지 업로드 불가 RAG 대응" in quality_scorecard
     assert "Docling 미설치 advisory skip" in quality_scorecard
     assert "Q91 Q90 output schema contract alignment" in quality_scorecard

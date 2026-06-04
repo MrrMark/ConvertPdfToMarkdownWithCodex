@@ -12,7 +12,7 @@ from typing import Any
 
 from pypdf import PdfReader
 
-from pdf2md.config import Config
+from pdf2md.config import Config, SUPPORTED_FIGURE_DESCRIPTION_BACKENDS
 from pdf2md.models import (
     DoclingArtifactComparisonReport,
     DoclingBenchmarkReport,
@@ -163,6 +163,10 @@ def run_current_tool(
     domain_adapter: str,
     image_mode: str,
     rag_figure_text_chunks: bool,
+    figure_region_ocr: bool,
+    rag_generated_figure_descriptions: bool,
+    figure_description_backend: str,
+    figure_structure_extraction: bool,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     started = time.perf_counter()
@@ -176,6 +180,10 @@ def run_current_tool(
             rag_profile=rag_profile,
             domain_adapter=DomainAdapterMode(domain_adapter),
             rag_figure_text_chunks=rag_figure_text_chunks,
+            figure_region_ocr=figure_region_ocr,
+            rag_generated_figure_descriptions=rag_generated_figure_descriptions,
+            figure_description_backend=figure_description_backend,
+            figure_structure_extraction=figure_structure_extraction,
         )
     )
     duration_ms = int((time.perf_counter() - started) * 1000)
@@ -187,12 +195,23 @@ def run_current_tool(
         "conversion_status": getattr(result.status, "value", str(result.status)),
         "processed_pages": summary.get("processed_pages", 0),
         "warning_count": summary.get("warning_count", 0),
+        "actionable_warning_count": summary.get("actionable_warning_count", 0),
         "table_total": summary.get("table_total", 0),
+        "table_html_count": summary.get("table_html_count", 0),
         "table_gfm_count": summary.get("table_gfm_count", 0),
+        "table_low_quality_count": summary.get("table_low_quality_count", 0),
         "figure_rag_record_count": summary.get("figure_rag_record_count", 0),
         "figure_text_chunk_record_count": summary.get("figure_text_chunk_record_count", 0),
+        "figure_region_ocr_attempted_count": summary.get("figure_region_ocr_attempted_count", 0),
+        "figure_region_ocr_candidate_count": summary.get("figure_region_ocr_candidate_count", 0),
+        "figure_region_ocr_promoted_label_count": summary.get("figure_region_ocr_promoted_label_count", 0),
+        "figure_description_record_count": summary.get("figure_description_record_count", 0),
+        "figure_description_chunk_record_count": summary.get("figure_description_chunk_record_count", 0),
+        "figure_structure_record_count": summary.get("figure_structure_record_count", 0),
+        "figure_structure_chunk_record_count": summary.get("figure_structure_chunk_record_count", 0),
         "retrieval_chunk_record_count": summary.get("retrieval_chunk_record_count", 0),
         "technical_table_record_count": summary.get("technical_table_record_count", 0),
+        "domain_unit_record_count": summary.get("domain_unit_record_count", 0),
         "stage_durations_ms": summary.get("stage_durations_ms", {}),
         **validator_status,
     }
@@ -427,6 +446,8 @@ def render_scorecard(report: dict[str, Any]) -> str:
             for key in (
                 "retrieval_chunk_record_count",
                 "figure_text_chunk_record_count",
+                "figure_description_chunk_record_count",
+                "figure_structure_chunk_record_count",
                 "table_total",
                 "table_like_node_count",
                 "figure_like_node_count",
@@ -460,6 +481,10 @@ def run_docling_comparison(
     domain_adapter: str = DomainAdapterMode.NONE.value,
     image_mode: str = ImageMode.PLACEHOLDER.value,
     rag_figure_text_chunks: bool = True,
+    figure_region_ocr: bool = False,
+    rag_generated_figure_descriptions: bool = False,
+    figure_description_backend: str = "local-vlm",
+    figure_structure_extraction: bool = False,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     source_sha256 = _source_sha256(input_pdf)
@@ -473,6 +498,10 @@ def run_docling_comparison(
         domain_adapter=domain_adapter,
         image_mode=image_mode,
         rag_figure_text_chunks=rag_figure_text_chunks,
+        figure_region_ocr=figure_region_ocr,
+        rag_generated_figure_descriptions=rag_generated_figure_descriptions,
+        figure_description_backend=figure_description_backend,
+        figure_structure_extraction=figure_structure_extraction,
     )
     docling_run, findings, docling_virtual_artifacts = run_docling_tool(
         input_pdf=input_pdf,
@@ -533,6 +562,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--image-mode", choices=[mode.value for mode in ImageMode], default=ImageMode.PLACEHOLDER.value)
     parser.add_argument("--no-rag-figure-text-chunks", dest="rag_figure_text_chunks", action="store_false")
+    parser.add_argument(
+        "--figure-region-ocr",
+        action="store_true",
+        default=False,
+        help="Include opt-in deterministic figure region OCR diagnostics in the current-tool run.",
+    )
+    parser.add_argument(
+        "--rag-generated-figure-descriptions",
+        action="store_true",
+        default=False,
+        help="Include opt-in generated figure description sidecars/chunks in the current-tool run.",
+    )
+    parser.add_argument(
+        "--figure-description-backend",
+        choices=SUPPORTED_FIGURE_DESCRIPTION_BACKENDS,
+        default="local-vlm",
+        help="Backend label recorded for generated figure description records.",
+    )
+    parser.add_argument(
+        "--figure-structure-extraction",
+        action="store_true",
+        default=False,
+        help="Include opt-in conservative figure structure sidecars/chunks in the current-tool run.",
+    )
     parser.add_argument("--fail-on-error", action="store_true")
     parser.set_defaults(rag_figure_text_chunks=True)
     return parser
@@ -550,6 +603,10 @@ def main(argv: list[str] | None = None) -> int:
         domain_adapter=args.domain_adapter,
         image_mode=args.image_mode,
         rag_figure_text_chunks=args.rag_figure_text_chunks,
+        figure_region_ocr=args.figure_region_ocr,
+        rag_generated_figure_descriptions=args.rag_generated_figure_descriptions,
+        figure_description_backend=args.figure_description_backend,
+        figure_structure_extraction=args.figure_structure_extraction,
     )
     print(f"Wrote {args.output_dir / REPORT_FILENAME}")
     if args.fail_on_error and report.get("summary", {}).get("error_count", 0):
