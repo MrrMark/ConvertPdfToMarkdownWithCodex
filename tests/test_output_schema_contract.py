@@ -62,6 +62,8 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "index_contract_report.schema.json",
         "provenance_integrity_report.schema.json",
         "artifact_integrity_report.schema.json",
+        "docling_benchmark_report.schema.json",
+        "docling_artifact_comparison.schema.json",
         "local_corpus_evidence_pack.schema.json",
         "corpus_evidence_analysis_report.schema.json",
         "corpus_evidence_trend_report.schema.json",
@@ -83,6 +85,14 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     assert provenance_schema["properties"]["purpose"]["default"] == "rag_provenance_integrity_validation"
     artifact_schema = json.loads((output_dir / "artifact_integrity_report.schema.json").read_text(encoding="utf-8"))
     assert artifact_schema["properties"]["purpose"]["default"] == "output_artifact_integrity_validation"
+    docling_benchmark_schema = json.loads(
+        (output_dir / "docling_benchmark_report.schema.json").read_text(encoding="utf-8")
+    )
+    assert docling_benchmark_schema["properties"]["purpose"]["default"] == "docling_benchmark_comparison"
+    docling_comparison_schema = json.loads(
+        (output_dir / "docling_artifact_comparison.schema.json").read_text(encoding="utf-8")
+    )
+    assert docling_comparison_schema["properties"]["purpose"]["default"] == "docling_sanitized_artifact_comparison"
     evidence_schema = json.loads((output_dir / "local_corpus_evidence_pack.schema.json").read_text(encoding="utf-8"))
     assert evidence_schema["properties"]["purpose"]["default"] == "local_technical_corpus_evidence_pack"
     analysis_schema = json.loads(
