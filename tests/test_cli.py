@@ -316,6 +316,31 @@ def test_cli_accepts_fast_output_profile(sample_pdf: Path, tmp_path: Path) -> No
     assert not (output_dir / "retrieval_chunks_rag.jsonl").exists()
 
 
+def test_cli_accepts_rag_figure_text_chunks_option(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-out-figure-text"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--image-mode",
+        "placeholder",
+        "--rag-figure-text-chunks",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["image_mode"] == "placeholder"
+    assert manifest["options"]["rag_figure_text_chunks"] is True
+    assert report["summary"]["rag_figure_text_chunks"] is True
+    assert report["summary"]["figure_text_chunk_record_count"] == 0
+
+
 def test_cli_accepts_domain_adapter_option(sample_pdf: Path, tmp_path: Path) -> None:
     output_dir = tmp_path / "cli-out-domain-adapter"
     cmd = [

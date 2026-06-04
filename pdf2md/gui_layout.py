@@ -71,6 +71,7 @@ GUI_LAYOUT_SECTIONS: tuple[GuiLayoutSection, ...] = (
             "dedupe_images",
             "repair_hyphenation",
             "figure_crop_fallback",
+            "rag_figure_text_chunks",
         ),
         wraps_text=True,
     ),

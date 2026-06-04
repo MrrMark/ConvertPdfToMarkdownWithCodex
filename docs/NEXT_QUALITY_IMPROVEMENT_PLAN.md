@@ -23,12 +23,6 @@
 
 ## 남은 작업
 
-### P0 / Q103. Assetless Technical RAG Figure Text Chunks
-
-이미지 파일 업로드가 불가능한 팀 RAG 환경을 위해 `placeholder + figure_text chunk` 경로를 구현한다.
-이미지 파일을 생성하거나 업로드하지 않아도 caption, heading, bbox, detected labels, nearby text를 근거로 검색 가능한 figure provenance chunk를 만든다.
-생성형 이미지 설명은 기본 비활성화로 유지한다.
-
 ### P1 / Q104. Docling Benchmark Harness And Comparison Pack
 
 Docling의 OCR, table/figure layout, image export, picture enrichment 경로를 로컬 벤치마크로 비교할 수 있는 harness를 만든다.

@@ -151,6 +151,7 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
             dedupe_images=True,
             repair_hyphenation=True,
             figure_crop_fallback=True,
+            rag_figure_text_chunks=True,
             page_workers=3,
             debug=True,
             verbose=True,
@@ -179,6 +180,7 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
     assert config.dedupe_images is True
     assert config.repair_hyphenation is True
     assert config.figure_crop_fallback is True
+    assert config.rag_figure_text_chunks is True
     assert config.page_workers == 3
     assert config.debug is True
     assert config.verbose is True
@@ -208,6 +210,7 @@ def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_pa
             dedupe_images=True,
             repair_hyphenation=True,
             figure_crop_fallback=True,
+            rag_figure_text_chunks=True,
             page_workers=4,
             debug=True,
             verbose=True,
@@ -234,6 +237,7 @@ def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_pa
     assert config.dedupe_images is True
     assert config.repair_hyphenation is True
     assert config.figure_crop_fallback is True
+    assert config.rag_figure_text_chunks is True
     assert config.page_workers == 4
     assert config.debug is True
     assert config.verbose is True

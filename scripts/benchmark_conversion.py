@@ -300,6 +300,7 @@ def run_benchmark(
     *,
     output_profile: OutputProfile = OutputProfile.FULL,
     rag_sidecar_scope: RagSidecarScope | None = None,
+    rag_figure_text_chunks: bool = False,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     page_workers = sorted(set(page_workers or [1]))
@@ -321,6 +322,7 @@ def run_benchmark(
                     rag_table_output=RagTableOutputMode.JSONL,
                     output_profile=output_profile,
                     rag_sidecar_scope=rag_sidecar_scope,
+                    rag_figure_text_chunks=rag_figure_text_chunks,
                 )
             )
             elapsed_ms = int((time.perf_counter() - started) * 1000)
@@ -356,6 +358,7 @@ def run_benchmark(
                     "rag_text_block_record_count": summary.get("rag_text_block_record_count"),
                     "retrieval_chunk_record_count": summary.get("retrieval_chunk_record_count"),
                     "rag_sidecar_scope": summary.get("rag_sidecar_scope", "full"),
+                    "figure_text_chunk_record_count": summary.get("figure_text_chunk_record_count", 0),
                     "technical_table_record_count": summary.get("technical_table_record_count"),
                     "artifact_hashes": artifact_hashes,
                 }
@@ -409,6 +412,11 @@ def main() -> int:
         default=None,
         help="Optional RAG sidecar scope override for benchmark runs.",
     )
+    parser.add_argument(
+        "--rag-figure-text-chunks",
+        action="store_true",
+        help="Include opt-in assetless figure_text retrieval chunks in benchmark runs.",
+    )
     parser.add_argument("--baseline-report", type=Path, help="Previous benchmark_report.json to compare against.")
     parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero when the performance gate fails.")
     parser.add_argument(
@@ -433,6 +441,7 @@ def main() -> int:
         page_workers,
         output_profile=OutputProfile(args.output_profile),
         rag_sidecar_scope=RagSidecarScope(args.rag_sidecar_scope) if args.rag_sidecar_scope is not None else None,
+        rag_figure_text_chunks=args.rag_figure_text_chunks,
     )
     baseline_report = _read_json(args.baseline_report) if args.baseline_report else None
     payload = apply_performance_gate(

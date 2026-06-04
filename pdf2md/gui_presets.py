@@ -36,6 +36,7 @@ GUI_PRESET_LOCKED_OPTION_FIELDS: tuple[str, ...] = (
     "rag_contextual_embedding_text",
     "rag_merge_sibling_text_chunks",
     "rag_chunk_relationship_metadata",
+    "rag_figure_text_chunks",
     "page_workers",
     "debug",
     "verbose",
@@ -88,6 +89,7 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
         rag_contextual_embedding_text=profile_options.rag_contextual_embedding_text,
         rag_merge_sibling_text_chunks=profile_options.rag_merge_sibling_text_chunks,
         rag_chunk_relationship_metadata=profile_options.rag_chunk_relationship_metadata,
+        rag_figure_text_chunks=profile_options.rag_figure_text_chunks,
     )
 
 

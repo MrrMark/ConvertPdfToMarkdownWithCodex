@@ -132,6 +132,7 @@ class Pdf2MdGuiApp:
         self.rag_contextual_embedding_text = tk.BooleanVar(value=False)
         self.rag_merge_sibling_text_chunks = tk.BooleanVar(value=False)
         self.rag_chunk_relationship_metadata = tk.BooleanVar(value=False)
+        self.rag_figure_text_chunks = tk.BooleanVar(value=False)
         self.page_workers = tk.StringVar(value="1")
         self.debug = tk.BooleanVar(value=False)
         self.verbose = tk.BooleanVar(value=False)
@@ -306,6 +307,7 @@ class Pdf2MdGuiApp:
             ("dedupe_images", self.dedupe_images),
             ("repair_hyphenation", self.repair_hyphenation),
             ("figure_crop_fallback", self.figure_crop_fallback),
+            ("rag_figure_text_chunks", self.rag_figure_text_chunks),
         ]
         for idx, (label_key, variable) in enumerate(checkboxes):
             checkbox = self._track_text(
@@ -616,6 +618,7 @@ class Pdf2MdGuiApp:
         self.rag_contextual_embedding_text.set(options.rag_contextual_embedding_text)
         self.rag_merge_sibling_text_chunks.set(options.rag_merge_sibling_text_chunks)
         self.rag_chunk_relationship_metadata.set(options.rag_chunk_relationship_metadata)
+        self.rag_figure_text_chunks.set(options.rag_figure_text_chunks)
         self.page_workers.set(str(options.page_workers))
         self.debug.set(options.debug)
         self.verbose.set(options.verbose)
@@ -745,6 +748,7 @@ class Pdf2MdGuiApp:
             rag_contextual_embedding_text=self.rag_contextual_embedding_text.get(),
             rag_merge_sibling_text_chunks=self.rag_merge_sibling_text_chunks.get(),
             rag_chunk_relationship_metadata=self.rag_chunk_relationship_metadata.get(),
+            rag_figure_text_chunks=self.rag_figure_text_chunks.get(),
             page_workers=self._page_workers_value(strict=strict_page_workers),
             debug=self.debug.get(),
             verbose=self.verbose.get(),

@@ -174,9 +174,16 @@ def _expected_full_rag_sidecars(
     return outputs
 
 
-def _expected_minimal_rag_sidecars(config: Config, *, rag_table_output: RagTableOutputMode) -> set[str]:
+def _expected_minimal_rag_sidecars(
+    config: Config,
+    *,
+    rag_table_output: RagTableOutputMode,
+    include_figure_text_chunks: bool,
+) -> set[str]:
     outputs = {config.rag_text_blocks_jsonl_filename, config.retrieval_chunks_jsonl_filename}
     outputs.update(_requested_rag_table_sidecars(config, rag_table_output))
+    if include_figure_text_chunks:
+        outputs.add(config.figures_rag_jsonl_filename)
     return outputs
 
 
@@ -186,11 +193,16 @@ def _written_rag_sidecars_for_scope(
     scope: RagSidecarScope,
     rag_table_output: RagTableOutputMode,
     domain_adapter: DomainAdapterMode,
+    include_figure_text_chunks: bool,
 ) -> set[str]:
     if scope is RagSidecarScope.FULL:
         return _expected_full_rag_sidecars(config, rag_table_output=rag_table_output, domain_adapter=domain_adapter)
     if scope is RagSidecarScope.MINIMAL:
-        return _expected_minimal_rag_sidecars(config, rag_table_output=rag_table_output)
+        return _expected_minimal_rag_sidecars(
+            config,
+            rag_table_output=rag_table_output,
+            include_figure_text_chunks=include_figure_text_chunks,
+        )
     return set()
 
 
@@ -200,6 +212,7 @@ def _omitted_rag_sidecars(
     scope: RagSidecarScope,
     rag_table_output: RagTableOutputMode,
     domain_adapter: DomainAdapterMode,
+    include_figure_text_chunks: bool,
 ) -> list[str]:
     expected_full = _expected_full_rag_sidecars(
         config,
@@ -211,6 +224,7 @@ def _omitted_rag_sidecars(
         scope=scope,
         rag_table_output=rag_table_output,
         domain_adapter=domain_adapter,
+        include_figure_text_chunks=include_figure_text_chunks,
     )
     return sorted(expected_full - written)
 
@@ -377,9 +391,13 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         scope=rag_sidecar_scope,
         rag_table_output=rag_table_output,
         domain_adapter=domain_adapter,
+        include_figure_text_chunks=config.rag_figure_text_chunks,
     )
     write_minimal_rag_sidecars = rag_sidecar_scope in {RagSidecarScope.FULL, RagSidecarScope.MINIMAL}
     write_full_rag_sidecars = rag_sidecar_scope is RagSidecarScope.FULL
+    write_figure_rag_sidecar = write_full_rag_sidecars or (
+        write_minimal_rag_sidecars and config.rag_figure_text_chunks
+    )
     stage_durations_ms: dict[str, int] = {}
 
     def stage_start() -> datetime:
@@ -424,6 +442,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     }
     figure_rag_record_count = 0
     figure_rag_file_count = 0
+    figure_text_chunk_record_count = 0
     domain_unit_record_count = 0
     domain_unit_file_count = 0
     requirement_traceability_record_count = 0
@@ -858,6 +877,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     requirements: list[dict] = []
     requirement_traceability_records: list[dict] = []
     technical_table_records: list[dict] = []
+    figure_records: list[dict] = []
     domain_units: list[dict] = []
     if write_minimal_rag_sidecars or config.debug:
         contextual_rag_tables = annotate_rag_tables_with_heading_context(
@@ -865,7 +885,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             text_block_result.records,
         )
 
-    if write_full_rag_sidecars:
+    if write_figure_rag_sidecar:
         figure_rag_started = stage_start()
         figure_records = build_figure_records(
             images=image_result.assets,
@@ -947,6 +967,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             semantic_units=semantic_units,
             requirements=requirements,
             rag_tables=contextual_rag_tables,
+            figure_records=figure_records,
             domain_units=domain_units,
             requirement_traceability_records=requirement_traceability_records,
             technical_table_records=technical_table_records,
@@ -954,8 +975,12 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             max_tokens=config.retrieval_chunk_max_tokens,
             token_counter=retrieval_token_counter,
             contextual_embedding_text=config.rag_contextual_embedding_text,
+            include_figure_text_chunks=config.rag_figure_text_chunks,
             merge_sibling_text_blocks=config.rag_merge_sibling_text_chunks,
             relationship_metadata=config.rag_chunk_relationship_metadata,
+        )
+        figure_text_chunk_record_count = sum(
+            1 for chunk in retrieval_chunks if chunk.get("chunk_type") == "figure_text"
         )
         retrieval_chunk_diagnostics = build_retrieval_chunk_diagnostics(
             retrieval_chunks,
@@ -1058,6 +1083,15 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 "retrieval_chunks_jsonl_filename": config.retrieval_chunks_jsonl_filename,
             }
         )
+    if config.rag_figure_text_chunks:
+        manifest_options["rag_figure_text_chunks"] = True
+    if write_figure_rag_sidecar:
+        manifest_options.update(
+            {
+                "figures_rag_output": "jsonl",
+                "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
+            }
+        )
     if write_full_rag_sidecars:
         manifest_options.update(
             {
@@ -1069,8 +1103,6 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 "requirement_traceability_jsonl_filename": config.requirement_traceability_jsonl_filename,
                 "technical_tables_output": "jsonl",
                 "technical_tables_jsonl_filename": config.technical_tables_jsonl_filename,
-                "figures_rag_output": "jsonl",
-                "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
             }
         )
     if output_profile is not OutputProfile.FULL or rag_sidecar_scope is not RagSidecarScope.FULL:
@@ -1143,16 +1175,19 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     elapsed_seconds = (finished_at - started_at).total_seconds()
     pages_per_second = round(len(selected_pages) / elapsed_seconds, 4) if elapsed_seconds > 0 else None
     finish_stage("reporting", reporting_started)
-    report_summary_extras = (
-        {
-            "output_profile": output_profile.value,
-            "rag_sidecar_scope": rag_sidecar_scope.value,
-            "rag_sidecar_omitted_outputs": rag_sidecar_omitted_outputs,
-            "rag_sidecar_omitted_reason": SIDECAR_OMITTED_REASON if rag_sidecar_omitted_outputs else None,
-        }
-        if output_profile is not OutputProfile.FULL or rag_sidecar_scope is not RagSidecarScope.FULL
-        else None
-    )
+    report_summary_extras: dict[str, object] = {}
+    if output_profile is not OutputProfile.FULL or rag_sidecar_scope is not RagSidecarScope.FULL:
+        report_summary_extras.update(
+            {
+                "output_profile": output_profile.value,
+                "rag_sidecar_scope": rag_sidecar_scope.value,
+                "rag_sidecar_omitted_outputs": rag_sidecar_omitted_outputs,
+                "rag_sidecar_omitted_reason": SIDECAR_OMITTED_REASON if rag_sidecar_omitted_outputs else None,
+            }
+        )
+    if config.rag_figure_text_chunks:
+        report_summary_extras["rag_figure_text_chunks"] = True
+        report_summary_extras["figure_text_chunk_record_count"] = figure_text_chunk_record_count
     report = build_report(
         started_at=started_at,
         finished_at=finished_at,
@@ -1227,7 +1262,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         technical_table_record_count=technical_table_record_count,
         technical_table_file_count=technical_table_file_count,
         confidential_safe_mode=config.confidential_safe_mode,
-        summary_extras=report_summary_extras,
+        summary_extras=report_summary_extras or None,
     )
     report_path = config.output_dir / config.report_filename
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)

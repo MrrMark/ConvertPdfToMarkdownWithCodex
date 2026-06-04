@@ -123,6 +123,108 @@ def test_retrieval_chunks_include_traceability_and_technical_table_units() -> No
     assert chunks[1]["semantic_types"] == ["log_page"]
 
 
+def test_retrieval_chunks_can_include_assetless_figure_text_chunks() -> None:
+    figure_records = [
+        {
+            "figure_id": "page-0001-figure-0001",
+            "page": 1,
+            "figure_index": 1,
+            "record_type": "image",
+            "status": "available",
+            "path": "assets/images/page-0001-figure-001.png",
+            "bbox": [72.0, 120.0, 420.0, 320.0],
+            "caption_text": "Figure 1: State machine diagram",
+            "caption_confidence": 0.91,
+            "heading_path": ["2.1 State Machine"],
+            "figure_kind": "state_machine",
+            "diagram_candidate": True,
+            "detected_labels": ["IDLE", "READY", "ERROR"],
+            "nearby_text_refs": [
+                {
+                    "block_id": "page-0001-block-0003",
+                    "page": 1,
+                    "text": "RESET transitions the controller back to IDLE.",
+                }
+            ],
+            "source_refs": [
+                {
+                    "source_type": "figure",
+                    "source_id": "page-0001-figure-0001",
+                    "page": 1,
+                    "bbox": [72.0, 120.0, 420.0, 320.0],
+                    "path": "assets/images/page-0001-figure-001.png",
+                }
+            ],
+        }
+    ]
+
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        figure_records=figure_records,
+        include_figure_text_chunks=True,
+        source_sha256="b" * 64,
+    )
+
+    assert [chunk["chunk_type"] for chunk in chunks] == ["figure_text"]
+    chunk = chunks[0]
+    assert chunk["text"] == "\n".join(
+        [
+            "caption: Figure 1: State machine diagram",
+            "heading_path: 2.1 State Machine",
+            "figure_kind: state_machine",
+            "detected_labels: IDLE | READY | ERROR",
+            "nearby_text: RESET transitions the controller back to IDLE.",
+        ]
+    )
+    assert chunk["source_refs"] == [
+        {
+            "source_type": "figure",
+            "source_id": "page-0001-figure-0001",
+            "page": 1,
+            "bbox": [72.0, 120.0, 420.0, 320.0],
+            "figure_id": "page-0001-figure-0001",
+        }
+    ]
+    assert "path" not in chunk["source_refs"][0]
+    assert chunk["semantic_types"] == ["diagram", "figure_text", "state_machine"]
+    assert chunk["retrieval_priority"] == 78
+    assert "observed_caption" in chunk["chunk_boundary_reasons"]
+
+
+def test_retrieval_chunks_skip_captionless_low_confidence_figure_diagnostics() -> None:
+    figure_records = [
+        {
+            "figure_id": "page-0001-figure-0001",
+            "page": 1,
+            "figure_index": 1,
+            "bbox": [72.0, 120.0, 420.0, 320.0],
+            "caption_text": None,
+            "caption_confidence": None,
+            "heading_path": [],
+            "figure_kind": "image",
+            "diagram_candidate": False,
+            "detected_labels": [],
+            "nearby_text_refs": [],
+            "captionless_diagnostics": {"status": "captionless_diagnostics_only"},
+            "source_refs": [{"source_type": "excluded_figure", "source_id": "page-0001-figure-0001", "page": 1}],
+        }
+    ]
+
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        figure_records=figure_records,
+        include_figure_text_chunks=True,
+    )
+
+    assert chunks == []
+
+
 def test_retrieval_chunk_diagnostics_report_length_and_duplicate_sources() -> None:
     records = [
         {"token_estimate": 8, "source_dedupe_key": "a"},

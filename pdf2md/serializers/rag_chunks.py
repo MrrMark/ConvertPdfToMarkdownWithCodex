@@ -14,6 +14,8 @@ TEXT_CHUNK_MERGE_POLICY = "merged_sibling_text_blocks"
 TEXT_CHUNK_MERGE_REASON = "sibling_text_merge"
 TEXT_CHUNK_MERGE_STRATEGY = "adjacent_text_block_same_section_token_budget"
 CHUNK_RELATIONSHIP_STRATEGY = "chunk_group_prev_next_section_anchor"
+FIGURE_TEXT_CHUNK_TYPE = "figure_text"
+FIGURE_TEXT_LOW_CONFIDENCE_THRESHOLD = 0.65
 TokenCounter = Callable[[str], int]
 
 
@@ -43,6 +45,10 @@ def _heading_path(record: dict[str, Any]) -> list[str]:
 def _bbox(record: dict[str, Any]) -> list[float] | None:
     value = record.get("bbox")
     return value if isinstance(value, list) else None
+
+
+def _string_list(value: Any) -> list[str]:
+    return [str(item).strip() for item in value if str(item).strip()] if isinstance(value, list) else []
 
 
 def _source_ref(source_type: str, source_id: str | None, record: dict[str, Any]) -> dict[str, Any]:
@@ -474,6 +480,113 @@ def _contextual_embedding_text(chunk_type: str, text: str, record: dict[str, Any
     return "\n".join(context_parts + [f"Text: {text}"])
 
 
+def _float_or_none(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _nearby_ref_texts(record: dict[str, Any]) -> list[str]:
+    texts: list[str] = []
+    for ref in record.get("nearby_text_refs") or []:
+        if not isinstance(ref, dict):
+            continue
+        text = str(ref.get("text") or "").strip()
+        if text:
+            texts.append(text)
+    return texts
+
+
+def _ordered_unique_text(values: list[str]) -> list[str]:
+    output: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = value.strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        output.append(text)
+    return output
+
+
+def _figure_source_ref(record: dict[str, Any]) -> dict[str, Any]:
+    source_type = "figure"
+    for ref in record.get("source_refs") or []:
+        if isinstance(ref, dict) and ref.get("source_type") in {"figure", "excluded_figure"}:
+            source_type = str(ref["source_type"])
+            break
+    return {
+        "source_type": source_type,
+        "source_id": record.get("figure_id"),
+        "page": record.get("page"),
+        "bbox": _bbox(record),
+        "figure_id": record.get("figure_id"),
+    }
+
+
+def _figure_text_payload(record: dict[str, Any]) -> dict[str, Any] | None:
+    caption_text = str(record.get("caption_text") or "").strip()
+    heading_path = _heading_path(record)
+    detected_labels = _string_list(record.get("detected_labels"))
+    nearby_texts = _nearby_ref_texts(record)
+    figure_kind = str(record.get("figure_kind") or "").strip()
+    captionless_diagnostics = record.get("captionless_diagnostics")
+    if isinstance(captionless_diagnostics, dict) and captionless_diagnostics.get("status") == "captionless_diagnostics_only":
+        return None
+    signal_count = sum(1 for value in (caption_text, heading_path, detected_labels, nearby_texts) if value)
+    if signal_count == 0:
+        return None
+
+    lines: list[str] = []
+    boundary_reasons = ["figure_text_boundary"]
+    if caption_text:
+        lines.append(f"caption: {caption_text}")
+        boundary_reasons.append("observed_caption")
+    if heading_path:
+        lines.append("heading_path: " + " > ".join(heading_path))
+        boundary_reasons.append("heading_context")
+    if figure_kind:
+        lines.append(f"figure_kind: {figure_kind}")
+        boundary_reasons.append("figure_kind")
+    if detected_labels:
+        lines.append("detected_labels: " + " | ".join(detected_labels))
+        boundary_reasons.append("detected_labels")
+    for text in nearby_texts:
+        lines.append(f"nearby_text: {text}")
+    if nearby_texts:
+        boundary_reasons.append("nearby_text")
+
+    confidence = _float_or_none(record.get("caption_confidence"))
+    has_caption = bool(caption_text)
+    low_confidence = confidence is not None and confidence < FIGURE_TEXT_LOW_CONFIDENCE_THRESHOLD
+    if has_caption and not low_confidence:
+        priority = 78 if record.get("diagram_candidate") else 68
+    else:
+        priority = 44
+        boundary_reasons.append("captionless_or_low_confidence")
+
+    semantic_types = [FIGURE_TEXT_CHUNK_TYPE]
+    if figure_kind:
+        semantic_types.append(figure_kind)
+    if record.get("diagram_candidate"):
+        semantic_types.append("diagram")
+
+    return {
+        "text": "\n".join(_ordered_unique_text(lines)),
+        "source_refs": [_figure_source_ref(record)],
+        "page_range": [_page_of(record), _page_of(record)],
+        "bbox": _bbox(record),
+        "heading_path": heading_path,
+        "semantic_types": semantic_types,
+        "retrieval_priority": priority,
+        "boundary_reasons": boundary_reasons,
+        "chunk_group_id": f"figure-page-{_page_of(record):04d}",
+    }
+
+
 def _semantic_source_refs(record: dict[str, Any], *, source_type: str) -> list[dict[str, Any]]:
     refs = list(record.get("source_refs") or [])
     refs.append(
@@ -493,6 +606,7 @@ def build_retrieval_chunks(
     semantic_units: list[dict[str, Any]],
     requirements: list[dict[str, Any]],
     rag_tables: list[dict[str, Any]],
+    figure_records: list[dict[str, Any]] | None = None,
     domain_units: list[dict[str, Any]] | None = None,
     requirement_traceability_records: list[dict[str, Any]] | None = None,
     technical_table_records: list[dict[str, Any]] | None = None,
@@ -501,6 +615,7 @@ def build_retrieval_chunks(
     max_tokens: int = 512,
     token_counter: TokenCounter | None = None,
     contextual_embedding_text: bool = False,
+    include_figure_text_chunks: bool = False,
     merge_sibling_text_blocks: bool = False,
     relationship_metadata: bool = False,
 ) -> list[dict[str, Any]]:
@@ -656,6 +771,25 @@ def build_retrieval_chunks(
             else None,
             embedding_text_strategy="technical_table_context_prefix",
         )
+
+    if include_figure_text_chunks:
+        for record in sorted(figure_records or [], key=lambda item: (_page_of(item), int(item.get("figure_index") or 0))):
+            payload = _figure_text_payload(record)
+            if payload is None:
+                continue
+            append_chunk(
+                chunk_type=FIGURE_TEXT_CHUNK_TYPE,
+                text=payload["text"],
+                source_refs=payload["source_refs"],
+                page_range=payload["page_range"],
+                bbox=payload["bbox"],
+                heading_path=payload["heading_path"],
+                semantic_types=payload["semantic_types"],
+                normative_strength=None,
+                retrieval_priority=payload["retrieval_priority"],
+                boundary_reasons=payload["boundary_reasons"],
+                chunk_group_id=payload["chunk_group_id"],
+            )
 
     for record in flatten_rag_table_records(normalize_rag_table_payload(rag_tables)):
         text = str(record.get("row_text") or "").strip()

@@ -68,7 +68,7 @@ Stable nested fields:
 - `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
 - `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
 - `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
-- `options.retrieval_chunk_max_tokens`, `options.retrieval_tokenizer`, `options.rag_contextual_embedding_text`, `options.rag_merge_sibling_text_chunks`, `options.rag_chunk_relationship_metadata`
+- `options.retrieval_chunk_max_tokens`, `options.retrieval_tokenizer`, `options.rag_contextual_embedding_text`, `options.rag_merge_sibling_text_chunks`, `options.rag_chunk_relationship_metadata`, `options.rag_figure_text_chunks` when enabled
 - `options.output_profile`, `options.rag_sidecar_scope`, `options.rag_sidecar_omitted_outputs`, `options.rag_sidecar_omitted_reason` when a non-full output scope was selected
 - `options.confidential_safe_mode`, `options.local_only_processing`, `options.external_llm_calls`, `options.external_embedding_calls`, `options.path_redaction`
 - `options.page_workers`, `options.page_worker_effective_count`, `options.page_parallel_enabled`
@@ -130,6 +130,11 @@ Non-full sidecar scope summary fields:
 - `rag_sidecar_scope`: effective sidecar scope, one of `full`, `minimal`, or `none`.
 - `rag_sidecar_omitted_outputs`: sidecar filenames skipped compared with the default full scope.
 - `rag_sidecar_omitted_reason`: stable reason code, currently `rag_sidecar_scope_omitted`.
+
+Assetless figure text summary fields:
+
+- `rag_figure_text_chunks`: present and `true` when `--rag-figure-text-chunks` was enabled.
+- `figure_text_chunk_record_count`: final `retrieval_chunks_rag.jsonl` records with `chunk_type="figure_text"`.
 
 `summary.table_quality[]` optional diagnostics:
 
@@ -366,7 +371,7 @@ Policy:
 
 ## retrieval_chunks_rag.jsonl
 
-Default JSONL output for vector DB ingest candidates. It is derived from text blocks, semantic units, requirements, table rows, and opt-in domain units.
+Default JSONL output for vector DB ingest candidates. It is derived from text blocks, semantic units, requirements, table rows, opt-in domain units, and opt-in figure text chunks.
 
 Required per JSONL record:
 
@@ -407,6 +412,15 @@ Optional per JSONL record:
 - `related_chunk_ids`: ordered list of available neighbor/section-anchor chunk ids for lightweight citation expansion.
 - `relationship_strategy`: deterministic strategy label such as `chunk_group_prev_next_section_anchor`.
 
+`figure_text` chunk policy:
+
+- `chunk_type` is `figure_text`.
+- It is generated only when `--rag-figure-text-chunks` is enabled.
+- It uses observed caption text, heading path, detected labels, nearby text refs, and conservative `figure_kind` metadata.
+- It does not contain generated picture descriptions, inferred semantics, or paraphrased explanations.
+- `source_refs[]` points to `figures_rag.jsonl` by `figure_id`, page, and bbox. The retrieval chunk source ref intentionally omits image file path.
+- Captionless or low-confidence records are skipped when they are diagnostics-only, or emitted with lower `retrieval_priority` when promoted evidence is present.
+
 Policy:
 
 - `text` remains extracted source text or deterministic row text, not a summary or paraphrase.
@@ -414,7 +428,7 @@ Policy:
 - `rag_merge_sibling_text_chunks`, when enabled, only merges adjacent `text_block` chunks with the same page/section/heading context and only while the combined `token_estimate` stays within `retrieval_chunk_max_tokens`.
 - Merged sibling text chunks use `chunk_boundary_policy="merged_sibling_text_blocks"` and keep every original source id in `source_refs`; requirement, requirement trace, table row, technical table, and domain unit chunks are not merged by this policy.
 - `rag_chunk_relationship_metadata`, when enabled, is added after merge/split optimization so `previous_chunk_id`, `next_chunk_id`, and `section_anchor_chunk_id` point to final chunk ids in the same JSONL file.
-- `source_refs` must be sufficient to trace a chunk back to the originating block, table row, requirement, requirement trace, technical table unit, or domain unit.
+- `source_refs` must be sufficient to trace a chunk back to the originating block, table row, requirement, requirement trace, technical table unit, figure record, or domain unit.
 - `source_sha256` is the lowercase SHA-256 of the input PDF and is copied into each chunk for downstream index identity checks.
 - Chunk boundary fields are deterministic diagnostics for long technical specs; token-budget splitting does not summarize or rewrite source text.
 
@@ -452,6 +466,7 @@ Optional diagnostics:
 Policy:
 
 - The sidecar records extracted image assets and excluded image candidates.
+- In `image_mode=placeholder` or `embedded`, `path` may be provenance only and the image file may not exist on disk.
 - `figure_kind` is conservative metadata such as `image`, `diagram`, `state_machine`, `sequence_diagram`, or `register_layout`.
 - Low-confidence OCR/label candidates stay in `diagram_label_diagnostics.rejected_ocr_candidates`; only promoted candidates appear in `detected_labels`.
 - Captionless candidates may include `captionless_diagnostics` with evidence counts and rejection reasons. This is diagnostics-only metadata and does not create a generated caption or visual description.

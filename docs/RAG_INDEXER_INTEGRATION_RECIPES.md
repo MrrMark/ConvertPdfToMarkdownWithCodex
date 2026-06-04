@@ -39,6 +39,36 @@ python3 -m pdf2md spec.pdf -o output/spec --rag-profile technical_spec_rag --dom
 python3 -m pdf2md spec.pdf -o output/share --rag-profile confidential_rag
 ```
 
+## Assetless Figure Text Chunks
+
+PNG/JPG 같은 image asset을 업로드할 수 없는 팀 RAG 환경에서는 placeholder mode와 figure_text chunk를 함께 사용한다.
+
+```bash
+python3 -m pdf2md spec.pdf -o output/spec \
+  --rag-profile technical_spec_rag \
+  --domain-adapter nvme \
+  --image-mode placeholder \
+  --rag-figure-text-chunks
+```
+
+운영 정책:
+
+- `document.md`에는 image link 대신 placeholder comment가 남는다.
+- `figures_rag.jsonl`은 caption, heading path, bbox, detected labels, nearby text refs를 원문 provenance로 보존한다.
+- `retrieval_chunks_rag.jsonl`에는 `chunk_type="figure_text"` record가 추가된다.
+- `figure_text.text`는 관측된 caption/heading/label/nearby text와 conservative figure kind만 사용한다.
+- 생성형 picture description, VLM 설명, 사람이 읽기 좋게 만든 요약은 기본 출력에 넣지 않는다.
+- `figure_text.source_refs[]`는 `figures_rag.jsonl`의 `figure_id`, page, bbox로 해소되어야 하며 image path는 넣지 않는다.
+- `--rag-sidecar-scope minimal`을 함께 쓰더라도 `--rag-figure-text-chunks`가 켜져 있으면 `figures_rag.jsonl`은 provenance 해소를 위해 함께 생성된다.
+
+검증:
+
+```bash
+python scripts/validate_index_contract.py --output-dir output/spec --target all --fail-on-error
+python scripts/validate_provenance_integrity.py --output-dir output/spec --fail-on-error
+python scripts/validate_artifact_integrity.py --output-dir output/spec --fail-on-error
+```
+
 ## 공통 Field Mapping
 
 | Index field | Source field | 비고 |
