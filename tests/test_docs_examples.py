@@ -166,6 +166,7 @@ def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
 
 def test_windows_guide_matches_cli_policy() -> None:
     guide = Path("docs/WINDOWS_A_TO_Z_GUIDE.md").read_text(encoding="utf-8")
+    assert "docs\\WINDOWS_INSTALL_RUN_QUICKSTART.md" in guide
     assert "python -m pdf2md .\\sample.pdf" in guide
     assert "sample_output\\document.md" in guide
     assert "python -m pdf2md --input-dir .\\pdfs --skip-existing" in guide
@@ -256,6 +257,31 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "PyInstaller/native bundle" in guide
     assert "GUI에서 output folder 오류" in guide
     assert "- Git\n  - `git clone`, `git pull` 같은 저장소 동기화 흐름에서만 필요" in guide
+
+
+def test_windows_quickstart_covers_install_cli_and_gui() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    guide = Path("docs/WINDOWS_INSTALL_RUN_QUICKSTART.md").read_text(encoding="utf-8")
+    gui_guide = Path("docs/GUI_USER_GUIDE.md").read_text(encoding="utf-8")
+
+    assert "docs/WINDOWS_INSTALL_RUN_QUICKSTART.md" in readme
+    assert "docs/WINDOWS_INSTALL_RUN_QUICKSTART.md" in gui_guide
+    assert ".\\scripts\\setup_windows_env.bat" in guide
+    assert 'python -m pip install -e ".[dev]"' in guide
+    assert "python -m pdf2md .\\sample.pdf" in guide
+    assert "python -m pdf2md --input-dir .\\pdfs" in guide
+    assert ".\\scripts\\run_batch_folder_windows.bat -InputDir .\\pdfs" in guide
+    assert "python -m pdf2md.gui" in guide
+    assert "pdf2md-gui" in guide
+    assert "python -m pdf2md.gui --doctor" in guide
+    assert "이미지 업로드 불가 RAG 대응" in guide
+    assert "--image-mode placeholder --rag-figure-text-chunks" in guide
+    assert "Domain=manual" in guide
+    assert "retrieval_chunks_rag.jsonl" in guide
+    assert "figures_rag.jsonl" in guide
+    assert "tesseract --version" in guide
+    assert "Set-ExecutionPolicy -Scope CurrentUser RemoteSigned" in guide
+    assert "git pull origin main" in guide
 
 
 def test_macos_gui_quickstart_is_non_developer_friendly() -> None:

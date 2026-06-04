@@ -3,6 +3,8 @@
 이 문서는 **Windows 환경에서 `pdf2md`를 설치하고 실행하는 전체 절차**를 다룹니다.
 대상: 처음 세팅하는 사용자
 
+빠른 설치와 CLI/GUI 실행만 필요한 사용자는 먼저 `docs\WINDOWS_INSTALL_RUN_QUICKSTART.md`를 따라가세요. 이 문서는 배치 운영, 오프라인 반입, schema/benchmark/release gate까지 확인해야 하는 운영자용 상세 문서입니다.
+
 ---
 
 ## 1) 빠른 시작

@@ -232,7 +232,8 @@ sudo apt-get install -y tesseract-ocr
 
 ### Windows 설치/실행 가이드
 
-- Windows 전용 상세 문서: [docs/WINDOWS_A_TO_Z_GUIDE.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/WINDOWS_A_TO_Z_GUIDE.md)
+- Windows 설치부터 CLI/GUI 실행까지의 빠른 시작 문서: [docs/WINDOWS_INSTALL_RUN_QUICKSTART.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/WINDOWS_INSTALL_RUN_QUICKSTART.md)
+- Windows 전용 상세 운영 문서: [docs/WINDOWS_A_TO_Z_GUIDE.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/WINDOWS_A_TO_Z_GUIDE.md)
 - 회사 보안 환경(온라인 설치 제한, `git clone` 제한) 대응 절차 포함
 - ZIP 배포본 기준 원클릭 환경 구성: `scripts\setup_windows_env.ps1`, `scripts\setup_windows_env.bat`
 - ZIP 배포본 기준 폴더 배치 변환: `scripts\run_batch_folder_windows.ps1`, `scripts\run_batch_folder_windows.bat`

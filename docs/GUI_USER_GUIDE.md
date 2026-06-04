@@ -43,7 +43,8 @@ python -m pdf2md.gui --doctor --doctor-format json
 운영체제별 설치/실행 준비는 다음 문서를 참고한다.
 
 - macOS: `docs/MACOS_GUI_QUICKSTART.md`
-- Windows: `docs/WINDOWS_A_TO_Z_GUIDE.md`
+- Windows 빠른 시작: `docs/WINDOWS_INSTALL_RUN_QUICKSTART.md`
+- Windows 상세 운영: `docs/WINDOWS_A_TO_Z_GUIDE.md`
 
 ## 2) 화면 구성
 
