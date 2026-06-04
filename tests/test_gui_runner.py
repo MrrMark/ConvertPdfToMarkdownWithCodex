@@ -183,6 +183,7 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
     assert config.confidential_safe_mode is True
     assert config.force_ocr is True
     assert config.ocr_lang == "kor+eng"
+    assert config.ocr_backend == "tesseract"
     assert config.keep_page_markers is True
     assert config.remove_header_footer is True
     assert config.dedupe_images is True
@@ -252,6 +253,7 @@ def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_pa
     assert config.confidential_safe_mode is True
     assert config.force_ocr is True
     assert config.ocr_lang == "kor+eng"
+    assert config.ocr_backend == "tesseract"
     assert config.keep_page_markers is True
     assert config.remove_header_footer is True
     assert config.dedupe_images is True

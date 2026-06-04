@@ -59,6 +59,7 @@ class BatchConversionOptions:
     confidential_safe_mode: bool = False
     force_ocr: bool = False
     ocr_lang: str = "eng"
+    ocr_backend: str = "tesseract"
     keep_page_markers: bool = False
     remove_header_footer: bool = False
     dedupe_images: bool = False
@@ -149,6 +150,7 @@ def build_batch_config(pdf_path: Path, output_root: Path, options: BatchConversi
         confidential_safe_mode=options.confidential_safe_mode,
         force_ocr=options.force_ocr,
         ocr_lang=options.ocr_lang,
+        ocr_backend=options.ocr_backend,
         keep_page_markers=options.keep_page_markers,
         remove_header_footer=options.remove_header_footer,
         dedupe_images=options.dedupe_images,

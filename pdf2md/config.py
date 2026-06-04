@@ -5,12 +5,14 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from pdf2md.extractors.ocr_backends import supported_ocr_backends
 from pdf2md.models import DomainAdapterMode, ImageMode, OutputProfile, RagSidecarScope, RagTableOutputMode, TableMode
 from pdf2md.rag_profiles import DEFAULT_RAG_PURPOSE_PROFILE, SUPPORTED_RAG_PURPOSE_PROFILES
 from pdf2md.utils.page_range import parse_page_range
 
 SUPPORTED_RETRIEVAL_TOKENIZERS = ("char", "regex", "tiktoken-cl100k")
 SUPPORTED_FIGURE_DESCRIPTION_BACKENDS = ("local-vlm", "docling")
+SUPPORTED_OCR_BACKENDS = supported_ocr_backends()
 
 
 class Config(BaseModel):
@@ -32,6 +34,7 @@ class Config(BaseModel):
     confidential_safe_mode: bool = False
     force_ocr: bool = False
     ocr_lang: str = "eng"
+    ocr_backend: str = "tesseract"
     keep_page_markers: bool = False
     remove_header_footer: bool = False
     dedupe_images: bool = False
@@ -102,6 +105,13 @@ class Config(BaseModel):
             raise ValueError(
                 f"figure_description_backend must be one of: {', '.join(SUPPORTED_FIGURE_DESCRIPTION_BACKENDS)}"
             )
+        return value
+
+    @field_validator("ocr_backend")
+    @classmethod
+    def _validate_ocr_backend(cls, value: str) -> str:
+        if value not in SUPPORTED_OCR_BACKENDS:
+            raise ValueError(f"ocr_backend must be one of: {', '.join(SUPPORTED_OCR_BACKENDS)}")
         return value
 
     @field_validator("rag_profile")

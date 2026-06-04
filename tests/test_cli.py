@@ -437,6 +437,8 @@ def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
         "--figure-crop-fallback",
         "--ocr-lang",
         "kor+eng",
+        "--ocr-backend",
+        "tesseract",
         "--debug",
     ]
 
@@ -449,6 +451,7 @@ def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
     assert manifest["options"]["repair_hyphenation"] is True
     assert manifest["options"]["figure_crop_fallback"] is True
     assert manifest["options"]["ocr_lang"] == "kor+eng"
+    assert manifest["options"]["ocr_backend"] == "tesseract"
     assert manifest["options"]["rag_text_blocks_output"] == "jsonl"
     assert manifest["options"]["rag_text_blocks_jsonl_filename"] == "text_blocks_rag.jsonl"
     assert manifest["options"]["semantic_layer_output"] == "jsonl"

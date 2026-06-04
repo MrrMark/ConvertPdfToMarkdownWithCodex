@@ -24,6 +24,9 @@ def test_config_validates_retrieval_chunk_options(tmp_path: Path) -> None:
     with pytest.raises(ValidationError):
         Config(input_pdf=input_pdf, output_dir=tmp_path / "out", retrieval_tokenizer="unknown")
 
+    with pytest.raises(ValidationError):
+        Config(input_pdf=input_pdf, output_dir=tmp_path / "out", ocr_backend="rapidocr")
+
 
 def test_validate_output_bundle_accepts_minimum_valid_outputs(tmp_path: Path) -> None:
     output_dir = tmp_path / "out"

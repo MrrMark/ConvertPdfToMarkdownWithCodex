@@ -126,13 +126,13 @@ Warning/reason 후보:
 
 ## Conservative Rollout Plan
 
-현재 시점에서는 아래 작업을 active backlog로 등록하지 않는다.
-Docling-installed benchmark evidence가 확보되면 다음 순서로 별도 Q 작업을 생성한다.
+현재 시점에서는 아래 남은 작업을 active backlog로 등록하지 않는다.
+Q110/Q111에서 runtime probe와 OCR backend adapter contract는 완료했다.
+추가 Docling-installed benchmark evidence가 확보되면 다음 순서로 별도 Q 작업을 생성한다.
 
-1. OCR backend adapter contract and runtime probe
-2. Region OCR report-only prototype
-3. Local-only picture description evaluation pack
-4. Docling layout adapter comparison mode
+1. Region OCR report-only prototype
+2. Local-only picture description evaluation pack
+3. Docling layout adapter comparison mode
 
 ## Non-Goals
 

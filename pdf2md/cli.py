@@ -8,6 +8,7 @@ from pdf2md.batch_runner import BatchConversionOptions, run_batch_conversion as 
 from pdf2md.config import (
     Config,
     SUPPORTED_FIGURE_DESCRIPTION_BACKENDS,
+    SUPPORTED_OCR_BACKENDS,
     SUPPORTED_RETRIEVAL_TOKENIZERS,
     default_output_dir_for_input,
 )
@@ -109,6 +110,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--force-ocr", action="store_true", default=None)
     parser.add_argument("--ocr-lang", default="eng", help="Tesseract language code for OCR, for example eng or kor+eng.")
+    parser.add_argument(
+        "--ocr-backend",
+        choices=SUPPORTED_OCR_BACKENDS,
+        default="tesseract",
+        help="OCR backend for conversion. Currently only tesseract is implemented.",
+    )
     parser.add_argument(
         "--page-workers",
         type=int,
@@ -233,6 +240,7 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),
         force_ocr=_option_value(args.force_ocr, profile_options.force_ocr),
         ocr_lang=args.ocr_lang,
+        ocr_backend=args.ocr_backend,
         keep_page_markers=_option_value(args.keep_page_markers, profile_options.keep_page_markers),
         remove_header_footer=_option_value(args.remove_header_footer, profile_options.remove_header_footer),
         dedupe_images=_option_value(args.dedupe_images, profile_options.dedupe_images),
@@ -296,6 +304,7 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
         confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),
         force_ocr=_option_value(args.force_ocr, profile_options.force_ocr),
         ocr_lang=args.ocr_lang,
+        ocr_backend=args.ocr_backend,
         keep_page_markers=_option_value(args.keep_page_markers, profile_options.keep_page_markers),
         remove_header_footer=_option_value(args.remove_header_footer, profile_options.remove_header_footer),
         dedupe_images=_option_value(args.dedupe_images, profile_options.dedupe_images),

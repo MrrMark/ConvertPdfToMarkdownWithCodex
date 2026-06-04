@@ -20,6 +20,7 @@
     "keep_page_markers": true,
     "local_only_processing": true,
     "ocr_lang": "eng",
+    "ocr_backend": "tesseract",
     "page_parallel_enabled": false,
     "page_worker_effective_count": 1,
     "page_workers": 1,

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import re
-import shutil
 import statistics
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from pdf2md.constants import WarningCode
+from pdf2md.extractors.ocr_backends import OCRBackend, get_ocr_backend
 from pdf2md.models import WarningEntry
 
 try:
@@ -101,16 +101,6 @@ def _is_language_data_missing(exc: Exception) -> bool:
     return bool(LANGUAGE_DATA_MISSING_PATTERN.search(str(exc)))
 
 
-def _resolve_tesseract_cmd() -> str | None:
-    executable = shutil.which("tesseract")
-    if executable:
-        return executable
-    homebrew_tesseract = Path("/opt/homebrew/bin/tesseract")
-    if homebrew_tesseract.exists():
-        return str(homebrew_tesseract)
-    return None
-
-
 def _effective_ocr_worker_count(requested_workers: int, page_count: int) -> int:
     if requested_workers <= 1 or page_count <= 1:
         return 1
@@ -152,6 +142,7 @@ def _confidence_warning_for_page(
     page_number: int,
     metrics: OcrMetrics,
     ocr_lang: str,
+    ocr_backend: str,
     ocr_context: dict,
 ) -> WarningEntry | None:
     if (
@@ -164,6 +155,7 @@ def _confidence_warning_for_page(
             page=page_number,
             details={
                 "ocr_lang": ocr_lang,
+                "ocr_backend": ocr_backend,
                 "ocr_confidence_mean": metrics.mean,
                 "ocr_confidence_median": metrics.median,
                 "low_conf_token_ratio": metrics.low_conf_token_ratio,
@@ -180,6 +172,7 @@ def _confidence_warning_for_page(
             page=page_number,
             details={
                 "ocr_lang": ocr_lang,
+                "ocr_backend": ocr_backend,
                 "ocr_confidence_mean": metrics.mean,
                 "ocr_confidence_median": metrics.median,
                 "low_conf_token_ratio": metrics.low_conf_token_ratio,
@@ -192,6 +185,7 @@ def _confidence_warning_for_page(
 def _run_ocr_for_page(
     *,
     document: object,
+    backend: OCRBackend,
     page_number: int,
     force_ocr: bool,
     ocr_lang: str,
@@ -204,8 +198,9 @@ def _run_ocr_for_page(
         page = document.get_page(page_number - 1)
         bitmap = page.render(scale=2.0)
         pil_image = bitmap.to_pil()
-        text = (pytesseract.image_to_string(pil_image, lang=ocr_lang) or "").strip()
-        data = pytesseract.image_to_data(pil_image, lang=ocr_lang, output_type=pytesseract.Output.DICT)
+        backend_result = backend.recognize(pil_image, lang=ocr_lang)
+        text = backend_result.text
+        data = backend_result.confidence_data
 
         metrics = _extract_confidence_metrics(data)
         result.metrics = metrics
@@ -221,6 +216,7 @@ def _run_ocr_for_page(
                 page_number=page_number,
                 metrics=metrics,
                 ocr_lang=ocr_lang,
+                ocr_backend=backend.metadata.name,
                 ocr_context=ocr_context,
             )
             if confidence_warning is not None:
@@ -233,6 +229,7 @@ def _run_ocr_for_page(
                     page=page_number,
                     details={
                         "ocr_lang": ocr_lang,
+                        "ocr_backend": backend.metadata.name,
                         "reason": "empty_result",
                         "ocr_confidence_mean": metrics.mean,
                         "ocr_confidence_median": metrics.median,
@@ -248,7 +245,11 @@ def _run_ocr_for_page(
                     code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
                     message=f"OCR language data is unavailable for '{ocr_lang}'.",
                     page=page_number,
-                    details={"ocr_lang": ocr_lang, "reason": "language_data_missing"},
+                    details={
+                        "ocr_lang": ocr_lang,
+                        "ocr_backend": backend.metadata.name,
+                        "reason": "language_data_missing",
+                    },
                 )
             )
         else:
@@ -257,7 +258,11 @@ def _run_ocr_for_page(
                     code=WarningCode.OCR_FAILED,
                     message=f"OCR failed on page {page_number}: {exc}",
                     page=page_number,
-                    details={"ocr_lang": ocr_lang, "reason": "ocr_failed"},
+                    details={
+                        "ocr_lang": ocr_lang,
+                        "ocr_backend": backend.metadata.name,
+                        "reason": "ocr_failed",
+                    },
                 )
             )
     finally:
@@ -269,6 +274,7 @@ def _run_ocr_for_page(
 def _run_ocr_page_chunk(
     *,
     pdf_path: Path,
+    backend: OCRBackend,
     pages: tuple[int, ...],
     force_ocr: bool,
     ocr_lang: str,
@@ -298,6 +304,7 @@ def _run_ocr_page_chunk(
             result.page_results.append(
                 _run_ocr_for_page(
                     document=document,
+                    backend=backend,
                     page_number=page_number,
                     force_ocr=force_ocr,
                     ocr_lang=ocr_lang,
@@ -319,6 +326,7 @@ def run_ocr(
     force_ocr: bool,
     ocr_lang: str = "eng",
     worker_count: int = 1,
+    ocr_backend: str = "tesseract",
 ) -> OcrResult:
     result = OcrResult()
     target_pages: list[int] = []
@@ -337,13 +345,31 @@ def run_ocr(
         return result
     result.attempted_pages = target_pages
 
-    if pytesseract is None or pdfium is None:
+    try:
+        backend = get_ocr_backend(ocr_backend, pytesseract_module=pytesseract)
+    except ValueError:
+        result.warnings.append(
+            WarningEntry(
+                code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
+                message=f"OCR backend '{ocr_backend}' is not supported for conversion.",
+                details={
+                    "ocr_lang": ocr_lang,
+                    "ocr_backend": ocr_backend,
+                    "reason": "unsupported_ocr_backend",
+                    "attempted_pages": target_pages,
+                },
+            )
+        )
+        return result
+
+    if pdfium is None or not backend.is_available():
         result.warnings.append(
             WarningEntry(
                 code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
                 message="OCR dependencies are unavailable. Install pytesseract and pypdfium2.",
                 details={
                     "ocr_lang": ocr_lang,
+                    "ocr_backend": backend.metadata.name,
                     "reason": "dependency_unavailable",
                     "attempted_pages": target_pages,
                 },
@@ -351,24 +377,21 @@ def run_ocr(
         )
         return result
 
-    tesseract_cmd = _resolve_tesseract_cmd()
-    if tesseract_cmd is None:
+    runtime_error_reason = backend.configure_runtime()
+    if runtime_error_reason is not None:
         result.warnings.append(
             WarningEntry(
                 code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
                 message="Tesseract executable is unavailable. Install tesseract or add it to PATH.",
                 details={
                     "ocr_lang": ocr_lang,
-                    "reason": "tesseract_unavailable",
+                    "ocr_backend": backend.metadata.name,
+                    "reason": runtime_error_reason,
                     "attempted_pages": target_pages,
                 },
             )
         )
         return result
-    if shutil.which("tesseract") is None:
-        pytesseract_module = getattr(pytesseract, "pytesseract", None)
-        if pytesseract_module is not None:
-            pytesseract_module.tesseract_cmd = tesseract_cmd
     result.runtime_available = True
 
     effective_worker_count = _effective_ocr_worker_count(worker_count, len(target_pages))
@@ -378,6 +401,7 @@ def run_ocr(
         chunk_results = [
             _run_ocr_page_chunk(
                 pdf_path=pdf_path,
+                backend=backend,
                 pages=chunks[0],
                 force_ocr=force_ocr,
                 ocr_lang=ocr_lang,
@@ -391,6 +415,7 @@ def run_ocr(
                 executor.submit(
                     _run_ocr_page_chunk,
                     pdf_path=pdf_path,
+                    backend=backend,
                     pages=chunk,
                     force_ocr=force_ocr,
                     ocr_lang=ocr_lang,
