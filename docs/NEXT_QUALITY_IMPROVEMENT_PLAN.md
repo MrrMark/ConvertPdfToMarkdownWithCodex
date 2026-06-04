@@ -23,11 +23,6 @@
 
 ## 남은 작업
 
-### P0 / Q99. Page Worker Chunked Parallelization
-
-`page_workers > 1` 경로가 페이지마다 PDF를 다시 여는 구조 때문에 느려지는 문제를 해결한다.
-page 단위 worker를 page chunk 단위 worker로 바꿔 worker당 PDF open 횟수를 줄이고, single-worker 산출물과 hash equivalence를 유지한다.
-
 ### P1 / Q100. OCR Page Parallelization
 
 스캔 PDF 또는 `--force-ocr` 경로에서 OCR target page를 bounded worker로 병렬 처리한다.

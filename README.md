@@ -965,8 +965,8 @@ lint / format / packaging tooling 예시:
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q99-Q105입니다. 우선순위는 page worker 병렬화 재설계, OCR/page/table 성능 개선, fast output scope 검토, assetless technical RAG figure text chunk, Docling 벤치마킹/확장 설계 순서입니다.
-- 완료된 Q34-Q98 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q100-Q105입니다. 우선순위는 OCR page 병렬화, table adaptive strategy, fast output scope 검토, assetless technical RAG figure text chunk, Docling 벤치마킹/확장 설계 순서입니다.
+- 완료된 Q34-Q99 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 

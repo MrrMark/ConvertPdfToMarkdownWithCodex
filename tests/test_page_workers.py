@@ -19,9 +19,10 @@ from fixtures.pdf_builder import (
 )
 from pdf2md.cli import build_parser
 from pdf2md.config import Config
+from pdf2md.extractors.page_worker import PageWorkerInput
 from pdf2md.models import RagTableOutputMode
 from pdf2md.pipeline import run_conversion
-from pdf2md.utils.page_executor import effective_page_worker_count
+from pdf2md.utils.page_executor import _chunk_page_worker_inputs, effective_page_worker_count, run_page_workers
 from helpers.normalize_outputs import normalize_manifest, normalize_report
 
 
@@ -63,6 +64,18 @@ def test_effective_page_worker_count_is_capped() -> None:
     assert effective_page_worker_count(1, 10) == 1
     assert effective_page_worker_count(8, 1) == 1
     assert effective_page_worker_count(4, 3) <= 3
+
+
+def test_page_worker_inputs_are_chunked_by_effective_worker_count(tmp_path: Path) -> None:
+    inputs = [PageWorkerInput(pdf_path=tmp_path / "input.pdf", page=page) for page in range(1, 6)]
+
+    chunks = _chunk_page_worker_inputs(inputs, worker_count=3)
+
+    assert [[worker_input.page for worker_input in chunk] for chunk in chunks] == [[1, 2], [3, 4], [5]]
+
+
+def test_run_page_workers_accepts_empty_input() -> None:
+    assert run_page_workers([], worker_count=4) == []
 
 
 def test_page_workers_preserve_deterministic_outputs(tmp_path: Path) -> None:
@@ -107,6 +120,7 @@ def test_page_workers_preserve_deterministic_outputs(tmp_path: Path) -> None:
     assert parallel_report["summary"]["page_worker_count"] == 2
     assert parallel_report["summary"]["page_parallel_enabled"] is True
     assert parallel_report["summary"]["page_worker_effective_count"] == 2
+    assert parallel_report["summary"]["pdf_open_count"] == parallel_report["summary"]["page_worker_effective_count"] + 2
     assert parallel_manifest["options"]["page_workers"] == 2
     assert parallel_manifest["options"]["page_parallel_enabled"] is True
 
