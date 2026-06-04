@@ -58,11 +58,12 @@ python -m pdf2md.gui --doctor --doctor-format json
 - `기본 모드(원본 유지)`: 원문 보존을 우선하는 보수적 기본값이다.
 - `RAG 등록용(최적화)`: Markdown 원문을 임의로 바꾸지 않고 RAG table sidecar, page marker, header/footer 보정, hyphenation 보정, table context `embedding_text`, sibling chunk merge, relationship metadata 같은 RAG 친화 옵션을 켠다.
 - `기술 스펙 RAG`: storage/PCIe/security spec ingest를 위해 RAG sidecar와 chunk 보강 옵션을 켠다. NVMe/PCIe/OCP/TCG/SPDM 같은 도메인 adapter는 필요에 따라 별도로 선택한다.
+- `이미지 업로드 불가 RAG 대응`: GUI 전용 조합이다. 내부 profile은 `technical_spec_rag`를 사용하고, 이미지 파일을 만들지 않는 `placeholder` mode와 `figure_text` retrieval chunk를 함께 켠다. PNG/JPG를 팀 RAG에 올릴 수 없는 기술 스펙 문서에 사용한다.
 - `민감정보 보호 RAG`: confidential-safe mode와 sanitized report를 켜고, 공유용 RAG JSONL sidecar 중심으로 산출한다.
 - `원본 유지 + sidecar`: Markdown 본문 변화 가능성이 있는 보정은 끄고 RAG JSONL sidecar와 relationship metadata만 추가한다.
 - `Optimize Options(유저 선택)`: image/table/RAG/domain과 상세 flag를 직접 고른다.
 - `Pages`, `Password`, `OCR lang`, 입력/출력 경로는 preset을 바꿔도 유지된다.
-- `custom`이 아닌 preset에서는 세부 변환 옵션이 읽기 전용으로 표시된다.
+- `기술 스펙 RAG`와 `이미지 업로드 불가 RAG 대응`에서는 `Domain`과 manual domain 입력값을 바꿀 수 있다. 나머지 `custom`이 아닌 preset에서는 세부 변환 옵션이 읽기 전용으로 표시된다.
 
 ### Input
 
@@ -85,7 +86,9 @@ python -m pdf2md.gui --doctor --doctor-format json
 - `Image`: 이미지 출력 방식이다. 기본값은 `referenced`다.
 - `Table`: 표 출력 방식이다. 기본값은 `auto`다.
 - `RAG tables`: RAG table sidecar 출력 방식이다.
-- `Domain`: NVMe, PCIe, OCP, TCG, customer requirements 같은 도메인 adapter 선택이다.
+- `Domain`: NVMe, PCIe, OCP, TCG, SPDM, customer requirements, manual 같은 도메인 adapter 선택이다.
+- `Manual domain label`: `Domain=manual`일 때 `domain_units_rag.jsonl`의 `adapter_profile`에 기록할 사용자 정의 라벨이다. 예: `Customer A Requirements`
+- `Manual domain keywords`: `Domain=manual`일 때 표 header 인식에 추가할 키워드다. 쉼표, 세미콜론, 줄바꿈으로 구분한다. 예: `Customer Key, Customer Requirement`
 
 ### Flags
 
@@ -134,6 +137,8 @@ python -m pdf2md.gui --doctor --doctor-format json
 4. 목적에 맞는 preset을 선택하고, 필요하면 `Optimize Options(유저 선택)`에서 option과 flag를 조정한다.
 5. `Start conversion`을 누른다.
 6. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`를 확인한다.
+
+PNG/JPG 같은 이미지 asset을 업로드할 수 없는 팀 RAG라면 `이미지 업로드 불가 RAG 대응` preset을 선택한다. 이 preset은 `document.md`에 image placeholder만 남기고, `figures_rag.jsonl`과 `retrieval_chunks_rag.jsonl`의 `chunk_type="figure_text"` record로 그림 주변의 관측 텍스트 provenance를 보존한다. 도메인 분류가 필요하면 같은 화면에서 `Domain`을 `nvme`, `pcie`, `spdm`, `manual` 등으로 지정한다.
 
 ## 4) 폴더 배치 변환
 

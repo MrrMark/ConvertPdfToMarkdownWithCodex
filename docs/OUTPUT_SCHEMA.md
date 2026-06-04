@@ -70,6 +70,7 @@ Stable nested fields:
 - `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
 - `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
 - `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
+- `options.manual_domain_adapter_label`, `options.manual_domain_adapter_keywords` when `options.domain_adapter="manual"` and those inputs were provided
 - `options.retrieval_chunk_max_tokens`, `options.retrieval_tokenizer`, `options.rag_contextual_embedding_text`, `options.rag_merge_sibling_text_chunks`, `options.rag_chunk_relationship_metadata`, `options.rag_figure_text_chunks` when enabled
 - `options.output_profile`, `options.rag_sidecar_scope`, `options.rag_sidecar_omitted_outputs`, `options.rag_sidecar_omitted_reason` when a non-full output scope was selected
 - `options.confidential_safe_mode`, `options.local_only_processing`, `options.external_llm_calls`, `options.external_embedding_calls`, `options.path_redaction`
@@ -137,6 +138,7 @@ Assetless figure text summary fields:
 
 - `rag_figure_text_chunks`: present and `true` when `--rag-figure-text-chunks` was enabled.
 - `figure_text_chunk_record_count`: final `retrieval_chunks_rag.jsonl` records with `chunk_type="figure_text"`.
+- `manual_domain_adapter_label`, `manual_domain_adapter_keywords`: present only when `--domain-adapter manual` was selected and those inputs were provided.
 
 `summary.table_quality[]` optional diagnostics:
 
@@ -587,9 +589,10 @@ Required per JSONL record:
 Policy:
 
 - Default adapter is `none`, so this file is only written when a domain adapter is explicitly selected.
-- Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, and `customer-requirements`.
+- Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`, and `manual`.
 - TCG domain units may use `security_method`, `security_object`, `security_authority`, `security_field`, `security_provider`, `locking_range`, `key_management`, or `session_state`; TCG is expected to map to SSD `HIL/TCG` without a CustomerRequirement fallback.
 - SPDM domain units may use `spdm_message`, `spdm_request_response`, `spdm_measurement`, `spdm_certificate`, `spdm_algorithm`, `spdm_key_exchange`, or `spdm_session`; SPDM maps to SSD `HIL/SPDM`.
+- Manual domain units keep `domain="manual"` and set `adapter_profile` to `--manual-domain-adapter-label` when provided, otherwise `manual`. `--manual-domain-adapter-keywords` only expands deterministic table header recognition; record `text`, `name`, `value`, and `description` are copied from observed table/technical-table provenance and are not generated.
 - Adapter profiles consume the typed technical table sidecar where possible and keep domain heuristics out of the default conversion path.
 
 ## corpus_manifest.json

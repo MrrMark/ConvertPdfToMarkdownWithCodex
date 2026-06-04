@@ -262,8 +262,9 @@ pdf2md-gui
 ```
 
 GUI 기본 언어는 한국어이며, 화면 상단에서 `English`로 바꿀 수 있습니다.
-옵션은 처음부터 세부 flag를 고르는 대신 `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `기술 스펙 RAG`, `민감정보 보호 RAG`, `원본 유지 + sidecar`, `Optimize Options(유저 선택)` preset 중 하나를 먼저 선택합니다. `pages`, `password`, `OCR lang`, 입력/출력 경로는 preset이 바뀌어도 유지됩니다.
-GUI에서는 입력 모드(단일 PDF 파일 / PDF 폴더), 입력 경로, 출력 폴더, page range, password, OCR, image/table/RAG/domain 옵션, confidential-safe mode, skip-existing 같은 주요 옵션을 선택할 수 있습니다. 폴더 배치에서는 `Previous corpus manifest`와 `Reuse unchanged`로 CLI의 `--previous-corpus-manifest`, `--reuse-unchanged` 흐름을 사용할 수 있습니다.
+옵션은 처음부터 세부 flag를 고르는 대신 `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `기술 스펙 RAG`, `이미지 업로드 불가 RAG 대응`, `민감정보 보호 RAG`, `원본 유지 + sidecar`, `Optimize Options(유저 선택)` preset 중 하나를 먼저 선택합니다. `pages`, `password`, `OCR lang`, 입력/출력 경로는 preset이 바뀌어도 유지됩니다.
+GUI에서는 입력 모드(단일 PDF 파일 / PDF 폴더), 입력 경로, 출력 폴더, page range, password, OCR, image/table/RAG/domain 옵션, manual domain adapter label/keywords, confidential-safe mode, skip-existing 같은 주요 옵션을 선택할 수 있습니다. 폴더 배치에서는 `Previous corpus manifest`와 `Reuse unchanged`로 CLI의 `--previous-corpus-manifest`, `--reuse-unchanged` 흐름을 사용할 수 있습니다.
+팀 RAG가 PNG/JPG 업로드를 지원하지 않는 경우 GUI에서는 `이미지 업로드 불가 RAG 대응` preset을 선택합니다. 이 preset은 내부적으로 `technical_spec_rag` profile을 사용하면서 `image_mode=placeholder`와 `rag_figure_text_chunks=true`를 적용합니다.
 `Optimize Options(유저 선택)`에서는 Expert options로 `page_workers`, `debug`, `verbose`를 조정할 수 있고, Import profile / Export profile로 local-only 실행 profile을 저장하거나 불러올 수 있습니다. profile은 password, input/output path, previous corpus manifest path, 원문 PDF/Markdown 내용, 표/이미지 내용을 저장하지 않습니다.
 실행 중에는 단일 변환 indeterminate progress 또는 폴더 배치 문서 index/total progress와 percent text를 표시합니다. 단일 PDF는 실제 page-level 진행률 callback이 들어올 때만 `Page 1/3 (33%)` 같은 percent로 전환하고, 완료 시 `100%`를 표시합니다.
 완료 summary/log에는 document count, status count, retry candidate count, elapsed time, processed page count, pages/sec가 함께 표시됩니다.
@@ -440,6 +441,7 @@ python3 -m pdf2md spec.pdf -o output/spec \
 - `retrieval_chunks_rag.jsonl`에는 opt-in `chunk_type="figure_text"` record를 추가합니다.
 - `figure_text.text`는 관측된 caption/heading/label/nearby text와 conservative figure kind만 사용하며 생성형 이미지 설명은 기본 출력에 넣지 않습니다.
 - `source_refs`는 `figures_rag.jsonl`의 `figure_id`, page, bbox로 해소되며 이미지 path는 chunk source ref에 넣지 않습니다.
+- GUI에서는 `이미지 업로드 불가 RAG 대응` preset을 선택하면 같은 조합이 적용됩니다.
 
 ### RAG용 도메인 adapter
 
@@ -448,7 +450,8 @@ python3 -m pdf2md input.pdf -o output/ --domain-adapter nvme --rag-table-output 
 ```
 
 - 기본값은 `none`이며, 도메인 heuristic은 기본 변환 로직에 섞지 않습니다.
-- `nvme`, `pcie`, `ocp`, `tcg`, `customer-requirements` adapter는 표 provenance가 명확한 command/opcode/register field/bitfield/log page/requirement/security method/security object/security authority/security field 행만 `domain_units_rag.jsonl`로 생성합니다.
+- `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`, `manual` adapter는 표 provenance가 명확한 command/opcode/register field/bitfield/log page/requirement/security method/security object/security authority/SPDM/manual requirement 행만 `domain_units_rag.jsonl`로 생성합니다.
+- `manual` adapter는 `--manual-domain-adapter-label`, `--manual-domain-adapter-keywords`로 사용자 정의 requirement header를 보수적으로 추가 인식합니다. 예: `--domain-adapter manual --manual-domain-adapter-label "Customer A Requirements" --manual-domain-adapter-keywords "Customer Key, Customer Requirement"`
 - 생성된 domain unit은 `retrieval_chunks_rag.jsonl`에도 provenance와 함께 포함됩니다.
 
 ### 고객 대외비 스펙 안전 모드
@@ -867,7 +870,7 @@ python3 -m pdf2md input.pdf -o output/ --rag-profile preserve_with_sidecars
 - `figures_rag.jsonl`: 이미지/도표 bbox, caption, OCR 후보, nearby heading, nearby text refs, figure kind를 별도 기록합니다.
 - `rag_tables.md`: 검색 chunk에 넣기 쉬운 행 단위 Markdown입니다.
 - `tables_rag.jsonl`: `table_id`, `table_row_id`, `page`, `table_index`, `headers`, `cells`, `row_text`, `bbox`, `quality_score`, `fallback_reasons`를 가진 행 단위 JSONL입니다.
-- `domain_units_rag.jsonl`: `--domain-adapter nvme|pcie|ocp|tcg|customer-requirements` 사용 시 domain unit을 기록합니다.
+- `domain_units_rag.jsonl`: `--domain-adapter nvme|pcie|ocp|tcg|spdm|customer-requirements|manual` 사용 시 domain unit을 기록합니다.
 - 텍스트 블록 sidecar는 본문을 요약하거나 재서술하지 않고, 추출된 원문 블록과 provenance만 기록합니다.
 - semantic sidecar도 요약/재서술/설명 생성을 하지 않고, 명확한 스펙 신호만 보수적으로 분류합니다.
 - sidecar는 셀 텍스트를 요약하거나 해석하지 않고, 추출된 셀을 행 단위로 재배열만 합니다.
@@ -1005,7 +1008,7 @@ lint / format / packaging tooling 예시:
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
 - 현재 active quality backlog는 없습니다.
-- 완료된 Q34-Q105 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 완료된 Q34-Q106 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 - Docling-informed OCR/layout 확장 판단은 `docs/DOCLING_INFORMED_EXTENSION_DESIGN.md`에서 확인합니다.
 
 ### 이후 후보

@@ -96,6 +96,53 @@ def test_domain_adapter_is_opt_in_and_feeds_retrieval_chunks() -> None:
     assert chunks[0]["source_refs"][-1]["source_type"] == "domain_unit"
 
 
+def test_manual_domain_adapter_uses_user_keywords_without_generated_text() -> None:
+    rag_tables = normalize_rag_table_payload(
+        [
+            {
+                "page": 3,
+                "table_index": 1,
+                "headers": ["Customer Key", "Customer Requirement", "Verification Note"],
+                "records": [
+                    {
+                        "page": 3,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Customer Key", "Customer Requirement", "Verification Note"],
+                        "cells": {
+                            "Customer Key": "CUST-LAT-001",
+                            "Customer Requirement": "The controller shall preserve latency telemetry.",
+                            "Verification Note": "Trace to customer acceptance test.",
+                        },
+                        "row_text": (
+                            "Customer Key = CUST-LAT-001 | Customer Requirement = The controller shall preserve "
+                            "latency telemetry. | Verification Note = Trace to customer acceptance test."
+                        ),
+                    }
+                ],
+            }
+        ]
+    )
+
+    records = build_domain_units(
+        domain_adapter=DomainAdapterMode.MANUAL,
+        rag_tables=rag_tables,
+        manual_adapter_label="Customer A Requirements",
+        manual_adapter_keywords="Customer Key, Customer Requirement",
+    )
+
+    assert len(records) == 1
+    record = records[0]
+    assert record["domain"] == "manual"
+    assert record["adapter_profile"] == "Customer A Requirements"
+    assert record["unit_type"] == "requirement"
+    assert record["name"] == "CUST-LAT-001"
+    assert record["value"] == "CUST-LAT-001"
+    assert record["description"] == "The controller shall preserve latency telemetry."
+    assert record["classification_reasons"] == ["manual_requirement_id_row"]
+    assert "Trace to customer acceptance test." in record["text"]
+
+
 def test_domain_adapter_profiles_extract_pcie_ocp_tcg_and_customer_units() -> None:
     pcie_tables = [
         {

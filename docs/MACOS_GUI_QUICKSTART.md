@@ -191,7 +191,7 @@ python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gui-benchma
 6. 선택한 결과 행의 Markdown/report/manifest/assets 또는 output folder가 열리는지 확인한다.
 7. 폴더 배치에서 `Open Corpus Manifest`, `Open Corpus Diff`, `Open Requirement Impact`가 생성된 corpus-level artifact를 여는지 확인한다.
 8. 기본 한국어 UI에서 `English`로 바꿨을 때 주요 label/button/status가 영어로 바뀌는지 확인한다.
-9. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `Optimize Options(유저 선택)` preset 변경 시 세부 옵션 잠금/해제가 맞는지 확인한다.
+9. `기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `기술 스펙 RAG`, `이미지 업로드 불가 RAG 대응`, `Optimize Options(유저 선택)` preset 변경 시 세부 옵션 잠금/해제가 맞는지 확인한다.
 10. Expert options에서 `Page workers`, `Debug artifacts`, `Verbose logs`를 조정할 수 있는지 확인한다.
 11. Export profile로 저장한 JSON에 password, input/output path, previous corpus manifest path, 원문 PDF/Markdown 내용이 들어가지 않는지 확인한다.
 12. Import profile이 현재 password를 유지하면서 option만 적용하는지 확인한다.

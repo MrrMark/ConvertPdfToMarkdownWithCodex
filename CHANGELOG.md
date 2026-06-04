@@ -5,6 +5,7 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add GUI `이미지 업로드 불가 RAG 대응` preset and manual domain adapter inputs for customer requirement table headers.
 - Add Docling-informed OCR/layout extension design, keeping new backend, region OCR, and picture-description work gated on Docling-installed benchmark evidence.
 - Add local-only Docling comparison harness outputs with sanitized benchmark, artifact comparison, scorecard, and schema contracts.
 - Add opt-in assetless `figure_text` retrieval chunks for placeholder image mode in RAG environments that cannot ingest image files.

@@ -321,10 +321,12 @@ RAG용 도메인 adapter:
 
 ```powershell
 python -m pdf2md .\sample.pdf -o .\output --domain-adapter nvme --rag-table-output jsonl
+python -m pdf2md .\sample.pdf -o .\output --rag-profile technical_spec_rag --domain-adapter manual --manual-domain-adapter-label "Customer A Requirements" --manual-domain-adapter-keywords "Customer Key, Customer Requirement"
 ```
 
 - 기본값은 `none`입니다.
-- `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements` adapter는 명확한 표 header가 있는 command/opcode/register field/bitfield/log page/requirement/security method/security object/security authority/SPDM message/measurement/certificate/algorithm field만 `domain_units_rag.jsonl`로 생성합니다.
+- `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`, `manual` adapter는 명확한 표 header가 있는 command/opcode/register field/bitfield/log page/requirement/security method/security object/security authority/SPDM message/measurement/certificate/algorithm/manual requirement field만 `domain_units_rag.jsonl`로 생성합니다.
+- GUI에서는 이미지 파일을 업로드할 수 없는 RAG 환경에 `이미지 업로드 불가 RAG 대응` preset을 사용하고, 고객 requirement 표 header가 기존 adapter와 다르면 `Domain=manual`, `Manual domain label`, `Manual domain keywords`를 입력합니다.
 
 고객 대외비 스펙을 공유 가능한 metadata로 점검해야 하면:
 

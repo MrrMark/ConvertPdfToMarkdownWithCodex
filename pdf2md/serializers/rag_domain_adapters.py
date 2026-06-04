@@ -77,10 +77,60 @@ SPDM_HEADER_TOKENS = {
     "state",
     "value",
 }
+MANUAL_REQUIREMENT_TOKENS = OCP_HEADER_TOKENS | {
+    "customer",
+    "customerid",
+    "customerrequirement",
+    "id",
+    "must",
+    "requirementdescription",
+    "requirementid",
+    "reqid",
+    "shall",
+}
+MANUAL_REQUIREMENT_ID_FIELDS = (
+    "Requirement ID",
+    "Req ID",
+    "ID",
+    "Requirement",
+    "Customer Requirement ID",
+    "Customer Req ID",
+)
+MANUAL_DESCRIPTION_FIELDS = (
+    "Description",
+    "Requirement Description",
+    "Customer Requirement",
+    "Requirement Text",
+    "Requirement",
+)
 
 
 def _clean_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def _split_manual_adapter_keywords(value: str | None) -> tuple[str, ...]:
+    if not value:
+        return ()
+    keywords: list[str] = []
+    seen: set[str] = set()
+    for raw_part in re.split(r"[,;\n]+", value):
+        keyword = raw_part.strip()
+        if not keyword:
+            continue
+        cleaned = _clean_key(keyword)
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        keywords.append(cleaned)
+    return tuple(keywords)
+
+
+def _adapter_profile(domain_adapter: DomainAdapterMode, manual_adapter_label: str | None) -> str:
+    if domain_adapter is not DomainAdapterMode.MANUAL:
+        return domain_adapter.value
+    label = re.sub(r"\s+", " ", (manual_adapter_label or "").strip())
+    return label[:120] if label else DomainAdapterMode.MANUAL.value
 
 
 def _cell_value(cells: dict[str, Any], *names: str) -> str | None:
@@ -92,6 +142,16 @@ def _cell_value(cells: dict[str, Any], *names: str) -> str | None:
         text = str(value).strip()
         if text:
             return text
+    return None
+
+
+def _manual_token_cell_value(cells: dict[str, Any], manual_tokens: set[str]) -> tuple[str, str] | None:
+    for key, value in cells.items():
+        if _clean_key(str(key)) not in manual_tokens:
+            continue
+        text = str(value).strip()
+        if text:
+            return str(key), text
     return None
 
 
@@ -112,6 +172,7 @@ def _unit_from_row(
     record: dict[str, Any],
     *,
     domain_adapter: DomainAdapterMode,
+    manual_tokens: set[str] | None = None,
 ) -> tuple[str, str, str | None, str | None, list[str]] | None:
     cells = record.get("cells")
     if not isinstance(cells, dict):
@@ -143,9 +204,30 @@ def _unit_from_row(
     algorithm = _cell_value(cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm")
     key_exchange = _cell_value(cells, "Key Exchange", "KeyExchange", "Key Exchange Parameter")
     spdm_session = _cell_value(cells, "Session", "Session State", "State")
+    manual_tokens = manual_tokens or set()
 
     if domain_adapter in {DomainAdapterMode.OCP, DomainAdapterMode.CUSTOMER_REQUIREMENTS} and requirement_id:
         return "requirement", requirement_id, requirement_id, description, [f"{prefix}_requirement_id_row"]
+    if domain_adapter is DomainAdapterMode.MANUAL:
+        manual_requirement_id = _cell_value(cells, *MANUAL_REQUIREMENT_ID_FIELDS)
+        manual_description = _cell_value(cells, *MANUAL_DESCRIPTION_FIELDS) or description
+        if manual_requirement_id:
+            return (
+                "requirement",
+                manual_requirement_id,
+                manual_requirement_id,
+                manual_description,
+                [f"{prefix}_requirement_id_row"],
+            )
+        manual_match = _manual_token_cell_value(cells, manual_tokens)
+        if manual_match is not None:
+            header, name = manual_match
+            unit_type = (
+                "requirement"
+                if any("requirement" in _clean_key(str(cell_header)) for cell_header in cells)
+                else "manual_field"
+            )
+            return unit_type, name, value or name, manual_description, [f"{prefix}_keyword_row"]
     if domain_adapter is DomainAdapterMode.TCG:
         if method:
             return "security_method", method, value or uid or opcode, description, [f"{prefix}_security_method_row"]
@@ -196,7 +278,7 @@ def _unit_from_row(
     return None
 
 
-def _domain_tokens(domain_adapter: DomainAdapterMode) -> set[str]:
+def _domain_tokens(domain_adapter: DomainAdapterMode, manual_tokens: set[str] | None = None) -> set[str]:
     if domain_adapter is DomainAdapterMode.NVME:
         return NVME_HEADER_TOKENS
     if domain_adapter is DomainAdapterMode.PCIE:
@@ -209,6 +291,8 @@ def _domain_tokens(domain_adapter: DomainAdapterMode) -> set[str]:
         return SPDM_HEADER_TOKENS
     if domain_adapter is DomainAdapterMode.CUSTOMER_REQUIREMENTS:
         return OCP_HEADER_TOKENS | {"id", "reqid", "shall", "must"}
+    if domain_adapter is DomainAdapterMode.MANUAL:
+        return MANUAL_REQUIREMENT_TOKENS | set(manual_tokens or set())
     return set()
 
 
@@ -216,6 +300,7 @@ def _unit_from_technical_record(
     record: dict[str, Any],
     *,
     domain_adapter: DomainAdapterMode,
+    manual_tokens: set[str] | None = None,
 ) -> tuple[str, str, str | None, str | None, list[str]] | None:
     unit_type = str(record.get("unit_type") or "")
     raw_cells = record.get("raw_cells")
@@ -309,6 +394,21 @@ def _unit_from_technical_record(
         if req_id:
             return "requirement", req_id, req_id, description, ["customer_requirement_id_row"]
 
+    if domain_adapter is DomainAdapterMode.MANUAL:
+        manual_description = _cell_value(raw_cells, *MANUAL_DESCRIPTION_FIELDS) or description
+        req_id = requirement_ref or _cell_value(raw_cells, *MANUAL_REQUIREMENT_ID_FIELDS)
+        if req_id:
+            return "requirement", req_id, req_id, manual_description, ["manual_requirement_id_row"]
+        manual_match = _manual_token_cell_value(raw_cells, manual_tokens or set())
+        if manual_match is not None:
+            header, name = manual_match
+            unit_type = (
+                "requirement"
+                if any("requirement" in _clean_key(str(cell_header)) for cell_header in raw_cells)
+                else "manual_field"
+            )
+            return unit_type, name, value or name, manual_description, ["manual_keyword_technical_row"]
+
     return None
 
 
@@ -373,6 +473,13 @@ def _normalized_domain_fields(
                 "session_state": _cell_value(cells, "Session", "Session State", "State"),
             }
         )
+    if domain_adapter is DomainAdapterMode.MANUAL:
+        fields.update(
+            {
+                "requirement_id": _cell_value(cells, *MANUAL_REQUIREMENT_ID_FIELDS),
+                "requirement_description": _cell_value(cells, *MANUAL_DESCRIPTION_FIELDS),
+            }
+        )
     return _without_empty_fields(fields)
 
 
@@ -381,6 +488,8 @@ def build_domain_units(
     domain_adapter: DomainAdapterMode | str,
     rag_tables: list[dict[str, Any]],
     technical_table_records: list[dict[str, Any]] | None = None,
+    manual_adapter_label: str | None = None,
+    manual_adapter_keywords: str | None = None,
 ) -> list[dict[str, Any]]:
     """Build opt-in domain-specific RAG records from deterministic table provenance."""
     if not isinstance(domain_adapter, DomainAdapterMode):
@@ -389,11 +498,17 @@ def build_domain_units(
         return []
 
     records: list[dict[str, Any]] = []
+    manual_tokens = set(_split_manual_adapter_keywords(manual_adapter_keywords))
+    adapter_profile = _adapter_profile(domain_adapter, manual_adapter_label)
     adapter_technical_records = (
         technical_table_records if technical_table_records is not None else build_technical_table_records(rag_tables)
     )
     for technical_record in adapter_technical_records:
-        unit = _unit_from_technical_record(technical_record, domain_adapter=domain_adapter)
+        unit = _unit_from_technical_record(
+            technical_record,
+            domain_adapter=domain_adapter,
+            manual_tokens=manual_tokens,
+        )
         if unit is None:
             continue
         unit_type, name, value, description, reasons = unit
@@ -413,7 +528,7 @@ def build_domain_units(
                 "domain_unit_id": f"domain-{domain_adapter.value}-{index:06d}",
                 "domain_unit_index": index,
                 "domain": domain_adapter.value,
-                "adapter_profile": domain_adapter.value,
+                "adapter_profile": adapter_profile,
                 "adapter_version": "1.0",
                 "unit_type": unit_type,
                 "name": name,
@@ -446,9 +561,9 @@ def build_domain_units(
         )
 
     for table_row in flatten_rag_table_records(normalize_rag_table_payload(rag_tables)):
-        if not _known_domain_row(table_row, _domain_tokens(domain_adapter)):
+        if not _known_domain_row(table_row, _domain_tokens(domain_adapter, manual_tokens)):
             continue
-        unit = _unit_from_row(table_row, domain_adapter=domain_adapter)
+        unit = _unit_from_row(table_row, domain_adapter=domain_adapter, manual_tokens=manual_tokens)
         if unit is None:
             continue
         unit_type, name, value, description, reasons = unit
@@ -456,10 +571,10 @@ def build_domain_units(
         index = len(records) + 1
         records.append(
             {
-                "domain_unit_id": f"domain-nvme-{index:06d}",
+                "domain_unit_id": f"domain-{domain_adapter.value}-{index:06d}",
                 "domain_unit_index": index,
                 "domain": domain_adapter.value,
-                "adapter_profile": domain_adapter.value,
+                "adapter_profile": adapter_profile,
                 "adapter_version": "1.0",
                 "unit_type": unit_type,
                 "name": name,

@@ -15,7 +15,7 @@ from pdf2md.gui_profiles import (
     write_gui_profile,
 )
 from pdf2md.gui_runner import GuiConversionOptions, GuiDiagnosticError
-from pdf2md.models import ImageMode, OutputProfile, RagSidecarScope, RagTableOutputMode, TableMode
+from pdf2md.models import DomainAdapterMode, ImageMode, OutputProfile, RagSidecarScope, RagTableOutputMode, TableMode
 
 
 def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path) -> None:
@@ -27,6 +27,9 @@ def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path)
         rag_table_output=RagTableOutputMode.JSONL.value,
         output_profile=OutputProfile.FAST.value,
         rag_sidecar_scope=RagSidecarScope.MINIMAL.value,
+        domain_adapter=DomainAdapterMode.MANUAL.value,
+        manual_domain_adapter_label="Customer A Requirements",
+        manual_domain_adapter_keywords="Customer ID, Customer Requirement",
         force_ocr=True,
         ocr_lang="kor+eng",
         rag_figure_text_chunks=True,
@@ -45,6 +48,9 @@ def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path)
     assert payload["options"]["page_workers"] == 4
     assert payload["options"]["output_profile"] == "fast"
     assert payload["options"]["rag_sidecar_scope"] == "minimal"
+    assert payload["options"]["domain_adapter"] == "manual"
+    assert payload["options"]["manual_domain_adapter_label"] == "Customer A Requirements"
+    assert payload["options"]["manual_domain_adapter_keywords"] == "Customer ID, Customer Requirement"
     assert payload["options"]["rag_figure_text_chunks"] is True
     assert payload["options"]["debug"] is True
     assert payload["options"]["verbose"] is True

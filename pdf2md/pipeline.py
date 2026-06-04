@@ -316,7 +316,7 @@ def _technical_profile_domain_adapter_warning(config: Config, domain_adapter: Do
         details={
             "rag_profile": config.rag_profile,
             "domain_adapter": domain_adapter.value,
-            "recommended_domain_adapters": ["nvme", "pcie", "ocp", "tcg", "spdm", "customer-requirements"],
+            "recommended_domain_adapters": ["nvme", "pcie", "ocp", "tcg", "spdm", "customer-requirements", "manual"],
         },
     )
 
@@ -953,6 +953,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 domain_adapter=domain_adapter,
                 rag_tables=contextual_rag_tables,
                 technical_table_records=technical_table_records,
+                manual_adapter_label=config.manual_domain_adapter_label,
+                manual_adapter_keywords=config.manual_domain_adapter_keywords,
             )
             if write_full_rag_sidecars:
                 domain_unit_record_count, domain_unit_file_count = write_domain_unit_output(config, domain_units)
@@ -1074,6 +1076,11 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         "pages": config.pages,
         "version": config.version,
     }
+    if domain_adapter is DomainAdapterMode.MANUAL:
+        if config.manual_domain_adapter_label:
+            manifest_options["manual_domain_adapter_label"] = config.manual_domain_adapter_label
+        if config.manual_domain_adapter_keywords:
+            manifest_options["manual_domain_adapter_keywords"] = config.manual_domain_adapter_keywords
     if write_minimal_rag_sidecars:
         manifest_options.update(
             {
@@ -1188,6 +1195,11 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     if config.rag_figure_text_chunks:
         report_summary_extras["rag_figure_text_chunks"] = True
         report_summary_extras["figure_text_chunk_record_count"] = figure_text_chunk_record_count
+    if domain_adapter is DomainAdapterMode.MANUAL:
+        if config.manual_domain_adapter_label:
+            report_summary_extras["manual_domain_adapter_label"] = config.manual_domain_adapter_label
+        if config.manual_domain_adapter_keywords:
+            report_summary_extras["manual_domain_adapter_keywords"] = config.manual_domain_adapter_keywords
     report = build_report(
         started_at=started_at,
         finished_at=finished_at,

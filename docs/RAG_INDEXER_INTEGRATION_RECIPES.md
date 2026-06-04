@@ -30,7 +30,7 @@ CLI와 GUI preset은 같은 local-only profile matrix를 사용한다.
 | --- | --- | --- |
 | `preserve` | 기본 원문 보존 | RAG table sidecar와 chunk 보강 옵션을 보수적으로 끔 |
 | `rag_optimized` | 일반 RAG ingest | RAG table both, page marker, header/footer removal, hyphen repair, contextual embedding text, sibling merge, relationship metadata |
-| `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg|spdm`와 함께 사용 |
+| `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg|spdm|manual`와 함께 사용 |
 | `confidential_rag` | 공유/evidence pack | confidential-safe mode, JSONL table sidecar, chunk 보강, sanitized report |
 | `preserve_with_sidecars` | Markdown 원문 보존 + sidecar ingest | 본문 변화 가능성이 있는 header/footer/hyphen repair는 끄고 JSONL sidecar와 relationship metadata만 추가 |
 
@@ -42,6 +42,7 @@ python3 -m pdf2md spec.pdf -o output/share --rag-profile confidential_rag
 ## Assetless Figure Text Chunks
 
 PNG/JPG 같은 image asset을 업로드할 수 없는 팀 RAG 환경에서는 placeholder mode와 figure_text chunk를 함께 사용한다.
+GUI에서는 `이미지 업로드 불가 RAG 대응` preset을 선택하면 같은 조합이 적용된다. 이 GUI preset은 새 CLI profile이 아니라 `technical_spec_rag`에 `image_mode=placeholder`, `rag_figure_text_chunks=true`를 더한 조합이다.
 
 ```bash
 python3 -m pdf2md spec.pdf -o output/spec \
@@ -60,6 +61,25 @@ python3 -m pdf2md spec.pdf -o output/spec \
 - 생성형 picture description, VLM 설명, 사람이 읽기 좋게 만든 요약은 기본 출력에 넣지 않는다.
 - `figure_text.source_refs[]`는 `figures_rag.jsonl`의 `figure_id`, page, bbox로 해소되어야 하며 image path는 넣지 않는다.
 - `--rag-sidecar-scope minimal`을 함께 쓰더라도 `--rag-figure-text-chunks`가 켜져 있으면 `figures_rag.jsonl`은 provenance 해소를 위해 함께 생성된다.
+
+## Manual Domain Adapter
+
+기존 `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`에 맞지 않는 고객 requirement 표는 `manual` adapter로 header 키워드를 보수적으로 추가한다.
+
+```bash
+python3 -m pdf2md customer-spec.pdf -o output/customer \
+  --rag-profile technical_spec_rag \
+  --domain-adapter manual \
+  --manual-domain-adapter-label "Customer A Requirements" \
+  --manual-domain-adapter-keywords "Customer Key, Customer Requirement"
+```
+
+운영 정책:
+
+- `domain_units_rag.jsonl`의 `domain`은 `manual`로 유지하고, `adapter_profile`에 manual label을 기록한다.
+- manual keywords는 table header matching을 넓히는 데만 사용한다.
+- domain unit의 `text`, `name`, `value`, `description`은 표 또는 typed technical table sidecar에서 관측된 값만 사용한다.
+- 고객별 downstream mapping은 RAG/indexer 쪽 profile 문서에서 `manual` adapter label을 기준으로 관리한다.
 
 검증:
 
@@ -139,7 +159,7 @@ python scripts/run_preset_eval.py \
 - `preset_artifact_comparison.json`: raw content 없이 artifact 존재/크기/record count와 주요 metric delta
 - `preset_scorecard.md`: 사람이 빠르게 보는 점수표
 
-`technical_spec_rag`는 `--domain-adapter nvme|pcie|ocp|tcg|spdm`를 함께 지정해야 domain unit, technical table, SSD contract gate가 의미 있게 동작한다. 실제 corpus 원문은 커밋하지 않고 위 세 파일처럼 sanitized summary만 공유한다.
+`technical_spec_rag`는 `--domain-adapter nvme|pcie|ocp|tcg|spdm|manual`를 함께 지정해야 domain unit, technical table, SSD contract gate가 의미 있게 동작한다. 실제 corpus 원문은 커밋하지 않고 위 세 파일처럼 sanitized summary만 공유한다.
 
 release gate에 포함:
 
@@ -249,7 +269,7 @@ python scripts/analyze_corpus_evidence_pack.py --evidence-pack local_corpus_evid
 python scripts/compare_corpus_evidence_packs.py --baseline old_evidence_pack.json --current local_corpus_evidence_pack.json --fail-on-new-signature
 ```
 
-운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg|spdm`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
+운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg|spdm|manual`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
 
 ## Azure AI Search
 

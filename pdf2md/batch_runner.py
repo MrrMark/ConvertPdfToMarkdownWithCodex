@@ -54,6 +54,8 @@ class BatchConversionOptions:
     rag_sidecar_scope: RagSidecarScope | None = None
     rag_profile: str = DEFAULT_RAG_PURPOSE_PROFILE
     domain_adapter: DomainAdapterMode = DomainAdapterMode.NONE
+    manual_domain_adapter_label: str | None = None
+    manual_domain_adapter_keywords: str | None = None
     confidential_safe_mode: bool = False
     force_ocr: bool = False
     ocr_lang: str = "eng"
@@ -138,6 +140,8 @@ def build_batch_config(pdf_path: Path, output_root: Path, options: BatchConversi
         rag_sidecar_scope=options.rag_sidecar_scope,
         rag_profile=options.rag_profile,
         domain_adapter=options.domain_adapter,
+        manual_domain_adapter_label=options.manual_domain_adapter_label,
+        manual_domain_adapter_keywords=options.manual_domain_adapter_keywords,
         confidential_safe_mode=options.confidential_safe_mode,
         force_ocr=options.force_ocr,
         ocr_lang=options.ocr_lang,

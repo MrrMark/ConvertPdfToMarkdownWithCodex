@@ -26,6 +26,8 @@ class Config(BaseModel):
     rag_sidecar_scope: RagSidecarScope | None = None
     rag_profile: str = DEFAULT_RAG_PURPOSE_PROFILE
     domain_adapter: DomainAdapterMode = DomainAdapterMode.NONE
+    manual_domain_adapter_label: Optional[str] = None
+    manual_domain_adapter_keywords: Optional[str] = None
     confidential_safe_mode: bool = False
     force_ocr: bool = False
     ocr_lang: str = "eng"
@@ -92,6 +94,14 @@ class Config(BaseModel):
         if value not in SUPPORTED_RAG_PURPOSE_PROFILES:
             raise ValueError(f"rag_profile must be one of: {', '.join(SUPPORTED_RAG_PURPOSE_PROFILES)}")
         return value
+
+    @field_validator("manual_domain_adapter_label", "manual_domain_adapter_keywords")
+    @classmethod
+    def _normalize_optional_text(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 def default_output_dir_for_input(input_pdf: Path) -> Path:

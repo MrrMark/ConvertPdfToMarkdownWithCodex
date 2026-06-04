@@ -5,25 +5,38 @@ from typing import Literal
 
 from pdf2md.gui_i18n import GuiLanguage, translate
 from pdf2md.gui_runner import GuiConversionOptions
-from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, rag_profile_options
+from pdf2md.models import ImageMode
+from pdf2md.rag_profiles import rag_profile_options
 
 
+ASSETLESS_TECHNICAL_SPEC_RAG_PRESET = "assetless_technical_spec_rag"
 GuiOptionPreset = Literal[
     "preserve",
     "rag_optimized",
     "technical_spec_rag",
+    "assetless_technical_spec_rag",
     "confidential_rag",
     "preserve_with_sidecars",
     "custom",
 ]
 DEFAULT_GUI_OPTION_PRESET: GuiOptionPreset = "preserve"
-SUPPORTED_GUI_OPTION_PRESETS: tuple[GuiOptionPreset, ...] = (*SUPPORTED_RAG_PURPOSE_PROFILES, "custom")
+SUPPORTED_GUI_OPTION_PRESETS: tuple[GuiOptionPreset, ...] = (
+    "preserve",
+    "rag_optimized",
+    "technical_spec_rag",
+    ASSETLESS_TECHNICAL_SPEC_RAG_PRESET,
+    "confidential_rag",
+    "preserve_with_sidecars",
+    "custom",
+)
 GUI_ALWAYS_EDITABLE_OPTION_FIELDS: tuple[str, ...] = ("pages", "password", "ocr_lang")
 GUI_PRESET_LOCKED_OPTION_FIELDS: tuple[str, ...] = (
     "image_mode",
     "table_mode",
     "rag_table_output",
     "domain_adapter",
+    "manual_domain_adapter_label",
+    "manual_domain_adapter_keywords",
     "confidential_safe_mode",
     "force_ocr",
     "keep_page_markers",
@@ -62,20 +75,24 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
     normalized = normalize_preset(str(preset))
     if normalized == "custom":
         return current
-    profile_options = rag_profile_options(normalized)
+    rag_profile = "technical_spec_rag" if normalized == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET else normalized
+    profile_options = rag_profile_options(rag_profile)
     dedupe_images = current.dedupe_images if normalized == "rag_optimized" else profile_options.dedupe_images
     figure_crop_fallback = (
         current.figure_crop_fallback if normalized == "rag_optimized" else profile_options.figure_crop_fallback
     )
     domain_adapter = (
-        current.domain_adapter if normalized == "technical_spec_rag" else profile_options.domain_adapter
+        current.domain_adapter
+        if normalized in {"technical_spec_rag", ASSETLESS_TECHNICAL_SPEC_RAG_PRESET}
+        else profile_options.domain_adapter
     )
+    image_mode = ImageMode.PLACEHOLDER.value if normalized == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET else profile_options.image_mode
     return replace(
         current,
-        image_mode=profile_options.image_mode,
+        image_mode=image_mode,
         table_mode=profile_options.table_mode,
         rag_table_output=profile_options.rag_table_output,
-        rag_profile=normalized,
+        rag_profile=rag_profile,
         domain_adapter=domain_adapter,
         confidential_safe_mode=profile_options.confidential_safe_mode,
         force_ocr=profile_options.force_ocr,
@@ -89,7 +106,9 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
         rag_contextual_embedding_text=profile_options.rag_contextual_embedding_text,
         rag_merge_sibling_text_chunks=profile_options.rag_merge_sibling_text_chunks,
         rag_chunk_relationship_metadata=profile_options.rag_chunk_relationship_metadata,
-        rag_figure_text_chunks=profile_options.rag_figure_text_chunks,
+        rag_figure_text_chunks=(
+            True if normalized == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET else profile_options.rag_figure_text_chunks
+        ),
     )
 
 
@@ -103,6 +122,8 @@ def preset_editable_fields(preset: GuiOptionPreset | str) -> dict[str, bool]:
     advanced_editable = preset_allows_custom_options(preset)
     editable = {field: True for field in GUI_ALWAYS_EDITABLE_OPTION_FIELDS}
     editable.update({field: advanced_editable for field in GUI_PRESET_LOCKED_OPTION_FIELDS})
-    if normalize_preset(str(preset)) == "technical_spec_rag":
+    if normalize_preset(str(preset)) in {"technical_spec_rag", ASSETLESS_TECHNICAL_SPEC_RAG_PRESET}:
         editable["domain_adapter"] = True
+        editable["manual_domain_adapter_label"] = True
+        editable["manual_domain_adapter_keywords"] = True
     return editable
