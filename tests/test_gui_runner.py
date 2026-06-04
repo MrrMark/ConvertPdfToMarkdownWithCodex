@@ -32,6 +32,8 @@ from pdf2md.models import (
     ConversionStatus,
     DomainAdapterMode,
     ImageMode,
+    OutputProfile,
+    RagSidecarScope,
     RagTableOutputMode,
     TableMode,
     WarningEntry,
@@ -137,6 +139,8 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
             image_mode=ImageMode.PLACEHOLDER.value,
             table_mode=TableMode.HTML.value,
             rag_table_output=RagTableOutputMode.BOTH.value,
+            output_profile=OutputProfile.FAST.value,
+            rag_sidecar_scope=RagSidecarScope.NONE.value,
             rag_profile="technical_spec_rag",
             domain_adapter=DomainAdapterMode.NVME.value,
             confidential_safe_mode=True,
@@ -163,6 +167,8 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
     assert config.image_mode == ImageMode.PLACEHOLDER.value
     assert config.table_mode == TableMode.HTML.value
     assert config.rag_table_output == RagTableOutputMode.BOTH.value
+    assert config.output_profile == OutputProfile.FAST.value
+    assert config.rag_sidecar_scope == RagSidecarScope.NONE.value
     assert config.rag_profile == "technical_spec_rag"
     assert config.domain_adapter == DomainAdapterMode.NVME.value
     assert config.confidential_safe_mode is True
@@ -190,6 +196,8 @@ def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_pa
             image_mode=ImageMode.EMBEDDED.value,
             table_mode=TableMode.GFM_ONLY.value,
             rag_table_output=RagTableOutputMode.JSONL.value,
+            output_profile=OutputProfile.FAST.value,
+            rag_sidecar_scope=RagSidecarScope.MINIMAL.value,
             rag_profile="technical_spec_rag",
             domain_adapter=DomainAdapterMode.TCG.value,
             confidential_safe_mode=True,
@@ -214,6 +222,8 @@ def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_pa
     assert config.image_mode == ImageMode.EMBEDDED.value
     assert config.table_mode == TableMode.GFM_ONLY.value
     assert config.rag_table_output == RagTableOutputMode.JSONL.value
+    assert config.output_profile == OutputProfile.FAST.value
+    assert config.rag_sidecar_scope == RagSidecarScope.MINIMAL.value
     assert config.rag_profile == "technical_spec_rag"
     assert config.domain_adapter == DomainAdapterMode.TCG.value
     assert config.confidential_safe_mode is True

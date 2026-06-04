@@ -15,7 +15,7 @@ from pdf2md.gui_profiles import (
     write_gui_profile,
 )
 from pdf2md.gui_runner import GuiConversionOptions, GuiDiagnosticError
-from pdf2md.models import ImageMode, RagTableOutputMode, TableMode
+from pdf2md.models import ImageMode, OutputProfile, RagSidecarScope, RagTableOutputMode, TableMode
 
 
 def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path) -> None:
@@ -25,6 +25,8 @@ def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path)
         image_mode=ImageMode.PLACEHOLDER.value,
         table_mode=TableMode.HTML.value,
         rag_table_output=RagTableOutputMode.JSONL.value,
+        output_profile=OutputProfile.FAST.value,
+        rag_sidecar_scope=RagSidecarScope.MINIMAL.value,
         force_ocr=True,
         ocr_lang="kor+eng",
         page_workers=4,
@@ -40,6 +42,8 @@ def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path)
     assert payload["schema_version"] == GUI_PROFILE_SCHEMA_VERSION
     assert payload["kind"] == GUI_PROFILE_KIND
     assert payload["options"]["page_workers"] == 4
+    assert payload["options"]["output_profile"] == "fast"
+    assert payload["options"]["rag_sidecar_scope"] == "minimal"
     assert payload["options"]["debug"] is True
     assert payload["options"]["verbose"] is True
     assert "password" not in payload["options"]
@@ -86,6 +90,8 @@ def test_gui_profile_invalid_payload_returns_structured_diagnostics() -> None:
             "password": "secret",
             "previous_corpus_manifest": "/Users/example/previous/corpus_manifest.json",
             "image_mode": "bad",
+            "output_profile": "turbo",
+            "rag_sidecar_scope": "partial",
             "page_workers": 0,
             "debug": "yes",
         },

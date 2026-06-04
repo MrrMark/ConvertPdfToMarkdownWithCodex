@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from pdf2md.config import SUPPORTED_RETRIEVAL_TOKENIZERS
 from pdf2md.gui_runner import GuiConversionOptions, GuiDiagnostic, GuiDiagnosticError, GuiDiagnosticReport
-from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
+from pdf2md.models import DomainAdapterMode, ImageMode, OutputProfile, RagSidecarScope, RagTableOutputMode, TableMode
 
 
 GUI_PROFILE_SCHEMA_VERSION = 1
@@ -18,6 +18,8 @@ GUI_PROFILE_OPTION_FIELDS: tuple[str, ...] = (
     "image_mode",
     "table_mode",
     "rag_table_output",
+    "output_profile",
+    "rag_sidecar_scope",
     "domain_adapter",
     "confidential_safe_mode",
     "force_ocr",
@@ -188,6 +190,8 @@ def _option_type_diagnostics(options: Mapping[str, object]) -> list[GuiDiagnosti
     _validate_enum(options, "image_mode", {mode.value for mode in ImageMode}, diagnostics)
     _validate_enum(options, "table_mode", {mode.value for mode in TableMode}, diagnostics)
     _validate_enum(options, "rag_table_output", {mode.value for mode in RagTableOutputMode}, diagnostics)
+    _validate_enum(options, "output_profile", {mode.value for mode in OutputProfile}, diagnostics)
+    _validate_optional_enum(options, "rag_sidecar_scope", {mode.value for mode in RagSidecarScope}, diagnostics)
     _validate_enum(options, "domain_adapter", {mode.value for mode in DomainAdapterMode}, diagnostics)
     for field in (
         "confidential_safe_mode",
@@ -254,6 +258,16 @@ def _validate_enum(
 ) -> None:
     if field in options and options[field] not in values:
         diagnostics.append(_invalid_option_diagnostic(field, "one of: " + ", ".join(sorted(values))))
+
+
+def _validate_optional_enum(
+    options: Mapping[str, object],
+    field: str,
+    values: set[str],
+    diagnostics: list[GuiDiagnostic],
+) -> None:
+    if field in options and options[field] is not None and options[field] not in values:
+        diagnostics.append(_invalid_option_diagnostic(field, "null or one of: " + ", ".join(sorted(values))))
 
 
 def _invalid_option_diagnostic(field: str, expected: str) -> GuiDiagnostic:

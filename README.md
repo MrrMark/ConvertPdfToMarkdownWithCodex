@@ -58,7 +58,7 @@ PDF 문서를 **신뢰성 있게 Markdown으로 변환**하기 위한 CLI/라이
 - `pdfplumber` 중심으로 텍스트를 추출합니다.
 - 공백 정리는 최소화하되 의미 손실은 피합니다.
 - OCR 결과도 의미를 바꾸는 후처리를 하지 않습니다.
-- RAG 등록을 기본 운영 경로로 보고 `text_blocks_rag.jsonl`, semantic sidecar 3종, `requirement_traceability_rag.jsonl`, `technical_tables_rag.jsonl`, `retrieval_chunks_rag.jsonl`, `figures_rag.jsonl`을 기본 생성합니다.
+- RAG 등록을 기본 운영 경로로 보고 `text_blocks_rag.jsonl`, semantic sidecar 3종, `requirement_traceability_rag.jsonl`, `technical_tables_rag.jsonl`, `retrieval_chunks_rag.jsonl`, `figures_rag.jsonl`을 기본 `full` profile에서 생성합니다.
 
 ### 테이블
 
@@ -407,7 +407,20 @@ python3 -m pdf2md input.pdf -o output/ --rag-table-output jsonl
 - 기본값은 `none`입니다.
 - `document.md`는 기존 정책을 유지합니다: 단순 표는 GFM, 복잡 표는 HTML fallback.
 - `rag_tables.md`는 행 단위 Markdown, `tables_rag.jsonl`은 stable `table_id`/`table_row_id`를 포함한 행 단위 structured JSONL입니다.
-- 텍스트, 스펙 semantic, retrieval chunk, figure sidecar는 별도 옵션 없이 항상 생성됩니다.
+- 텍스트, 스펙 semantic, retrieval chunk, figure sidecar는 기본 `full` profile에서 별도 옵션 없이 생성됩니다.
+
+### 빠른 core 산출물 profile
+
+```bash
+python3 -m pdf2md input.pdf -o output/ --output-profile fast
+python3 -m pdf2md input.pdf -o output/ --rag-sidecar-scope minimal
+python3 -m pdf2md input.pdf -o output/ --output-profile fast --rag-sidecar-scope full
+```
+
+- 기본값은 `--output-profile full`과 effective `--rag-sidecar-scope full`이며 기존 산출물 계약을 유지합니다.
+- `--output-profile fast`만 지정하면 effective sidecar scope는 `none`으로 계산되어 `document.md`, `manifest.json`, `report.json` 중심으로 빠르게 생성합니다.
+- `--rag-sidecar-scope minimal`은 `text_blocks_rag.jsonl`, `retrieval_chunks_rag.jsonl`, 요청된 table sidecar만 파일로 남깁니다.
+- sidecar가 생략되면 `manifest.options`와 `report.summary`에 `rag_sidecar_scope`, `rag_sidecar_omitted_outputs`, `rag_sidecar_omitted_reason`을 기록합니다.
 
 ### RAG용 도메인 adapter
 
@@ -713,6 +726,7 @@ pdfs/
 - `summary.requirement_traceability_file_count`
 - `summary.technical_table_record_count`
 - `summary.technical_table_file_count`
+- `summary.output_profile` / `summary.rag_sidecar_scope` / `summary.rag_sidecar_omitted_outputs` / `summary.rag_sidecar_omitted_reason` (non-full scope에서만)
 - `summary.confidential_safe_mode`
 - `summary.font_heading_candidate_count`
 - `summary.footnote_candidate_count`
@@ -967,8 +981,8 @@ lint / format / packaging tooling 예시:
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q102-Q105입니다. 우선순위는 fast output scope 검토, assetless technical RAG figure text chunk, Docling 벤치마킹/확장 설계 순서입니다.
-- 완료된 Q34-Q101 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q103-Q105입니다. 우선순위는 assetless technical RAG figure text chunk, Docling 벤치마킹/확장 설계 순서입니다.
+- 완료된 Q34-Q102 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 

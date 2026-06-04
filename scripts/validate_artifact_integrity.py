@@ -322,6 +322,11 @@ def _validate_sidecar_counts(
     summary = report.get("summary")
     if not isinstance(summary, dict):
         return 0, 0
+    omitted_outputs = {
+        str(item)
+        for item in summary.get("rag_sidecar_omitted_outputs", [])
+        if isinstance(item, str) and item.strip()
+    }
     checked_records = 0
     mismatch_count = 0
     for file_name, summary_field in SIDECAR_COUNT_FIELDS.items():
@@ -330,6 +335,16 @@ def _validate_sidecar_counts(
             continue
         path = output_dir / file_name
         actual = _read_jsonl_count(path, file_name=file_name, findings=findings)
+        if file_name in omitted_outputs and actual is not None:
+            _add_finding(
+                findings,
+                severity="warning",
+                code="omitted_sidecar_present",
+                file=file_name,
+                field="report.summary.rag_sidecar_omitted_outputs",
+                path=str(path),
+                message="Sidecar file exists even though report marks it as omitted by scope.",
+            )
         actual_count = 0 if actual is None else actual
         checked_records += actual_count
         if expected > 0 and actual is None:

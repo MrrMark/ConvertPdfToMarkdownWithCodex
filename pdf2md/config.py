@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, TableMode
+from pdf2md.models import DomainAdapterMode, ImageMode, OutputProfile, RagSidecarScope, RagTableOutputMode, TableMode
 from pdf2md.rag_profiles import DEFAULT_RAG_PURPOSE_PROFILE, SUPPORTED_RAG_PURPOSE_PROFILES
 from pdf2md.utils.page_range import parse_page_range
 
@@ -22,6 +22,8 @@ class Config(BaseModel):
     image_mode: ImageMode = ImageMode.REFERENCED
     table_mode: TableMode = TableMode.AUTO
     rag_table_output: RagTableOutputMode = RagTableOutputMode.NONE
+    output_profile: OutputProfile = OutputProfile.FULL
+    rag_sidecar_scope: RagSidecarScope | None = None
     rag_profile: str = DEFAULT_RAG_PURPOSE_PROFILE
     domain_adapter: DomainAdapterMode = DomainAdapterMode.NONE
     confidential_safe_mode: bool = False

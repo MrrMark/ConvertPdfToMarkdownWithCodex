@@ -69,6 +69,7 @@ Stable nested fields:
 - `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
 - `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
 - `options.retrieval_chunk_max_tokens`, `options.retrieval_tokenizer`, `options.rag_contextual_embedding_text`, `options.rag_merge_sibling_text_chunks`, `options.rag_chunk_relationship_metadata`
+- `options.output_profile`, `options.rag_sidecar_scope`, `options.rag_sidecar_omitted_outputs`, `options.rag_sidecar_omitted_reason` when a non-full output scope was selected
 - `options.confidential_safe_mode`, `options.local_only_processing`, `options.external_llm_calls`, `options.external_embedding_calls`, `options.path_redaction`
 - `options.page_workers`, `options.page_worker_effective_count`, `options.page_parallel_enabled`
 - `images[].page`, `index`, `path`, `source`, `bbox`, `sha256`
@@ -122,6 +123,13 @@ Stable summary fields:
 - `technical_table_record_count`, `technical_table_file_count`
 - `confidential_safe_mode`
 - `font_heading_candidate_count`, `footnote_candidate_count`, `structure_low_confidence_count`
+
+Non-full sidecar scope summary fields:
+
+- `output_profile`: `full` or `fast`, present when a non-full output scope is selected.
+- `rag_sidecar_scope`: effective sidecar scope, one of `full`, `minimal`, or `none`.
+- `rag_sidecar_omitted_outputs`: sidecar filenames skipped compared with the default full scope.
+- `rag_sidecar_omitted_reason`: stable reason code, currently `rag_sidecar_scope_omitted`.
 
 `summary.table_quality[]` optional diagnostics:
 

@@ -26,8 +26,10 @@ from pdf2md.models import (
     ImageMode,
     Manifest,
     NormalizedLine,
+    OutputProfile,
     PageResult,
     PageStatus,
+    RagSidecarScope,
     RagTableOutputMode,
     Report,
     TableMode,
@@ -84,6 +86,8 @@ EXIT_FATAL = 1
 EXIT_PARTIAL = 2
 logger = logging.getLogger(__name__)
 
+SIDECAR_OMITTED_REASON = "rag_sidecar_scope_omitted"
+
 
 @dataclass
 class ConversionResult:
@@ -121,6 +125,94 @@ def _file_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def _output_profile(config: Config) -> OutputProfile:
+    return config.output_profile if isinstance(config.output_profile, OutputProfile) else OutputProfile(config.output_profile)
+
+
+def _effective_rag_sidecar_scope(config: Config, output_profile: OutputProfile) -> RagSidecarScope:
+    if config.rag_sidecar_scope is not None:
+        return (
+            config.rag_sidecar_scope
+            if isinstance(config.rag_sidecar_scope, RagSidecarScope)
+            else RagSidecarScope(config.rag_sidecar_scope)
+        )
+    if output_profile is OutputProfile.FAST:
+        return RagSidecarScope.NONE
+    return RagSidecarScope.FULL
+
+
+def _requested_rag_table_sidecars(config: Config, rag_table_output: RagTableOutputMode) -> set[str]:
+    outputs: set[str] = set()
+    if rag_table_output.writes_markdown():
+        outputs.add(config.rag_tables_markdown_filename)
+    if rag_table_output.writes_jsonl():
+        outputs.add(config.rag_tables_jsonl_filename)
+    return outputs
+
+
+def _expected_full_rag_sidecars(
+    config: Config,
+    *,
+    rag_table_output: RagTableOutputMode,
+    domain_adapter: DomainAdapterMode,
+) -> set[str]:
+    outputs = {
+        config.rag_text_blocks_jsonl_filename,
+        config.semantic_units_jsonl_filename,
+        config.requirements_jsonl_filename,
+        config.cross_refs_jsonl_filename,
+        config.figures_rag_jsonl_filename,
+        config.requirement_traceability_jsonl_filename,
+        config.technical_tables_jsonl_filename,
+        config.retrieval_chunks_jsonl_filename,
+    }
+    outputs.update(_requested_rag_table_sidecars(config, rag_table_output))
+    if domain_adapter is not DomainAdapterMode.NONE:
+        outputs.add(config.domain_units_jsonl_filename)
+    return outputs
+
+
+def _expected_minimal_rag_sidecars(config: Config, *, rag_table_output: RagTableOutputMode) -> set[str]:
+    outputs = {config.rag_text_blocks_jsonl_filename, config.retrieval_chunks_jsonl_filename}
+    outputs.update(_requested_rag_table_sidecars(config, rag_table_output))
+    return outputs
+
+
+def _written_rag_sidecars_for_scope(
+    config: Config,
+    *,
+    scope: RagSidecarScope,
+    rag_table_output: RagTableOutputMode,
+    domain_adapter: DomainAdapterMode,
+) -> set[str]:
+    if scope is RagSidecarScope.FULL:
+        return _expected_full_rag_sidecars(config, rag_table_output=rag_table_output, domain_adapter=domain_adapter)
+    if scope is RagSidecarScope.MINIMAL:
+        return _expected_minimal_rag_sidecars(config, rag_table_output=rag_table_output)
+    return set()
+
+
+def _omitted_rag_sidecars(
+    config: Config,
+    *,
+    scope: RagSidecarScope,
+    rag_table_output: RagTableOutputMode,
+    domain_adapter: DomainAdapterMode,
+) -> list[str]:
+    expected_full = _expected_full_rag_sidecars(
+        config,
+        rag_table_output=rag_table_output,
+        domain_adapter=domain_adapter,
+    )
+    written = _written_rag_sidecars_for_scope(
+        config,
+        scope=scope,
+        rag_table_output=rag_table_output,
+        domain_adapter=domain_adapter,
+    )
+    return sorted(expected_full - written)
 
 
 def _find_anchor_index(line_tops: list[float], block_top: float) -> int:
@@ -278,6 +370,16 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         if isinstance(config.domain_adapter, DomainAdapterMode)
         else DomainAdapterMode(config.domain_adapter)
     )
+    output_profile = _output_profile(config)
+    rag_sidecar_scope = _effective_rag_sidecar_scope(config, output_profile)
+    rag_sidecar_omitted_outputs = _omitted_rag_sidecars(
+        config,
+        scope=rag_sidecar_scope,
+        rag_table_output=rag_table_output,
+        domain_adapter=domain_adapter,
+    )
+    write_minimal_rag_sidecars = rag_sidecar_scope in {RagSidecarScope.FULL, RagSidecarScope.MINIMAL}
+    write_full_rag_sidecars = rag_sidecar_scope is RagSidecarScope.FULL
     stage_durations_ms: dict[str, int] = {}
 
     def stage_start() -> datetime:
@@ -299,6 +401,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     font_heading_candidate_count = 0
     footnote_candidate_count = 0
     structure_low_confidence_count = 0
+    rag_table_record_count = 0
+    rag_table_file_count = 0
     rag_text_block_record_count = 0
     rag_text_block_file_count = 0
     semantic_unit_record_count = 0
@@ -740,111 +844,128 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
 
     rag_text_started = stage_start()
     text_block_result = build_text_blocks(normalized_lines_by_page_for_blocks)
-    rag_text_block_record_count, rag_text_block_file_count = write_rag_text_block_output(
-        config,
-        text_block_result.records,
-    )
+    if write_minimal_rag_sidecars:
+        rag_text_block_record_count, rag_text_block_file_count = write_rag_text_block_output(
+            config,
+            text_block_result.records,
+        )
     font_heading_candidate_count = text_block_result.font_heading_candidate_count
     footnote_candidate_count = text_block_result.footnote_candidate_count
     structure_low_confidence_count = text_block_result.structure_low_confidence_count
     finish_stage("rag_text_blocks", rag_text_started)
-    contextual_rag_tables = annotate_rag_tables_with_heading_context(
-        table_result.rag_tables,
-        text_block_result.records,
-    )
-
-    figure_rag_started = stage_start()
-    figure_records = build_figure_records(
-        images=image_result.assets,
-        excluded_images=image_result.excluded_assets,
-        text_block_records=text_block_result.records,
-    )
-    figure_rag_record_count, figure_rag_file_count = write_figure_rag_output(config, figure_records)
-    finish_stage("rag_figures", figure_rag_started)
-
-    semantic_started = stage_start()
-    pdf_outline_targets = extract_pdf_outline_reference_targets(reader, selected_pages=set(selected_pages))
-    semantic_result = build_semantic_layer(
-        text_block_records=text_block_result.records,
-        rag_tables=contextual_rag_tables,
-        pdf_outline_targets=pdf_outline_targets,
-    )
-    (
-        semantic_unit_record_count,
-        semantic_unit_file_count,
-        requirement_record_count,
-        requirement_file_count,
-        cross_ref_record_count,
-        cross_ref_file_count,
-    ) = write_semantic_layer_outputs(
-        config,
-        semantic_units=semantic_result.semantic_units,
-        requirements=semantic_result.requirements,
-        cross_refs=semantic_result.cross_refs,
-    )
-    semantic_low_confidence_count = semantic_result.semantic_low_confidence_count
-    unresolved_cross_ref_count = semantic_result.unresolved_cross_ref_count
-    normative_requirement_count = semantic_result.normative_requirement_count
-    finish_stage("rag_semantics", semantic_started)
-
-    requirement_traceability_started = stage_start()
-    requirement_traceability_records = build_requirement_traceability_records(
-        requirements=semantic_result.requirements,
-        rag_tables=contextual_rag_tables,
-    )
-    requirement_traceability_record_count, requirement_traceability_file_count = write_requirement_traceability_output(
-        config,
-        requirement_traceability_records,
-    )
-    finish_stage("rag_requirement_traceability", requirement_traceability_started)
-
-    technical_tables_started = stage_start()
-    technical_table_records = build_technical_table_records(contextual_rag_tables)
-    technical_table_record_count, technical_table_file_count = write_technical_table_output(
-        config,
-        technical_table_records,
-    )
-    finish_stage("rag_technical_tables", technical_tables_started)
-
+    contextual_rag_tables: list[dict] = []
+    semantic_units: list[dict] = []
+    requirements: list[dict] = []
+    requirement_traceability_records: list[dict] = []
+    technical_table_records: list[dict] = []
     domain_units: list[dict] = []
-    if domain_adapter is not DomainAdapterMode.NONE:
-        domain_started = stage_start()
-        domain_units = build_domain_units(
-            domain_adapter=domain_adapter,
-            rag_tables=contextual_rag_tables,
-            technical_table_records=technical_table_records,
+    if write_minimal_rag_sidecars or config.debug:
+        contextual_rag_tables = annotate_rag_tables_with_heading_context(
+            table_result.rag_tables,
+            text_block_result.records,
         )
-        domain_unit_record_count, domain_unit_file_count = write_domain_unit_output(config, domain_units)
-        finish_stage("rag_domain_adapter", domain_started)
 
-    retrieval_started = stage_start()
-    retrieval_token_counter = (
-        None if config.retrieval_tokenizer == "char" else make_token_counter(config.retrieval_tokenizer)
-    )
-    retrieval_chunks = build_retrieval_chunks(
-        text_block_records=text_block_result.records,
-        semantic_units=semantic_result.semantic_units,
-        requirements=semantic_result.requirements,
-        rag_tables=contextual_rag_tables,
-        domain_units=domain_units,
-        requirement_traceability_records=requirement_traceability_records,
-        technical_table_records=technical_table_records,
-        source_sha256=source_sha256,
-        max_tokens=config.retrieval_chunk_max_tokens,
-        token_counter=retrieval_token_counter,
-        contextual_embedding_text=config.rag_contextual_embedding_text,
-        merge_sibling_text_blocks=config.rag_merge_sibling_text_chunks,
-        relationship_metadata=config.rag_chunk_relationship_metadata,
-    )
-    retrieval_chunk_diagnostics = build_retrieval_chunk_diagnostics(
-        retrieval_chunks,
-        target_tokens=config.retrieval_chunk_max_tokens,
-    )
-    retrieval_chunk_record_count, retrieval_chunk_file_count = write_retrieval_chunk_output(
-        config,
-        retrieval_chunks,
-    )
-    finish_stage("rag_retrieval_chunks", retrieval_started)
+    if write_full_rag_sidecars:
+        figure_rag_started = stage_start()
+        figure_records = build_figure_records(
+            images=image_result.assets,
+            excluded_images=image_result.excluded_assets,
+            text_block_records=text_block_result.records,
+        )
+        figure_rag_record_count, figure_rag_file_count = write_figure_rag_output(config, figure_records)
+        finish_stage("rag_figures", figure_rag_started)
+
+    if write_minimal_rag_sidecars:
+        semantic_started = stage_start()
+        pdf_outline_targets = extract_pdf_outline_reference_targets(reader, selected_pages=set(selected_pages))
+        semantic_result = build_semantic_layer(
+            text_block_records=text_block_result.records,
+            rag_tables=contextual_rag_tables,
+            pdf_outline_targets=pdf_outline_targets,
+        )
+        semantic_units = semantic_result.semantic_units
+        requirements = semantic_result.requirements
+        if write_full_rag_sidecars:
+            (
+                semantic_unit_record_count,
+                semantic_unit_file_count,
+                requirement_record_count,
+                requirement_file_count,
+                cross_ref_record_count,
+                cross_ref_file_count,
+            ) = write_semantic_layer_outputs(
+                config,
+                semantic_units=semantic_result.semantic_units,
+                requirements=semantic_result.requirements,
+                cross_refs=semantic_result.cross_refs,
+            )
+        semantic_low_confidence_count = semantic_result.semantic_low_confidence_count
+        unresolved_cross_ref_count = semantic_result.unresolved_cross_ref_count
+        normative_requirement_count = semantic_result.normative_requirement_count
+        finish_stage("rag_semantics", semantic_started)
+
+        requirement_traceability_started = stage_start()
+        requirement_traceability_records = build_requirement_traceability_records(
+            requirements=semantic_result.requirements,
+            rag_tables=contextual_rag_tables,
+        )
+        if write_full_rag_sidecars:
+            requirement_traceability_record_count, requirement_traceability_file_count = (
+                write_requirement_traceability_output(
+                    config,
+                    requirement_traceability_records,
+                )
+            )
+        finish_stage("rag_requirement_traceability", requirement_traceability_started)
+
+        technical_tables_started = stage_start()
+        technical_table_records = build_technical_table_records(contextual_rag_tables)
+        if write_full_rag_sidecars:
+            technical_table_record_count, technical_table_file_count = write_technical_table_output(
+                config,
+                technical_table_records,
+            )
+        finish_stage("rag_technical_tables", technical_tables_started)
+
+        if domain_adapter is not DomainAdapterMode.NONE:
+            domain_started = stage_start()
+            domain_units = build_domain_units(
+                domain_adapter=domain_adapter,
+                rag_tables=contextual_rag_tables,
+                technical_table_records=technical_table_records,
+            )
+            if write_full_rag_sidecars:
+                domain_unit_record_count, domain_unit_file_count = write_domain_unit_output(config, domain_units)
+            finish_stage("rag_domain_adapter", domain_started)
+
+        retrieval_started = stage_start()
+        retrieval_token_counter = (
+            None if config.retrieval_tokenizer == "char" else make_token_counter(config.retrieval_tokenizer)
+        )
+        retrieval_chunks = build_retrieval_chunks(
+            text_block_records=text_block_result.records,
+            semantic_units=semantic_units,
+            requirements=requirements,
+            rag_tables=contextual_rag_tables,
+            domain_units=domain_units,
+            requirement_traceability_records=requirement_traceability_records,
+            technical_table_records=technical_table_records,
+            source_sha256=source_sha256,
+            max_tokens=config.retrieval_chunk_max_tokens,
+            token_counter=retrieval_token_counter,
+            contextual_embedding_text=config.rag_contextual_embedding_text,
+            merge_sibling_text_blocks=config.rag_merge_sibling_text_chunks,
+            relationship_metadata=config.rag_chunk_relationship_metadata,
+        )
+        retrieval_chunk_diagnostics = build_retrieval_chunk_diagnostics(
+            retrieval_chunks,
+            target_tokens=config.retrieval_chunk_max_tokens,
+        )
+        retrieval_chunk_record_count, retrieval_chunk_file_count = write_retrieval_chunk_output(
+            config,
+            retrieval_chunks,
+        )
+        finish_stage("rag_retrieval_chunks", retrieval_started)
 
     markdown_started = stage_start()
     markdown_result = serialize_markdown_blocks_result(
@@ -865,11 +986,12 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     finish_stage("markdown_serialization", markdown_started)
 
     rag_started = stage_start()
-    rag_table_record_count, rag_table_file_count = write_rag_table_outputs(
-        config=config,
-        output_mode=rag_table_output,
-        rag_tables=table_result.rag_tables,
-    )
+    if write_minimal_rag_sidecars:
+        rag_table_record_count, rag_table_file_count = write_rag_table_outputs(
+            config=config,
+            output_mode=rag_table_output,
+            rag_tables=table_result.rag_tables,
+        )
     finish_stage("rag_tables", rag_started)
 
     if config.debug:
@@ -895,56 +1017,76 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         finish_stage("debug_artifacts", debug_started)
 
     manifest_started = stage_start()
+    manifest_options = {
+        "image_mode": image_mode,
+        "table_mode": table_mode.manifest_value(),
+        "force_ocr": config.force_ocr,
+        "ocr_lang": config.ocr_lang,
+        "keep_page_markers": config.keep_page_markers,
+        "remove_header_footer": config.remove_header_footer,
+        "dedupe_images": config.dedupe_images,
+        "repair_hyphenation": config.repair_hyphenation,
+        "figure_crop_fallback": config.figure_crop_fallback,
+        "page_workers": requested_page_workers,
+        "page_worker_effective_count": effective_page_workers,
+        "page_parallel_enabled": page_parallel_enabled,
+        "rag_table_output": rag_table_output.value,
+        "domain_adapter": domain_adapter.value,
+        **({"rag_profile": config.rag_profile} if config.rag_profile != "preserve" else {}),
+        "confidential_safe_mode": config.confidential_safe_mode,
+        "local_only_processing": True,
+        "external_llm_calls": False,
+        "external_embedding_calls": False,
+        "path_redaction": "enabled" if config.confidential_safe_mode else "disabled",
+        "source_filename_masked": config.confidential_safe_mode,
+        "retrieval_chunk_max_tokens": config.retrieval_chunk_max_tokens,
+        "retrieval_tokenizer": config.retrieval_tokenizer,
+        "rag_contextual_embedding_text": config.rag_contextual_embedding_text,
+        "rag_merge_sibling_text_chunks": config.rag_merge_sibling_text_chunks,
+        "rag_chunk_relationship_metadata": config.rag_chunk_relationship_metadata,
+        "domain_units_jsonl_filename": config.domain_units_jsonl_filename,
+        "debug": config.debug,
+        "pages": config.pages,
+        "version": config.version,
+    }
+    if write_minimal_rag_sidecars:
+        manifest_options.update(
+            {
+                "rag_text_blocks_output": "jsonl",
+                "rag_text_blocks_jsonl_filename": config.rag_text_blocks_jsonl_filename,
+                "retrieval_chunks_output": "jsonl",
+                "retrieval_chunks_jsonl_filename": config.retrieval_chunks_jsonl_filename,
+            }
+        )
+    if write_full_rag_sidecars:
+        manifest_options.update(
+            {
+                "semantic_layer_output": "jsonl",
+                "semantic_units_jsonl_filename": config.semantic_units_jsonl_filename,
+                "requirements_jsonl_filename": config.requirements_jsonl_filename,
+                "cross_refs_jsonl_filename": config.cross_refs_jsonl_filename,
+                "requirement_traceability_output": "jsonl",
+                "requirement_traceability_jsonl_filename": config.requirement_traceability_jsonl_filename,
+                "technical_tables_output": "jsonl",
+                "technical_tables_jsonl_filename": config.technical_tables_jsonl_filename,
+                "figures_rag_output": "jsonl",
+                "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
+            }
+        )
+    if output_profile is not OutputProfile.FULL or rag_sidecar_scope is not RagSidecarScope.FULL:
+        manifest_options.update(
+            {
+                "output_profile": output_profile.value,
+                "rag_sidecar_scope": rag_sidecar_scope.value,
+                "rag_sidecar_omitted_outputs": rag_sidecar_omitted_outputs,
+                "rag_sidecar_omitted_reason": SIDECAR_OMITTED_REASON if rag_sidecar_omitted_outputs else None,
+            }
+        )
     manifest = Manifest(
         input_file="redacted.pdf" if config.confidential_safe_mode else config.input_pdf.name,
         total_pages=total_pages,
         selected_pages=selected_pages,
-        options={
-            "image_mode": image_mode,
-            "table_mode": table_mode.manifest_value(),
-            "force_ocr": config.force_ocr,
-            "ocr_lang": config.ocr_lang,
-            "keep_page_markers": config.keep_page_markers,
-            "remove_header_footer": config.remove_header_footer,
-            "dedupe_images": config.dedupe_images,
-            "repair_hyphenation": config.repair_hyphenation,
-            "figure_crop_fallback": config.figure_crop_fallback,
-            "page_workers": requested_page_workers,
-            "page_worker_effective_count": effective_page_workers,
-            "page_parallel_enabled": page_parallel_enabled,
-            "rag_table_output": rag_table_output.value,
-            "domain_adapter": domain_adapter.value,
-            **({"rag_profile": config.rag_profile} if config.rag_profile != "preserve" else {}),
-            "confidential_safe_mode": config.confidential_safe_mode,
-            "local_only_processing": True,
-            "external_llm_calls": False,
-            "external_embedding_calls": False,
-            "path_redaction": "enabled" if config.confidential_safe_mode else "disabled",
-            "source_filename_masked": config.confidential_safe_mode,
-            "rag_text_blocks_output": "jsonl",
-            "rag_text_blocks_jsonl_filename": config.rag_text_blocks_jsonl_filename,
-            "semantic_layer_output": "jsonl",
-            "semantic_units_jsonl_filename": config.semantic_units_jsonl_filename,
-            "requirements_jsonl_filename": config.requirements_jsonl_filename,
-            "cross_refs_jsonl_filename": config.cross_refs_jsonl_filename,
-            "requirement_traceability_output": "jsonl",
-            "requirement_traceability_jsonl_filename": config.requirement_traceability_jsonl_filename,
-            "technical_tables_output": "jsonl",
-            "technical_tables_jsonl_filename": config.technical_tables_jsonl_filename,
-            "retrieval_chunks_output": "jsonl",
-            "retrieval_chunks_jsonl_filename": config.retrieval_chunks_jsonl_filename,
-            "retrieval_chunk_max_tokens": config.retrieval_chunk_max_tokens,
-            "retrieval_tokenizer": config.retrieval_tokenizer,
-            "rag_contextual_embedding_text": config.rag_contextual_embedding_text,
-            "rag_merge_sibling_text_chunks": config.rag_merge_sibling_text_chunks,
-            "rag_chunk_relationship_metadata": config.rag_chunk_relationship_metadata,
-            "figures_rag_output": "jsonl",
-            "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
-            "domain_units_jsonl_filename": config.domain_units_jsonl_filename,
-            "debug": config.debug,
-            "pages": config.pages,
-            "version": config.version,
-        },
+        options=manifest_options,
         images=image_result.assets,
         excluded_images=image_result.excluded_assets,
         tables=table_result.assets,
@@ -1001,6 +1143,16 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     elapsed_seconds = (finished_at - started_at).total_seconds()
     pages_per_second = round(len(selected_pages) / elapsed_seconds, 4) if elapsed_seconds > 0 else None
     finish_stage("reporting", reporting_started)
+    report_summary_extras = (
+        {
+            "output_profile": output_profile.value,
+            "rag_sidecar_scope": rag_sidecar_scope.value,
+            "rag_sidecar_omitted_outputs": rag_sidecar_omitted_outputs,
+            "rag_sidecar_omitted_reason": SIDECAR_OMITTED_REASON if rag_sidecar_omitted_outputs else None,
+        }
+        if output_profile is not OutputProfile.FULL or rag_sidecar_scope is not RagSidecarScope.FULL
+        else None
+    )
     report = build_report(
         started_at=started_at,
         finished_at=finished_at,
@@ -1075,6 +1227,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         technical_table_record_count=technical_table_record_count,
         technical_table_file_count=technical_table_file_count,
         confidential_safe_mode=config.confidential_safe_mode,
+        summary_extras=report_summary_extras,
     )
     report_path = config.output_dir / config.report_filename
     logger.info("Writing report path=%s status=%s exit_code=%s", report_path, status.value, exit_code)
