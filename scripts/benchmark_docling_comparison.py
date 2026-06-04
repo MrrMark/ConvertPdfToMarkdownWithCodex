@@ -55,6 +55,7 @@ SANITIZED_ARTIFACTS = (
     "tables_rag.jsonl",
     "technical_tables_rag.jsonl",
 )
+LAYOUT_COMPARISON_MODES = ("off", "summary")
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -140,6 +141,33 @@ def _count_key_occurrences(value: Any, tokens: tuple[str, ...]) -> int:
     return count
 
 
+def _current_layout_metrics(summary: dict[str, Any], mode: str) -> dict[str, Any]:
+    if mode == "off":
+        return {}
+    return {
+        "layout_comparison_mode": mode,
+        "layout_table_candidate_count": summary.get("table_total", 0),
+        "layout_figure_candidate_count": summary.get("figure_rag_record_count", 0),
+        "layout_retrieval_chunk_count": summary.get("retrieval_chunk_record_count", 0),
+    }
+
+
+def _docling_layout_metrics(document_dict: dict[str, Any], mode: str) -> dict[str, Any]:
+    if mode == "off":
+        return {}
+    return {
+        "layout_comparison_mode": mode,
+        "layout_top_level_key_count": len(document_dict),
+        "layout_table_candidate_count": _count_key_occurrences(document_dict, ("table",)),
+        "layout_figure_candidate_count": _count_key_occurrences(document_dict, ("picture", "figure", "image")),
+        "layout_page_candidate_count": _count_key_occurrences(document_dict, ("page",)),
+        "layout_text_container_key_count": _count_key_occurrences(
+            document_dict,
+            ("text", "paragraph", "section"),
+        ),
+    }
+
+
 def _validator_status(output_dir: Path) -> dict[str, Any]:
     artifact = validate_artifact_integrity(output_dir=output_dir)
     index = validate_index_contract(output_dir=output_dir)
@@ -167,6 +195,7 @@ def run_current_tool(
     rag_generated_figure_descriptions: bool,
     figure_description_backend: str,
     figure_structure_extraction: bool,
+    layout_comparison_mode: str,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     started = time.perf_counter()
@@ -213,6 +242,7 @@ def run_current_tool(
         "technical_table_record_count": summary.get("technical_table_record_count", 0),
         "domain_unit_record_count": summary.get("domain_unit_record_count", 0),
         "stage_durations_ms": summary.get("stage_durations_ms", {}),
+        **_current_layout_metrics(summary, layout_comparison_mode),
         **validator_status,
     }
     return {
@@ -239,7 +269,12 @@ def _docling_document_to_dict(document: Any) -> dict[str, Any]:
     return {}
 
 
-def run_docling_tool(*, input_pdf: Path, output_dir: Path) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+def run_docling_tool(
+    *,
+    input_pdf: Path,
+    output_dir: Path,
+    layout_comparison_mode: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     virtual_artifacts: list[dict[str, Any]] = []
     if not _module_available("docling"):
@@ -310,6 +345,7 @@ def run_docling_tool(*, input_pdf: Path, output_dir: Path) -> tuple[dict[str, An
             "document_dict_top_level_key_count": len(document_dict),
             "table_like_node_count": _count_key_occurrences(document_dict, ("table",)),
             "figure_like_node_count": _count_key_occurrences(document_dict, ("picture", "figure", "image")),
+            **_docling_layout_metrics(document_dict, layout_comparison_mode),
         }
         return (
             {
@@ -396,6 +432,7 @@ def build_comparison(
     current_output_dir: Path,
     docling_virtual_artifacts: list[dict[str, Any]],
     findings: list[dict[str, Any]],
+    layout_comparison_mode: str,
 ) -> dict[str, Any]:
     current_artifacts = _artifact_entries(CURRENT_TOOL, current_output_dir)
     artifacts = current_artifacts + docling_virtual_artifacts
@@ -410,6 +447,8 @@ def build_comparison(
         "comparable_metric_count": len(metric_deltas),
         "hash_match_count": hash_match_count,
         "hash_mismatch_count": len(matching_names) - hash_match_count,
+        "layout_comparison_mode": layout_comparison_mode,
+        "layout_comparable": docling_run.get("status") == "success" and layout_comparison_mode != "off",
     }
     payload = {
         "schema_version": SCHEMA_VERSION,
@@ -451,6 +490,9 @@ def render_scorecard(report: dict[str, Any]) -> str:
                 "table_total",
                 "table_like_node_count",
                 "figure_like_node_count",
+                "layout_table_candidate_count",
+                "layout_figure_candidate_count",
+                "layout_page_candidate_count",
             )
             if key in metrics
         }
@@ -486,6 +528,7 @@ def run_docling_comparison(
     figure_description_backend: str = "local-vlm",
     figure_structure_extraction: bool = False,
     require_docling: bool = False,
+    layout_comparison_mode: str = "off",
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     source_sha256 = _source_sha256(input_pdf)
@@ -503,10 +546,12 @@ def run_docling_comparison(
         rag_generated_figure_descriptions=rag_generated_figure_descriptions,
         figure_description_backend=figure_description_backend,
         figure_structure_extraction=figure_structure_extraction,
+        layout_comparison_mode=layout_comparison_mode,
     )
     docling_run, findings, docling_virtual_artifacts = run_docling_tool(
         input_pdf=input_pdf,
         output_dir=docling_output_dir,
+        layout_comparison_mode=layout_comparison_mode,
     )
     all_findings = list(findings)
     if require_docling and docling_run["status"] == "skipped":
@@ -539,6 +584,8 @@ def run_docling_comparison(
             "finding_count": len(all_findings),
             "error_count": error_count,
             "warning_count": warning_count,
+            "layout_comparison_mode": layout_comparison_mode,
+            "layout_comparison_enabled": layout_comparison_mode != "off",
         },
         "runs": [current_run, docling_run],
         "findings": all_findings,
@@ -552,6 +599,7 @@ def run_docling_comparison(
         current_output_dir=current_output_dir,
         docling_virtual_artifacts=docling_virtual_artifacts,
         findings=all_findings,
+        layout_comparison_mode=layout_comparison_mode,
     )
     write_json(output_dir / REPORT_FILENAME, report)
     write_json(output_dir / COMPARISON_FILENAME, comparison)
@@ -603,6 +651,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Treat a missing Docling installation as an error instead of an advisory skip.",
     )
+    parser.add_argument(
+        "--layout-comparison-mode",
+        choices=LAYOUT_COMPARISON_MODES,
+        default="off",
+        help="Comparison-only sanitized layout metrics to collect from current-tool and Docling outputs.",
+    )
     parser.add_argument("--fail-on-error", action="store_true")
     parser.set_defaults(rag_figure_text_chunks=True)
     return parser
@@ -625,6 +679,7 @@ def main(argv: list[str] | None = None) -> int:
         figure_description_backend=args.figure_description_backend,
         figure_structure_extraction=args.figure_structure_extraction,
         require_docling=args.require_docling,
+        layout_comparison_mode=args.layout_comparison_mode,
     )
     print(f"Wrote {args.output_dir / REPORT_FILENAME}")
     if args.fail_on_error and report.get("summary", {}).get("error_count", 0):

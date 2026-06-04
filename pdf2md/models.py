@@ -632,6 +632,8 @@ class DoclingBenchmarkSummary(BaseModel):
     finding_count: int = 0
     error_count: int = 0
     warning_count: int = 0
+    layout_comparison_mode: str = "off"
+    layout_comparison_enabled: bool = False
 
 
 class DoclingBenchmarkReport(BaseModel):
@@ -661,6 +663,8 @@ class DoclingArtifactSummary(BaseModel):
     comparable_metric_count: int = 0
     hash_match_count: int = 0
     hash_mismatch_count: int = 0
+    layout_comparison_mode: str = "off"
+    layout_comparable: bool = False
 
 
 class DoclingArtifactComparisonReport(BaseModel):

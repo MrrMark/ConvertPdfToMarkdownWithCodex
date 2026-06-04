@@ -71,6 +71,16 @@
           "default": 0,
           "title": "Hash Mismatch Count",
           "type": "integer"
+        },
+        "layout_comparable": {
+          "default": false,
+          "title": "Layout Comparable",
+          "type": "boolean"
+        },
+        "layout_comparison_mode": {
+          "default": "off",
+          "title": "Layout Comparison Mode",
+          "type": "string"
         }
       },
       "title": "DoclingArtifactSummary",

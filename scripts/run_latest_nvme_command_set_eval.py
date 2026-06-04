@@ -147,6 +147,8 @@ def render_latest_nvme_scorecard(
         f"| figure_text_chunk_record_count | {current_metrics.get('figure_text_chunk_record_count', 0)} |",
         f"| figure_description_chunk_record_count | {current_metrics.get('figure_description_chunk_record_count', 0)} |",
         f"| figure_structure_chunk_record_count | {current_metrics.get('figure_structure_chunk_record_count', 0)} |",
+        f"| layout_table_candidate_count | {current_metrics.get('layout_table_candidate_count', '')} |",
+        f"| layout_figure_candidate_count | {current_metrics.get('layout_figure_candidate_count', '')} |",
         f"| artifact_integrity | {_bool_status(current_metrics.get('artifact_integrity_passed'))} |",
         f"| index_contract | {_bool_status(current_metrics.get('index_contract_passed'))} |",
         f"| provenance_integrity | {_bool_status(current_metrics.get('provenance_integrity_passed'))} |",
@@ -162,6 +164,9 @@ def render_latest_nvme_scorecard(
         f"| docling_available | `{report.get('summary', {}).get('docling_available')}` |",
         f"| table_like_node_count | `{docling_metrics.get('table_like_node_count')}` |",
         f"| figure_like_node_count | `{docling_metrics.get('figure_like_node_count')}` |",
+        f"| layout_table_candidate_count | `{docling_metrics.get('layout_table_candidate_count')}` |",
+        f"| layout_figure_candidate_count | `{docling_metrics.get('layout_figure_candidate_count')}` |",
+        f"| layout_page_candidate_count | `{docling_metrics.get('layout_page_candidate_count')}` |",
         f"| backend_availability | `{json.dumps(docling_metrics.get('backend_availability', {}), sort_keys=True)}` |",
         "",
         "## Sanitization Contract",
@@ -190,6 +195,7 @@ def run_latest_nvme_command_set_eval(
     official_source_url: str = OFFICIAL_SOURCE_URL,
     figure_semantics_mode: str = "visual",
     figure_description_backend: str = "local-vlm",
+    layout_comparison_mode: str = "summary",
     require_docling: bool = False,
 ) -> dict[str, Any]:
     """Run the latest NVMe Command Set current-tool/Docling comparison pack."""
@@ -209,6 +215,7 @@ def run_latest_nvme_command_set_eval(
         figure_description_backend=figure_description_backend,
         figure_structure_extraction=include_visual_semantics,
         require_docling=require_docling,
+        layout_comparison_mode=layout_comparison_mode,
     )
     comparison = _read_json(output_dir / COMPARISON_FILENAME)
     scorecard = render_latest_nvme_scorecard(
@@ -249,6 +256,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Treat a missing Docling installation as an error for installed-backend benchmark gates.",
     )
+    parser.add_argument(
+        "--layout-comparison-mode",
+        choices=("off", "summary"),
+        default="summary",
+        help="Comparison-only sanitized layout metrics to collect from current-tool and Docling outputs.",
+    )
     parser.add_argument("--fail-on-current-tool-failure", action="store_true")
     parser.add_argument("--fail-on-error", action="store_true")
     return parser
@@ -265,6 +278,7 @@ def main(argv: list[str] | None = None) -> int:
         official_source_url=args.official_source_url,
         figure_semantics_mode=args.figure_semantics_mode,
         figure_description_backend=args.figure_description_backend,
+        layout_comparison_mode=args.layout_comparison_mode,
         require_docling=args.require_docling,
     )
     print(f"Wrote {args.output_dir / REPORT_FILENAME}")

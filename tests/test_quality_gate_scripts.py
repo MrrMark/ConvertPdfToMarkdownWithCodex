@@ -258,6 +258,72 @@ def test_docling_comparison_passes_figure_semantics_options_to_current_tool(
     assert "figure_structure_chunk_record_count" in current_metrics
 
 
+def test_docling_layout_comparison_collects_sanitized_counts(
+    monkeypatch,  # noqa: ANN001
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    class FakeDocument:
+        def export_to_markdown(self) -> str:
+            return "# Synthetic Docling Export\n"
+
+        def export_to_dict(self) -> dict:
+            return {
+                "pages": [
+                    {
+                        "tables": [{"cells": []}],
+                        "pictures": [{"annotations": []}],
+                        "text_blocks": [{"kind": "paragraph"}],
+                    }
+                ],
+                "body": {"children": []},
+            }
+
+    class FakeConverter:
+        def convert(self, input_pdf: str):  # noqa: ANN001
+            return SimpleNamespace(document=FakeDocument())
+
+    original_import_module = benchmark_docling_comparison.importlib.import_module
+
+    def fake_import_module(module_name: str):  # noqa: ANN001
+        if module_name == "docling.document_converter":
+            return SimpleNamespace(DocumentConverter=FakeConverter)
+        return original_import_module(module_name)
+
+    monkeypatch.setattr(benchmark_docling_comparison, "_module_available", lambda module_name: module_name == "docling")
+    monkeypatch.setattr(benchmark_docling_comparison.importlib, "import_module", fake_import_module)
+
+    output_dir = tmp_path / "docling-layout-comparison"
+    report = benchmark_docling_comparison.run_docling_comparison(
+        input_pdf=sample_pdf,
+        output_dir=output_dir,
+        document_label="docling-layout",
+        layout_comparison_mode="summary",
+    )
+    comparison = benchmark_docling_comparison._read_json(  # noqa: SLF001
+        output_dir / benchmark_docling_comparison.COMPARISON_FILENAME
+    )
+    current_metrics = next(run["metrics"] for run in report["runs"] if run["tool"] == "pdf2md")
+    docling_metrics = next(run["metrics"] for run in report["runs"] if run["tool"] == "docling")
+    deltas = {item["metric"]: item for item in comparison["metric_deltas"]}
+
+    assert report["summary"]["layout_comparison_mode"] == "summary"
+    assert report["summary"]["layout_comparison_enabled"] is True
+    assert comparison["summary"]["layout_comparison_mode"] == "summary"
+    assert comparison["summary"]["layout_comparable"] is True
+    assert current_metrics["layout_comparison_mode"] == "summary"
+    assert "layout_table_candidate_count" in current_metrics
+    assert docling_metrics["layout_comparison_mode"] == "summary"
+    assert docling_metrics["layout_table_candidate_count"] >= 1
+    assert docling_metrics["layout_figure_candidate_count"] >= 1
+    assert docling_metrics["layout_page_candidate_count"] >= 1
+    assert "layout_table_candidate_count" in deltas
+    assert "layout_figure_candidate_count" in deltas
+    assert report["raw_content_included"] is False
+    assert comparison["raw_content_included"] is False
+    assert "sample.pdf" not in json.dumps(report, ensure_ascii=False, sort_keys=True)
+
+
 def test_latest_nvme_command_set_eval_writes_sanitized_scorecard(
     monkeypatch,  # noqa: ANN001
     sample_pdf: Path,
@@ -984,6 +1050,8 @@ def test_release_gate_runner_supports_docling_installed_gate(monkeypatch, tmp_pa
     assert "--fail-on-current-tool-failure" in command
     assert "--figure-semantics-mode" in command
     assert "visual" in command
+    assert "--layout-comparison-mode" in command
+    assert "summary" in command
     assert "--pages" in command
 
 

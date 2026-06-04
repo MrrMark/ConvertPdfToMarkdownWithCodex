@@ -155,6 +155,16 @@
           "title": "Finding Count",
           "type": "integer"
         },
+        "layout_comparison_enabled": {
+          "default": false,
+          "title": "Layout Comparison Enabled",
+          "type": "boolean"
+        },
+        "layout_comparison_mode": {
+          "default": "off",
+          "title": "Layout Comparison Mode",
+          "type": "string"
+        },
         "warning_count": {
           "default": 0,
           "title": "Warning Count",

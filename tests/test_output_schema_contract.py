@@ -91,10 +91,12 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         (output_dir / "docling_benchmark_report.schema.json").read_text(encoding="utf-8")
     )
     assert docling_benchmark_schema["properties"]["purpose"]["default"] == "docling_benchmark_comparison"
+    assert "layout_comparison_mode" in docling_benchmark_schema["$defs"]["DoclingBenchmarkSummary"]["properties"]
     docling_comparison_schema = json.loads(
         (output_dir / "docling_artifact_comparison.schema.json").read_text(encoding="utf-8")
     )
     assert docling_comparison_schema["properties"]["purpose"]["default"] == "docling_sanitized_artifact_comparison"
+    assert "layout_comparable" in docling_comparison_schema["$defs"]["DoclingArtifactSummary"]["properties"]
     ocr_probe_schema = json.loads((output_dir / "ocr_backend_probe_report.schema.json").read_text(encoding="utf-8"))
     assert ocr_probe_schema["properties"]["purpose"]["default"] == "multi_ocr_backend_probe"
     figure_eval_schema = json.loads(

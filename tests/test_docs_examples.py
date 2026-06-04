@@ -52,6 +52,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/schema/corpus_evidence_analysis_report.schema.json" in readme
     assert "scripts/benchmark_docling_comparison.py" in readme
     assert "scripts/run_latest_nvme_command_set_eval.py" in readme
+    assert "--layout-comparison-mode summary" in readme
     assert "--gates docling" in readme
     assert "--gates ocr-backends" in readme
     assert "--gates figure-description-eval" in readme
@@ -74,7 +75,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "이미지 업로드 불가 RAG 대응" in readme
     assert "--manual-domain-adapter-keywords" in readme
     assert "--ocr-backend tesseract" in readme
-    assert "완료된 Q34-Q113" in readme
+    assert "완료된 Q34-Q114" in readme
     assert "docs/DOCLING_INFORMED_EXTENSION_DESIGN.md" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
@@ -447,6 +448,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q111. OCR Backend Adapter Contract" not in next_plan
     assert "Q112. Region OCR Report-Only Prototype" not in next_plan
     assert "Q113. Local-Only Figure Description Evaluation Pack" not in next_plan
+    assert "Q114. Docling Layout Adapter Comparison Mode" not in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
@@ -494,6 +496,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q111. OCR Backend Adapter Contract" not in development_specs
     assert "Q112. Region OCR Report-Only Prototype" not in development_specs
     assert "Q113. Local-Only Figure Description Evaluation Pack" not in development_specs
+    assert "Q114. Docling Layout Adapter Comparison Mode" not in development_specs
     assert "figure_descriptions_rag.jsonl" not in development_specs
     assert "figure_structures_rag.jsonl" not in development_specs
     assert "--rag-generated-figure-descriptions" not in development_specs
@@ -550,8 +553,11 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
     assert "현재 없음." in development_specs
-    assert "완료된 Q34-Q113" in development_specs
+    assert "완료된 Q34-Q114" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q114. Docling Layout Adapter Comparison Mode" in implemented_specs
+    assert "layout_comparison_mode" in implemented_specs
+    assert "--layout-comparison-mode" in implemented_specs
     assert "Q113. Local-Only Figure Description Evaluation Pack" in implemented_specs
     assert "figure_description_eval_report.json" in implemented_specs
     assert "evaluate_figure_descriptions.py" in implemented_specs
@@ -574,9 +580,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" in implemented_specs
     assert "manual_domain_adapter_keywords" in implemented_specs
     assert "DOCLING_INFORMED_EXTENSION_DESIGN.md" in implemented_specs
-    assert "Q113에서 local-only picture description evaluation pack을 완료했다" in docling_design
-    assert "Docling layout adapter comparison mode" in docling_design
-    assert "Local-only picture description evaluation pack" not in docling_design
+    assert "Q113에서 local-only picture description evaluation pack" in docling_design
+    assert "Q114에서 Docling layout adapter comparison mode를 완료했다" in docling_design
+    assert "1. Docling layout adapter comparison mode" not in docling_design
     assert "DocumentConverter().convert" in docling_design
     assert "raw_content_included=false" in docling_design
     assert "generated_description" in docling_design
@@ -705,6 +711,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "docling_benchmark_report.json" in output_schema
     assert "docling_artifact_comparison.json" in output_schema
     assert "docling_required_not_available" in output_schema
+    assert "layout_comparison_mode" in output_schema
+    assert "layout_table_candidate_count" in output_schema
+    assert "layout_comparable" in output_schema
     assert "text_blocks_rag.jsonl" in output_schema
     assert "semantic_units_rag.jsonl" in output_schema
     assert "requirements_rag.jsonl" in output_schema
@@ -792,6 +801,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q111 OCR backend adapter contract" in quality_scorecard
     assert "Q112 region OCR report-only prototype" in quality_scorecard
     assert "Q113 local-only figure description evaluation pack" in quality_scorecard
+    assert "Q114 Docling layout adapter comparison mode" in quality_scorecard
     assert "latest_nvme_command_set_scorecard.md" in quality_scorecard
     assert "이미지 업로드 불가 RAG 대응" in quality_scorecard
     assert "Docling 미설치 advisory skip" in quality_scorecard
