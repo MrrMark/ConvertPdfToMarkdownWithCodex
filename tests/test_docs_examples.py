@@ -56,8 +56,9 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 없습니다" in readme
-    assert "완료된 Q34-Q97" in readme
+    assert "현재 active quality backlog는 Q99-Q105입니다" in readme
+    assert "page worker 병렬화 재설계" in readme
+    assert "완료된 Q34-Q98" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
     assert "summary.actionable_warning_count" in readme
@@ -131,6 +132,9 @@ def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
     )
     assert "M04는 Q92에서 active backlog와 문서 정합성 1차 정리를 완료했다" in tasks
     assert "M05는 Q95에서 lightweight CI gate를 보강했고, Q96에서 한글/OCR fixture 회귀 방어를 보강했다" in tasks
+    assert "M06은 Q98에서 structure marker OCR lazy 처리를 완료했고" in tasks
+    assert "Q99-Q102에서 남은 변환 속도 병목을 품질 보존 방식으로 줄이는 성능 개선 트랙으로 관리한다" in tasks
+    assert "M07은 Q103-Q105에서 이미지 파일 업로드가 불가능한 RAG 환경과 Docling 벤치마킹/확장 설계를 관리한다" in tasks
 
 
 def test_windows_guide_matches_cli_policy() -> None:
@@ -330,6 +334,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     implemented_specs = Path("docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md").read_text(encoding="utf-8")
     output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
     quality_scorecard = Path("docs/QUALITY_SCORECARD.md").read_text(encoding="utf-8")
+    changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
 
     assert "python-version" in workflow
     assert '"3.11"' in workflow
@@ -399,7 +404,15 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q95. Lightweight CI And Release Gate Coverage" not in next_plan
     assert "Q96. Korean, OCR, And Image-Only Golden Promotion" not in next_plan
     assert "Q97. Modern Python Tooling And Packaging Readiness" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
+    assert "Q98. Lazy Structure Marker OCR" not in next_plan
+    assert "Q99. Page Worker Chunked Parallelization" in next_plan
+    assert "Q100. OCR Page Parallelization" in next_plan
+    assert "Q101. Table Strategy Adaptive Mode" in next_plan
+    assert "Q102. Fast Output Profile And Sidecar Scope" in next_plan
+    assert "Q103. Assetless Technical RAG Figure Text Chunks" in next_plan
+    assert "Q104. Docling Benchmark Harness And Comparison Pack" in next_plan
+    assert "Q105. Docling-Informed OCR And Layout Extension Design" in next_plan
+    assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in next_plan
@@ -430,7 +443,17 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "cross_ref_resolved_coverage >= 0.90" not in development_specs
     assert "PDF outline/bookmark section fallback" not in development_specs
     assert "Register/capability false-positive suppression" not in development_specs
-    assert "현재 active 개발 명세 없음." in development_specs
+    assert "Q98. Lazy Structure Marker OCR" not in development_specs
+    assert "Q99. Page Worker Chunked Parallelization" in development_specs
+    assert "Q100. OCR Page Parallelization" in development_specs
+    assert "Q101. Table Strategy Adaptive Mode" in development_specs
+    assert "Q102. Fast Output Profile And Sidecar Scope" in development_specs
+    assert "Q103. Assetless Technical RAG Figure Text Chunks" in development_specs
+    assert "Q104. Docling Benchmark Harness And Comparison Pack" in development_specs
+    assert "Q105. Docling-Informed OCR And Layout Extension Design" in development_specs
+    assert "placeholder + figure_text chunk" in development_specs
+    assert "다중 OCR backend" in development_specs
+    assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in development_specs
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in development_specs
@@ -479,7 +502,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q97" in development_specs
+    assert "완료된 Q34-Q98" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -506,6 +529,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q95. Lightweight CI And Release Gate Coverage" in implemented_specs
     assert "Q96. Korean, OCR, And Image-Only Golden Promotion" in implemented_specs
     assert "Q97. Modern Python Tooling And Packaging Readiness" in implemented_specs
+    assert "Q98. Lazy Structure Marker OCR" in implemented_specs
+    assert "context-resolvable markers avoid Tesseract calls" in changelog
     assert "dependency-audit" in implemented_specs
     assert "pdf-outline-" in implemented_specs
     assert "scripts/run_preset_eval.py" in implemented_specs

@@ -102,11 +102,12 @@ class PendingStructureMarker:
     width: int | None
     height: int | None
     sha256: str
+    image_bytes: bytes
     title_text: str
     title_top: float
     parent_heading_index: str | None
     child_heading_index: str | None
-    ocr_candidates: list[StructureOcrCandidate]
+    ocr_candidates: list[StructureOcrCandidate] = field(default_factory=list)
 
 
 def _guess_extension(image_name: str) -> str:
@@ -708,6 +709,58 @@ def _resolve_structure_marker_recovery(
     )
 
 
+def _context_marker_matches_parent_hint(expected_marker: str, parent_heading_index: str | None) -> bool:
+    if parent_heading_index is None:
+        return True
+    expected_parts = expected_marker.split(".")
+    parent_parts = parent_heading_index.split(".")
+    common_prefix_length = 0
+    for expected_part, parent_part in zip(expected_parts, parent_parts):
+        if expected_part != parent_part:
+            break
+        common_prefix_length += 1
+    return common_prefix_length >= min(2, len(expected_parts), len(parent_parts))
+
+
+def _resolve_structure_marker_from_context_only(
+    marker: PendingStructureMarker,
+    *,
+    previous_recovered_text: str | None = None,
+    next_recovered_text: str | None = None,
+) -> StructureRecoveryDecision | None:
+    expected_from_child = _expected_structure_marker_from_context(
+        parent_heading_index=marker.parent_heading_index,
+        child_heading_index=marker.child_heading_index,
+    )
+    if expected_from_child is not None and _context_marker_matches_parent_hint(
+        expected_from_child,
+        marker.parent_heading_index,
+    ):
+        return StructureRecoveryDecision(
+            text=expected_from_child,
+            confidence=None,
+            reason=StructureRecoveryReason.RECOVERED_CONTEXT_VALIDATED,
+            recovery_strategy=StructureRecoveryStrategy.CHILD_HEADING_CONTEXT,
+            context_validated=True,
+            parent_heading_index=marker.parent_heading_index,
+            source_candidates=[],
+        )
+
+    expected_from_siblings = _interpolate_from_siblings(previous_recovered_text, next_recovered_text)
+    if expected_from_siblings is not None:
+        return StructureRecoveryDecision(
+            text=expected_from_siblings,
+            confidence=None,
+            reason=StructureRecoveryReason.RECOVERED_CONTEXT_VALIDATED,
+            recovery_strategy=StructureRecoveryStrategy.SIBLING_SEQUENCE_CONTEXT,
+            context_validated=True,
+            parent_heading_index=marker.parent_heading_index,
+            source_candidates=[],
+        )
+
+    return None
+
+
 def _append_structure_marker_result(
     result: ImageExtractionResult,
     marker: PendingStructureMarker,
@@ -747,12 +800,53 @@ def _append_structure_marker_result(
         )
 
 
-def _resolve_structure_markers(markers: list[PendingStructureMarker]) -> list[tuple[PendingStructureMarker, StructureRecoveryDecision]]:
+def _resolve_structure_markers(
+    markers: list[PendingStructureMarker],
+    *,
+    ocr_cache: dict[tuple[str, str, int], StructureOcrObservation] | None = None,
+) -> list[tuple[PendingStructureMarker, StructureRecoveryDecision]]:
     ordered = sorted(markers, key=lambda item: (item.page, item.top, item.index))
+    if ocr_cache is None:
+        ocr_cache = {}
+
+    context_recoveries: list[StructureRecoveryDecision | None] = [None] * len(ordered)
+    for idx, marker in enumerate(ordered):
+        context_recoveries[idx] = _resolve_structure_marker_from_context_only(marker)
+
+    for idx, marker in enumerate(ordered):
+        if context_recoveries[idx] is not None:
+            continue
+        previous_recovered = None
+        next_recovered = None
+        for back in range(idx - 1, -1, -1):
+            if context_recoveries[back] is not None and context_recoveries[back].text is not None:
+                previous_recovered = context_recoveries[back].text
+                break
+        for forward in range(idx + 1, len(ordered)):
+            if context_recoveries[forward] is not None and context_recoveries[forward].text is not None:
+                next_recovered = context_recoveries[forward].text
+                break
+        context_recoveries[idx] = _resolve_structure_marker_from_context_only(
+            marker,
+            previous_recovered_text=previous_recovered,
+            next_recovered_text=next_recovered,
+        )
+
+    ocr_candidates_by_index: list[list[StructureOcrCandidate]] = [marker.ocr_candidates for marker in ordered]
     strong_recoveries: list[StructureRecoveryDecision | None] = [None] * len(ordered)
     for idx, marker in enumerate(ordered):
+        if context_recoveries[idx] is not None:
+            strong_recoveries[idx] = context_recoveries[idx]
+            continue
+        ocr_candidates = _collect_structure_marker_candidates(
+            marker.image_bytes,
+            parent_heading_index=marker.parent_heading_index,
+            child_heading_index=marker.child_heading_index,
+            ocr_cache=ocr_cache,
+        )
+        ocr_candidates_by_index[idx] = ocr_candidates
         decision = _resolve_structure_marker_recovery(
-            marker.ocr_candidates,
+            ocr_candidates,
             marker.parent_heading_index,
             marker.child_heading_index,
         )
@@ -761,6 +855,9 @@ def _resolve_structure_markers(markers: list[PendingStructureMarker]) -> list[tu
 
     resolved: list[tuple[PendingStructureMarker, StructureRecoveryDecision]] = []
     for idx, marker in enumerate(ordered):
+        if context_recoveries[idx] is not None:
+            resolved.append((marker, context_recoveries[idx]))
+            continue
         previous_recovered = None
         next_recovered = None
         for back in range(idx - 1, -1, -1):
@@ -772,7 +869,7 @@ def _resolve_structure_markers(markers: list[PendingStructureMarker]) -> list[tu
                 next_recovered = strong_recoveries[forward].text
                 break
         recovery = _resolve_structure_marker_recovery(
-            marker.ocr_candidates,
+            ocr_candidates_by_index[idx],
             marker.parent_heading_index,
             marker.child_heading_index,
             previous_recovered_text=previous_recovered,
@@ -929,7 +1026,6 @@ def _handle_structure_marker_candidate(
     image_bytes: bytes,
     page_text_lines: dict[int, list[dict]],
     pending_structure_markers: dict[int, list[PendingStructureMarker]],
-    structure_ocr_cache: dict[tuple[str, str, int], StructureOcrObservation],
 ) -> bool:
     title_line = _find_structure_title(page_text_lines.get(page_number, []), bbox_payload)
     if not _is_structure_marker_candidate(
@@ -941,12 +1037,6 @@ def _handle_structure_marker_candidate(
         return False
     parent_heading_index = _find_parent_heading_index(page_text_lines.get(page_number, []), title_line)
     child_heading_index = _find_child_heading_index(page_text_lines, page_number, title_line)
-    ocr_candidates = _collect_structure_marker_candidates(
-        image_bytes,
-        parent_heading_index=parent_heading_index,
-        child_heading_index=child_heading_index,
-        ocr_cache=structure_ocr_cache,
-    )
     pending_structure_markers.setdefault(page_number, []).append(
         PendingStructureMarker(
             page=page_number,
@@ -956,11 +1046,11 @@ def _handle_structure_marker_candidate(
             width=width,
             height=height,
             sha256=sha256,
+            image_bytes=image_bytes,
             title_text=str(title_line.get("text", "")).strip() if title_line is not None else "",
             title_top=float(title_line.get("top", top)) if title_line is not None else top,
             parent_heading_index=parent_heading_index,
             child_heading_index=child_heading_index,
-            ocr_candidates=ocr_candidates,
         )
     )
     return True
@@ -1355,7 +1445,6 @@ def extract_images(
             image_bytes=image_bytes,
             page_text_lines=page_text_lines,
             pending_structure_markers=pending_structure_markers,
-            structure_ocr_cache=structure_ocr_cache,
         ):
             debug_payload["excluded"] = True
             debug_payload["exclude_reason"] = "STRUCTURE_MARKER_CANDIDATE"
@@ -1428,7 +1517,7 @@ def extract_images(
         for page_number in sorted(pending_structure_markers)
         for marker in pending_structure_markers[page_number]
     ]
-    for marker, recovery in _resolve_structure_markers(all_pending_markers):
+    for marker, recovery in _resolve_structure_markers(all_pending_markers, ocr_cache=structure_ocr_cache):
         _append_structure_marker_result(result, marker, recovery)
 
     if figure_crop_fallback:

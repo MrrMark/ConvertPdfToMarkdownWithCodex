@@ -8,8 +8,10 @@ from types import SimpleNamespace
 from PIL import Image, ImageDraw
 
 from pdf2md.extractors.images import (
+    PendingStructureMarker,
     StructureOcrCandidate,
     _collect_structure_marker_candidates,
+    _resolve_structure_markers,
     _resolve_structure_marker_recovery,
     extract_images,
 )
@@ -372,6 +374,78 @@ def test_structure_marker_recovery_uses_previous_sibling_context() -> None:
     assert decision.recovery_strategy == "previous_sibling_context"
 
 
+def _pending_structure_marker(
+    index: int,
+    *,
+    child_heading_index: str | None = None,
+    parent_heading_index: str | None = None,
+) -> PendingStructureMarker:
+    return PendingStructureMarker(
+        page=1,
+        index=index,
+        top=float(index * 20),
+        bbox=[72.0, float(index * 20), 92.0, float(index * 20 + 8)],
+        width=20,
+        height=8,
+        sha256=f"sha-{index}",
+        image_bytes=f"marker-{index}".encode("ascii"),
+        title_text=f"Marker {index}",
+        title_top=float(index * 20),
+        parent_heading_index=parent_heading_index,
+        child_heading_index=child_heading_index,
+    )
+
+
+def test_structure_marker_context_only_interpolates_sibling_sequence_without_ocr(monkeypatch) -> None:
+    calls = {"ocr": 0}
+
+    def fake_collect(data: bytes, **kwargs) -> list[StructureOcrCandidate]:
+        calls["ocr"] += 1
+        return []
+
+    monkeypatch.setattr("pdf2md.extractors.images._collect_structure_marker_candidates", fake_collect)
+
+    resolved = _resolve_structure_markers(
+        [
+            _pending_structure_marker(1, child_heading_index="2.2.1.1"),
+            _pending_structure_marker(2),
+            _pending_structure_marker(3, child_heading_index="2.2.3.1"),
+        ]
+    )
+
+    assert [decision.text for _, decision in resolved] == ["2.2.1", "2.2.2", "2.2.3"]
+    assert [decision.recovery_strategy for _, decision in resolved] == [
+        "child_heading_context",
+        "sibling_sequence_context",
+        "child_heading_context",
+    ]
+    assert calls["ocr"] == 0
+
+
+def test_structure_marker_child_context_rejects_mismatched_parent_hint(monkeypatch) -> None:
+    calls = {"ocr": 0}
+
+    def fake_collect(data: bytes, **kwargs) -> list[StructureOcrCandidate]:
+        calls["ocr"] += 1
+        return []
+
+    monkeypatch.setattr("pdf2md.extractors.images._collect_structure_marker_candidates", fake_collect)
+
+    resolved = _resolve_structure_markers(
+        [
+            _pending_structure_marker(
+                1,
+                parent_heading_index="2.2",
+                child_heading_index="3.1.4.1",
+            )
+        ]
+    )
+
+    assert resolved[0][1].text is None
+    assert resolved[0][1].reason == "STRUCTURE_MARKER_SUPPRESSED_NO_CANDIDATE"
+    assert calls["ocr"] == 1
+
+
 def test_structure_marker_ocr_uses_data_for_text_and_confidence(monkeypatch) -> None:
     calls = {"data": 0, "string": 0}
 
@@ -540,6 +614,52 @@ def test_extract_images_suppresses_structure_marker_and_recovers_text(monkeypatc
     assert result.structure_recoveries[0]["recovered_text"] == "2.2.1"
 
 
+def test_extract_images_recovers_structure_marker_from_child_context_without_ocr(
+    monkeypatch,
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    fake_page = _FakePdfPlumberPage(
+        images=[{"top": 260.0, "bottom": 268.0, "x0": 72.0, "x1": 92.0, "width": 20, "height": 7}],
+        text_lines=[
+            {"top": 242.0, "x0": 72.0, "text": "2.2 I/O Controller Requirements"},
+            {"top": 262.0, "x0": 108.0, "text": "Command Support"},
+            {"top": 284.0, "x0": 108.0, "text": "2.2.1.1 Doorbell Registers"},
+        ],
+    )
+    calls = {"ocr": 0}
+
+    def fake_collect(data: bytes, **kwargs) -> list[StructureOcrCandidate]:
+        calls["ocr"] += 1
+        return []
+
+    monkeypatch.setattr(
+        "pdf2md.extractors.images.pdfplumber.open",
+        lambda *args, **kwargs: _FakePdfPlumberDocument([fake_page]),
+    )
+    monkeypatch.setattr("pdf2md.extractors.images._collect_structure_marker_candidates", fake_collect)
+
+    result = extract_images(
+        reader=_fake_reader(_FakeImage(b"image-bytes", name="structure.png", width=20, height=7)),
+        pdf_path=sample_pdf,
+        selected_pages=[1],
+        password=None,
+        output_dir=tmp_path / "structure-marker-child-context",
+        image_mode=ImageMode.REFERENCED,
+    )
+
+    assert result.assets == []
+    assert result.blocks_by_page == {}
+    assert result.excluded_assets[0].reason == "STRUCTURE_MARKER_RECOVERED_CONTEXT_VALIDATED"
+    assert result.excluded_assets[0].recovered_text == "2.2.1"
+    assert result.excluded_assets[0].recovery_strategy == "child_heading_context"
+    assert result.excluded_assets[0].context_validated is True
+    assert result.excluded_assets[0].ocr_candidates == []
+    assert result.structure_recoveries[0]["recovered_text"] == "2.2.1"
+    assert result.structure_recoveries[0]["source_candidates"] == []
+    assert calls["ocr"] == 0
+
+
 def test_extract_images_suppresses_structure_marker_without_hallucinating(monkeypatch, sample_pdf: Path, tmp_path: Path) -> None:
     fake_page = _FakePdfPlumberPage(
         images=[{"top": 260.0, "bottom": 268.0, "x0": 72.0, "x1": 92.0, "width": 20, "height": 7}],
@@ -552,10 +672,13 @@ def test_extract_images_suppresses_structure_marker_without_hallucinating(monkey
         "pdf2md.extractors.images.pdfplumber.open",
         lambda *args, **kwargs: _FakePdfPlumberDocument([fake_page]),
     )
-    monkeypatch.setattr(
-        "pdf2md.extractors.images._collect_structure_marker_candidates",
-        lambda data, **kwargs: [],
-    )
+    calls = {"ocr": 0}
+
+    def fake_collect(data: bytes, **kwargs) -> list[StructureOcrCandidate]:
+        calls["ocr"] += 1
+        return []
+
+    monkeypatch.setattr("pdf2md.extractors.images._collect_structure_marker_candidates", fake_collect)
 
     result = extract_images(
         reader=_fake_reader(_FakeImage(b"image-bytes", name="structure.png", width=20, height=7)),
@@ -571,3 +694,4 @@ def test_extract_images_suppresses_structure_marker_without_hallucinating(monkey
     assert result.excluded_assets[0].reason == "STRUCTURE_MARKER_SUPPRESSED_NO_CANDIDATE"
     assert result.excluded_assets[0].recovered_text is None
     assert result.structure_recoveries == []
+    assert calls["ocr"] == 1
