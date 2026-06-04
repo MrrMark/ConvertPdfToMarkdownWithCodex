@@ -23,6 +23,38 @@
 
 ## 남은 작업
 
-현재 남은 작업 없음.
+### P0 / Q99. Page Worker Chunked Parallelization
 
-새 개선 과제가 발견되면 이 섹션에 신규 Q 항목을 추가하고, 구현 전 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에 대응 active 개발 명세를 작성한다.
+`page_workers > 1` 경로가 페이지마다 PDF를 다시 여는 구조 때문에 느려지는 문제를 해결한다.
+page 단위 worker를 page chunk 단위 worker로 바꿔 worker당 PDF open 횟수를 줄이고, single-worker 산출물과 hash equivalence를 유지한다.
+
+### P1 / Q100. OCR Page Parallelization
+
+스캔 PDF 또는 `--force-ocr` 경로에서 OCR target page를 bounded worker로 병렬 처리한다.
+warning/report/page ordering은 selected page 순서로 deterministic하게 유지한다.
+
+### P1 / Q101. Table Strategy Adaptive Mode
+
+표 추출에서 기본 전략 품질이 충분한 경우 추가 fallback 전략을 생략하는 adaptive mode를 도입한다.
+복잡 표를 억지로 GFM으로 내보내지 않는 기존 안전 정책과 table quality diagnostics는 유지한다.
+
+### P1 / Q102. Fast Output Profile And Sidecar Scope
+
+`document.md`, `manifest.json`, `report.json` 중심의 opt-in fast profile과 RAG sidecar 생성 범위 `minimal|full`을 검토한다.
+기본 output contract와 기본 profile 동작은 변경하지 않는다.
+
+### P0 / Q103. Assetless Technical RAG Figure Text Chunks
+
+이미지 파일 업로드가 불가능한 팀 RAG 환경을 위해 `placeholder + figure_text chunk` 경로를 구현한다.
+이미지 파일을 생성하거나 업로드하지 않아도 caption, heading, bbox, detected labels, nearby text를 근거로 검색 가능한 figure provenance chunk를 만든다.
+생성형 이미지 설명은 기본 비활성화로 유지한다.
+
+### P1 / Q104. Docling Benchmark Harness And Comparison Pack
+
+Docling의 OCR, table/figure layout, image export, picture enrichment 경로를 로컬 벤치마크로 비교할 수 있는 harness를 만든다.
+외부 서비스 호출 없이 local-only 실행을 기본으로 하고, raw PDF/이미지/본문을 커밋하지 않는 sanitized comparison pack만 남긴다.
+
+### P2 / Q105. Docling-Informed OCR And Layout Extension Design
+
+Q104 결과를 바탕으로 다중 OCR backend, 도표/표 영역별 OCR, 선택적 picture description, layout-aware table/figure 인식 중 실제 도입할 항목을 설계한다.
+도입 기능은 adapter/opt-in 구조로 분리하고 원문 보존, deterministic output, partial success/report 원칙을 유지한다.

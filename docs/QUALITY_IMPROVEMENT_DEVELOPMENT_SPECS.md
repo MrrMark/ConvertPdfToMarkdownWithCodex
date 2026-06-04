@@ -23,8 +23,295 @@
 
 ## 현재 Active Development Specs
 
-현재 active 개발 명세 없음.
+### 공통 결정 사항
+
+Q99-Q105는 변환 품질을 희생하지 않는 성능 개선과 팀 RAG 업로드 제약 대응을 함께 다룬다.
+상충되는 요구는 아래 기준으로 정리한다.
+
+- 기본 `image_mode=referenced`와 기존 public output contract는 유지한다.
+- OCR 비활성화는 성능 개선책으로 사용하지 않는다. OCR 호출 수를 줄이더라도 evidence/context로 결정 가능한 경우에만 줄인다.
+- 팀 RAG용 assetless 경로는 opt-in으로 둔다. 이미지 파일을 못 올리는 환경에서는 `placeholder + figure_text chunk` 조합을 쓰게 한다.
+- Docling식 picture description 또는 VLM 경로는 벤치마크와 설계 대상이지만 기본 변환에는 넣지 않는다.
+- benchmark evidence는 `/tmp` 또는 local `pdf/` 아래에 두고 raw PDF, image, Markdown 원문, 고객 식별 경로는 커밋하지 않는다.
+- 새 CLI 옵션, public JSON field, summary count가 생기면 README, `docs/OUTPUT_SCHEMA.md`, schema export, docs tests를 함께 갱신한다.
+
+### P0 / Q99. Page Worker Chunked Parallelization
+
+#### 목표
+
+현재 `page_workers > 1`이 페이지마다 PDF를 다시 열어 synthetic 100p에서 single worker보다 느려지는 문제를 해결한다.
+worker가 page chunk를 받아 PDF를 한 번 열고 여러 페이지의 text/read-order/table-candidate를 처리하게 한다.
+
+#### 구현 범위
+
+- `PageWorkerInput`을 유지하되 내부 executor에서 page chunk 단위 input을 구성하거나, backward-compatible한 `PageWorkerBatchInput`을 추가한다.
+- worker당 `pdfplumber.open()`과 PDF backend open 횟수를 1회에 가깝게 줄인다.
+- page별 warning/result ordering은 selected page 순서로 정렬한다.
+- `page_cache_hits`, `page_cache_misses`, `pdf_open_count`, `page_worker_effective_count` summary 의미를 갱신하거나 유지한다.
+- `scripts/benchmark_conversion.py`에 page worker 비교 evidence를 남길 수 있게 한다.
+
+#### 주요 파일
+
+- `pdf2md/extractors/page_worker.py`
+- `pdf2md/utils/page_executor.py`
+- `pdf2md/pipeline.py`
+- `scripts/benchmark_conversion.py`
+- `tests/test_page_workers.py`
+- `tests/test_performance_metadata.py`
+
+#### 검증
+
+- `page_workers=1`과 `page_workers=4`의 normalized output hash equivalence
+- `.venv311/bin/python -m pytest tests/test_page_workers.py tests/test_performance_metadata.py -q`
+- synthetic 100p benchmark에서 `page_workers=4`가 `page_workers=1`보다 비정상적으로 느려지지 않을 것
+
+### P1 / Q100. OCR Page Parallelization
+
+#### 목표
+
+스캔 PDF 또는 `--force-ocr`에서 target pages OCR을 bounded worker로 병렬 처리한다.
+OCR runtime unavailable, language data missing, low confidence warning은 기존 의미를 유지한다.
+
+#### 구현 범위
+
+- `run_ocr` 내부에 page-level worker helper를 분리한다.
+- 각 page OCR result를 page number 기준으로 merge해 deterministic output을 보장한다.
+- Tesseract executable resolution과 language-data failure는 중복 warning noise를 줄이되 page context를 보존한다.
+- worker count는 기존 `page_workers`를 재사용할지 별도 `ocr_workers`를 둘지 구현 전 최종 결정한다. 기본값은 기존 동작과 같은 순차 처리로 둔다.
+
+#### 주요 파일
+
+- `pdf2md/extractors/ocr.py`
+- `pdf2md/pipeline.py`
+- `tests/test_ocr.py`
+- `tests/test_pipeline_reporting.py`
+
+#### 검증
+
+- mock OCR tests에서 warning order, metrics, page text가 deterministic하게 유지된다.
+- force OCR multi-page fixture에서 sequential/parallel output이 같다.
+- low confidence와 empty result warning count가 baseline과 일치한다.
+
+### P1 / Q101. Table Strategy Adaptive Mode
+
+#### 목표
+
+표 추출에서 모든 전략을 항상 실행하지 않고, 기본 전략 품질이 충분하면 추가 전략을 생략한다.
+품질 낮은 경우에만 fallback 전략을 실행해 성능을 개선한다.
+
+#### 구현 범위
+
+- default table candidate가 아래 조건을 만족하면 fallback strategy를 생략한다.
+  - header confidence가 threshold 이상
+  - empty cell ratio와 placeholder header ratio가 낮음
+  - merged-cell/multi-row-header/stub-column 등 known fallback reason이 없음
+  - GFM safety check를 통과하거나 HTML fallback이 명확함
+- threshold와 reason은 상수화하고 report/table quality diagnostics에 남긴다.
+- `--table-mode html|markdown|gfm-only|html-only` 강제 모드의 기존 의미는 유지한다.
+
+#### 주요 파일
+
+- `pdf2md/extractors/tables.py`
+- `pdf2md/table_quality.py`
+- `tests/test_tables.py`
+- `tests/test_rag_tables.py`
+- `tests/test_golden_corpus.py`
+
+#### 검증
+
+- simple/complex/continued/table accuracy fixture golden 통과
+- 복잡 표가 잘못된 GFM으로 바뀌지 않음
+- fallback 생략 여부가 debug/report에서 설명 가능함
+
+### P1 / Q102. Fast Output Profile And Sidecar Scope
+
+#### 목표
+
+대량 변환이나 1차 검토에서 `document.md`, `manifest.json`, `report.json` 중심으로 빠르게 산출하는 opt-in profile을 설계하고 구현한다.
+현재 기본처럼 모든 RAG sidecar를 생성하는 경로는 `full`로 유지한다.
+
+#### 제안 인터페이스
+
+- CLI 초안: `--output-profile full|fast`
+- sidecar 초안: `--rag-sidecar-scope full|minimal|none`
+- 기본값: `full`
+- `fast`는 `rag-sidecar-scope=none` 또는 `minimal`을 적용하되, manifest/report에는 생략된 sidecar scope와 reason을 기록한다.
+
+#### 구현 범위
+
+- sidecar writer를 pipeline에서 조건부 호출할 수 있게 한다.
+- `report.summary`의 file/record count는 생략 시 0 또는 omitted reason을 안정적으로 표현한다.
+- GUI preset과 batch runner는 같은 option matrix를 사용한다.
+- `confidential_rag`, `technical_spec_rag` 기존 프리셋의 기본 동작은 바꾸지 않는다.
+
+#### 주요 파일
+
+- `pdf2md/config.py`
+- `pdf2md/models.py`
+- `pdf2md/rag_profiles.py`
+- `pdf2md/pipeline.py`
+- `pdf2md/output_writers.py`
+- `pdf2md/cli.py`
+- `pdf2md/gui_presets.py`
+- `tests/test_cli.py`
+- `tests/test_pipeline_reporting.py`
+- `tests/test_output_schema_contract.py`
+
+#### 검증
+
+- 기존 default/full golden은 변경 없음
+- fast profile은 core artifact만 생성하고 partial success/report 계약을 유지
+- artifact integrity validator가 sidecar-scope aware하게 동작
+
+### P0 / Q103. Assetless Technical RAG Figure Text Chunks
+
+#### 배경
+
+팀 RAG가 PNG/JPG 같은 이미지 파일을 지원하지 않는 경우, 현재 `referenced` 이미지 파일은 업로드 대상에서 제외된다.
+이미 `--image-mode placeholder`는 있으나, 이것만 쓰면 도표/이미지의 검색 가능한 정보가 caption/comment 수준으로 제한된다.
+
+#### 목표
+
+이미지 파일 없이도 기술 스펙 도표의 검색성과 provenance를 유지한다.
+`figures_rag.jsonl`의 caption, heading path, bbox, detected labels, nearby text refs를 이용해 `retrieval_chunks_rag.jsonl`에 `figure_text` chunk를 opt-in으로 추가한다.
+
+#### 제안 인터페이스
+
+```bash
+python3 -m pdf2md spec.pdf -o output/spec \
+  --rag-profile technical_spec_rag \
+  --domain-adapter nvme \
+  --image-mode placeholder \
+  --rag-figure-text-chunks
+```
+
+GUI는 기존 `기술 스펙 RAG`에 별도 toggle 또는 새 표시명 `기술 스펙 RAG(이미지 파일 제외)`를 제공하되, 내부 구현은 위 option 조합을 사용한다.
+
+#### 구현 규칙
+
+- `figure_text`의 `text`는 관측된 텍스트만 사용한다.
+  - caption text
+  - section/heading path
+  - detected labels
+  - nearby text refs
+  - figure kind
+- 생성형 설명, 추론된 의미, 사람이 읽기 좋게 만든 요약은 넣지 않는다.
+- `source_refs`는 `figures_rag.jsonl`의 `figure_id`, page, bbox를 가리킨다.
+- 이미지 파일 path가 없는 placeholder 모드에서도 manifest/report/provenance가 깨지지 않아야 한다.
+- captionless/low-confidence 후보는 `figure_text`로 승격하지 않거나 `retrieval_priority`를 낮추고 diagnostics-only로 남긴다.
+
+#### 주요 파일
+
+- `pdf2md/config.py`
+- `pdf2md/models.py`
+- `pdf2md/cli.py`
+- `pdf2md/gui_presets.py`
+- `pdf2md/serializers/rag_figures.py`
+- `pdf2md/serializers/rag_chunks.py`
+- `pdf2md/pipeline.py`
+- `docs/OUTPUT_SCHEMA.md`
+- `docs/RAG_INDEXER_INTEGRATION_RECIPES.md`
+- `tests/test_rag_figures.py`
+- `tests/test_rag_chunks.py`
+- `tests/test_output_schema_contract.py`
+
+#### 검증
+
+- `--image-mode placeholder --rag-figure-text-chunks`에서 이미지 파일 없이 `figure_text` chunk가 생성된다.
+- `retrieval_chunks_rag.jsonl`의 source refs가 `figures_rag.jsonl` record와 해소된다.
+- `validate_index_contract.py`, `validate_provenance_integrity.py`, `validate_artifact_integrity.py`가 assetless profile을 통과한다.
+- generated description이 기본 출력에 들어가지 않는 테스트를 추가한다.
+
+### P1 / Q104. Docling Benchmark Harness And Comparison Pack
+
+#### 목표
+
+Docling에서 배울 부분을 감으로 도입하지 않고, 현재 툴과 같은 input corpus에서 OCR/layout/table/figure/RAG 품질과 속도를 비교한다.
+벤치마크는 local-only를 기본으로 하며, Docling 미설치 환경에서는 skip/advisory로 처리한다.
+
+#### 벤치마크 축
+
+- OCR backend
+  - Docling `auto`, Tesseract, RapidOCR, EasyOCR, macOS OCR 중 설치된 것
+  - 현재 툴 `pytesseract + pypdfium2`
+- OCR mode
+  - normal OCR
+  - force full page OCR
+  - image/table/figure region OCR 후보
+- Table/layout
+  - Docling table structure fast/accurate
+  - 현재 툴 auto/html fallback/table sidecar
+- Image/figure
+  - placeholder/referenced export
+  - figure caption coverage
+  - picture classification/description은 local model 또는 explicit opt-in일 때만 측정
+- RAG readiness
+  - retrieval chunk count
+  - expected source coverage
+  - table-field coverage
+  - figure_text query coverage
+  - source-ref/provenance integrity
+- Performance
+  - total duration
+  - pages/sec
+  - stage durations when available
+  - output file count/size
+
+#### 제안 산출물
+
+- `docling_benchmark_report.json`
+- `docling_artifact_comparison.json`
+- `docling_scorecard.md`
+
+위 산출물은 raw text body, image bytes, customer path를 복사하지 않고 count, hash, metric, warning code, sanitized label만 저장한다.
+
+#### 주요 파일
+
+- `scripts/benchmark_conversion.py`
+- `scripts/run_preset_eval.py`
+- 신규 `scripts/benchmark_docling_comparison.py`
+- `docs/RAG_INDEXER_INTEGRATION_RECIPES.md`
+- `docs/QUALITY_SCORECARD.md` if the scorecard is refreshed
+- `tests/test_quality_gate_scripts.py`
+- `tests/test_docs_examples.py`
+
+#### 검증
+
+- Docling 미설치 환경에서 script가 명확한 advisory report를 남기고 실패하지 않음
+- synthetic fixture에서 현재 툴만으로 comparison schema를 생성 가능
+- local Docling 설치 환경에서는 최소 PDF 1개에 대해 Markdown/JSON export metric을 수집 가능
+- remote service, hosted VLM, external embedding 호출은 기본 금지
+
+### P2 / Q105. Docling-Informed OCR And Layout Extension Design
+
+#### 목표
+
+Q104 벤치마크 결과를 바탕으로 실제 도입할 확장 기능을 정한다.
+후보는 다중 OCR backend, 도표/표 영역별 OCR, 선택적 picture description, layout-aware table/figure 인식이다.
+
+#### 설계 후보
+
+- OCR backend adapter
+  - `TesseractOcrBackend` 기존 구현 유지
+  - `RapidOcrBackend`, `EasyOcrBackend`, `OcrMacBackend`는 optional dependency로 분리
+  - backend별 language code mapping과 confidence normalization을 명시
+- Region OCR
+  - full page OCR보다 image/table/figure crop OCR을 먼저 시도
+  - crop bbox, source figure/table id, confidence, rejected reason을 report에 기록
+- Picture description
+  - 기본 비활성화
+  - local-only model 또는 explicit remote opt-in만 허용
+  - output field는 `generated_description` 계열로 원문 `text`와 분리
+- Layout-aware table/figure adapter
+  - Docling adapter는 P2 experimental backend로 둔다.
+  - current extractor 결과와 adapter 결과를 바로 섞지 않고 comparison/evidence pack을 먼저 만든다.
+
+#### 완료 조건
+
+- Q104 metric으로 실제 개선 가능성이 확인된 후보만 구현 backlog로 승격한다.
+- 새 기능은 adapter/opt-in 구조와 schema contract를 갖는다.
+- 원문 텍스트와 table row source-of-truth를 생성형 출력으로 대체하지 않는다.
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q97 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q98 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
