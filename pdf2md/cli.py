@@ -154,6 +154,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Add optional previous/next/section anchor metadata to retrieval chunks.",
     )
+    parser.add_argument(
+        "--rag-figure-text-chunks",
+        action="store_true",
+        default=None,
+        help="Opt-in observed-text figure retrieval chunks for assetless RAG indexing.",
+    )
     marker_group = parser.add_mutually_exclusive_group()
     marker_group.add_argument("--keep-page-markers", dest="keep_page_markers", action="store_true")
     marker_group.add_argument("--no-page-markers", dest="keep_page_markers", action="store_false")
@@ -208,6 +214,10 @@ def _build_single_config(args: argparse.Namespace) -> Config:
             args.rag_chunk_relationship_metadata,
             profile_options.rag_chunk_relationship_metadata,
         ),
+        rag_figure_text_chunks=_option_value(
+            args.rag_figure_text_chunks,
+            profile_options.rag_figure_text_chunks,
+        ),
         page_workers=args.page_workers,
         debug=args.debug,
         verbose=args.verbose,
@@ -251,6 +261,10 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
         rag_chunk_relationship_metadata=_option_value(
             args.rag_chunk_relationship_metadata,
             profile_options.rag_chunk_relationship_metadata,
+        ),
+        rag_figure_text_chunks=_option_value(
+            args.rag_figure_text_chunks,
+            profile_options.rag_figure_text_chunks,
         ),
         page_workers=args.page_workers,
         debug=args.debug,

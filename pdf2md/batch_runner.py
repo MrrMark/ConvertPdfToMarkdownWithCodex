@@ -67,6 +67,7 @@ class BatchConversionOptions:
     rag_contextual_embedding_text: bool = False
     rag_merge_sibling_text_chunks: bool = False
     rag_chunk_relationship_metadata: bool = False
+    rag_figure_text_chunks: bool = False
     page_workers: int = 1
     debug: bool = False
     verbose: bool = False
@@ -150,6 +151,7 @@ def build_batch_config(pdf_path: Path, output_root: Path, options: BatchConversi
         rag_contextual_embedding_text=options.rag_contextual_embedding_text,
         rag_merge_sibling_text_chunks=options.rag_merge_sibling_text_chunks,
         rag_chunk_relationship_metadata=options.rag_chunk_relationship_metadata,
+        rag_figure_text_chunks=options.rag_figure_text_chunks,
         page_workers=options.page_workers,
         debug=options.debug,
         verbose=options.verbose,

@@ -58,9 +58,10 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q103-Q105입니다" in readme
-    assert "assetless technical RAG figure text chunk" in readme
-    assert "완료된 Q34-Q102" in readme
+    assert "현재 active quality backlog는 Q104-Q105입니다" in readme
+    assert "--rag-figure-text-chunks" in readme
+    assert "chunk_type=\"figure_text\"" in readme
+    assert "완료된 Q34-Q103" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
     assert "summary.actionable_warning_count" in readme
@@ -141,7 +142,11 @@ def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
         "Q102에서 fast output profile과 sidecar scope를 완료했다"
         in tasks
     )
-    assert "M07은 Q103-Q105에서 이미지 파일 업로드가 불가능한 RAG 환경과 Docling 벤치마킹/확장 설계를 관리한다" in tasks
+    assert (
+        "M07은 Q103에서 이미지 파일 업로드가 불가능한 RAG 환경 대응을 완료했고, "
+        "Q104-Q105에서 Docling 벤치마킹/확장 설계를 관리한다"
+        in tasks
+    )
 
 
 def test_windows_guide_matches_cli_policy() -> None:
@@ -416,7 +421,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q100. OCR Page Parallelization" not in next_plan
     assert "Q101. Table Strategy Adaptive Mode" not in next_plan
     assert "Q102. Fast Output Profile And Sidecar Scope" not in next_plan
-    assert "Q103. Assetless Technical RAG Figure Text Chunks" in next_plan
+    assert "Q103. Assetless Technical RAG Figure Text Chunks" not in next_plan
     assert "Q104. Docling Benchmark Harness And Comparison Pack" in next_plan
     assert "Q105. Docling-Informed OCR And Layout Extension Design" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
@@ -455,10 +460,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q100. OCR Page Parallelization" not in development_specs
     assert "Q101. Table Strategy Adaptive Mode" not in development_specs
     assert "Q102. Fast Output Profile And Sidecar Scope" not in development_specs
-    assert "Q103. Assetless Technical RAG Figure Text Chunks" in development_specs
+    assert "Q103. Assetless Technical RAG Figure Text Chunks" not in development_specs
     assert "Q104. Docling Benchmark Harness And Comparison Pack" in development_specs
     assert "Q105. Docling-Informed OCR And Layout Extension Design" in development_specs
-    assert "placeholder + figure_text chunk" in development_specs
+    assert "placeholder + figure_text chunk" not in development_specs
     assert "다중 OCR backend" in development_specs
     assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
@@ -509,8 +514,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q102" in development_specs
+    assert "완료된 Q34-Q103" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q103. Assetless Technical RAG Figure Text Chunks" in implemented_specs
+    assert "figure_text_chunk_record_count" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
     assert "Q46. RAG Golden Query Expected Source Coverage" in implemented_specs
@@ -629,6 +636,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "target_source_pdf_list" in output_schema
     assert "retrieval_chunks_rag.jsonl" in output_schema
     assert "source_sha256" in output_schema
+    assert "figure_text" in output_schema
+    assert "rag_figure_text_chunks" in output_schema
+    assert "figure_text_chunk_record_count" in output_schema
     assert "rag_sidecar_omitted_outputs" in output_schema
     assert "rag_sidecar_scope_omitted" in output_schema
     assert "figures_rag.jsonl" in output_schema

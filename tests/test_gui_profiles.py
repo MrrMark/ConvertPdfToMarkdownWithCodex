@@ -29,6 +29,7 @@ def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path)
         rag_sidecar_scope=RagSidecarScope.MINIMAL.value,
         force_ocr=True,
         ocr_lang="kor+eng",
+        rag_figure_text_chunks=True,
         page_workers=4,
         debug=True,
         verbose=True,
@@ -44,6 +45,7 @@ def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path)
     assert payload["options"]["page_workers"] == 4
     assert payload["options"]["output_profile"] == "fast"
     assert payload["options"]["rag_sidecar_scope"] == "minimal"
+    assert payload["options"]["rag_figure_text_chunks"] is True
     assert payload["options"]["debug"] is True
     assert payload["options"]["verbose"] is True
     assert "password" not in payload["options"]
@@ -92,6 +94,7 @@ def test_gui_profile_invalid_payload_returns_structured_diagnostics() -> None:
             "image_mode": "bad",
             "output_profile": "turbo",
             "rag_sidecar_scope": "partial",
+            "rag_figure_text_chunks": "yes",
             "page_workers": 0,
             "debug": "yes",
         },

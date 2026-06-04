@@ -420,7 +420,26 @@ python3 -m pdf2md input.pdf -o output/ --output-profile fast --rag-sidecar-scope
 - 기본값은 `--output-profile full`과 effective `--rag-sidecar-scope full`이며 기존 산출물 계약을 유지합니다.
 - `--output-profile fast`만 지정하면 effective sidecar scope는 `none`으로 계산되어 `document.md`, `manifest.json`, `report.json` 중심으로 빠르게 생성합니다.
 - `--rag-sidecar-scope minimal`은 `text_blocks_rag.jsonl`, `retrieval_chunks_rag.jsonl`, 요청된 table sidecar만 파일로 남깁니다.
+- `--rag-sidecar-scope minimal`에서 `--rag-figure-text-chunks`를 함께 켜면 source provenance 해소를 위해 `figures_rag.jsonl`도 함께 남깁니다.
 - sidecar가 생략되면 `manifest.options`와 `report.summary`에 `rag_sidecar_scope`, `rag_sidecar_omitted_outputs`, `rag_sidecar_omitted_reason`을 기록합니다.
+
+### 이미지 파일 없는 기술 스펙 RAG
+
+팀 RAG가 PNG/JPG 업로드를 지원하지 않는 환경에서는 이미지 파일 대신 placeholder와 `figure_text` retrieval chunk를 사용합니다.
+
+```bash
+python3 -m pdf2md spec.pdf -o output/spec \
+  --rag-profile technical_spec_rag \
+  --domain-adapter nvme \
+  --image-mode placeholder \
+  --rag-figure-text-chunks
+```
+
+- 이미지 파일은 쓰지 않고 `document.md`에는 placeholder comment만 남깁니다.
+- `figures_rag.jsonl`은 caption, heading path, bbox, detected labels, nearby text refs를 provenance로 보존합니다.
+- `retrieval_chunks_rag.jsonl`에는 opt-in `chunk_type="figure_text"` record를 추가합니다.
+- `figure_text.text`는 관측된 caption/heading/label/nearby text와 conservative figure kind만 사용하며 생성형 이미지 설명은 기본 출력에 넣지 않습니다.
+- `source_refs`는 `figures_rag.jsonl`의 `figure_id`, page, bbox로 해소되며 이미지 path는 chunk source ref에 넣지 않습니다.
 
 ### RAG용 도메인 adapter
 
@@ -844,8 +863,8 @@ python3 -m pdf2md input.pdf -o output/ --rag-profile preserve_with_sidecars
 - `cross_refs_rag.jsonl`: Section/Clause/Table/Figure/Appendix와 requirement/log page/feature/opcode/register 참조의 resolved/unresolved 상태를 기록하며, technical ref는 normalized key, candidate count, unresolved reason을 함께 남깁니다. PDF outline/list fallback으로 해석한 참조는 `target_ref`가 `pdf-outline-` 또는 `pdf-list-`로 시작할 수 있고, `classification_reasons`에 `target_source_pdf_outline`/`target_source_pdf_list`를 남깁니다.
 - `requirement_traceability_rag.jsonl`: Requirement ID, condition, dependency, exception, testability hint를 원문 기반으로 기록합니다.
 - `technical_tables_rag.jsonl`: register, bitfield, command/opcode, log page, feature identifier, enum/value table row를 typed sidecar로 기록합니다.
-- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록하며, 각 chunk에 `schema_version`과 원본 PDF `source_sha256`를 포함합니다. 긴 chunk는 token budget 기준으로 deterministic split되고 `parent_chunk_id`, `chunk_part_index`, `chunk_part_count`가 보존됩니다. RAG 최적화 옵션에서는 table-like chunk에 optional `embedding_text`를 추가해 section/caption/header context를 embedding 대상에만 보강하고, 같은 page/section/heading context의 짧은 인접 `text_block`은 token budget 안에서만 병합합니다. 관계 metadata 옵션을 켜면 최종 chunk id 기준 `previous_chunk_id`, `next_chunk_id`, `section_anchor_chunk_id`, `related_chunk_ids`를 추가해 citation expansion과 UI drilldown을 돕습니다. 원문 기준 `text`는 재서술하지 않고 source 순서대로만 결합됩니다.
-- `figures_rag.jsonl`: 이미지/도표 bbox, caption, OCR 후보, nearby heading, figure kind를 별도 기록합니다.
+- `retrieval_chunks_rag.jsonl`: vector DB ingest 후보 chunk를 text/semantic/requirement/trace/table/technical/domain provenance와 함께 기록하며, 각 chunk에 `schema_version`과 원본 PDF `source_sha256`를 포함합니다. 긴 chunk는 token budget 기준으로 deterministic split되고 `parent_chunk_id`, `chunk_part_index`, `chunk_part_count`가 보존됩니다. RAG 최적화 옵션에서는 table-like chunk에 optional `embedding_text`를 추가해 section/caption/header context를 embedding 대상에만 보강하고, 같은 page/section/heading context의 짧은 인접 `text_block`은 token budget 안에서만 병합합니다. 관계 metadata 옵션을 켜면 최종 chunk id 기준 `previous_chunk_id`, `next_chunk_id`, `section_anchor_chunk_id`, `related_chunk_ids`를 추가해 citation expansion과 UI drilldown을 돕습니다. `--rag-figure-text-chunks`를 켜면 image 파일 없이도 caption/heading/label/nearby text 기반 `figure_text` chunk가 추가됩니다. 원문 기준 `text`는 재서술하지 않고 source 순서대로만 결합됩니다.
+- `figures_rag.jsonl`: 이미지/도표 bbox, caption, OCR 후보, nearby heading, nearby text refs, figure kind를 별도 기록합니다.
 - `rag_tables.md`: 검색 chunk에 넣기 쉬운 행 단위 Markdown입니다.
 - `tables_rag.jsonl`: `table_id`, `table_row_id`, `page`, `table_index`, `headers`, `cells`, `row_text`, `bbox`, `quality_score`, `fallback_reasons`를 가진 행 단위 JSONL입니다.
 - `domain_units_rag.jsonl`: `--domain-adapter nvme|pcie|ocp|tcg|customer-requirements` 사용 시 domain unit을 기록합니다.
@@ -981,8 +1000,8 @@ lint / format / packaging tooling 예시:
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q103-Q105입니다. 우선순위는 assetless technical RAG figure text chunk, Docling 벤치마킹/확장 설계 순서입니다.
-- 완료된 Q34-Q102 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q104-Q105입니다. 우선순위는 Docling 벤치마킹/확장 설계 순서입니다.
+- 완료된 Q34-Q103 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 

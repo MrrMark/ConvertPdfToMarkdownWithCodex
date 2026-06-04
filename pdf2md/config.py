@@ -39,6 +39,7 @@ class Config(BaseModel):
     rag_contextual_embedding_text: bool = False
     rag_merge_sibling_text_chunks: bool = False
     rag_chunk_relationship_metadata: bool = False
+    rag_figure_text_chunks: bool = False
     debug: bool = False
     verbose: bool = False
     skip_existing: bool = False

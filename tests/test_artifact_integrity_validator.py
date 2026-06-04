@@ -128,6 +128,25 @@ def test_artifact_integrity_warns_when_omitted_sidecar_still_exists(tmp_path: Pa
     assert [finding["code"] for finding in report["findings"]] == ["omitted_sidecar_present"]
 
 
+def test_artifact_integrity_accepts_placeholder_image_provenance_without_asset_file(tmp_path: Path) -> None:
+    _write_valid_output(tmp_path)
+    (tmp_path / "document.md").write_text(
+        "<!-- image: page=1 index=1 mode=placeholder path=assets/images/page-0001-figure-001.png -->\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "assets" / "images" / "page-0001-figure-001.png").unlink()
+    manifest_payload = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest_payload["options"] = {"image_mode": "placeholder"}
+    _write_json(tmp_path / "manifest.json", manifest_payload)
+
+    report = validate_artifact_integrity.validate_artifact_integrity(output_dir=tmp_path)
+
+    assert report["passed"] is True
+    assert report["summary"]["missing_assets"] == 0
+    assert "missing_manifest_image_asset" not in [finding["code"] for finding in report["findings"]]
+    assert "missing_figure_asset" not in [finding["code"] for finding in report["findings"]]
+
+
 def test_artifact_integrity_checks_batch_and_corpus_file_maps(tmp_path: Path) -> None:
     _write_valid_output(tmp_path)
     _write_json(

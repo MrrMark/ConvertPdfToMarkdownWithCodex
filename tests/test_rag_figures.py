@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
-from pdf2md.models import ExcludedImageAsset, ImageAsset
+import pdf2md.pipeline as pipeline_module
+from pdf2md.config import Config
+from pdf2md.extractors.images import ImageExtractionResult
+from pdf2md.extractors.ocr import OcrResult
+from pdf2md.extractors.tables import TableExtractionResult
+from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, RagSidecarScope
 from pdf2md.serializers.rag_figures import build_figure_records, serialize_figures_jsonl
+from scripts.validate_artifact_integrity import validate_artifact_integrity
+from scripts.validate_index_contract import validate_index_contract
+from scripts.validate_provenance_integrity import validate_provenance_integrity
 
 
 def test_figure_records_include_available_and_excluded_image_provenance() -> None:
@@ -205,3 +214,70 @@ def test_figure_records_use_nearby_crop_text_for_diagram_labels() -> None:
     assert "READY" in records[0]["detected_labels"]
     assert "ERROR" in records[0]["detected_labels"]
     assert "outside" not in records[0]["detected_labels"]
+
+
+def test_pipeline_writes_assetless_figure_text_chunks_with_placeholder_mode(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    image = ImageAsset(
+        page=1,
+        index=1,
+        path="assets/images/page-0001-figure-001.png",
+        caption_text="Figure 1: State machine diagram",
+        caption_source="nearby_caption",
+        caption_confidence=0.91,
+        bbox=[72.0, 120.0, 420.0, 320.0],
+        width=348,
+        height=200,
+        sha256="abc",
+        source="page_crop",
+        anchor_line_index=1,
+        anchor_top=120.0,
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_images",
+        lambda *args, **kwargs: ImageExtractionResult(assets=[image]),
+    )
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "assetless"
+    result = pipeline_module.run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=output_dir,
+            image_mode=ImageMode.PLACEHOLDER,
+            rag_sidecar_scope=RagSidecarScope.MINIMAL,
+            rag_figure_text_chunks=True,
+        )
+    )
+
+    assert result.exit_code == 0
+    assert not (output_dir / "assets" / "images" / "page-0001-figure-001.png").exists()
+    assert (output_dir / "figures_rag.jsonl").exists()
+    retrieval_records = [
+        json.loads(line)
+        for line in (output_dir / "retrieval_chunks_rag.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    figure_chunks = [record for record in retrieval_records if record.get("chunk_type") == "figure_text"]
+    assert len(figure_chunks) == 1
+    assert "caption: Figure 1: State machine diagram" in figure_chunks[0]["text"]
+    assert figure_chunks[0]["source_refs"][0]["source_id"] == "page-0001-figure-0001"
+    assert "path" not in figure_chunks[0]["source_refs"][0]
+
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["rag_figure_text_chunks"] is True
+    assert manifest["options"]["rag_sidecar_scope"] == "minimal"
+    assert manifest["options"]["figures_rag_jsonl_filename"] == "figures_rag.jsonl"
+    assert "figures_rag.jsonl" not in manifest["options"]["rag_sidecar_omitted_outputs"]
+    assert report["summary"]["figure_text_chunk_record_count"] == 1
+    assert report["summary"]["figure_rag_record_count"] == 1
+
+    assert validate_index_contract(output_dir=output_dir)["passed"] is True
+    assert validate_provenance_integrity(output_dir=output_dir)["passed"] is True
+    assert validate_artifact_integrity(output_dir=output_dir)["passed"] is True

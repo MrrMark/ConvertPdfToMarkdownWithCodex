@@ -188,7 +188,16 @@ def _manifest_image_paths(manifest: dict[str, Any]) -> set[str]:
     return paths
 
 
-def _figure_paths(path: Path, *, findings: list[dict[str, Any]]) -> set[str]:
+def _image_mode_omits_asset_files(manifest: dict[str, Any] | None) -> bool:
+    if not isinstance(manifest, dict):
+        return False
+    options = manifest.get("options")
+    if not isinstance(options, dict):
+        return False
+    return options.get("image_mode") in {"embedded", "placeholder"}
+
+
+def _figure_paths(path: Path, *, findings: list[dict[str, Any]], allow_missing_assets: bool = False) -> set[str]:
     paths: set[str] = set()
     if not path.exists():
         return paths
@@ -205,7 +214,7 @@ def _figure_paths(path: Path, *, findings: list[dict[str, Any]]) -> set[str]:
         if figure_path is None:
             continue
         paths.add(figure_path)
-        if not _existing_relative_path(path.parent, figure_path):
+        if not allow_missing_assets and not _existing_relative_path(path.parent, figure_path):
             _add_finding(
                 findings,
                 severity="error",
@@ -275,6 +284,8 @@ def _validate_manifest_assets(
     output_dir: Path,
     manifest: dict[str, Any] | None,
     findings: list[dict[str, Any]],
+    *,
+    allow_missing_assets: bool = False,
 ) -> tuple[int, set[str]]:
     if manifest is None:
         return 0, set()
@@ -299,7 +310,7 @@ def _validate_manifest_assets(
             continue
         checked += 1
         paths.add(path)
-        if not _existing_relative_path(output_dir, path):
+        if not allow_missing_assets and not _existing_relative_path(output_dir, path):
             _add_finding(
                 findings,
                 severity="error",
@@ -511,8 +522,18 @@ def validate_artifact_integrity(
     markdown_link_count, markdown_paths = _validate_markdown_links(output_dir, findings)
     manifest = _read_json(output_dir / "manifest.json", file_name="manifest.json", findings=findings)
     report = _read_json(output_dir / "report.json", file_name="report.json", findings=findings)
-    manifest_asset_count, manifest_paths = _validate_manifest_assets(output_dir, manifest, findings)
-    figure_paths = _figure_paths(output_dir / "figures_rag.jsonl", findings=findings)
+    allow_missing_image_assets = _image_mode_omits_asset_files(manifest)
+    manifest_asset_count, manifest_paths = _validate_manifest_assets(
+        output_dir,
+        manifest,
+        findings,
+        allow_missing_assets=allow_missing_image_assets,
+    )
+    figure_paths = _figure_paths(
+        output_dir / "figures_rag.jsonl",
+        findings=findings,
+        allow_missing_assets=allow_missing_image_assets,
+    )
     checked_records, mismatch_count = _validate_sidecar_counts(output_dir, report, findings)
     referenced_paths = markdown_paths | manifest_paths | figure_paths
     orphan_count = _validate_orphan_assets(output_dir, referenced_paths, findings)
