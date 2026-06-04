@@ -498,6 +498,12 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         "figure_region_ocr_candidate_count": 0,
         "figure_region_ocr_promoted_label_count": 0,
         "figure_region_ocr_low_confidence_count": 0,
+        "figure_region_ocr_render_attempted_count": 0,
+        "figure_region_ocr_region_candidate_count": 0,
+        "figure_region_ocr_accepted_region_count": 0,
+        "figure_region_ocr_rejected_region_count": 0,
+        "figure_region_ocr_crop_rejected_count": 0,
+        "figure_region_ocr_runtime_unavailable_count": 0,
     }
     domain_unit_record_count = 0
     domain_unit_file_count = 0
@@ -952,7 +958,12 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             text_block_records=text_block_result.records,
         )
         if config.figure_region_ocr:
-            figure_records, figure_region_ocr_metrics = augment_figure_records_with_region_ocr(figure_records)
+            figure_records, figure_region_ocr_metrics = augment_figure_records_with_region_ocr(
+                figure_records,
+                pdf_path=config.input_pdf,
+                ocr_lang=config.ocr_lang,
+                ocr_backend=config.ocr_backend,
+            )
         figure_rag_record_count, figure_rag_file_count = write_figure_rag_output(config, figure_records)
         finish_stage("rag_figures", figure_rag_started)
 

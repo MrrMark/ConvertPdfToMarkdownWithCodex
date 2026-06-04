@@ -142,6 +142,7 @@ Assetless figure text summary fields:
 - `figure_text_chunk_record_count`: final `retrieval_chunks_rag.jsonl` records with `chunk_type="figure_text"`.
 - `figure_region_ocr`: present and `true` when `--figure-region-ocr` was enabled.
 - `figure_region_ocr_attempted_count`, `figure_region_ocr_candidate_count`, `figure_region_ocr_promoted_label_count`, `figure_region_ocr_low_confidence_count`: deterministic OCR evidence promotion counters.
+- `figure_region_ocr_render_attempted_count`, `figure_region_ocr_region_candidate_count`, `figure_region_ocr_accepted_region_count`, `figure_region_ocr_rejected_region_count`, `figure_region_ocr_crop_rejected_count`, `figure_region_ocr_runtime_unavailable_count`: report-only figure bbox crop OCR counters.
 - `rag_generated_figure_descriptions`: present and `true` when `--rag-generated-figure-descriptions` was enabled.
 - `figure_description_backend`: selected backend label, currently emitted for deterministic context-only description records.
 - `figure_description_record_count`, `figure_description_file_count`, `figure_description_low_confidence_count`, `figure_description_skipped_no_evidence_count`, `figure_description_chunk_record_count`: generated figure description sidecar and chunk counters.
@@ -624,7 +625,7 @@ Optional diagnostics:
 
 - `diagram_label_diagnostics`
 - `captionless_diagnostics`
-- `figure_region_ocr`
+- `figure_region_ocr`: includes existing OCR candidate promotion plus optional report-only bbox crop OCR diagnostics. Nested `region_ocr.report_only=true` and `region_ocr.text_replaced=false` mean the OCR result did not replace Markdown/text extraction output.
 
 Policy:
 
@@ -632,6 +633,7 @@ Policy:
 - In `image_mode=placeholder` or `embedded`, `path` may be provenance only and the image file may not exist on disk.
 - `figure_kind` is conservative metadata such as `image`, `diagram`, `state_machine`, `sequence_diagram`, or `register_layout`.
 - Low-confidence OCR/label candidates stay in `diagram_label_diagnostics.rejected_ocr_candidates`; only promoted candidates appear in `detected_labels`.
+- `figure_region_ocr.region_ocr` may record `candidate`, `runtime_unavailable`, or `rejected` status with reasons such as `missing_bbox`, `invalid_bbox`, `empty_result`, `language_data_missing`, or `ocr_failed`. Label-pattern and confidence rejection details stay in `figure_region_ocr.rejected_candidates`.
 - Captionless candidates may include `captionless_diagnostics` with evidence counts and rejection reasons. This is diagnostics-only metadata and does not create a generated caption or visual description.
 - No generated visual description is added by default.
 

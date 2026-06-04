@@ -140,7 +140,7 @@ python -m pdf2md.gui --doctor --doctor-format json
 
 PNG/JPG 같은 이미지 asset을 업로드할 수 없는 팀 RAG라면 `이미지 업로드 불가 RAG 대응` preset을 선택한다. 이 preset은 `document.md`에 image placeholder만 남기고, `figures_rag.jsonl`과 `retrieval_chunks_rag.jsonl`의 `chunk_type="figure_text"` record로 그림 주변의 관측 텍스트 provenance를 보존한다. 도메인 분류가 필요하면 같은 화면에서 `Domain`을 `nvme`, `pcie`, `spdm`, `manual` 등으로 지정한다.
 
-회로도, 파형, 블록다이어그램처럼 의미가 그림 내부에 주로 있는 문서는 `Optimize Options(유저 선택)`에서 `Figure region OCR`, `Generated figure descriptions`, `Figure structure extraction`을 추가로 켠다. 이 기능은 원문 Markdown을 바꾸지 않고 `figure_descriptions_rag.jsonl`, `figure_structures_rag.jsonl`, `retrieval_chunks_rag.jsonl`의 `figure_description`/`figure_structure` chunk로만 보강 정보를 기록한다. 현재 내장 동작은 deterministic context-only 방식이므로 실제 visual backend 호출 없이 캡션, heading, 근접 텍스트, 기존 OCR 후보를 근거로 기록한다.
+회로도, 파형, 블록다이어그램처럼 의미가 그림 내부에 주로 있는 문서는 `Optimize Options(유저 선택)`에서 `Figure region OCR`, `Generated figure descriptions`, `Figure structure extraction`을 추가로 켠다. `Figure region OCR`은 figure bbox 영역을 로컬 OCR로 시도하고 결과를 `figures_rag.jsonl`의 diagnostics에만 기록한다. 원문 Markdown이나 text extraction 출력은 바꾸지 않는다. `Generated figure descriptions`와 `Figure structure extraction`은 여전히 deterministic context-only 방식이며 `figure_descriptions_rag.jsonl`, `figure_structures_rag.jsonl`, `retrieval_chunks_rag.jsonl`의 `figure_description`/`figure_structure` chunk로만 보강 정보를 기록한다.
 
 ## 4) 폴더 배치 변환
 

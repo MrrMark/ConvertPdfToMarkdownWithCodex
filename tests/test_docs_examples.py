@@ -71,7 +71,7 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "이미지 업로드 불가 RAG 대응" in readme
     assert "--manual-domain-adapter-keywords" in readme
     assert "--ocr-backend tesseract" in readme
-    assert "완료된 Q34-Q111" in readme
+    assert "완료된 Q34-Q112" in readme
     assert "docs/DOCLING_INFORMED_EXTENSION_DESIGN.md" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
@@ -442,6 +442,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q109. Docling-Installed Benchmark Gate" not in next_plan
     assert "Q110. Multi OCR Backend Runtime Probe" not in next_plan
     assert "Q111. OCR Backend Adapter Contract" not in next_plan
+    assert "Q112. Region OCR Report-Only Prototype" not in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
@@ -487,6 +488,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q109. Docling-Installed Benchmark Gate" not in development_specs
     assert "Q110. Multi OCR Backend Runtime Probe" not in development_specs
     assert "Q111. OCR Backend Adapter Contract" not in development_specs
+    assert "Q112. Region OCR Report-Only Prototype" not in development_specs
     assert "figure_descriptions_rag.jsonl" not in development_specs
     assert "figure_structures_rag.jsonl" not in development_specs
     assert "--rag-generated-figure-descriptions" not in development_specs
@@ -543,8 +545,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
     assert "현재 없음." in development_specs
-    assert "완료된 Q34-Q111" in development_specs
+    assert "완료된 Q34-Q112" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q112. Region OCR Report-Only Prototype" in implemented_specs
+    assert "region_ocr.report_only=true" in implemented_specs
     assert "Q111. OCR Backend Adapter Contract" in implemented_specs
     assert "pdf2md/extractors/ocr_backends/" in implemented_specs
     assert "Q110. Multi OCR Backend Runtime Probe" in implemented_specs
@@ -682,6 +686,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "ocr_backend_probe_report.json" in output_schema
     assert "docs/schema/ocr_backend_probe_report.schema.json" in output_schema
     assert "options.ocr_backend" in output_schema
+    assert "figure_region_ocr_accepted_region_count" in output_schema
+    assert "region_ocr.text_replaced=false" in output_schema
     assert "docling_benchmark_report.json" in output_schema
     assert "docling_artifact_comparison.json" in output_schema
     assert "docling_required_not_available" in output_schema
@@ -770,6 +776,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q109 Docling-installed benchmark gate" in quality_scorecard
     assert "Q110 multi OCR backend runtime probe" in quality_scorecard
     assert "Q111 OCR backend adapter contract" in quality_scorecard
+    assert "Q112 region OCR report-only prototype" in quality_scorecard
     assert "latest_nvme_command_set_scorecard.md" in quality_scorecard
     assert "이미지 업로드 불가 RAG 대응" in quality_scorecard
     assert "Docling 미설치 advisory skip" in quality_scorecard
