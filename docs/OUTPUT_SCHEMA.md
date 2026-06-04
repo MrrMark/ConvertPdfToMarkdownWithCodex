@@ -213,6 +213,8 @@ Stable summary fields:
 - `finding_count`
 - `error_count`
 - `warning_count`
+- `layout_comparison_mode`: `off` or `summary`
+- `layout_comparison_enabled`
 
 Stable run fields:
 
@@ -235,6 +237,7 @@ Policy:
 - optional OCR backend availability는 module availability boolean만 기록한다.
 - current-tool metrics may include table count, low-quality table count, domain unit count, figure text chunk count,
   figure description/structure chunk count, and validator pass booleans.
+- When `--layout-comparison-mode summary` is used, current-tool and Docling runs add sanitized count-only metrics such as `layout_table_candidate_count`, `layout_figure_candidate_count`, `layout_page_candidate_count`, and `layout_text_container_key_count`. These metrics are derived from report summaries or Docling dictionary keys, not raw document text.
 
 ## docling_artifact_comparison.json
 
@@ -262,6 +265,8 @@ Stable summary fields:
 - `comparable_metric_count`
 - `hash_match_count`
 - `hash_mismatch_count`
+- `layout_comparison_mode`
+- `layout_comparable`
 
 Stable artifact fields:
 
@@ -276,6 +281,7 @@ Policy:
 
 - current-tool artifacts are represented by existence, byte size, and SHA-256 for committed-safe filenames only.
 - Docling Markdown/dict exports are not written as raw files by the harness; only virtual artifact hash and size are recorded.
+- Layout comparison mode is comparison-only. It records count metrics and metric deltas; it does not merge Docling layout into `document.md`, tables, figures, or RAG sidecars.
 
 ## ocr_backend_probe_report.json
 

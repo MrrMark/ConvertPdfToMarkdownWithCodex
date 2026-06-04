@@ -90,6 +90,7 @@ class ReleaseGateConfig:
     docling_document_label: str = "nvme-nvm-command-set-rev-1.2-2025-08-01"
     docling_figure_semantics_mode: str = "visual"
     docling_figure_description_backend: str = "local-vlm"
+    docling_layout_comparison_mode: str = "summary"
     figure_description_eval_output_dir: Path | None = None
     figure_description_eval_min_confidence: float = 0.65
 
@@ -480,6 +481,8 @@ def _docling_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
         config.docling_figure_semantics_mode,
         "--figure-description-backend",
         config.docling_figure_description_backend,
+        "--layout-comparison-mode",
+        config.docling_layout_comparison_mode,
         "--require-docling",
         "--fail-on-error",
         "--fail-on-current-tool-failure",
@@ -854,6 +857,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("local-vlm", "docling"),
         default="local-vlm",
     )
+    parser.add_argument("--docling-layout-comparison-mode", choices=("off", "summary"), default="summary")
     parser.add_argument("--figure-description-eval-output-dir", type=Path)
     parser.add_argument("--figure-description-eval-min-confidence", type=float, default=0.65)
     return parser
@@ -923,6 +927,7 @@ def main(argv: list[str] | None = None) -> int:
             docling_document_label=args.docling_document_label,
             docling_figure_semantics_mode=args.docling_figure_semantics_mode,
             docling_figure_description_backend=args.docling_figure_description_backend,
+            docling_layout_comparison_mode=args.docling_layout_comparison_mode,
             figure_description_eval_output_dir=args.figure_description_eval_output_dir,
             figure_description_eval_min_confidence=args.figure_description_eval_min_confidence,
         )
