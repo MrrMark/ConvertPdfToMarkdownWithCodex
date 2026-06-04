@@ -5,6 +5,7 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add bounded OCR page chunk workers, reusing effective page worker count while preserving deterministic warning and page merge order.
 - Add chunked page worker execution so parallel conversion opens the PDF once per worker chunk instead of once per page.
 - Add lazy/context-first structure marker OCR so context-resolvable markers avoid Tesseract calls while unresolved markers keep the existing OCR fallback.
 - Add conservative ruff lint smoke configuration for Python 3.11+.

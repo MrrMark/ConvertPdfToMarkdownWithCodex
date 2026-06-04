@@ -333,12 +333,20 @@ def test_pipeline_routes_image_only_scanned_pdf_through_ocr_without_correction(
     pdf_path = tmp_path / "image-only.pdf"
     build_image_only_pdf(pdf_path)
 
-    def fake_run_ocr(pdf_path_arg, selected_pages, existing_page_texts, force_ocr, ocr_lang) -> OcrResult:  # noqa: ANN001
+    def fake_run_ocr(  # noqa: ANN001
+        pdf_path_arg,
+        selected_pages,
+        existing_page_texts,
+        force_ocr,
+        ocr_lang,
+        worker_count=1,
+    ) -> OcrResult:
         assert pdf_path_arg == pdf_path
         assert selected_pages == [1]
         assert existing_page_texts == {1: ""}
         assert force_ocr is False
         assert ocr_lang == "eng"
+        assert worker_count == 1
         return OcrResult(
             warnings=[
                 WarningEntry(
@@ -388,6 +396,30 @@ def test_pipeline_routes_image_only_scanned_pdf_through_ocr_without_correction(
     assert report["summary"]["ocr_advisory_warning_count"] == 0
     assert report["summary"]["low_confidence_pages"] == [1]
     assert manifest["ocr_pages"] == [1]
+
+
+def test_pipeline_passes_effective_page_workers_to_ocr(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
+    seen: dict[str, int] = {}
+
+    def fake_run_ocr(*args, worker_count=1, **kwargs) -> OcrResult:  # noqa: ANN001
+        seen["worker_count"] = worker_count
+        return OcrResult()
+
+    monkeypatch.setattr(pipeline_module, "run_ocr", fake_run_ocr)
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+
+    result = run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=tmp_path / "ocr-workers",
+            force_ocr=True,
+            page_workers=2,
+        )
+    )
+
+    assert result.exit_code == EXIT_SUCCESS
+    assert seen["worker_count"] == 2
 
 
 def test_pipeline_records_empty_ocr_confidence_metrics_in_report(

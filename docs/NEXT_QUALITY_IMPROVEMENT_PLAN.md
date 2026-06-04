@@ -23,11 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q100. OCR Page Parallelization
-
-스캔 PDF 또는 `--force-ocr` 경로에서 OCR target page를 bounded worker로 병렬 처리한다.
-warning/report/page ordering은 selected page 순서로 deterministic하게 유지한다.
-
 ### P1 / Q101. Table Strategy Adaptive Mode
 
 표 추출에서 기본 전략 품질이 충분한 경우 추가 fallback 전략을 생략하는 adaptive mode를 도입한다.
