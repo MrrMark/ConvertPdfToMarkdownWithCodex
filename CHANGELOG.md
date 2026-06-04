@@ -5,6 +5,11 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add Docling-informed OCR/layout extension design, keeping new backend, region OCR, and picture-description work gated on Docling-installed benchmark evidence.
+- Add local-only Docling comparison harness outputs with sanitized benchmark, artifact comparison, scorecard, and schema contracts.
+- Add opt-in assetless `figure_text` retrieval chunks for placeholder image mode in RAG environments that cannot ingest image files.
+- Add opt-in fast output profile and RAG sidecar scope controls while preserving the default full output contract.
+- Add adaptive table strategy skipping when the default candidate meets conservative quality thresholds.
 - Add bounded OCR page chunk workers, reusing effective page worker count while preserving deterministic warning and page merge order.
 - Add chunked page worker execution so parallel conversion opens the PDF once per worker chunk instead of once per page.
 - Add lazy/context-first structure marker OCR so context-resolvable markers avoid Tesseract calls while unresolved markers keep the existing OCR fallback.
