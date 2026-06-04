@@ -11,6 +11,7 @@ from scripts import benchmark_docling_comparison
 from scripts import benchmark_gui_cli_parity
 from scripts import check_ocr_runtime
 from scripts import inspect_wheel_contract
+from scripts import probe_ocr_backends
 from scripts import run_preset_eval
 from scripts import run_gui_cli_parity
 from scripts import run_corpus_eval
@@ -346,6 +347,39 @@ def test_ocr_runtime_check_identifies_missing_composite_language(monkeypatch) ->
     assert report["checks"]["language_data"]["missing"] == ["kor"]
 
 
+def test_ocr_backend_probe_reports_ready_tesseract_and_optional_backends(monkeypatch) -> None:  # noqa: ANN001
+    def fake_module_available(module_name: str) -> bool:
+        return module_name in {"pytesseract", "pypdfium2", "docling"}
+
+    monkeypatch.setattr(probe_ocr_backends, "_module_available", fake_module_available)
+    monkeypatch.setattr(probe_ocr_backends, "_discover_tesseract", lambda: "/usr/bin/tesseract")
+    monkeypatch.setattr(probe_ocr_backends, "_list_tesseract_languages", lambda executable: (["eng", "kor"], None))
+
+    report = probe_ocr_backends.probe_ocr_backends(ocr_lang="kor+eng", backends="tesseract,rapidocr,docling")
+    by_backend = {record["backend"]: record for record in report["backends"]}
+
+    assert report["summary"]["ready_backends"] == ["tesseract", "docling"]
+    assert report["summary"]["recommended_backend"] == "tesseract"
+    assert by_backend["tesseract"]["ready"] is True
+    assert by_backend["tesseract"]["language_data"]["missing"] == []
+    assert by_backend["tesseract"]["confidence_normalization"]["raw_unit"] == "0_to_100"
+    assert by_backend["rapidocr"]["status"] == "unavailable"
+    assert by_backend["docling"]["module_available"] is True
+    assert report["raw_content_included"] is False
+
+
+def test_ocr_backend_probe_reports_missing_languages(monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(probe_ocr_backends, "_module_available", lambda module_name: True)
+    monkeypatch.setattr(probe_ocr_backends, "_discover_tesseract", lambda: "/usr/bin/tesseract")
+    monkeypatch.setattr(probe_ocr_backends, "_list_tesseract_languages", lambda executable: (["eng"], None))
+
+    report = probe_ocr_backends.probe_ocr_backends(ocr_lang="kor+eng", backends="tesseract")
+
+    assert report["summary"]["ready_backend_count"] == 0
+    assert report["backends"][0]["status"] == "available"
+    assert report["backends"][0]["language_data"]["missing"] == ["kor"]
+
+
 def test_release_gate_runner_writes_success_summary(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
     calls: list[list[str]] = []
 
@@ -454,6 +488,36 @@ def test_release_gate_runner_records_dependency_audit_as_advisory(monkeypatch, t
         }
     ]
     assert any(command[1:3] == ["-m", "pip_audit"] for command in calls)
+
+
+def test_release_gate_runner_supports_ocr_backends_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout='{"purpose": "multi_ocr_backend_probe"}', stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "ocr-backends",
+            gates=["ocr-backends"],
+            ocr_lang="kor+eng",
+            ocr_backend_probe_backends="tesseract,docling",
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["gates"][0]["gate"] == "ocr-backends"
+    assert payload["gates"][0]["report_path"].endswith("ocr_backend_probe_report.json")
+    command = calls[0]
+    assert any(str(part).endswith("probe_ocr_backends.py") for part in command)
+    assert "--ocr-lang" in command
+    assert "kor+eng" in command
+    assert "--backends" in command
+    assert "tesseract,docling" in command
+    assert "--require-ready" in command
 
 
 def test_release_gate_runner_fails_when_any_gate_command_fails(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
