@@ -51,20 +51,23 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "scripts/analyze_corpus_evidence_pack.py" in readme
     assert "scripts/compare_corpus_evidence_packs.py" in readme
     assert "scripts/export_output_schema.py --check" in readme
+    assert "--output-profile fast" in readme
+    assert "--rag-sidecar-scope minimal" in readme
     assert "python -m build" in readme
     assert "benchmark_report.json" in readme
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q102-Q105입니다" in readme
-    assert "fast output scope 검토" in readme
-    assert "완료된 Q34-Q101" in readme
+    assert "현재 active quality backlog는 Q103-Q105입니다" in readme
+    assert "assetless technical RAG figure text chunk" in readme
+    assert "완료된 Q34-Q102" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
     assert "summary.actionable_warning_count" in readme
     assert "summary.advisory_warning_count" in readme
     assert "warning taxonomy registry" in readme
     assert "summary.table_expected_fallback_count" in readme
+    assert "summary.rag_sidecar_scope" in readme
     assert "python -m ruff check ." in readme
     assert "pdf2md/py.typed" in readme
     assert "--gates dependency-audit" in readme
@@ -134,11 +137,10 @@ def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
     assert "M05는 Q95에서 lightweight CI gate를 보강했고, Q96에서 한글/OCR fixture 회귀 방어를 보강했다" in tasks
     assert (
         "M06은 Q98에서 structure marker OCR lazy 처리, Q99에서 page worker chunked parallelization, "
-        "Q100에서 OCR page parallelization, Q101에서 adaptive table strategy를 완료했고"
+        "Q100에서 OCR page parallelization, Q101에서 adaptive table strategy, "
+        "Q102에서 fast output profile과 sidecar scope를 완료했다"
         in tasks
     )
-    assert "Q101에서 adaptive table strategy를 완료했고" in tasks
-    assert "Q102에서 남은 output scope 병목을 품질 보존 방식으로 줄이는 성능 개선 트랙으로 관리한다" in tasks
     assert "M07은 Q103-Q105에서 이미지 파일 업로드가 불가능한 RAG 환경과 Docling 벤치마킹/확장 설계를 관리한다" in tasks
 
 
@@ -413,7 +415,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q99. Page Worker Chunked Parallelization" not in next_plan
     assert "Q100. OCR Page Parallelization" not in next_plan
     assert "Q101. Table Strategy Adaptive Mode" not in next_plan
-    assert "Q102. Fast Output Profile And Sidecar Scope" in next_plan
+    assert "Q102. Fast Output Profile And Sidecar Scope" not in next_plan
     assert "Q103. Assetless Technical RAG Figure Text Chunks" in next_plan
     assert "Q104. Docling Benchmark Harness And Comparison Pack" in next_plan
     assert "Q105. Docling-Informed OCR And Layout Extension Design" in next_plan
@@ -452,7 +454,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q99. Page Worker Chunked Parallelization" not in development_specs
     assert "Q100. OCR Page Parallelization" not in development_specs
     assert "Q101. Table Strategy Adaptive Mode" not in development_specs
-    assert "Q102. Fast Output Profile And Sidecar Scope" in development_specs
+    assert "Q102. Fast Output Profile And Sidecar Scope" not in development_specs
     assert "Q103. Assetless Technical RAG Figure Text Chunks" in development_specs
     assert "Q104. Docling Benchmark Harness And Comparison Pack" in development_specs
     assert "Q105. Docling-Informed OCR And Layout Extension Design" in development_specs
@@ -507,7 +509,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q101" in development_specs
+    assert "완료된 Q34-Q102" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -627,6 +629,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "target_source_pdf_list" in output_schema
     assert "retrieval_chunks_rag.jsonl" in output_schema
     assert "source_sha256" in output_schema
+    assert "rag_sidecar_omitted_outputs" in output_schema
+    assert "rag_sidecar_scope_omitted" in output_schema
     assert "figures_rag.jsonl" in output_schema
     assert "domain_units_rag.jsonl" in output_schema
     assert "requirement_traceability_rag.jsonl" in output_schema

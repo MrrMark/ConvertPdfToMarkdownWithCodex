@@ -156,6 +156,7 @@
       "type": "string"
     },
     "ReportSummary": {
+      "additionalProperties": true,
       "properties": {
         "actionable_warning_count": {
           "default": 0,

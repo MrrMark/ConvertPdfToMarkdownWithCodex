@@ -289,6 +289,33 @@ def test_cli_accepts_rag_table_output_mode(sample_pdf: Path, tmp_path: Path) -> 
     assert not (output_dir / "tables_rag.jsonl").exists()
 
 
+def test_cli_accepts_fast_output_profile(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-out-fast-profile"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--output-profile",
+        "fast",
+        "--rag-table-output",
+        "jsonl",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["output_profile"] == "fast"
+    assert manifest["options"]["rag_sidecar_scope"] == "none"
+    assert report["summary"]["rag_sidecar_scope"] == "none"
+    assert not (output_dir / "tables_rag.jsonl").exists()
+    assert not (output_dir / "retrieval_chunks_rag.jsonl").exists()
+
+
 def test_cli_accepts_domain_adapter_option(sample_pdf: Path, tmp_path: Path) -> None:
     output_dir = tmp_path / "cli-out-domain-adapter"
     cmd = [

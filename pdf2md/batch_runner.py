@@ -21,6 +21,8 @@ from pdf2md.models import (
     CorpusManifest,
     DomainAdapterMode,
     ImageMode,
+    OutputProfile,
+    RagSidecarScope,
     Manifest,
     RagTableOutputMode,
     Report,
@@ -48,6 +50,8 @@ class BatchConversionOptions:
     image_mode: ImageMode = ImageMode.REFERENCED
     table_mode: TableMode = TableMode.AUTO
     rag_table_output: RagTableOutputMode = RagTableOutputMode.NONE
+    output_profile: OutputProfile = OutputProfile.FULL
+    rag_sidecar_scope: RagSidecarScope | None = None
     rag_profile: str = DEFAULT_RAG_PURPOSE_PROFILE
     domain_adapter: DomainAdapterMode = DomainAdapterMode.NONE
     confidential_safe_mode: bool = False
@@ -129,6 +133,8 @@ def build_batch_config(pdf_path: Path, output_root: Path, options: BatchConversi
         image_mode=options.image_mode,
         table_mode=options.table_mode,
         rag_table_output=options.rag_table_output,
+        output_profile=options.output_profile,
+        rag_sidecar_scope=options.rag_sidecar_scope,
         rag_profile=options.rag_profile,
         domain_adapter=options.domain_adapter,
         confidential_safe_mode=options.confidential_safe_mode,

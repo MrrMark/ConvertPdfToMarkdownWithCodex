@@ -23,11 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q102. Fast Output Profile And Sidecar Scope
-
-`document.md`, `manifest.json`, `report.json` 중심의 opt-in fast profile과 RAG sidecar 생성 범위 `minimal|full`을 검토한다.
-기본 output contract와 기본 profile 동작은 변경하지 않는다.
-
 ### P0 / Q103. Assetless Technical RAG Figure Text Chunks
 
 이미지 파일 업로드가 불가능한 팀 RAG 환경을 위해 `placeholder + figure_text chunk` 경로를 구현한다.

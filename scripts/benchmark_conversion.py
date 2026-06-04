@@ -13,7 +13,7 @@ from pypdf import PdfWriter
 from pypdf.generic import DictionaryObject, NameObject, StreamObject
 
 from pdf2md.config import Config
-from pdf2md.models import RagTableOutputMode
+from pdf2md.models import OutputProfile, RagSidecarScope, RagTableOutputMode
 from pdf2md.pipeline import run_conversion
 from pdf2md.utils.io import write_json
 
@@ -293,7 +293,14 @@ def apply_performance_gate(
     return payload
 
 
-def run_benchmark(output_dir: Path, page_counts: list[int], page_workers: list[int] | None = None) -> dict[str, Any]:
+def run_benchmark(
+    output_dir: Path,
+    page_counts: list[int],
+    page_workers: list[int] | None = None,
+    *,
+    output_profile: OutputProfile = OutputProfile.FULL,
+    rag_sidecar_scope: RagSidecarScope | None = None,
+) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     page_workers = sorted(set(page_workers or [1]))
     runs: list[dict[str, Any]] = []
@@ -312,6 +319,8 @@ def run_benchmark(output_dir: Path, page_counts: list[int], page_workers: list[i
                     keep_page_markers=True,
                     page_workers=page_worker_count,
                     rag_table_output=RagTableOutputMode.JSONL,
+                    output_profile=output_profile,
+                    rag_sidecar_scope=rag_sidecar_scope,
                 )
             )
             elapsed_ms = int((time.perf_counter() - started) * 1000)
@@ -344,6 +353,9 @@ def run_benchmark(output_dir: Path, page_counts: list[int], page_workers: list[i
                     "table_total": summary.get("table_total"),
                     "table_gfm_count": summary.get("table_gfm_count"),
                     "rag_table_record_count": summary.get("rag_table_record_count"),
+                    "rag_text_block_record_count": summary.get("rag_text_block_record_count"),
+                    "retrieval_chunk_record_count": summary.get("retrieval_chunk_record_count"),
+                    "rag_sidecar_scope": summary.get("rag_sidecar_scope", "full"),
                     "technical_table_record_count": summary.get("technical_table_record_count"),
                     "artifact_hashes": artifact_hashes,
                 }
@@ -385,6 +397,18 @@ def main() -> int:
     parser.add_argument("--output-dir", default="benchmark_output")
     parser.add_argument("--page-counts", default="10,50,100")
     parser.add_argument("--page-workers", default="1", help="Comma-separated page worker counts, for example 1,4.")
+    parser.add_argument(
+        "--output-profile",
+        choices=[mode.value for mode in OutputProfile],
+        default=OutputProfile.FULL.value,
+        help="Output profile to benchmark. Default: full.",
+    )
+    parser.add_argument(
+        "--rag-sidecar-scope",
+        choices=[mode.value for mode in RagSidecarScope],
+        default=None,
+        help="Optional RAG sidecar scope override for benchmark runs.",
+    )
     parser.add_argument("--baseline-report", type=Path, help="Previous benchmark_report.json to compare against.")
     parser.add_argument("--fail-on-regression", action="store_true", help="Return non-zero when the performance gate fails.")
     parser.add_argument(
@@ -403,7 +427,13 @@ def main() -> int:
     args = parser.parse_args()
     page_counts = _parse_int_list(args.page_counts)
     page_workers = _parse_int_list(args.page_workers)
-    payload = run_benchmark(Path(args.output_dir), page_counts, page_workers)
+    payload = run_benchmark(
+        Path(args.output_dir),
+        page_counts,
+        page_workers,
+        output_profile=OutputProfile(args.output_profile),
+        rag_sidecar_scope=RagSidecarScope(args.rag_sidecar_scope) if args.rag_sidecar_scope is not None else None,
+    )
     baseline_report = _read_json(args.baseline_report) if args.baseline_report else None
     payload = apply_performance_gate(
         payload,

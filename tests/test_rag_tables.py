@@ -9,7 +9,7 @@ from pdf2md.config import Config
 from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrResult
 from pdf2md.extractors.tables import TableExtractionResult
-from pdf2md.models import RagTableOutputMode, TableMode, WarningEntry
+from pdf2md.models import OutputProfile, RagSidecarScope, RagTableOutputMode, TableMode, WarningEntry
 from pdf2md.pipeline import run_conversion
 from pdf2md.serializers.rag_tables import serialize_rag_tables_jsonl, serialize_rag_tables_markdown
 
@@ -181,6 +181,107 @@ def test_pipeline_does_not_write_rag_sidecars_by_default(sample_pdf: Path, tmp_p
     report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
     assert report["summary"]["rag_table_output"] == "none"
     assert report["summary"]["rag_table_record_count"] == 0
+
+
+def test_fast_output_profile_omits_rag_sidecars(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_tables",
+        lambda *args, **kwargs: TableExtractionResult(rag_tables=_rag_table_payload()),
+    )
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "fast-output"
+    result = run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=output_dir,
+            output_profile=OutputProfile.FAST,
+            rag_table_output=RagTableOutputMode.BOTH,
+        )
+    )
+
+    assert result.exit_code == 0
+    assert (output_dir / "document.md").exists()
+    assert (output_dir / "manifest.json").exists()
+    assert (output_dir / "report.json").exists()
+    for filename in (
+        "rag_tables.md",
+        "tables_rag.jsonl",
+        "text_blocks_rag.jsonl",
+        "semantic_units_rag.jsonl",
+        "requirements_rag.jsonl",
+        "cross_refs_rag.jsonl",
+        "figures_rag.jsonl",
+        "requirement_traceability_rag.jsonl",
+        "technical_tables_rag.jsonl",
+        "retrieval_chunks_rag.jsonl",
+    ):
+        assert not (output_dir / filename).exists()
+
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["output_profile"] == "fast"
+    assert manifest["options"]["rag_sidecar_scope"] == "none"
+    assert manifest["options"]["rag_sidecar_omitted_reason"] == "rag_sidecar_scope_omitted"
+    assert report["summary"]["output_profile"] == "fast"
+    assert report["summary"]["rag_sidecar_scope"] == "none"
+    assert report["summary"]["rag_table_record_count"] == 0
+    assert report["summary"]["rag_text_block_file_count"] == 0
+    assert report["summary"]["retrieval_chunk_file_count"] == 0
+    assert "tables_rag.jsonl" in report["summary"]["rag_sidecar_omitted_outputs"]
+    assert "retrieval_chunks_rag.jsonl" in report["summary"]["rag_sidecar_omitted_outputs"]
+
+
+def test_minimal_rag_sidecar_scope_writes_core_sidecars(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_tables",
+        lambda *args, **kwargs: TableExtractionResult(rag_tables=_rag_table_payload()),
+    )
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "minimal-sidecars"
+    result = run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=output_dir,
+            rag_sidecar_scope=RagSidecarScope.MINIMAL,
+            rag_table_output=RagTableOutputMode.JSONL,
+        )
+    )
+
+    assert result.exit_code == 0
+    assert (output_dir / "document.md").exists()
+    assert (output_dir / "text_blocks_rag.jsonl").exists()
+    assert (output_dir / "retrieval_chunks_rag.jsonl").exists()
+    assert (output_dir / "tables_rag.jsonl").exists()
+    assert not (output_dir / "rag_tables.md").exists()
+    for filename in (
+        "semantic_units_rag.jsonl",
+        "requirements_rag.jsonl",
+        "cross_refs_rag.jsonl",
+        "figures_rag.jsonl",
+        "requirement_traceability_rag.jsonl",
+        "technical_tables_rag.jsonl",
+    ):
+        assert not (output_dir / filename).exists()
+
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["output_profile"] == "full"
+    assert manifest["options"]["rag_sidecar_scope"] == "minimal"
+    assert manifest["options"]["rag_sidecar_omitted_reason"] == "rag_sidecar_scope_omitted"
+    assert report["summary"]["rag_sidecar_scope"] == "minimal"
+    assert report["summary"]["rag_table_record_count"] == 1
+    assert report["summary"]["rag_table_file_count"] == 1
+    assert report["summary"]["rag_text_block_file_count"] == 1
+    assert report["summary"]["retrieval_chunk_file_count"] == 1
+    assert report["summary"]["semantic_unit_file_count"] == 0
+    assert report["summary"]["technical_table_file_count"] == 0
+    assert "semantic_units_rag.jsonl" in report["summary"]["rag_sidecar_omitted_outputs"]
 
 
 def test_pipeline_can_add_contextual_embedding_text_to_table_chunks(

@@ -9,6 +9,8 @@ from pdf2md.config import Config, SUPPORTED_RETRIEVAL_TOKENIZERS, default_output
 from pdf2md.models import (
     DomainAdapterMode,
     ImageMode,
+    OutputProfile,
+    RagSidecarScope,
     RagTableOutputMode,
     TableMode,
 )
@@ -59,6 +61,18 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[m.value for m in RagTableOutputMode],
         default=None,
         help="Optional RAG sidecar table output: none, markdown, jsonl, or both.",
+    )
+    parser.add_argument(
+        "--output-profile",
+        choices=[m.value for m in OutputProfile],
+        default=OutputProfile.FULL.value,
+        help="Output profile. full preserves the default artifact contract; fast omits RAG sidecars unless overridden.",
+    )
+    parser.add_argument(
+        "--rag-sidecar-scope",
+        choices=[m.value for m in RagSidecarScope],
+        default=None,
+        help="Opt-in RAG sidecar scope: full, minimal, or none. Defaults to full, or none with --output-profile fast.",
     )
     parser.add_argument(
         "--domain-adapter",
@@ -165,6 +179,8 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         image_mode=ImageMode(_option_value(args.image_mode, profile_options.image_mode)),
         table_mode=TableMode(_option_value(args.table_mode, profile_options.table_mode)),
         rag_table_output=RagTableOutputMode(_option_value(args.rag_table_output, profile_options.rag_table_output)),
+        output_profile=OutputProfile(args.output_profile),
+        rag_sidecar_scope=RagSidecarScope(args.rag_sidecar_scope) if args.rag_sidecar_scope is not None else None,
         rag_profile=args.rag_profile,
         domain_adapter=DomainAdapterMode(_option_value(args.domain_adapter, profile_options.domain_adapter)),
         confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),
@@ -207,6 +223,8 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
         image_mode=ImageMode(_option_value(args.image_mode, profile_options.image_mode)),
         table_mode=TableMode(_option_value(args.table_mode, profile_options.table_mode)),
         rag_table_output=RagTableOutputMode(_option_value(args.rag_table_output, profile_options.rag_table_output)),
+        output_profile=OutputProfile(args.output_profile),
+        rag_sidecar_scope=RagSidecarScope(args.rag_sidecar_scope) if args.rag_sidecar_scope is not None else None,
         rag_profile=args.rag_profile,
         domain_adapter=DomainAdapterMode(_option_value(args.domain_adapter, profile_options.domain_adapter)),
         confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),

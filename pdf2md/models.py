@@ -48,6 +48,17 @@ class RagTableOutputMode(str, Enum):
         return self in {RagTableOutputMode.JSONL, RagTableOutputMode.BOTH}
 
 
+class OutputProfile(str, Enum):
+    FULL = "full"
+    FAST = "fast"
+
+
+class RagSidecarScope(str, Enum):
+    FULL = "full"
+    MINIMAL = "minimal"
+    NONE = "none"
+
+
 class DomainAdapterMode(str, Enum):
     NONE = "none"
     NVME = "nvme"
@@ -109,6 +120,8 @@ class PageResult(BaseModel):
 
 
 class ReportSummary(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     processed_pages: int = 0
     warning_count: int = 0
     actionable_warning_count: int = 0

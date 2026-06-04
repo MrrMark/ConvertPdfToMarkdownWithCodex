@@ -88,6 +88,46 @@ def test_artifact_integrity_reports_missing_links_and_count_mismatches(tmp_path:
     assert report["summary"]["sidecar_count_mismatches"] == 1
 
 
+def test_artifact_integrity_accepts_omitted_sidecar_scope(tmp_path: Path) -> None:
+    _write_valid_output(tmp_path)
+    (tmp_path / "figures_rag.jsonl").unlink()
+    (tmp_path / "retrieval_chunks_rag.jsonl").unlink()
+    report_payload = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
+    report_payload["summary"].update(
+        {
+            "figure_rag_record_count": 0,
+            "retrieval_chunk_record_count": 0,
+            "rag_sidecar_scope": "none",
+            "rag_sidecar_omitted_outputs": ["figures_rag.jsonl", "retrieval_chunks_rag.jsonl"],
+            "rag_sidecar_omitted_reason": "rag_sidecar_scope_omitted",
+        }
+    )
+    _write_json(tmp_path / "report.json", report_payload)
+
+    report = validate_artifact_integrity.validate_artifact_integrity(output_dir=tmp_path)
+
+    assert report["passed"] is True
+    assert report["summary"]["sidecar_count_mismatches"] == 0
+
+
+def test_artifact_integrity_warns_when_omitted_sidecar_still_exists(tmp_path: Path) -> None:
+    _write_valid_output(tmp_path)
+    report_payload = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
+    report_payload["summary"].update(
+        {
+            "rag_sidecar_scope": "none",
+            "rag_sidecar_omitted_outputs": ["retrieval_chunks_rag.jsonl"],
+            "rag_sidecar_omitted_reason": "rag_sidecar_scope_omitted",
+        }
+    )
+    _write_json(tmp_path / "report.json", report_payload)
+
+    report = validate_artifact_integrity.validate_artifact_integrity(output_dir=tmp_path)
+
+    assert report["passed"] is True
+    assert [finding["code"] for finding in report["findings"]] == ["omitted_sidecar_present"]
+
+
 def test_artifact_integrity_checks_batch_and_corpus_file_maps(tmp_path: Path) -> None:
     _write_valid_output(tmp_path)
     _write_json(

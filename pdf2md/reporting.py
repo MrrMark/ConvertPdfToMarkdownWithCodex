@@ -224,6 +224,7 @@ def build_report(
     technical_table_record_count: int = 0,
     technical_table_file_count: int = 0,
     confidential_safe_mode: bool = False,
+    summary_extras: dict[str, object] | None = None,
 ) -> Report:
     ocr_confidence_by_page = ocr_confidence_by_page or {}
     excluded_images = excluded_images or []
@@ -344,6 +345,7 @@ def build_report(
         technical_table_record_count=technical_table_record_count,
         technical_table_file_count=technical_table_file_count,
         confidential_safe_mode=confidential_safe_mode,
+        **(summary_extras or {}),
     )
 
     return Report(
