@@ -23,7 +23,4 @@
 
 ## 남은 작업
 
-### P2 / Q105. Docling-Informed OCR And Layout Extension Design
-
-Q104 결과를 바탕으로 다중 OCR backend, 도표/표 영역별 OCR, 선택적 picture description, layout-aware table/figure 인식 중 실제 도입할 항목을 설계한다.
-도입 기능은 adapter/opt-in 구조로 분리하고 원문 보존, deterministic output, partial success/report 원칙을 유지한다.
+현재 남은 작업 없음.

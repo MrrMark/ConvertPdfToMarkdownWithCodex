@@ -79,7 +79,7 @@ P0 안정화 후 구현:
 - M04는 Q92에서 active backlog와 문서 정합성 1차 정리를 완료했다.
 - M05는 Q95에서 lightweight CI gate를 보강했고, Q96에서 한글/OCR fixture 회귀 방어를 보강했다.
 - M06은 Q98에서 structure marker OCR lazy 처리, Q99에서 page worker chunked parallelization, Q100에서 OCR page parallelization, Q101에서 adaptive table strategy, Q102에서 fast output profile과 sidecar scope를 완료했다.
-- M07은 Q103에서 이미지 파일 업로드가 불가능한 RAG 환경 대응을 완료했고, Q104에서 Docling 벤치마크 하네스를 완료했으며, Q105에서 확장 설계를 관리한다.
+- M07은 Q103에서 이미지 파일 업로드가 불가능한 RAG 환경 대응, Q104에서 Docling 벤치마크 하네스, Q105에서 Docling-informed 확장 설계를 완료했다.
 
 ### M01. pipeline/report 집계 책임 분리
 
@@ -129,7 +129,8 @@ P0 안정화 후 구현:
 - 이미지 파일 없이 figure provenance를 검색 가능한 text chunk로 승격(Q103 완료)
 - 팀 RAG 업로드용 placeholder + figure_text chunk 경로 문서화(Q103 완료)
 - Docling OCR/layout/table/figure 처리 경로와 현재 툴 비교(Q104 완료)
-- 다중 OCR backend, region OCR, picture description, layout-aware adapter 도입 여부 검토
+- 다중 OCR backend, region OCR, picture description, layout-aware adapter 도입 여부 검토(Q105 완료)
+- Docling-installed benchmark evidence 확보 시 신규 Q 작업으로 재등록
 
 ---
 
