@@ -25,6 +25,7 @@ OPTIONAL_GATES = (
     "artifact-integrity",
     "preset-eval",
     "docling",
+    "figure-description-eval",
     "gui",
     "gui-parity",
     "gui-benchmark",
@@ -89,6 +90,8 @@ class ReleaseGateConfig:
     docling_document_label: str = "nvme-nvm-command-set-rev-1.2-2025-08-01"
     docling_figure_semantics_mode: str = "visual"
     docling_figure_description_backend: str = "local-vlm"
+    figure_description_eval_output_dir: Path | None = None
+    figure_description_eval_min_confidence: float = 0.65
 
 
 def _split_gates(raw_gates: str) -> list[str]:
@@ -485,6 +488,37 @@ def _docling_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     return [_run_command(gate="docling", command=command, report_path=report_path)]
 
 
+def _figure_description_eval_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    report_path = config.output_dir / "figure_description_eval_report.json"
+    if config.figure_description_eval_output_dir is None:
+        return [
+            {
+                "gate": "figure-description-eval",
+                "command": [],
+                "exit_code": 2,
+                "status": "failed",
+                "report_path": str(report_path),
+                "stdout_tail": "",
+                "stderr_tail": (
+                    "--figure-description-eval-output-dir is required when "
+                    "--gates includes figure-description-eval."
+                ),
+            }
+        ]
+    command = [
+        sys.executable,
+        "scripts/evaluate_figure_descriptions.py",
+        "--output-dir",
+        str(config.figure_description_eval_output_dir),
+        "--report-file",
+        str(report_path),
+        "--min-confidence",
+        str(config.figure_description_eval_min_confidence),
+        "--fail-on-error",
+    ]
+    return [_run_command(gate="figure-description-eval", command=command, report_path=report_path)]
+
+
 def _gui_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     gui_python = _gui_python_executable()
     output_dir = config.output_dir / "gui"
@@ -710,6 +744,8 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
             records.extend(_preset_eval_gate(config))
         elif gate == "docling":
             records.extend(_docling_gate(config))
+        elif gate == "figure-description-eval":
+            records.extend(_figure_description_eval_gate(config))
         elif gate == "gui":
             records.extend(_gui_gate(config))
         elif gate == "gui-parity":
@@ -750,7 +786,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Comma-separated gates: "
             "ocr,corpus,benchmark,schema,packaging,ci-lightweight,dependency-audit,ocr-backends,rag,index-contract,provenance-integrity,"
-            "artifact-integrity,preset-eval,docling,gui,gui-parity,gui-benchmark."
+            "artifact-integrity,preset-eval,docling,figure-description-eval,gui,gui-parity,gui-benchmark."
         ),
     )
     parser.add_argument("--ocr-lang", default="eng")
@@ -818,6 +854,8 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("local-vlm", "docling"),
         default="local-vlm",
     )
+    parser.add_argument("--figure-description-eval-output-dir", type=Path)
+    parser.add_argument("--figure-description-eval-min-confidence", type=float, default=0.65)
     return parser
 
 
@@ -885,6 +923,8 @@ def main(argv: list[str] | None = None) -> int:
             docling_document_label=args.docling_document_label,
             docling_figure_semantics_mode=args.docling_figure_semantics_mode,
             docling_figure_description_backend=args.docling_figure_description_backend,
+            figure_description_eval_output_dir=args.figure_description_eval_output_dir,
+            figure_description_eval_min_confidence=args.figure_description_eval_min_confidence,
         )
     )
     print(f"Wrote {args.output_dir / 'release_gate_report.json'}")

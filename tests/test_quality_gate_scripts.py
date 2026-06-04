@@ -10,6 +10,7 @@ from scripts import benchmark_conversion
 from scripts import benchmark_docling_comparison
 from scripts import benchmark_gui_cli_parity
 from scripts import check_ocr_runtime
+from scripts import evaluate_figure_descriptions
 from scripts import inspect_wheel_contract
 from scripts import probe_ocr_backends
 from scripts import run_preset_eval
@@ -17,6 +18,13 @@ from scripts import run_gui_cli_parity
 from scripts import run_corpus_eval
 from scripts import run_latest_nvme_command_set_eval
 from scripts import run_release_gates
+
+
+def _write_jsonl(path: Path, records: list[dict]) -> None:
+    path.write_text(
+        "".join(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in records),
+        encoding="utf-8",
+    )
 
 
 def test_pyproject_declares_modern_tooling_and_typed_package_contract() -> None:
@@ -378,6 +386,117 @@ def test_ocr_backend_probe_reports_missing_languages(monkeypatch) -> None:  # no
     assert report["summary"]["ready_backend_count"] == 0
     assert report["backends"][0]["status"] == "available"
     assert report["backends"][0]["language_data"]["missing"] == ["kor"]
+
+
+def test_figure_description_eval_passes_context_only_sidecars(tmp_path: Path) -> None:
+    output_dir = tmp_path / "figure-description-pass"
+    output_dir.mkdir()
+    _write_jsonl(output_dir / "figures_rag.jsonl", [{"figure_id": "page-0001-figure-0001", "page": 1}])
+    _write_jsonl(
+        output_dir / "figure_descriptions_rag.jsonl",
+        [
+            {
+                "description_id": "figure-description-000001",
+                "figure_id": "page-0001-figure-0001",
+                "generated_text": True,
+                "backend_status": "not_invoked_context_only",
+                "classification_confidence": 0.82,
+                "source_evidence": {
+                    "caption_present": True,
+                    "heading_path_present": False,
+                    "detected_label_count": 0,
+                    "nearby_text_count": 0,
+                    "visual_pixels_interpreted": False,
+                },
+                "source_refs": [{"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1}],
+            }
+        ],
+    )
+    _write_jsonl(
+        output_dir / "retrieval_chunks_rag.jsonl",
+        [
+            {
+                "chunk_id": "chunk-1",
+                "chunk_type": "figure_description",
+                "source_refs": [
+                    {"source_type": "figure_description", "source_id": "figure-description-000001"}
+                ],
+            }
+        ],
+    )
+
+    report = evaluate_figure_descriptions.evaluate_figure_descriptions(output_dir=output_dir)
+
+    assert report["summary"]["passed"] is True
+    assert report["summary"]["description_record_count"] == 1
+    assert report["summary"]["figure_description_chunk_count"] == 1
+    assert report["summary"]["evidence_backed_record_count"] == 1
+    assert report["findings"] == []
+
+
+def test_figure_description_eval_reports_local_only_violations(tmp_path: Path) -> None:
+    output_dir = tmp_path / "figure-description-fail"
+    output_dir.mkdir()
+    _write_jsonl(output_dir / "figures_rag.jsonl", [])
+    _write_jsonl(
+        output_dir / "figure_descriptions_rag.jsonl",
+        [
+            {
+                "description_id": "figure-description-000001",
+                "figure_id": "page-0001-figure-0001",
+                "generated_text": False,
+                "backend_status": "vlm_invoked",
+                "classification_confidence": 0.2,
+                "source_evidence": {
+                    "caption_present": False,
+                    "heading_path_present": False,
+                    "detected_label_count": 0,
+                    "nearby_text_count": 0,
+                    "visual_pixels_interpreted": True,
+                },
+                "source_refs": [],
+            }
+        ],
+    )
+    _write_jsonl(output_dir / "retrieval_chunks_rag.jsonl", [])
+
+    report = evaluate_figure_descriptions.evaluate_figure_descriptions(output_dir=output_dir)
+
+    codes = {finding["code"] for finding in report["findings"]}
+    assert report["summary"]["passed"] is False
+    assert report["summary"]["error_count"] == 5
+    assert report["summary"]["warning_count"] == 2
+    assert {
+        "missing_generated_text_flag",
+        "missing_source_refs",
+        "missing_source_evidence",
+        "visual_pixels_interpreted",
+        "backend_invoked",
+        "low_confidence",
+        "missing_retrieval_chunk",
+    } <= codes
+
+
+def test_figure_description_eval_cli_writes_report_and_fails_on_error(tmp_path: Path) -> None:
+    output_dir = tmp_path / "figure-description-cli"
+    output_dir.mkdir()
+    report_file = tmp_path / "figure-description-report.json"
+
+    exit_code = evaluate_figure_descriptions.main(
+        [
+            "--output-dir",
+            str(output_dir),
+            "--report-file",
+            str(report_file),
+            "--fail-on-error",
+        ]
+    )
+
+    payload = json.loads(report_file.read_text(encoding="utf-8"))
+    assert exit_code == 1
+    assert payload["purpose"] == "local_figure_description_eval"
+    assert payload["summary"]["error_count"] == 1
+    assert payload["findings"][0]["code"] == "missing_figure_descriptions"
 
 
 def test_release_gate_runner_writes_success_summary(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
@@ -866,6 +985,52 @@ def test_release_gate_runner_supports_docling_installed_gate(monkeypatch, tmp_pa
     assert "--figure-semantics-mode" in command
     assert "visual" in command
     assert "--pages" in command
+
+
+def test_release_gate_runner_requires_figure_description_eval_output_dir(tmp_path: Path) -> None:
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-figure-description-missing-output",
+            gates=["figure-description-eval"],
+        )
+    )
+
+    assert payload["passed_release_gate"] is False
+    assert payload["gates"][0]["gate"] == "figure-description-eval"
+    assert payload["gates"][0]["exit_code"] == 2
+    assert "--figure-description-eval-output-dir is required" in payload["gates"][0]["stderr_tail"]
+
+
+def test_release_gate_runner_supports_figure_description_eval_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="Wrote figure_description_eval_report.json", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    output_dir = tmp_path / "converted-spec"
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-figure-description-eval",
+            gates=["figure-description-eval"],
+            figure_description_eval_output_dir=output_dir,
+            figure_description_eval_min_confidence=0.7,
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["gates"][0]["gate"] == "figure-description-eval"
+    assert payload["gates"][0]["report_path"].endswith("figure_description_eval_report.json")
+    command = calls[0]
+    assert any(str(part).endswith("evaluate_figure_descriptions.py") for part in command)
+    assert "--output-dir" in command
+    assert str(output_dir) in command
+    assert "--report-file" in command
+    assert "--min-confidence" in command
+    assert "0.7" in command
+    assert "--fail-on-error" in command
 
 
 def test_release_gate_runner_supports_optional_gui_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
