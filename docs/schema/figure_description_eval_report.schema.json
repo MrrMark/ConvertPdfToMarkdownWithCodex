@@ -1,0 +1,193 @@
+{
+  "$defs": {
+    "FigureDescriptionEvalFinding": {
+      "properties": {
+        "chunk_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Chunk Id"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "description_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description Id"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "figure_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figure Id"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ],
+      "title": "FigureDescriptionEvalFinding",
+      "type": "object"
+    },
+    "FigureDescriptionEvalSummary": {
+      "properties": {
+        "backend_invoked_count": {
+          "default": 0,
+          "title": "Backend Invoked Count",
+          "type": "integer"
+        },
+        "description_record_count": {
+          "default": 0,
+          "title": "Description Record Count",
+          "type": "integer"
+        },
+        "error_count": {
+          "default": 0,
+          "title": "Error Count",
+          "type": "integer"
+        },
+        "evidence_backed_record_count": {
+          "default": 0,
+          "title": "Evidence Backed Record Count",
+          "type": "integer"
+        },
+        "figure_description_chunk_count": {
+          "default": 0,
+          "title": "Figure Description Chunk Count",
+          "type": "integer"
+        },
+        "figure_record_count": {
+          "default": 0,
+          "title": "Figure Record Count",
+          "type": "integer"
+        },
+        "generated_text_record_count": {
+          "default": 0,
+          "title": "Generated Text Record Count",
+          "type": "integer"
+        },
+        "low_confidence_count": {
+          "default": 0,
+          "title": "Low Confidence Count",
+          "type": "integer"
+        },
+        "missing_retrieval_chunk_count": {
+          "default": 0,
+          "title": "Missing Retrieval Chunk Count",
+          "type": "integer"
+        },
+        "missing_source_evidence_count": {
+          "default": 0,
+          "title": "Missing Source Evidence Count",
+          "type": "integer"
+        },
+        "missing_source_ref_count": {
+          "default": 0,
+          "title": "Missing Source Ref Count",
+          "type": "integer"
+        },
+        "passed": {
+          "default": true,
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "visual_pixels_interpreted_count": {
+          "default": 0,
+          "title": "Visual Pixels Interpreted Count",
+          "type": "integer"
+        },
+        "warning_count": {
+          "default": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "title": "FigureDescriptionEvalSummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "customer_paths_included": {
+      "default": false,
+      "title": "Customer Paths Included",
+      "type": "boolean"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/FigureDescriptionEvalFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "local_only": {
+      "default": true,
+      "title": "Local Only",
+      "type": "boolean"
+    },
+    "min_confidence": {
+      "default": 0.65,
+      "title": "Min Confidence",
+      "type": "number"
+    },
+    "purpose": {
+      "default": "local_figure_description_eval",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "raw_images_included": {
+      "default": false,
+      "title": "Raw Images Included",
+      "type": "boolean"
+    },
+    "raw_pdf_text_included": {
+      "default": false,
+      "title": "Raw Pdf Text Included",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/FigureDescriptionEvalSummary"
+    }
+  },
+  "title": "FigureDescriptionEvalReport",
+  "type": "object"
+}

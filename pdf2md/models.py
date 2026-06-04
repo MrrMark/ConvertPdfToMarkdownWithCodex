@@ -731,6 +731,45 @@ class OCRBackendProbeReport(BaseModel):
     backends: list[OCRBackendProbe] = Field(default_factory=list)
 
 
+class FigureDescriptionEvalFinding(BaseModel):
+    severity: str
+    code: str
+    description_id: Optional[str] = None
+    figure_id: Optional[str] = None
+    chunk_id: Optional[str] = None
+    message: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class FigureDescriptionEvalSummary(BaseModel):
+    figure_record_count: int = 0
+    description_record_count: int = 0
+    figure_description_chunk_count: int = 0
+    generated_text_record_count: int = 0
+    evidence_backed_record_count: int = 0
+    low_confidence_count: int = 0
+    missing_source_ref_count: int = 0
+    missing_source_evidence_count: int = 0
+    visual_pixels_interpreted_count: int = 0
+    backend_invoked_count: int = 0
+    missing_retrieval_chunk_count: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+    passed: bool = True
+
+
+class FigureDescriptionEvalReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "local_figure_description_eval"
+    local_only: bool = True
+    raw_images_included: bool = False
+    raw_pdf_text_included: bool = False
+    customer_paths_included: bool = False
+    min_confidence: float = 0.65
+    summary: FigureDescriptionEvalSummary = Field(default_factory=FigureDescriptionEvalSummary)
+    findings: list[FigureDescriptionEvalFinding] = Field(default_factory=list)
+
+
 class LocalCorpusEvidenceRedactionPolicy(BaseModel):
     raw_paths_included: bool = False
     commands_included: bool = False

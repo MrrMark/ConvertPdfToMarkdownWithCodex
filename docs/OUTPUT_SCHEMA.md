@@ -26,6 +26,7 @@
 - `docs/schema/docling_benchmark_report.schema.json`
 - `docs/schema/docling_artifact_comparison.schema.json`
 - `docs/schema/ocr_backend_probe_report.schema.json`
+- `docs/schema/figure_description_eval_report.schema.json`
 - `docs/schema/local_corpus_evidence_pack.schema.json`
 - `docs/schema/corpus_evidence_analysis_report.schema.json`
 - `docs/schema/corpus_evidence_trend_report.schema.json`
@@ -323,6 +324,57 @@ Policy:
 - Non-Tesseract backend language support is recorded as unchecked until a backend adapter normalizes it.
 - Confidence values are not compared across backends until normalized into the reported `normalized_unit`.
 - metric deltas compare numeric values only and leave non-numeric or nested values with `delta=null`.
+
+## figure_description_eval_report.json
+
+Optional local-only evaluation output written by `scripts/evaluate_figure_descriptions.py`.
+
+Required:
+
+- `schema_version`
+- `purpose="local_figure_description_eval"`
+- `local_only=true`
+- `raw_images_included=false`
+- `raw_pdf_text_included=false`
+- `customer_paths_included=false`
+- `min_confidence`
+- `summary`
+- `findings[]`
+
+Stable summary fields:
+
+- `figure_record_count`
+- `description_record_count`
+- `figure_description_chunk_count`
+- `generated_text_record_count`
+- `evidence_backed_record_count`
+- `low_confidence_count`
+- `missing_source_ref_count`
+- `missing_source_evidence_count`
+- `visual_pixels_interpreted_count`
+- `backend_invoked_count`
+- `missing_retrieval_chunk_count`
+- `error_count`
+- `warning_count`
+- `passed`
+
+Stable finding fields:
+
+- `severity`: `error` or `warning`
+- `code`
+- `description_id`
+- `figure_id`
+- `chunk_id`
+- `message`
+- `details`
+
+Policy:
+
+- The evaluator reads `figure_descriptions_rag.jsonl`, `figures_rag.jsonl`, and `retrieval_chunks_rag.jsonl` only.
+- It does not read raw image files or PDF pages and does not call VLM, Docling picture description, remote APIs, or embedding services.
+- Passing records must be generated helper text with `generated_text=true`, `backend_status="not_invoked_context_only"`, source refs, source evidence, and retrieval chunk linkage.
+- `visual_pixels_interpreted=true` or any backend invocation is an error in this local-only evaluation path.
+- Low confidence and missing retrieval chunk linkage are warnings unless a stricter release policy wraps the report.
 
 ## text_blocks_rag.jsonl
 
