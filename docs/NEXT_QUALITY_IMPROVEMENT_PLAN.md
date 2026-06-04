@@ -23,11 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q104. Docling Benchmark Harness And Comparison Pack
-
-Docling의 OCR, table/figure layout, image export, picture enrichment 경로를 로컬 벤치마크로 비교할 수 있는 harness를 만든다.
-외부 서비스 호출 없이 local-only 실행을 기본으로 하고, raw PDF/이미지/본문을 커밋하지 않는 sanitized comparison pack만 남긴다.
-
 ### P2 / Q105. Docling-Informed OCR And Layout Extension Design
 
 Q104 결과를 바탕으로 다중 OCR backend, 도표/표 영역별 OCR, 선택적 picture description, layout-aware table/figure 인식 중 실제 도입할 항목을 설계한다.

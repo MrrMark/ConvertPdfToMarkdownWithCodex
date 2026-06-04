@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import tomllib
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
 from scripts import benchmark_conversion
+from scripts import benchmark_docling_comparison
 from scripts import benchmark_gui_cli_parity
 from scripts import check_ocr_runtime
 from scripts import inspect_wheel_contract
@@ -174,6 +176,67 @@ def test_benchmark_performance_gate_records_worker_equivalence_failures() -> Non
     assert result["regressions"][0]["type"] == "worker_equivalence_failure"
     assert result["regressions"][0]["metric"] == "worker_output_hashes"
     assert result["regressions"][0]["different_artifacts"] == ["tables_rag.jsonl"]
+
+
+def test_docling_comparison_writes_sanitized_advisory_pack_when_docling_is_missing(
+    monkeypatch,  # noqa: ANN001
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(benchmark_docling_comparison, "_module_available", lambda module_name: False)
+
+    report = benchmark_docling_comparison.run_docling_comparison(
+        input_pdf=sample_pdf,
+        output_dir=tmp_path / "docling-comparison",
+        document_label="doc-0001",
+    )
+
+    output_dir = tmp_path / "docling-comparison"
+    comparison = benchmark_docling_comparison._read_json(  # noqa: SLF001
+        output_dir / benchmark_docling_comparison.COMPARISON_FILENAME
+    )
+    scorecard = (output_dir / benchmark_docling_comparison.SCORECARD_FILENAME).read_text(encoding="utf-8")
+
+    assert (output_dir / benchmark_docling_comparison.REPORT_FILENAME).is_file()
+    assert report["summary"]["current_tool_status"] in {"success", "partial_success"}
+    assert report["summary"]["docling_status"] == "skipped"
+    assert report["summary"]["docling_available"] is False
+    assert report["summary"]["warning_count"] == 1
+    assert report["findings"][0]["code"] == "docling_not_installed"
+    assert report["raw_content_included"] is False
+    assert report["image_bytes_included"] is False
+    assert report["customer_paths_included"] is False
+    assert report["runs"][0]["output_dir"] == "current_tool"
+    assert report["runs"][1]["output_dir"] is None
+    assert "sample.pdf" not in json.dumps(report, ensure_ascii=False, sort_keys=True)
+    assert comparison["summary"]["current_artifact_count"] >= 3
+    assert comparison["summary"]["docling_artifact_count"] == 0
+    assert comparison["raw_content_included"] is False
+    assert comparison["image_bytes_included"] is False
+    assert comparison["customer_paths_included"] is False
+    assert "# Docling Benchmark Scorecard" in scorecard
+    assert "docling_not_installed" in scorecard
+
+
+def test_docling_metric_deltas_are_numeric_when_both_tools_report_numbers() -> None:
+    current_run = {
+        "duration_ms": 100,
+        "pages_per_second": 20.0,
+        "metrics": {"table_total": 2, "backend_availability": {"tesseract": True}},
+    }
+    docling_run = {
+        "duration_ms": 150,
+        "pages_per_second": 10.0,
+        "metrics": {"table_total": 3, "backend_availability": {"tesseract": True}},
+    }
+
+    deltas = benchmark_docling_comparison.build_metric_deltas(current_run, docling_run)
+    by_metric = {delta["metric"]: delta for delta in deltas}
+
+    assert by_metric["duration_ms"]["delta"] == 50.0
+    assert by_metric["pages_per_second"]["delta"] == -10.0
+    assert by_metric["table_total"]["delta"] == 1.0
+    assert by_metric["backend_availability"]["delta"] is None
 
 
 def test_ocr_runtime_check_reports_missing_tesseract(monkeypatch) -> None:  # noqa: ANN001

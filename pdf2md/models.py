@@ -601,6 +601,80 @@ class ArtifactIntegrityReport(BaseModel):
     findings: list[ArtifactIntegrityFinding] = Field(default_factory=list)
 
 
+class DoclingBenchmarkFinding(BaseModel):
+    severity: str
+    code: str
+    tool: Optional[str] = None
+    message: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class DoclingBenchmarkRun(BaseModel):
+    tool: str
+    status: str
+    output_dir: Optional[str] = None
+    duration_ms: int = 0
+    pages_per_second: Optional[float] = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    artifact_hashes: dict[str, str] = Field(default_factory=dict)
+    error_code: Optional[str] = None
+    advisory: Optional[str] = None
+
+
+class DoclingBenchmarkSummary(BaseModel):
+    compared: bool = False
+    current_tool_status: str = "not_run"
+    docling_status: str = "not_run"
+    docling_available: bool = False
+    finding_count: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+
+
+class DoclingBenchmarkReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "docling_benchmark_comparison"
+    document_label: str
+    source_sha256: str
+    local_only: bool = True
+    raw_content_included: bool = False
+    image_bytes_included: bool = False
+    customer_paths_included: bool = False
+    summary: DoclingBenchmarkSummary = Field(default_factory=DoclingBenchmarkSummary)
+    runs: list[DoclingBenchmarkRun] = Field(default_factory=list)
+    findings: list[DoclingBenchmarkFinding] = Field(default_factory=list)
+
+
+class DoclingArtifactMetricDelta(BaseModel):
+    metric: str
+    current_tool: Optional[Any] = None
+    docling: Optional[Any] = None
+    delta: Optional[float] = None
+
+
+class DoclingArtifactSummary(BaseModel):
+    current_artifact_count: int = 0
+    docling_artifact_count: int = 0
+    comparable_metric_count: int = 0
+    hash_match_count: int = 0
+    hash_mismatch_count: int = 0
+
+
+class DoclingArtifactComparisonReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "docling_sanitized_artifact_comparison"
+    document_label: str
+    source_sha256: str
+    local_only: bool = True
+    raw_content_included: bool = False
+    image_bytes_included: bool = False
+    customer_paths_included: bool = False
+    summary: DoclingArtifactSummary = Field(default_factory=DoclingArtifactSummary)
+    artifacts: list[dict[str, Any]] = Field(default_factory=list)
+    metric_deltas: list[DoclingArtifactMetricDelta] = Field(default_factory=list)
+    findings: list[DoclingBenchmarkFinding] = Field(default_factory=list)
+
+
 class LocalCorpusEvidenceRedactionPolicy(BaseModel):
     raw_paths_included: bool = False
     commands_included: bool = False

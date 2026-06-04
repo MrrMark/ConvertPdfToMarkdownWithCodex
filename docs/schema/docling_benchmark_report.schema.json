@@ -1,0 +1,231 @@
+{
+  "$defs": {
+    "DoclingBenchmarkFinding": {
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "title": "Severity",
+          "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ],
+      "title": "DoclingBenchmarkFinding",
+      "type": "object"
+    },
+    "DoclingBenchmarkRun": {
+      "properties": {
+        "advisory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Advisory"
+        },
+        "artifact_hashes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Artifact Hashes",
+          "type": "object"
+        },
+        "duration_ms": {
+          "default": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Code"
+        },
+        "metrics": {
+          "additionalProperties": true,
+          "title": "Metrics",
+          "type": "object"
+        },
+        "output_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Dir"
+        },
+        "pages_per_second": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pages Per Second"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "status"
+      ],
+      "title": "DoclingBenchmarkRun",
+      "type": "object"
+    },
+    "DoclingBenchmarkSummary": {
+      "properties": {
+        "compared": {
+          "default": false,
+          "title": "Compared",
+          "type": "boolean"
+        },
+        "current_tool_status": {
+          "default": "not_run",
+          "title": "Current Tool Status",
+          "type": "string"
+        },
+        "docling_available": {
+          "default": false,
+          "title": "Docling Available",
+          "type": "boolean"
+        },
+        "docling_status": {
+          "default": "not_run",
+          "title": "Docling Status",
+          "type": "string"
+        },
+        "error_count": {
+          "default": 0,
+          "title": "Error Count",
+          "type": "integer"
+        },
+        "finding_count": {
+          "default": 0,
+          "title": "Finding Count",
+          "type": "integer"
+        },
+        "warning_count": {
+          "default": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "title": "DoclingBenchmarkSummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "customer_paths_included": {
+      "default": false,
+      "title": "Customer Paths Included",
+      "type": "boolean"
+    },
+    "document_label": {
+      "title": "Document Label",
+      "type": "string"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/DoclingBenchmarkFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "image_bytes_included": {
+      "default": false,
+      "title": "Image Bytes Included",
+      "type": "boolean"
+    },
+    "local_only": {
+      "default": true,
+      "title": "Local Only",
+      "type": "boolean"
+    },
+    "purpose": {
+      "default": "docling_benchmark_comparison",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "raw_content_included": {
+      "default": false,
+      "title": "Raw Content Included",
+      "type": "boolean"
+    },
+    "runs": {
+      "items": {
+        "$ref": "#/$defs/DoclingBenchmarkRun"
+      },
+      "title": "Runs",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_sha256": {
+      "title": "Source Sha256",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/DoclingBenchmarkSummary"
+    }
+  },
+  "required": [
+    "document_label",
+    "source_sha256"
+  ],
+  "title": "DoclingBenchmarkReport",
+  "type": "object"
+}

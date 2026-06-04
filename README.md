@@ -956,6 +956,7 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 ./.venv311/bin/python scripts/run_corpus_eval.py --input-dir pdf --output-dir pdf/eval_output --baseline-report pdf/baseline/corpus_eval_report.json --max-partial-rate 0.1 --max-low-quality-table-rate 0.05 --min-pages-per-second 1.0 --fail-on-regression
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100
 ./.venv311/bin/python scripts/benchmark_conversion.py --output-dir /tmp/pdf2md-benchmark --page-counts 10,50,100 --baseline-report /tmp/pdf2md-baseline/benchmark_report.json --max-duration-regression 0.2 --max-memory-regression 0.2 --min-pages-per-second 1.0 --fail-on-regression
+./.venv311/bin/python scripts/benchmark_docling_comparison.py --input-pdf pdf/local-spec.pdf --output-dir /tmp/pdf2md-docling-comparison --document-label doc-0001
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-ci-lightweight --gates ci-lightweight
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-dependency-audit --gates dependency-audit
 ./.venv311/bin/python scripts/run_release_gates.py --output-dir /tmp/pdf2md-release-gates --gates ocr,corpus,benchmark,schema,packaging --corpus-input-dir pdf --corpus-baseline-report pdf/baseline/corpus_eval_report.json --benchmark-baseline-report /tmp/pdf2md-baseline/benchmark_report.json
@@ -969,6 +970,9 @@ synthetic fixture는 `tests/golden/corpus/`의 golden과 비교해 회귀를 막
 
 - `corpus_eval_report.json`: success/partial 집계, fallback reason, suppressed line, low quality table, pages/sec, pdf open count, text line extract count, regression summary
 - `benchmark_report.json`: page count별 duration, stage duration, pages/sec, pdf open count, text line extract count, peak memory, regression summary
+- `docling_benchmark_report.json`: 현재 툴과 Docling 실행 상태, duration/pages/sec, backend availability, validator metric, advisory finding을 raw text/image/customer path 없이 기록
+- `docling_artifact_comparison.json`: current artifact와 Docling virtual export를 existence/size/SHA-256/metric delta로만 비교
+- `docling_scorecard.md`: 위 두 JSON을 사람이 빠르게 검토할 수 있는 local-only scorecard로 요약
 - `rag_eval_report.json`: hit@k, MRR, expected source coverage, requirement/table-field/cross-ref/relationship target coverage, chunk token 분포, threshold summary
 - `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, lightweight CI gate, advisory dependency audit gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, optional GUI/CLI benchmark gate, schema check, packaging smoke/wheel contract command/status summary
 - `wheel_contract_report.json`: wheel 내부 typed package marker, GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
@@ -1000,8 +1004,8 @@ lint / format / packaging tooling 예시:
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q104-Q105입니다. 우선순위는 Docling 벤치마킹/확장 설계 순서입니다.
-- 완료된 Q34-Q103 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q105입니다. 우선순위는 Docling 벤치마크 결과 기반 확장 설계입니다.
+- 완료된 Q34-Q104 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 

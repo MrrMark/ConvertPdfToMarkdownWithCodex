@@ -23,6 +23,8 @@
 - `docs/schema/index_contract_report.schema.json`
 - `docs/schema/provenance_integrity_report.schema.json`
 - `docs/schema/artifact_integrity_report.schema.json`
+- `docs/schema/docling_benchmark_report.schema.json`
+- `docs/schema/docling_artifact_comparison.schema.json`
 - `docs/schema/local_corpus_evidence_pack.schema.json`
 - `docs/schema/corpus_evidence_analysis_report.schema.json`
 - `docs/schema/corpus_evidence_trend_report.schema.json`
@@ -169,6 +171,95 @@ Policy:
 
 - The pack is for local quality triage and is not written by default.
 - `sample_row_text_preview` is truncated; full source text remains in the normal local outputs.
+
+## docling_benchmark_report.json
+
+Optional local-only benchmark output written by `scripts/benchmark_docling_comparison.py`.
+
+Required:
+
+- `schema_version`
+- `purpose="docling_benchmark_comparison"`
+- `document_label`
+- `source_sha256`
+- `local_only=true`
+- `raw_content_included=false`
+- `image_bytes_included=false`
+- `customer_paths_included=false`
+- `summary`
+- `runs[]`
+- `findings[]`
+
+Stable summary fields:
+
+- `compared`
+- `current_tool_status`
+- `docling_status`
+- `docling_available`
+- `finding_count`
+- `error_count`
+- `warning_count`
+
+Stable run fields:
+
+- `tool`: `pdf2md` or `docling`
+- `status`: `success`, `partial_success`, `failed`, or `skipped`
+- `output_dir`: sanitized output folder name only, never an absolute customer path
+- `duration_ms`
+- `pages_per_second`
+- `metrics`
+- `artifact_hashes`
+- `error_code`
+- `advisory`
+
+Policy:
+
+- Docling 미설치 환경은 실패가 아니라 `status="skipped"`와 `docling_not_installed` advisory finding으로 기록한다.
+- script는 current-tool metric과 validator status를 계속 생성한다.
+- raw Markdown body, raw Docling document dict, image bytes, input file path는 report에 넣지 않는다.
+- optional OCR backend availability는 module availability boolean만 기록한다.
+
+## docling_artifact_comparison.json
+
+Optional local-only sanitized artifact comparison written by `scripts/benchmark_docling_comparison.py`.
+
+Required:
+
+- `schema_version`
+- `purpose="docling_sanitized_artifact_comparison"`
+- `document_label`
+- `source_sha256`
+- `local_only=true`
+- `raw_content_included=false`
+- `image_bytes_included=false`
+- `customer_paths_included=false`
+- `summary`
+- `artifacts[]`
+- `metric_deltas[]`
+- `findings[]`
+
+Stable summary fields:
+
+- `current_artifact_count`
+- `docling_artifact_count`
+- `comparable_metric_count`
+- `hash_match_count`
+- `hash_mismatch_count`
+
+Stable artifact fields:
+
+- `tool`
+- `artifact`
+- `exists`
+- `size_bytes`
+- `sha256`
+- `virtual` for Docling in-memory exports
+
+Policy:
+
+- current-tool artifacts are represented by existence, byte size, and SHA-256 for committed-safe filenames only.
+- Docling Markdown/dict exports are not written as raw files by the harness; only virtual artifact hash and size are recorded.
+- metric deltas compare numeric values only and leave non-numeric or nested values with `delta=null`.
 
 ## text_blocks_rag.jsonl
 

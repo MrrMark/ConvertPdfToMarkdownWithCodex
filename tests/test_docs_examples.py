@@ -48,6 +48,9 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/OUTPUT_SCHEMA.md" in readme
     assert "docs/schema/manifest.schema.json" in readme
     assert "docs/schema/corpus_evidence_analysis_report.schema.json" in readme
+    assert "scripts/benchmark_docling_comparison.py" in readme
+    assert "docling_benchmark_report.json" in readme
+    assert "docling_artifact_comparison.json" in readme
     assert "scripts/analyze_corpus_evidence_pack.py" in readme
     assert "scripts/compare_corpus_evidence_packs.py" in readme
     assert "scripts/export_output_schema.py --check" in readme
@@ -58,10 +61,10 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q104-Q105입니다" in readme
+    assert "현재 active quality backlog는 Q105입니다" in readme
     assert "--rag-figure-text-chunks" in readme
     assert "chunk_type=\"figure_text\"" in readme
-    assert "완료된 Q34-Q103" in readme
+    assert "완료된 Q34-Q104" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
     assert "summary.actionable_warning_count" in readme
@@ -144,7 +147,7 @@ def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
     )
     assert (
         "M07은 Q103에서 이미지 파일 업로드가 불가능한 RAG 환경 대응을 완료했고, "
-        "Q104-Q105에서 Docling 벤치마킹/확장 설계를 관리한다"
+        "Q104에서 Docling 벤치마크 하네스를 완료했으며, Q105에서 확장 설계를 관리한다"
         in tasks
     )
 
@@ -422,7 +425,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q101. Table Strategy Adaptive Mode" not in next_plan
     assert "Q102. Fast Output Profile And Sidecar Scope" not in next_plan
     assert "Q103. Assetless Technical RAG Figure Text Chunks" not in next_plan
-    assert "Q104. Docling Benchmark Harness And Comparison Pack" in next_plan
+    assert "Q104. Docling Benchmark Harness And Comparison Pack" not in next_plan
     assert "Q105. Docling-Informed OCR And Layout Extension Design" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
@@ -461,7 +464,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q101. Table Strategy Adaptive Mode" not in development_specs
     assert "Q102. Fast Output Profile And Sidecar Scope" not in development_specs
     assert "Q103. Assetless Technical RAG Figure Text Chunks" not in development_specs
-    assert "Q104. Docling Benchmark Harness And Comparison Pack" in development_specs
+    assert "Q104. Docling Benchmark Harness And Comparison Pack" not in development_specs
     assert "Q105. Docling-Informed OCR And Layout Extension Design" in development_specs
     assert "placeholder + figure_text chunk" not in development_specs
     assert "다중 OCR backend" in development_specs
@@ -514,8 +517,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q103" in development_specs
+    assert "완료된 Q34-Q104" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q104. Docling Benchmark Harness And Comparison Pack" in implemented_specs
+    assert "docling_benchmark_report.json" in implemented_specs
     assert "Q103. Assetless Technical RAG Figure Text Chunks" in implemented_specs
     assert "figure_text_chunk_record_count" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
@@ -626,6 +631,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "gui_options_fingerprint()" in implemented_specs
     assert "schema_version" in output_schema
     assert "docs/schema/manifest.schema.json" in output_schema
+    assert "docs/schema/docling_benchmark_report.schema.json" in output_schema
+    assert "docs/schema/docling_artifact_comparison.schema.json" in output_schema
+    assert "docling_benchmark_report.json" in output_schema
+    assert "docling_artifact_comparison.json" in output_schema
     assert "text_blocks_rag.jsonl" in output_schema
     assert "semantic_units_rag.jsonl" in output_schema
     assert "requirements_rag.jsonl" in output_schema

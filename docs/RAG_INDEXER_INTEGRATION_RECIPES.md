@@ -152,6 +152,33 @@ python scripts/run_release_gates.py \
   --preset-eval-min-score 80
 ```
 
+## Docling Comparison Harness
+
+Docling의 OCR/layout/table/figure 처리 결과를 현재 툴과 비교할 때는 local-only comparison harness를 사용한다.
+이 harness는 Docling이 설치되지 않은 CI/개발 환경에서도 현재 툴 metric을 생성하고, Docling 경로는 `docling_not_installed` advisory로 기록한다.
+
+```bash
+python scripts/benchmark_docling_comparison.py \
+  --input-pdf spec.pdf \
+  --output-dir /tmp/pdf2md-docling-comparison \
+  --document-label doc-0001 \
+  --rag-profile technical_spec_rag \
+  --domain-adapter nvme \
+  --image-mode placeholder
+```
+
+생성 파일:
+
+- `docling_benchmark_report.json`: current-tool/Docling 실행 상태, duration/pages/sec, backend availability, validator metric, finding count
+- `docling_artifact_comparison.json`: committed-safe artifact name의 existence/size/SHA-256과 numeric metric delta
+- `docling_scorecard.md`: 사람이 빠르게 검토하는 local scorecard
+
+운영 정책:
+
+- raw Markdown body, Docling raw document dict, image bytes, 고객 파일 경로는 comparison pack에 넣지 않는다.
+- Docling Markdown/dict export는 파일로 저장하지 않고 in-memory virtual artifact hash/size만 기록한다.
+- Q105 확장 설계는 이 comparison pack에서 확인된 metric/finding을 근거로 adapter/opt-in 후보를 정한다.
+
 ## OpenAI Vector Store / Generic Embedding Pipeline
 
 권장 payload:
