@@ -23,4 +23,14 @@
 
 ## 남은 작업
 
-현재 남은 작업 없음.
+### P1 / Q107. Assetless Figure Visual Semantics Layer
+
+이미지 파일 업로드가 불가능한 RAG 환경에서 회로도, 파형, 블록다이어그램처럼 의미가 이미지 자체에 있는 figure의 검색성을 개선한다.
+기존 `이미지 업로드 불가 RAG 대응` preset의 기본 보수 동작은 유지하고, region OCR, generated figure description, figure structure extraction을 모두 opt-in 시각 의미 보강 계층으로 설계한다.
+
+핵심 원칙:
+
+- `figure_text`는 계속 관측 텍스트 기반 chunk로 유지한다.
+- 생성 설명은 원문 텍스트와 분리해 별도 sidecar와 `chunk_type`으로 표시한다.
+- 이미지 파일, base64 image payload, 외부 RAG/indexing service 호출은 산출물에 포함하지 않는다.
+- backend 미설치/저신뢰 결과는 partial success보다 advisory warning/report로 우선 기록한다.
