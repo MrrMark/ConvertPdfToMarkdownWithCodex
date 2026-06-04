@@ -44,6 +44,10 @@ class RagProfileOptions:
     rag_merge_sibling_text_chunks: bool = False
     rag_chunk_relationship_metadata: bool = False
     rag_figure_text_chunks: bool = False
+    figure_region_ocr: bool = False
+    rag_generated_figure_descriptions: bool = False
+    figure_description_backend: str = "local-vlm"
+    figure_structure_extraction: bool = False
 
 
 def normalize_rag_profile(value: str | None) -> RagPurposeProfile:

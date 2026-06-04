@@ -69,9 +69,10 @@ Stable nested fields:
 - `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_profile` when a non-default RAG profile was selected, `options.rag_text_blocks_output`, `options.semantic_layer_output`, `options.ocr_lang`
 - `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
 - `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
-- `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
+- `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.figure_descriptions_jsonl_filename`, `options.figure_structures_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
 - `options.manual_domain_adapter_label`, `options.manual_domain_adapter_keywords` when `options.domain_adapter="manual"` and those inputs were provided
 - `options.retrieval_chunk_max_tokens`, `options.retrieval_tokenizer`, `options.rag_contextual_embedding_text`, `options.rag_merge_sibling_text_chunks`, `options.rag_chunk_relationship_metadata`, `options.rag_figure_text_chunks` when enabled
+- `options.figure_region_ocr`, `options.rag_generated_figure_descriptions`, `options.figure_description_backend`, `options.figure_structure_extraction` when enabled
 - `options.output_profile`, `options.rag_sidecar_scope`, `options.rag_sidecar_omitted_outputs`, `options.rag_sidecar_omitted_reason` when a non-full output scope was selected
 - `options.confidential_safe_mode`, `options.local_only_processing`, `options.external_llm_calls`, `options.external_embedding_calls`, `options.path_redaction`
 - `options.page_workers`, `options.page_worker_effective_count`, `options.page_parallel_enabled`
@@ -138,6 +139,13 @@ Assetless figure text summary fields:
 
 - `rag_figure_text_chunks`: present and `true` when `--rag-figure-text-chunks` was enabled.
 - `figure_text_chunk_record_count`: final `retrieval_chunks_rag.jsonl` records with `chunk_type="figure_text"`.
+- `figure_region_ocr`: present and `true` when `--figure-region-ocr` was enabled.
+- `figure_region_ocr_attempted_count`, `figure_region_ocr_candidate_count`, `figure_region_ocr_promoted_label_count`, `figure_region_ocr_low_confidence_count`: deterministic OCR evidence promotion counters.
+- `rag_generated_figure_descriptions`: present and `true` when `--rag-generated-figure-descriptions` was enabled.
+- `figure_description_backend`: selected backend label, currently emitted for deterministic context-only description records.
+- `figure_description_record_count`, `figure_description_file_count`, `figure_description_low_confidence_count`, `figure_description_skipped_no_evidence_count`, `figure_description_chunk_record_count`: generated figure description sidecar and chunk counters.
+- `figure_structure_extraction`: present and `true` when `--figure-structure-extraction` was enabled.
+- `figure_structure_record_count`, `figure_structure_file_count`, `figure_structure_low_confidence_count`, `figure_structure_skipped_no_structure_count`, `figure_structure_chunk_record_count`: conservative figure structure sidecar and chunk counters.
 - `manual_domain_adapter_label`, `manual_domain_adapter_keywords`: present only when `--domain-adapter manual` was selected and those inputs were provided.
 
 `summary.table_quality[]` optional diagnostics:
@@ -514,6 +522,15 @@ Optional per JSONL record:
 - `source_refs[]` points to `figures_rag.jsonl` by `figure_id`, page, and bbox. The retrieval chunk source ref intentionally omits image file path.
 - Captionless or low-confidence records are skipped when they are diagnostics-only, or emitted with lower `retrieval_priority` when promoted evidence is present.
 
+`figure_description` and `figure_structure` chunk policy:
+
+- `chunk_type` is `figure_description` or `figure_structure`.
+- They are generated only when `--rag-generated-figure-descriptions` or `--figure-structure-extraction` is enabled.
+- `figure_description.generated_text=true` marks generated index helper text. It is not inserted into `document.md`.
+- Current built-in records use deterministic context-only evidence: caption, heading path, detected labels, nearby text, and existing OCR candidates. They do not claim that raw pixels were interpreted by an external model.
+- `figure_structure` records are context-derived structure hints for diagrams, waveforms, block diagrams, and circuit/schematic figures. Edges remain empty unless there is deterministic evidence.
+- `source_refs[]` points to `figures_rag.jsonl` and the corresponding figure semantic sidecar record. Retrieval chunks intentionally omit image file paths.
+
 Policy:
 
 - `text` remains extracted source text or deterministic row text, not a summary or paraphrase.
@@ -555,6 +572,7 @@ Optional diagnostics:
 
 - `diagram_label_diagnostics`
 - `captionless_diagnostics`
+- `figure_region_ocr`
 
 Policy:
 
@@ -564,6 +582,65 @@ Policy:
 - Low-confidence OCR/label candidates stay in `diagram_label_diagnostics.rejected_ocr_candidates`; only promoted candidates appear in `detected_labels`.
 - Captionless candidates may include `captionless_diagnostics` with evidence counts and rejection reasons. This is diagnostics-only metadata and does not create a generated caption or visual description.
 - No generated visual description is added by default.
+
+## figure_descriptions_rag.jsonl
+
+Optional JSONL output controlled by `--rag-generated-figure-descriptions`.
+
+Required per JSONL record:
+
+- `description_id`
+- `description_index`
+- `figure_id`
+- `page`
+- `bbox`
+- `heading_path`
+- `figure_kind`
+- `text`
+- `generated_text`
+- `generation_strategy`
+- `backend`
+- `backend_status`
+- `source_evidence`
+- `source_refs`
+- `classification_confidence`
+- `classification_reasons`
+
+Policy:
+
+- Description text is generated helper text and is always separated from source Markdown.
+- The current local implementation records `backend_status="not_invoked_context_only"` and `source_evidence.visual_pixels_interpreted=false`.
+- Records are skipped when no caption, heading, detected label, or nearby text evidence exists.
+
+## figure_structures_rag.jsonl
+
+Optional JSONL output controlled by `--figure-structure-extraction`.
+
+Required per JSONL record:
+
+- `structure_id`
+- `structure_index`
+- `figure_id`
+- `page`
+- `bbox`
+- `heading_path`
+- `figure_kind`
+- `structure_type`
+- `nodes`
+- `edges`
+- `signals`
+- `text`
+- `generated_text`
+- `derived_from_context`
+- `source_refs`
+- `classification_confidence`
+- `classification_reasons`
+
+Policy:
+
+- Structure records are conservative, deterministic hints for retrieval, not a replacement for the original PDF image.
+- Nodes and signals are created only from detected labels or other observed context. Edges remain empty unless deterministic evidence is available.
+- Records are skipped when no diagram/label/structure signal is available.
 
 ## domain_units_rag.jsonl
 

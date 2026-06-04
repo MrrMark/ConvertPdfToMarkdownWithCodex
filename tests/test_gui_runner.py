@@ -154,6 +154,10 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
             repair_hyphenation=True,
             figure_crop_fallback=True,
             rag_figure_text_chunks=True,
+            figure_region_ocr=True,
+            rag_generated_figure_descriptions=True,
+            figure_description_backend="docling",
+            figure_structure_extraction=True,
             page_workers=3,
             debug=True,
             verbose=True,
@@ -185,6 +189,10 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
     assert config.repair_hyphenation is True
     assert config.figure_crop_fallback is True
     assert config.rag_figure_text_chunks is True
+    assert config.figure_region_ocr is True
+    assert config.rag_generated_figure_descriptions is True
+    assert config.figure_description_backend == "docling"
+    assert config.figure_structure_extraction is True
     assert config.page_workers == 3
     assert config.debug is True
     assert config.verbose is True
@@ -217,6 +225,10 @@ def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_pa
             repair_hyphenation=True,
             figure_crop_fallback=True,
             rag_figure_text_chunks=True,
+            figure_region_ocr=True,
+            rag_generated_figure_descriptions=True,
+            figure_description_backend="docling",
+            figure_structure_extraction=True,
             page_workers=4,
             debug=True,
             verbose=True,
@@ -246,6 +258,10 @@ def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_pa
     assert config.repair_hyphenation is True
     assert config.figure_crop_fallback is True
     assert config.rag_figure_text_chunks is True
+    assert config.figure_region_ocr is True
+    assert config.rag_generated_figure_descriptions is True
+    assert config.figure_description_backend == "docling"
+    assert config.figure_structure_extraction is True
     assert config.page_workers == 4
     assert config.debug is True
     assert config.verbose is True

@@ -38,7 +38,9 @@ from pdf2md.models import (
 from pdf2md.output_writers import (
     write_debug_artifacts,
     write_domain_unit_output,
+    write_figure_description_output,
     write_figure_rag_output,
+    write_figure_structure_output,
     write_rag_table_outputs,
     write_rag_text_block_output,
     write_requirement_traceability_output,
@@ -55,6 +57,11 @@ from pdf2md.serializers.rag_chunks import (
     make_token_counter,
 )
 from pdf2md.serializers.rag_domain_adapters import build_domain_units
+from pdf2md.serializers.rag_figure_semantics import (
+    augment_figure_records_with_region_ocr,
+    build_figure_description_records,
+    build_figure_structure_records,
+)
 from pdf2md.serializers.rag_figures import build_figure_records
 from pdf2md.serializers.rag_requirements import build_requirement_traceability_records
 from pdf2md.serializers.rag_tables import (
@@ -157,6 +164,8 @@ def _expected_full_rag_sidecars(
     *,
     rag_table_output: RagTableOutputMode,
     domain_adapter: DomainAdapterMode,
+    include_figure_descriptions: bool,
+    include_figure_structures: bool,
 ) -> set[str]:
     outputs = {
         config.rag_text_blocks_jsonl_filename,
@@ -171,6 +180,10 @@ def _expected_full_rag_sidecars(
     outputs.update(_requested_rag_table_sidecars(config, rag_table_output))
     if domain_adapter is not DomainAdapterMode.NONE:
         outputs.add(config.domain_units_jsonl_filename)
+    if include_figure_descriptions:
+        outputs.add(config.figure_descriptions_jsonl_filename)
+    if include_figure_structures:
+        outputs.add(config.figure_structures_jsonl_filename)
     return outputs
 
 
@@ -179,11 +192,17 @@ def _expected_minimal_rag_sidecars(
     *,
     rag_table_output: RagTableOutputMode,
     include_figure_text_chunks: bool,
+    include_figure_descriptions: bool,
+    include_figure_structures: bool,
 ) -> set[str]:
     outputs = {config.rag_text_blocks_jsonl_filename, config.retrieval_chunks_jsonl_filename}
     outputs.update(_requested_rag_table_sidecars(config, rag_table_output))
-    if include_figure_text_chunks:
+    if include_figure_text_chunks or include_figure_descriptions or include_figure_structures:
         outputs.add(config.figures_rag_jsonl_filename)
+    if include_figure_descriptions:
+        outputs.add(config.figure_descriptions_jsonl_filename)
+    if include_figure_structures:
+        outputs.add(config.figure_structures_jsonl_filename)
     return outputs
 
 
@@ -194,14 +213,24 @@ def _written_rag_sidecars_for_scope(
     rag_table_output: RagTableOutputMode,
     domain_adapter: DomainAdapterMode,
     include_figure_text_chunks: bool,
+    include_figure_descriptions: bool,
+    include_figure_structures: bool,
 ) -> set[str]:
     if scope is RagSidecarScope.FULL:
-        return _expected_full_rag_sidecars(config, rag_table_output=rag_table_output, domain_adapter=domain_adapter)
+        return _expected_full_rag_sidecars(
+            config,
+            rag_table_output=rag_table_output,
+            domain_adapter=domain_adapter,
+            include_figure_descriptions=include_figure_descriptions,
+            include_figure_structures=include_figure_structures,
+        )
     if scope is RagSidecarScope.MINIMAL:
         return _expected_minimal_rag_sidecars(
             config,
             rag_table_output=rag_table_output,
             include_figure_text_chunks=include_figure_text_chunks,
+            include_figure_descriptions=include_figure_descriptions,
+            include_figure_structures=include_figure_structures,
         )
     return set()
 
@@ -213,11 +242,15 @@ def _omitted_rag_sidecars(
     rag_table_output: RagTableOutputMode,
     domain_adapter: DomainAdapterMode,
     include_figure_text_chunks: bool,
+    include_figure_descriptions: bool,
+    include_figure_structures: bool,
 ) -> list[str]:
     expected_full = _expected_full_rag_sidecars(
         config,
         rag_table_output=rag_table_output,
         domain_adapter=domain_adapter,
+        include_figure_descriptions=include_figure_descriptions,
+        include_figure_structures=include_figure_structures,
     )
     written = _written_rag_sidecars_for_scope(
         config,
@@ -225,6 +258,8 @@ def _omitted_rag_sidecars(
         rag_table_output=rag_table_output,
         domain_adapter=domain_adapter,
         include_figure_text_chunks=include_figure_text_chunks,
+        include_figure_descriptions=include_figure_descriptions,
+        include_figure_structures=include_figure_structures,
     )
     return sorted(expected_full - written)
 
@@ -386,17 +421,22 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     )
     output_profile = _output_profile(config)
     rag_sidecar_scope = _effective_rag_sidecar_scope(config, output_profile)
+    include_figure_visual_semantics = (
+        config.figure_region_ocr or config.rag_generated_figure_descriptions or config.figure_structure_extraction
+    )
     rag_sidecar_omitted_outputs = _omitted_rag_sidecars(
         config,
         scope=rag_sidecar_scope,
         rag_table_output=rag_table_output,
         domain_adapter=domain_adapter,
         include_figure_text_chunks=config.rag_figure_text_chunks,
+        include_figure_descriptions=config.rag_generated_figure_descriptions,
+        include_figure_structures=config.figure_structure_extraction,
     )
     write_minimal_rag_sidecars = rag_sidecar_scope in {RagSidecarScope.FULL, RagSidecarScope.MINIMAL}
     write_full_rag_sidecars = rag_sidecar_scope is RagSidecarScope.FULL
     write_figure_rag_sidecar = write_full_rag_sidecars or (
-        write_minimal_rag_sidecars and config.rag_figure_text_chunks
+        write_minimal_rag_sidecars and (config.rag_figure_text_chunks or include_figure_visual_semantics)
     )
     stage_durations_ms: dict[str, int] = {}
 
@@ -443,6 +483,22 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     figure_rag_record_count = 0
     figure_rag_file_count = 0
     figure_text_chunk_record_count = 0
+    figure_description_record_count = 0
+    figure_description_file_count = 0
+    figure_description_low_confidence_count = 0
+    figure_description_skipped_no_evidence_count = 0
+    figure_description_chunk_record_count = 0
+    figure_structure_record_count = 0
+    figure_structure_file_count = 0
+    figure_structure_low_confidence_count = 0
+    figure_structure_skipped_no_structure_count = 0
+    figure_structure_chunk_record_count = 0
+    figure_region_ocr_metrics = {
+        "figure_region_ocr_attempted_count": 0,
+        "figure_region_ocr_candidate_count": 0,
+        "figure_region_ocr_promoted_label_count": 0,
+        "figure_region_ocr_low_confidence_count": 0,
+    }
     domain_unit_record_count = 0
     domain_unit_file_count = 0
     requirement_traceability_record_count = 0
@@ -878,6 +934,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     requirement_traceability_records: list[dict] = []
     technical_table_records: list[dict] = []
     figure_records: list[dict] = []
+    figure_description_records: list[dict] = []
+    figure_structure_records: list[dict] = []
     domain_units: list[dict] = []
     if write_minimal_rag_sidecars or config.debug:
         contextual_rag_tables = annotate_rag_tables_with_heading_context(
@@ -892,8 +950,43 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             excluded_images=image_result.excluded_assets,
             text_block_records=text_block_result.records,
         )
+        if config.figure_region_ocr:
+            figure_records, figure_region_ocr_metrics = augment_figure_records_with_region_ocr(figure_records)
         figure_rag_record_count, figure_rag_file_count = write_figure_rag_output(config, figure_records)
         finish_stage("rag_figures", figure_rag_started)
+
+    if write_minimal_rag_sidecars and config.rag_generated_figure_descriptions:
+        figure_description_started = stage_start()
+        figure_description_records, figure_description_metrics = build_figure_description_records(
+            figure_records,
+            backend=config.figure_description_backend,
+        )
+        figure_description_record_count = figure_description_metrics["figure_description_record_count"]
+        figure_description_low_confidence_count = figure_description_metrics[
+            "figure_description_low_confidence_count"
+        ]
+        figure_description_skipped_no_evidence_count = figure_description_metrics[
+            "figure_description_skipped_no_evidence_count"
+        ]
+        figure_description_record_count, figure_description_file_count = write_figure_description_output(
+            config,
+            figure_description_records,
+        )
+        finish_stage("rag_figure_descriptions", figure_description_started)
+
+    if write_minimal_rag_sidecars and config.figure_structure_extraction:
+        figure_structure_started = stage_start()
+        figure_structure_records, figure_structure_metrics = build_figure_structure_records(figure_records)
+        figure_structure_record_count = figure_structure_metrics["figure_structure_record_count"]
+        figure_structure_low_confidence_count = figure_structure_metrics["figure_structure_low_confidence_count"]
+        figure_structure_skipped_no_structure_count = figure_structure_metrics[
+            "figure_structure_skipped_no_structure_count"
+        ]
+        figure_structure_record_count, figure_structure_file_count = write_figure_structure_output(
+            config,
+            figure_structure_records,
+        )
+        finish_stage("rag_figure_structures", figure_structure_started)
 
     if write_minimal_rag_sidecars:
         semantic_started = stage_start()
@@ -970,6 +1063,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             requirements=requirements,
             rag_tables=contextual_rag_tables,
             figure_records=figure_records,
+            figure_description_records=figure_description_records,
+            figure_structure_records=figure_structure_records,
             domain_units=domain_units,
             requirement_traceability_records=requirement_traceability_records,
             technical_table_records=technical_table_records,
@@ -983,6 +1078,12 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         )
         figure_text_chunk_record_count = sum(
             1 for chunk in retrieval_chunks if chunk.get("chunk_type") == "figure_text"
+        )
+        figure_description_chunk_record_count = sum(
+            1 for chunk in retrieval_chunks if chunk.get("chunk_type") == "figure_description"
+        )
+        figure_structure_chunk_record_count = sum(
+            1 for chunk in retrieval_chunks if chunk.get("chunk_type") == "figure_structure"
         )
         retrieval_chunk_diagnostics = build_retrieval_chunk_diagnostics(
             retrieval_chunks,
@@ -1092,11 +1193,32 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         )
     if config.rag_figure_text_chunks:
         manifest_options["rag_figure_text_chunks"] = True
+    if config.figure_region_ocr:
+        manifest_options["figure_region_ocr"] = True
+    if config.rag_generated_figure_descriptions:
+        manifest_options["rag_generated_figure_descriptions"] = True
+        manifest_options["figure_description_backend"] = config.figure_description_backend
+    if config.figure_structure_extraction:
+        manifest_options["figure_structure_extraction"] = True
     if write_figure_rag_sidecar:
         manifest_options.update(
             {
                 "figures_rag_output": "jsonl",
                 "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
+            }
+        )
+    if write_minimal_rag_sidecars and config.rag_generated_figure_descriptions:
+        manifest_options.update(
+            {
+                "figure_descriptions_output": "jsonl",
+                "figure_descriptions_jsonl_filename": config.figure_descriptions_jsonl_filename,
+            }
+        )
+    if write_minimal_rag_sidecars and config.figure_structure_extraction:
+        manifest_options.update(
+            {
+                "figure_structures_output": "jsonl",
+                "figure_structures_jsonl_filename": config.figure_structures_jsonl_filename,
             }
         )
     if write_full_rag_sidecars:
@@ -1195,6 +1317,28 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     if config.rag_figure_text_chunks:
         report_summary_extras["rag_figure_text_chunks"] = True
         report_summary_extras["figure_text_chunk_record_count"] = figure_text_chunk_record_count
+    if config.figure_region_ocr:
+        report_summary_extras["figure_region_ocr"] = True
+        report_summary_extras.update(figure_region_ocr_metrics)
+    if config.rag_generated_figure_descriptions:
+        report_summary_extras["rag_generated_figure_descriptions"] = True
+        report_summary_extras["figure_description_backend"] = config.figure_description_backend
+        report_summary_extras["figure_description_record_count"] = figure_description_record_count
+        report_summary_extras["figure_description_file_count"] = figure_description_file_count
+        report_summary_extras["figure_description_low_confidence_count"] = figure_description_low_confidence_count
+        report_summary_extras["figure_description_skipped_no_evidence_count"] = (
+            figure_description_skipped_no_evidence_count
+        )
+        report_summary_extras["figure_description_chunk_record_count"] = figure_description_chunk_record_count
+    if config.figure_structure_extraction:
+        report_summary_extras["figure_structure_extraction"] = True
+        report_summary_extras["figure_structure_record_count"] = figure_structure_record_count
+        report_summary_extras["figure_structure_file_count"] = figure_structure_file_count
+        report_summary_extras["figure_structure_low_confidence_count"] = figure_structure_low_confidence_count
+        report_summary_extras["figure_structure_skipped_no_structure_count"] = (
+            figure_structure_skipped_no_structure_count
+        )
+        report_summary_extras["figure_structure_chunk_record_count"] = figure_structure_chunk_record_count
     if domain_adapter is DomainAdapterMode.MANUAL:
         if config.manual_domain_adapter_label:
             report_summary_extras["manual_domain_adapter_label"] = config.manual_domain_adapter_label

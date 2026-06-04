@@ -352,6 +352,8 @@ class BatchDocumentFiles(BaseModel):
     cross_refs_rag: Optional[str] = None
     retrieval_chunks_rag: Optional[str] = None
     figures_rag: Optional[str] = None
+    figure_descriptions_rag: Optional[str] = None
+    figure_structures_rag: Optional[str] = None
     domain_units_rag: Optional[str] = None
     requirement_traceability_rag: Optional[str] = None
     technical_tables_rag: Optional[str] = None

@@ -8,6 +8,7 @@ import sys
 import threading
 import webbrowser
 
+from pdf2md.config import SUPPORTED_FIGURE_DESCRIPTION_BACKENDS
 from pdf2md.gui_help import gui_user_guide_path
 from pdf2md.gui_runner import (
     GuiBatchProgress,
@@ -136,6 +137,10 @@ class Pdf2MdGuiApp:
         self.rag_merge_sibling_text_chunks = tk.BooleanVar(value=False)
         self.rag_chunk_relationship_metadata = tk.BooleanVar(value=False)
         self.rag_figure_text_chunks = tk.BooleanVar(value=False)
+        self.figure_region_ocr = tk.BooleanVar(value=False)
+        self.rag_generated_figure_descriptions = tk.BooleanVar(value=False)
+        self.figure_description_backend = tk.StringVar(value="local-vlm")
+        self.figure_structure_extraction = tk.BooleanVar(value=False)
         self.page_workers = tk.StringVar(value="1")
         self.debug = tk.BooleanVar(value=False)
         self.verbose = tk.BooleanVar(value=False)
@@ -330,6 +335,9 @@ class Pdf2MdGuiApp:
             ("repair_hyphenation", self.repair_hyphenation),
             ("figure_crop_fallback", self.figure_crop_fallback),
             ("rag_figure_text_chunks", self.rag_figure_text_chunks),
+            ("figure_region_ocr", self.figure_region_ocr),
+            ("rag_generated_figure_descriptions", self.rag_generated_figure_descriptions),
+            ("figure_structure_extraction", self.figure_structure_extraction),
         ]
         for idx, (label_key, variable) in enumerate(checkboxes):
             checkbox = self._track_text(
@@ -346,11 +354,20 @@ class Pdf2MdGuiApp:
             expert.columnconfigure(col, weight=1)
         page_workers_entry = self._add_labeled_entry(expert, "page_workers", self.page_workers, 0, 0)
         self.advanced_option_widgets.append(page_workers_entry)
+        self._add_labeled_combo(
+            expert,
+            "figure_description_backend",
+            self.figure_description_backend,
+            list(SUPPORTED_FIGURE_DESCRIPTION_BACKENDS),
+            1,
+            0,
+            option_field="figure_description_backend",
+        )
         debug_checkbox = self._track_text("debug", ttk.Checkbutton(expert, text=self._t("debug"), variable=self.debug))
-        debug_checkbox.grid(row=1, column=0, sticky="w", pady=1)
+        debug_checkbox.grid(row=2, column=0, sticky="w", pady=1)
         self.advanced_option_widgets.append(debug_checkbox)
         verbose_checkbox = self._track_text("verbose", ttk.Checkbutton(expert, text=self._t("verbose"), variable=self.verbose))
-        verbose_checkbox.grid(row=1, column=1, sticky="w", pady=1)
+        verbose_checkbox.grid(row=2, column=1, sticky="w", pady=1)
         self.advanced_option_widgets.append(verbose_checkbox)
         self.import_profile_button = self._track_text(
             "import_profile",
@@ -643,6 +660,10 @@ class Pdf2MdGuiApp:
         self.rag_merge_sibling_text_chunks.set(options.rag_merge_sibling_text_chunks)
         self.rag_chunk_relationship_metadata.set(options.rag_chunk_relationship_metadata)
         self.rag_figure_text_chunks.set(options.rag_figure_text_chunks)
+        self.figure_region_ocr.set(options.figure_region_ocr)
+        self.rag_generated_figure_descriptions.set(options.rag_generated_figure_descriptions)
+        self.figure_description_backend.set(options.figure_description_backend)
+        self.figure_structure_extraction.set(options.figure_structure_extraction)
         self.page_workers.set(str(options.page_workers))
         self.debug.set(options.debug)
         self.verbose.set(options.verbose)
@@ -779,6 +800,10 @@ class Pdf2MdGuiApp:
             rag_merge_sibling_text_chunks=self.rag_merge_sibling_text_chunks.get(),
             rag_chunk_relationship_metadata=self.rag_chunk_relationship_metadata.get(),
             rag_figure_text_chunks=self.rag_figure_text_chunks.get(),
+            figure_region_ocr=self.figure_region_ocr.get(),
+            rag_generated_figure_descriptions=self.rag_generated_figure_descriptions.get(),
+            figure_description_backend=self.figure_description_backend.get() or "local-vlm",
+            figure_structure_extraction=self.figure_structure_extraction.get(),
             page_workers=self._page_workers_value(strict=strict_page_workers),
             debug=self.debug.get(),
             verbose=self.verbose.get(),

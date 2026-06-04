@@ -70,6 +70,10 @@ class BatchConversionOptions:
     rag_merge_sibling_text_chunks: bool = False
     rag_chunk_relationship_metadata: bool = False
     rag_figure_text_chunks: bool = False
+    figure_region_ocr: bool = False
+    rag_generated_figure_descriptions: bool = False
+    figure_description_backend: str = "local-vlm"
+    figure_structure_extraction: bool = False
     page_workers: int = 1
     debug: bool = False
     verbose: bool = False
@@ -156,6 +160,10 @@ def build_batch_config(pdf_path: Path, output_root: Path, options: BatchConversi
         rag_merge_sibling_text_chunks=options.rag_merge_sibling_text_chunks,
         rag_chunk_relationship_metadata=options.rag_chunk_relationship_metadata,
         rag_figure_text_chunks=options.rag_figure_text_chunks,
+        figure_region_ocr=options.figure_region_ocr,
+        rag_generated_figure_descriptions=options.rag_generated_figure_descriptions,
+        figure_description_backend=options.figure_description_backend,
+        figure_structure_extraction=options.figure_structure_extraction,
         page_workers=options.page_workers,
         debug=options.debug,
         verbose=options.verbose,
@@ -389,6 +397,8 @@ def _document_files(
         "cross_refs_rag": config.output_dir / config.cross_refs_jsonl_filename,
         "retrieval_chunks_rag": config.output_dir / config.retrieval_chunks_jsonl_filename,
         "figures_rag": config.output_dir / config.figures_rag_jsonl_filename,
+        "figure_descriptions_rag": config.output_dir / config.figure_descriptions_jsonl_filename,
+        "figure_structures_rag": config.output_dir / config.figure_structures_jsonl_filename,
         "domain_units_rag": config.output_dir / config.domain_units_jsonl_filename,
         "requirement_traceability_rag": config.output_dir / config.requirement_traceability_jsonl_filename,
         "technical_tables_rag": config.output_dir / config.technical_tables_jsonl_filename,

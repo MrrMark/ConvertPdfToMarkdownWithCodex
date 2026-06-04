@@ -10,6 +10,7 @@ from pdf2md.rag_profiles import DEFAULT_RAG_PURPOSE_PROFILE, SUPPORTED_RAG_PURPO
 from pdf2md.utils.page_range import parse_page_range
 
 SUPPORTED_RETRIEVAL_TOKENIZERS = ("char", "regex", "tiktoken-cl100k")
+SUPPORTED_FIGURE_DESCRIPTION_BACKENDS = ("local-vlm", "docling")
 
 
 class Config(BaseModel):
@@ -42,6 +43,10 @@ class Config(BaseModel):
     rag_merge_sibling_text_chunks: bool = False
     rag_chunk_relationship_metadata: bool = False
     rag_figure_text_chunks: bool = False
+    figure_region_ocr: bool = False
+    rag_generated_figure_descriptions: bool = False
+    figure_description_backend: str = "local-vlm"
+    figure_structure_extraction: bool = False
     debug: bool = False
     verbose: bool = False
     skip_existing: bool = False
@@ -58,6 +63,8 @@ class Config(BaseModel):
     cross_refs_jsonl_filename: str = "cross_refs_rag.jsonl"
     retrieval_chunks_jsonl_filename: str = "retrieval_chunks_rag.jsonl"
     figures_rag_jsonl_filename: str = "figures_rag.jsonl"
+    figure_descriptions_jsonl_filename: str = "figure_descriptions_rag.jsonl"
+    figure_structures_jsonl_filename: str = "figure_structures_rag.jsonl"
     domain_units_jsonl_filename: str = "domain_units_rag.jsonl"
     requirement_traceability_jsonl_filename: str = "requirement_traceability_rag.jsonl"
     technical_tables_jsonl_filename: str = "technical_tables_rag.jsonl"
@@ -86,6 +93,15 @@ class Config(BaseModel):
     def _validate_retrieval_tokenizer(cls, value: str) -> str:
         if value not in SUPPORTED_RETRIEVAL_TOKENIZERS:
             raise ValueError(f"retrieval_tokenizer must be one of: {', '.join(SUPPORTED_RETRIEVAL_TOKENIZERS)}")
+        return value
+
+    @field_validator("figure_description_backend")
+    @classmethod
+    def _validate_figure_description_backend(cls, value: str) -> str:
+        if value not in SUPPORTED_FIGURE_DESCRIPTION_BACKENDS:
+            raise ValueError(
+                f"figure_description_backend must be one of: {', '.join(SUPPORTED_FIGURE_DESCRIPTION_BACKENDS)}"
+            )
         return value
 
     @field_validator("rag_profile")

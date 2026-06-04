@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from pdf2md.config import SUPPORTED_RETRIEVAL_TOKENIZERS
+from pdf2md.config import SUPPORTED_FIGURE_DESCRIPTION_BACKENDS, SUPPORTED_RETRIEVAL_TOKENIZERS
 from pdf2md.gui_runner import GuiConversionOptions, GuiDiagnostic, GuiDiagnosticError, GuiDiagnosticReport
 from pdf2md.models import DomainAdapterMode, ImageMode, OutputProfile, RagSidecarScope, RagTableOutputMode, TableMode
 
@@ -37,6 +37,10 @@ GUI_PROFILE_OPTION_FIELDS: tuple[str, ...] = (
     "rag_merge_sibling_text_chunks",
     "rag_chunk_relationship_metadata",
     "rag_figure_text_chunks",
+    "figure_region_ocr",
+    "rag_generated_figure_descriptions",
+    "figure_description_backend",
+    "figure_structure_extraction",
     "page_workers",
     "debug",
     "verbose",
@@ -210,6 +214,9 @@ def _option_type_diagnostics(options: Mapping[str, object]) -> list[GuiDiagnosti
         "rag_merge_sibling_text_chunks",
         "rag_chunk_relationship_metadata",
         "rag_figure_text_chunks",
+        "figure_region_ocr",
+        "rag_generated_figure_descriptions",
+        "figure_structure_extraction",
         "debug",
         "verbose",
         "skip_existing",
@@ -227,6 +234,7 @@ def _option_type_diagnostics(options: Mapping[str, object]) -> list[GuiDiagnosti
                 )
             )
     _validate_enum(options, "retrieval_tokenizer", set(SUPPORTED_RETRIEVAL_TOKENIZERS), diagnostics)
+    _validate_enum(options, "figure_description_backend", set(SUPPORTED_FIGURE_DESCRIPTION_BACKENDS), diagnostics)
     if "page_workers" in options:
         value = options["page_workers"]
         if not isinstance(value, int) or isinstance(value, bool) or not (1 <= value <= GUI_PROFILE_MAX_PAGE_WORKERS):

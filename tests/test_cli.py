@@ -328,6 +328,11 @@ def test_cli_accepts_rag_figure_text_chunks_option(sample_pdf: Path, tmp_path: P
         "--image-mode",
         "placeholder",
         "--rag-figure-text-chunks",
+        "--figure-region-ocr",
+        "--rag-generated-figure-descriptions",
+        "--figure-description-backend",
+        "docling",
+        "--figure-structure-extraction",
     ]
 
     completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
@@ -337,8 +342,19 @@ def test_cli_accepts_rag_figure_text_chunks_option(sample_pdf: Path, tmp_path: P
     report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
     assert manifest["options"]["image_mode"] == "placeholder"
     assert manifest["options"]["rag_figure_text_chunks"] is True
+    assert manifest["options"]["figure_region_ocr"] is True
+    assert manifest["options"]["rag_generated_figure_descriptions"] is True
+    assert manifest["options"]["figure_description_backend"] == "docling"
+    assert manifest["options"]["figure_structure_extraction"] is True
+    assert (output_dir / "figure_descriptions_rag.jsonl").exists()
+    assert (output_dir / "figure_structures_rag.jsonl").exists()
     assert report["summary"]["rag_figure_text_chunks"] is True
     assert report["summary"]["figure_text_chunk_record_count"] == 0
+    assert report["summary"]["figure_region_ocr"] is True
+    assert report["summary"]["figure_region_ocr_attempted_count"] == 0
+    assert report["summary"]["figure_description_backend"] == "docling"
+    assert report["summary"]["figure_description_record_count"] == 0
+    assert report["summary"]["figure_structure_record_count"] == 0
 
 
 def test_cli_accepts_domain_adapter_option(sample_pdf: Path, tmp_path: Path) -> None:

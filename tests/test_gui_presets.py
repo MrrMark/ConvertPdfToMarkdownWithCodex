@@ -56,6 +56,10 @@ def test_preserve_preset_is_conservative_and_keeps_document_inputs() -> None:
     assert options.rag_merge_sibling_text_chunks is False
     assert options.rag_chunk_relationship_metadata is False
     assert options.rag_figure_text_chunks is False
+    assert options.figure_region_ocr is False
+    assert options.rag_generated_figure_descriptions is False
+    assert options.figure_description_backend == "local-vlm"
+    assert options.figure_structure_extraction is False
     assert options.skip_existing is True
 
 
@@ -87,6 +91,9 @@ def test_rag_optimized_preset_enables_sidecar_options_without_force_ocr() -> Non
     assert options.rag_merge_sibling_text_chunks is True
     assert options.rag_chunk_relationship_metadata is True
     assert options.rag_figure_text_chunks is False
+    assert options.figure_region_ocr is False
+    assert options.rag_generated_figure_descriptions is False
+    assert options.figure_structure_extraction is False
     assert options.force_ocr is False
     assert options.confidential_safe_mode is False
 
@@ -110,6 +117,10 @@ def test_purpose_specific_rag_presets_apply_expected_option_matrix() -> None:
     assert technical.rag_merge_sibling_text_chunks is True
     assert technical.rag_chunk_relationship_metadata is True
     assert technical.rag_figure_text_chunks is False
+    assert technical.figure_region_ocr is False
+    assert technical.rag_generated_figure_descriptions is False
+    assert technical.figure_description_backend == "local-vlm"
+    assert technical.figure_structure_extraction is False
 
     assetless = apply_preset_to_options(
         ASSETLESS_TECHNICAL_SPEC_RAG_PRESET,
@@ -121,6 +132,9 @@ def test_purpose_specific_rag_presets_apply_expected_option_matrix() -> None:
     assert assetless.domain_adapter == DomainAdapterMode.MANUAL.value
     assert assetless.manual_domain_adapter_label == "Customer A"
     assert assetless.rag_figure_text_chunks is True
+    assert assetless.figure_region_ocr is False
+    assert assetless.rag_generated_figure_descriptions is False
+    assert assetless.figure_structure_extraction is False
 
     assert confidential.confidential_safe_mode is True
     assert confidential.rag_profile == "confidential_rag"
@@ -136,6 +150,7 @@ def test_purpose_specific_rag_presets_apply_expected_option_matrix() -> None:
     assert sidecar.rag_merge_sibling_text_chunks is False
     assert sidecar.rag_chunk_relationship_metadata is True
     assert sidecar.rag_figure_text_chunks is False
+    assert sidecar.rag_generated_figure_descriptions is False
 
 
 def test_custom_preset_preserves_current_options() -> None:
@@ -166,6 +181,10 @@ def test_preset_editable_fields_lock_advanced_options_headlessly() -> None:
     assert rag_fields["rag_merge_sibling_text_chunks"] is False
     assert rag_fields["rag_chunk_relationship_metadata"] is False
     assert rag_fields["rag_figure_text_chunks"] is False
+    assert rag_fields["figure_region_ocr"] is False
+    assert rag_fields["rag_generated_figure_descriptions"] is False
+    assert rag_fields["figure_description_backend"] is False
+    assert rag_fields["figure_structure_extraction"] is False
     assert rag_fields["remove_header_footer"] is False
     assert rag_fields["domain_adapter"] is False
     assert preset_editable_fields("technical_spec_rag")["retrieval_tokenizer"] is False
@@ -176,6 +195,8 @@ def test_preset_editable_fields_lock_advanced_options_headlessly() -> None:
     assert custom_fields["image_mode"] is True
     assert custom_fields["page_workers"] is True
     assert custom_fields["retrieval_tokenizer"] is True
+    assert custom_fields["figure_description_backend"] is True
+    assert custom_fields["figure_structure_extraction"] is True
     assert custom_fields["debug"] is True
     assert custom_fields["verbose"] is True
     assert custom_fields["skip_existing"] is True

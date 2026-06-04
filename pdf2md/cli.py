@@ -5,7 +5,12 @@ from pathlib import Path
 from typing import Optional
 
 from pdf2md.batch_runner import BatchConversionOptions, run_batch_conversion as run_shared_batch_conversion
-from pdf2md.config import Config, SUPPORTED_RETRIEVAL_TOKENIZERS, default_output_dir_for_input
+from pdf2md.config import (
+    Config,
+    SUPPORTED_FIGURE_DESCRIPTION_BACKENDS,
+    SUPPORTED_RETRIEVAL_TOKENIZERS,
+    default_output_dir_for_input,
+)
 from pdf2md.models import (
     DomainAdapterMode,
     ImageMode,
@@ -170,6 +175,30 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Opt-in observed-text figure retrieval chunks for assetless RAG indexing.",
     )
+    parser.add_argument(
+        "--figure-region-ocr",
+        action="store_true",
+        default=None,
+        help="Opt-in figure-region OCR evidence promotion for diagram labels.",
+    )
+    parser.add_argument(
+        "--rag-generated-figure-descriptions",
+        action="store_true",
+        default=None,
+        help="Opt-in generated figure description sidecar/chunks from observed figure context.",
+    )
+    parser.add_argument(
+        "--figure-description-backend",
+        choices=SUPPORTED_FIGURE_DESCRIPTION_BACKENDS,
+        default=None,
+        help="Backend label for generated figure descriptions. Current implementation is deterministic local context.",
+    )
+    parser.add_argument(
+        "--figure-structure-extraction",
+        action="store_true",
+        default=None,
+        help="Opt-in conservative figure structure sidecar/chunks for diagrams, waveforms, and block/circuit figures.",
+    )
     marker_group = parser.add_mutually_exclusive_group()
     marker_group.add_argument("--keep-page-markers", dest="keep_page_markers", action="store_true")
     marker_group.add_argument("--no-page-markers", dest="keep_page_markers", action="store_false")
@@ -230,6 +259,19 @@ def _build_single_config(args: argparse.Namespace) -> Config:
             args.rag_figure_text_chunks,
             profile_options.rag_figure_text_chunks,
         ),
+        figure_region_ocr=_option_value(args.figure_region_ocr, profile_options.figure_region_ocr),
+        rag_generated_figure_descriptions=_option_value(
+            args.rag_generated_figure_descriptions,
+            profile_options.rag_generated_figure_descriptions,
+        ),
+        figure_description_backend=_option_value(
+            args.figure_description_backend,
+            profile_options.figure_description_backend,
+        ),
+        figure_structure_extraction=_option_value(
+            args.figure_structure_extraction,
+            profile_options.figure_structure_extraction,
+        ),
         page_workers=args.page_workers,
         debug=args.debug,
         verbose=args.verbose,
@@ -279,6 +321,19 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
         rag_figure_text_chunks=_option_value(
             args.rag_figure_text_chunks,
             profile_options.rag_figure_text_chunks,
+        ),
+        figure_region_ocr=_option_value(args.figure_region_ocr, profile_options.figure_region_ocr),
+        rag_generated_figure_descriptions=_option_value(
+            args.rag_generated_figure_descriptions,
+            profile_options.rag_generated_figure_descriptions,
+        ),
+        figure_description_backend=_option_value(
+            args.figure_description_backend,
+            profile_options.figure_description_backend,
+        ),
+        figure_structure_extraction=_option_value(
+            args.figure_structure_extraction,
+            profile_options.figure_structure_extraction,
         ),
         page_workers=args.page_workers,
         debug=args.debug,
