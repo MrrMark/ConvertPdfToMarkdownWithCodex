@@ -7,8 +7,11 @@ from pdf2md.extractors.ocr import run_ocr
 
 
 class _FakePage:
+    def __init__(self, index: int = 0) -> None:
+        self.index = index
+
     def render(self, scale: float):  # noqa: ANN201, ARG002
-        return SimpleNamespace(to_pil=lambda: object())
+        return SimpleNamespace(to_pil=lambda: SimpleNamespace(page_number=self.index + 1))
 
     def close(self) -> None:
         return None
@@ -18,8 +21,11 @@ class _FakeDocument:
     def __init__(self, path: str) -> None:  # noqa: ARG002
         self.path = path
 
-    def get_page(self, index: int) -> _FakePage:  # noqa: ARG002
-        return _FakePage()
+    def get_page(self, index: int) -> _FakePage:
+        return _FakePage(index)
+
+    def close(self) -> None:
+        return None
 
 
 def _patch_ocr_runtime(monkeypatch, image_to_string, image_to_data) -> None:  # noqa: ANN001
@@ -180,3 +186,73 @@ def test_run_ocr_runtime_unavailable_records_attempt_without_text(sample_pdf, mo
         "reason": "dependency_unavailable",
         "attempted_pages": [1],
     }
+
+
+def test_run_ocr_parallel_pages_merge_in_page_order(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
+    def image_to_string(image, lang: str):  # noqa: ANN001, ARG001
+        return f"ocr text page {image.page_number}"
+
+    def image_to_data(image, lang: str, output_type):  # noqa: ANN001, ARG001
+        return {"text": ["ocr", "text", str(image.page_number)], "conf": ["95", "92", "91"]}
+
+    _patch_ocr_runtime(monkeypatch, image_to_string=image_to_string, image_to_data=image_to_data)
+
+    sequential = run_ocr(
+        sample_pdf,
+        [1, 2, 3, 4],
+        {1: "", 2: "", 3: "", 4: ""},
+        force_ocr=True,
+        ocr_lang="eng",
+        worker_count=1,
+    )
+    result = run_ocr(
+        sample_pdf,
+        [1, 2, 3, 4],
+        {1: "", 2: "", 3: "", 4: ""},
+        force_ocr=True,
+        ocr_lang="eng",
+        worker_count=2,
+    )
+
+    assert result.runtime_available is True
+    assert result.used_ocr is True
+    assert result.pdf_open_count == 2
+    assert result.attempted_pages == [1, 2, 3, 4]
+    assert result.ocr_pages == [1, 2, 3, 4]
+    assert list(result.page_texts) == [1, 2, 3, 4]
+    assert result.page_texts[4] == "ocr text page 4"
+    assert list(result.metrics_by_page) == [1, 2, 3, 4]
+    assert result.warnings == []
+    assert sequential.pdf_open_count == 1
+    assert sequential.ocr_pages == result.ocr_pages
+    assert sequential.page_texts == result.page_texts
+    assert sequential.metrics_by_page == result.metrics_by_page
+    assert sequential.warnings == result.warnings
+
+
+def test_run_ocr_parallel_warnings_remain_page_ordered(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
+    def image_to_string(image, lang: str):  # noqa: ANN001, ARG001
+        if image.page_number == 2:
+            return " "
+        if image.page_number == 3:
+            raise RuntimeError("Failed loading language 'eng'")
+        return f"ocr text page {image.page_number}"
+
+    def image_to_data(image, lang: str, output_type):  # noqa: ANN001, ARG001
+        return {"text": ["ocr", "text"], "conf": ["95", "92"]}
+
+    _patch_ocr_runtime(monkeypatch, image_to_string=image_to_string, image_to_data=image_to_data)
+
+    result = run_ocr(
+        sample_pdf,
+        [1, 2, 3, 4],
+        {1: "", 2: "", 3: "", 4: ""},
+        force_ocr=True,
+        ocr_lang="eng",
+        worker_count=2,
+    )
+
+    assert result.pdf_open_count == 2
+    assert result.ocr_pages == [1, 4]
+    assert [warning.page for warning in result.warnings] == [2, 3]
+    assert [warning.code for warning in result.warnings] == ["OCR_EMPTY_RESULT", "OCR_RUNTIME_UNAVAILABLE"]

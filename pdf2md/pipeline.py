@@ -522,7 +522,14 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
 
     ocr_started = stage_start()
     logger.info("Running OCR target_pages=%s force=%s", selected_pages, config.force_ocr)
-    ocr_result = run_ocr(config.input_pdf, selected_pages, page_texts, config.force_ocr, ocr_lang=config.ocr_lang)
+    ocr_result = run_ocr(
+        config.input_pdf,
+        selected_pages,
+        page_texts,
+        config.force_ocr,
+        ocr_lang=config.ocr_lang,
+        worker_count=effective_page_workers,
+    )
     finish_stage("ocr", ocr_started)
     warnings.extend(ocr_result.warnings)
     engine_usage["ocr"] = ocr_result.used_ocr
