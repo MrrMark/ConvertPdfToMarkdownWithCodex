@@ -23,47 +23,8 @@
 
 ## 현재 Active Development Specs
 
-### 공통 결정 사항
-
-Q105는 Docling 벤치마킹 결과 기반 확장 설계를 다룬다.
-상충되는 요구는 아래 기준으로 정리한다.
-
-- 기본 `image_mode=referenced`와 기존 public output contract는 유지한다.
-- OCR 비활성화는 성능 개선책으로 사용하지 않는다. OCR 호출 수를 줄이더라도 evidence/context로 결정 가능한 경우에만 줄인다.
-- Docling식 picture description 또는 VLM 경로는 설계 대상이지만 기본 변환에는 넣지 않는다.
-- Q104 benchmark evidence는 `/tmp` 또는 local `pdf/` 아래에 두고 raw PDF, image, Markdown 원문, 고객 식별 경로는 커밋하지 않는다.
-- 새 CLI 옵션, public JSON field, summary count가 생기면 README, `docs/OUTPUT_SCHEMA.md`, schema export, docs tests를 함께 갱신한다.
-
-### P2 / Q105. Docling-Informed OCR And Layout Extension Design
-
-#### 목표
-
-Q104 벤치마크 결과를 바탕으로 실제 도입할 확장 기능을 정한다.
-후보는 다중 OCR backend, 도표/표 영역별 OCR, 선택적 picture description, layout-aware table/figure 인식이다.
-
-#### 설계 후보
-
-- OCR backend adapter
-  - `TesseractOcrBackend` 기존 구현 유지
-  - `RapidOcrBackend`, `EasyOcrBackend`, `OcrMacBackend`는 optional dependency로 분리
-  - backend별 language code mapping과 confidence normalization을 명시
-- Region OCR
-  - full page OCR보다 image/table/figure crop OCR을 먼저 시도
-  - crop bbox, source figure/table id, confidence, rejected reason을 report에 기록
-- Picture description
-  - 기본 비활성화
-  - local-only model 또는 explicit remote opt-in만 허용
-  - output field는 `generated_description` 계열로 원문 `text`와 분리
-- Layout-aware table/figure adapter
-  - Docling adapter는 P2 experimental backend로 둔다.
-  - current extractor 결과와 adapter 결과를 바로 섞지 않고 comparison/evidence pack을 먼저 만든다.
-
-#### 완료 조건
-
-- Q104 metric으로 실제 개선 가능성이 확인된 후보만 구현 backlog로 승격한다.
-- 새 기능은 adapter/opt-in 구조와 schema contract를 갖는다.
-- 원문 텍스트와 table row source-of-truth를 생성형 출력으로 대체하지 않는다.
+현재 active 개발 명세 없음.
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q104 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q105 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

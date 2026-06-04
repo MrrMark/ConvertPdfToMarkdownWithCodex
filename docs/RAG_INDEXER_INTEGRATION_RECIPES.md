@@ -177,7 +177,7 @@ python scripts/benchmark_docling_comparison.py \
 
 - raw Markdown body, Docling raw document dict, image bytes, 고객 파일 경로는 comparison pack에 넣지 않는다.
 - Docling Markdown/dict export는 파일로 저장하지 않고 in-memory virtual artifact hash/size만 기록한다.
-- Q105 확장 설계는 이 comparison pack에서 확인된 metric/finding을 근거로 adapter/opt-in 후보를 정한다.
+- Q105 확장 설계는 `docs/DOCLING_INFORMED_EXTENSION_DESIGN.md`에서 관리하며, 이 comparison pack에서 확인된 metric/finding을 근거로 adapter/opt-in 후보를 정한다.
 
 ## OpenAI Vector Store / Generic Embedding Pipeline
 
