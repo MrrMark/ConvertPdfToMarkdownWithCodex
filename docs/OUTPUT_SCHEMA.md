@@ -226,6 +226,7 @@ Stable run fields:
 Policy:
 
 - Docling 미설치 환경은 실패가 아니라 `status="skipped"`와 `docling_not_installed` advisory finding으로 기록한다.
+- `--require-docling` 또는 release gate `--gates docling`이 명시된 경우 Docling 미설치는 `docling_required_not_available` error finding으로 기록한다.
 - script는 current-tool metric과 validator status를 계속 생성한다.
 - raw Markdown body, raw Docling document dict, image bytes, input file path는 report에 넣지 않는다.
 - optional OCR backend availability는 module availability boolean만 기록한다.

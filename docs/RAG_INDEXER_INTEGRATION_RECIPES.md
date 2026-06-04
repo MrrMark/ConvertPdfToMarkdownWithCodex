@@ -198,6 +198,15 @@ python scripts/run_latest_nvme_command_set_eval.py \
   --output-dir /tmp/pdf2md-latest-nvme-command-set
 ```
 
+Docling이 실제 설치된 환경에서만 통과해야 하는 release gate는 다음과 같이 실행한다.
+
+```bash
+python scripts/run_release_gates.py \
+  --output-dir /tmp/pdf2md-release-docling \
+  --gates docling \
+  --docling-input-pdf /tmp/NVM-Express-NVM-Command-Set-Specification-Revision-1.2-2025.08.01-Ratified.pdf
+```
+
 생성 파일:
 
 - `docling_benchmark_report.json`: current-tool/Docling 실행 상태, duration/pages/sec, backend availability, validator metric, finding count
@@ -209,6 +218,7 @@ python scripts/run_latest_nvme_command_set_eval.py \
 
 - raw Markdown body, Docling raw document dict, image bytes, 고객 파일 경로는 comparison pack에 넣지 않는다.
 - Docling Markdown/dict export는 파일로 저장하지 않고 in-memory virtual artifact hash/size만 기록한다.
+- `--require-docling` 또는 release gate `--gates docling`은 Docling 미설치를 실패로 처리한다.
 - Q105 확장 설계는 `docs/DOCLING_INFORMED_EXTENSION_DESIGN.md`에서 관리하며, 이 comparison pack에서 확인된 metric/finding을 근거로 adapter/opt-in 후보를 정한다.
 
 ## OpenAI Vector Store / Generic Embedding Pipeline

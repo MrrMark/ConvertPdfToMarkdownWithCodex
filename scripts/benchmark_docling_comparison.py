@@ -485,6 +485,7 @@ def run_docling_comparison(
     rag_generated_figure_descriptions: bool = False,
     figure_description_backend: str = "local-vlm",
     figure_structure_extraction: bool = False,
+    require_docling: bool = False,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     source_sha256 = _source_sha256(input_pdf)
@@ -508,6 +509,16 @@ def run_docling_comparison(
         output_dir=docling_output_dir,
     )
     all_findings = list(findings)
+    if require_docling and docling_run["status"] == "skipped":
+        all_findings.append(
+            {
+                "severity": "error",
+                "code": "docling_required_not_available",
+                "tool": DOCLING_TOOL,
+                "message": "Docling is required for this benchmark gate but is not installed.",
+                "details": {"install_required": True},
+            }
+        )
     compared = current_run["status"] in {"success", "partial_success"} and docling_run["status"] == "success"
     error_count = sum(1 for finding in all_findings if finding["severity"] == "error")
     warning_count = sum(1 for finding in all_findings if finding["severity"] == "warning")
@@ -586,6 +597,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Include opt-in conservative figure structure sidecars/chunks in the current-tool run.",
     )
+    parser.add_argument(
+        "--require-docling",
+        action="store_true",
+        default=False,
+        help="Treat a missing Docling installation as an error instead of an advisory skip.",
+    )
     parser.add_argument("--fail-on-error", action="store_true")
     parser.set_defaults(rag_figure_text_chunks=True)
     return parser
@@ -607,6 +624,7 @@ def main(argv: list[str] | None = None) -> int:
         rag_generated_figure_descriptions=args.rag_generated_figure_descriptions,
         figure_description_backend=args.figure_description_backend,
         figure_structure_extraction=args.figure_structure_extraction,
+        require_docling=args.require_docling,
     )
     print(f"Wrote {args.output_dir / REPORT_FILENAME}")
     if args.fail_on_error and report.get("summary", {}).get("error_count", 0):
