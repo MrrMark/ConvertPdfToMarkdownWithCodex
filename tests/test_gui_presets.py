@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pdf2md.gui_presets import (
+    ASSETLESS_TECHNICAL_SPEC_RAG_PRESET,
     apply_preset_to_options,
     normalize_preset,
     preset_allows_custom_options,
@@ -14,6 +15,7 @@ from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, Tabl
 def test_gui_preset_display_names_are_localized() -> None:
     assert preset_display_name("ko", "preserve") == "기본 모드(원본 유지)"
     assert preset_display_name("ko", "technical_spec_rag") == "기술 스펙 RAG"
+    assert preset_display_name("ko", ASSETLESS_TECHNICAL_SPEC_RAG_PRESET) == "이미지 업로드 불가 RAG 대응"
     assert preset_display_name("en", "custom") == "Optimize Options"
     assert normalize_preset(None) == "preserve"
     assert normalize_preset("unknown") == "preserve"
@@ -109,6 +111,17 @@ def test_purpose_specific_rag_presets_apply_expected_option_matrix() -> None:
     assert technical.rag_chunk_relationship_metadata is True
     assert technical.rag_figure_text_chunks is False
 
+    assetless = apply_preset_to_options(
+        ASSETLESS_TECHNICAL_SPEC_RAG_PRESET,
+        GuiConversionOptions(domain_adapter=DomainAdapterMode.MANUAL.value, manual_domain_adapter_label="Customer A"),
+    )
+    assert assetless.rag_profile == "technical_spec_rag"
+    assert assetless.image_mode == ImageMode.PLACEHOLDER.value
+    assert assetless.rag_table_output == RagTableOutputMode.BOTH.value
+    assert assetless.domain_adapter == DomainAdapterMode.MANUAL.value
+    assert assetless.manual_domain_adapter_label == "Customer A"
+    assert assetless.rag_figure_text_chunks is True
+
     assert confidential.confidential_safe_mode is True
     assert confidential.rag_profile == "confidential_rag"
     assert confidential.rag_table_output == RagTableOutputMode.JSONL.value
@@ -157,6 +170,9 @@ def test_preset_editable_fields_lock_advanced_options_headlessly() -> None:
     assert rag_fields["domain_adapter"] is False
     assert preset_editable_fields("technical_spec_rag")["retrieval_tokenizer"] is False
     assert preset_editable_fields("technical_spec_rag")["domain_adapter"] is True
+    assert preset_editable_fields(ASSETLESS_TECHNICAL_SPEC_RAG_PRESET)["domain_adapter"] is True
+    assert preset_editable_fields(ASSETLESS_TECHNICAL_SPEC_RAG_PRESET)["manual_domain_adapter_label"] is True
+    assert preset_editable_fields(ASSETLESS_TECHNICAL_SPEC_RAG_PRESET)["manual_domain_adapter_keywords"] is True
     assert custom_fields["image_mode"] is True
     assert custom_fields["page_workers"] is True
     assert custom_fields["retrieval_tokenizer"] is True

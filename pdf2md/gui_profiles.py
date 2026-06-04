@@ -21,6 +21,8 @@ GUI_PROFILE_OPTION_FIELDS: tuple[str, ...] = (
     "output_profile",
     "rag_sidecar_scope",
     "domain_adapter",
+    "manual_domain_adapter_label",
+    "manual_domain_adapter_keywords",
     "confidential_safe_mode",
     "force_ocr",
     "ocr_lang",
@@ -194,6 +196,8 @@ def _option_type_diagnostics(options: Mapping[str, object]) -> list[GuiDiagnosti
     _validate_enum(options, "output_profile", {mode.value for mode in OutputProfile}, diagnostics)
     _validate_optional_enum(options, "rag_sidecar_scope", {mode.value for mode in RagSidecarScope}, diagnostics)
     _validate_enum(options, "domain_adapter", {mode.value for mode in DomainAdapterMode}, diagnostics)
+    _validate_optional_string(options, "manual_domain_adapter_label", diagnostics)
+    _validate_optional_string(options, "manual_domain_adapter_keywords", diagnostics)
     for field in (
         "confidential_safe_mode",
         "force_ocr",

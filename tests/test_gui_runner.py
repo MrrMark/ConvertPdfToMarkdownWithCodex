@@ -143,6 +143,8 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
             rag_sidecar_scope=RagSidecarScope.NONE.value,
             rag_profile="technical_spec_rag",
             domain_adapter=DomainAdapterMode.NVME.value,
+            manual_domain_adapter_label="Customer A Requirements",
+            manual_domain_adapter_keywords="Customer ID, Customer Requirement",
             confidential_safe_mode=True,
             force_ocr=True,
             ocr_lang="kor+eng",
@@ -172,6 +174,8 @@ def test_gui_request_builds_single_config_from_cli_options(sample_pdf: Path, tmp
     assert config.rag_sidecar_scope == RagSidecarScope.NONE.value
     assert config.rag_profile == "technical_spec_rag"
     assert config.domain_adapter == DomainAdapterMode.NVME.value
+    assert config.manual_domain_adapter_label == "Customer A Requirements"
+    assert config.manual_domain_adapter_keywords == "Customer ID, Customer Requirement"
     assert config.confidential_safe_mode is True
     assert config.force_ocr is True
     assert config.ocr_lang == "kor+eng"
@@ -202,6 +206,8 @@ def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_pa
             rag_sidecar_scope=RagSidecarScope.MINIMAL.value,
             rag_profile="technical_spec_rag",
             domain_adapter=DomainAdapterMode.TCG.value,
+            manual_domain_adapter_label="Customer B",
+            manual_domain_adapter_keywords="Req Key; Req Text",
             confidential_safe_mode=True,
             force_ocr=True,
             ocr_lang="kor+eng",
@@ -229,6 +235,8 @@ def test_gui_batch_config_preserves_cli_option_contract(sample_pdf: Path, tmp_pa
     assert config.rag_sidecar_scope == RagSidecarScope.MINIMAL.value
     assert config.rag_profile == "technical_spec_rag"
     assert config.domain_adapter == DomainAdapterMode.TCG.value
+    assert config.manual_domain_adapter_label == "Customer B"
+    assert config.manual_domain_adapter_keywords == "Req Key; Req Text"
     assert config.confidential_safe_mode is True
     assert config.force_ocr is True
     assert config.ocr_lang == "kor+eng"

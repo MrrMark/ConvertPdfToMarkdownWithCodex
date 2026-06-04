@@ -67,6 +67,7 @@ class DomainAdapterMode(str, Enum):
     TCG = "tcg"
     SPDM = "spdm"
     CUSTOMER_REQUIREMENTS = "customer-requirements"
+    MANUAL = "manual"
 
 
 class ConversionStatus(str, Enum):

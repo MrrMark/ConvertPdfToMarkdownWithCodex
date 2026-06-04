@@ -105,6 +105,8 @@ class GuiConversionOptions:
     rag_sidecar_scope: str | None = None
     rag_profile: str = DEFAULT_RAG_PURPOSE_PROFILE
     domain_adapter: str = DomainAdapterMode.NONE.value
+    manual_domain_adapter_label: str | None = None
+    manual_domain_adapter_keywords: str | None = None
     confidential_safe_mode: bool = False
     force_ocr: bool = False
     ocr_lang: str = "eng"
@@ -984,6 +986,8 @@ def _coerce_options(options: GuiConversionOptions) -> dict:
         "rag_sidecar_scope": RagSidecarScope(options.rag_sidecar_scope) if options.rag_sidecar_scope is not None else None,
         "rag_profile": normalize_rag_profile(options.rag_profile),
         "domain_adapter": DomainAdapterMode(options.domain_adapter),
+        "manual_domain_adapter_label": options.manual_domain_adapter_label or None,
+        "manual_domain_adapter_keywords": options.manual_domain_adapter_keywords or None,
         "confidential_safe_mode": options.confidential_safe_mode,
         "force_ocr": options.force_ocr,
         "ocr_lang": options.ocr_lang or "eng",
@@ -1016,6 +1020,8 @@ def _batch_options_from_gui(options: GuiConversionOptions) -> BatchConversionOpt
         rag_sidecar_scope=RagSidecarScope(options.rag_sidecar_scope) if options.rag_sidecar_scope is not None else None,
         rag_profile=normalize_rag_profile(options.rag_profile),
         domain_adapter=DomainAdapterMode(options.domain_adapter),
+        manual_domain_adapter_label=options.manual_domain_adapter_label or None,
+        manual_domain_adapter_keywords=options.manual_domain_adapter_keywords or None,
         confidential_safe_mode=options.confidential_safe_mode,
         force_ocr=options.force_ocr,
         ocr_lang=options.ocr_lang or "eng",
@@ -1049,6 +1055,8 @@ def _batch_options_from_request(request: GuiConversionRequest) -> BatchConversio
         rag_sidecar_scope=options.rag_sidecar_scope,
         rag_profile=options.rag_profile,
         domain_adapter=options.domain_adapter,
+        manual_domain_adapter_label=options.manual_domain_adapter_label,
+        manual_domain_adapter_keywords=options.manual_domain_adapter_keywords,
         confidential_safe_mode=options.confidential_safe_mode,
         force_ocr=options.force_ocr,
         ocr_lang=options.ocr_lang,

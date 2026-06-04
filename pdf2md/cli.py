@@ -78,7 +78,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--domain-adapter",
         choices=[m.value for m in DomainAdapterMode],
         default=None,
-        help="Optional domain-specific RAG adapter: nvme, pcie, ocp, tcg, spdm, or customer-requirements.",
+        help="Optional domain-specific RAG adapter: nvme, pcie, ocp, tcg, spdm, customer-requirements, or manual.",
+    )
+    parser.add_argument(
+        "--manual-domain-adapter-label",
+        default=None,
+        help="Optional display label for --domain-adapter manual, for example a customer requirement profile name.",
+    )
+    parser.add_argument(
+        "--manual-domain-adapter-keywords",
+        default=None,
+        help="Comma-, semicolon-, or newline-separated table header keywords for --domain-adapter manual.",
     )
     parser.add_argument(
         "--require-domain-adapter-for-technical-profile",
@@ -189,6 +199,8 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         rag_sidecar_scope=RagSidecarScope(args.rag_sidecar_scope) if args.rag_sidecar_scope is not None else None,
         rag_profile=args.rag_profile,
         domain_adapter=DomainAdapterMode(_option_value(args.domain_adapter, profile_options.domain_adapter)),
+        manual_domain_adapter_label=args.manual_domain_adapter_label,
+        manual_domain_adapter_keywords=args.manual_domain_adapter_keywords,
         confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),
         force_ocr=_option_value(args.force_ocr, profile_options.force_ocr),
         ocr_lang=args.ocr_lang,
@@ -237,6 +249,8 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
         rag_sidecar_scope=RagSidecarScope(args.rag_sidecar_scope) if args.rag_sidecar_scope is not None else None,
         rag_profile=args.rag_profile,
         domain_adapter=DomainAdapterMode(_option_value(args.domain_adapter, profile_options.domain_adapter)),
+        manual_domain_adapter_label=args.manual_domain_adapter_label,
+        manual_domain_adapter_keywords=args.manual_domain_adapter_keywords,
         confidential_safe_mode=_option_value(args.confidential_safe_mode, profile_options.confidential_safe_mode),
         force_ocr=_option_value(args.force_ocr, profile_options.force_ocr),
         ocr_lang=args.ocr_lang,

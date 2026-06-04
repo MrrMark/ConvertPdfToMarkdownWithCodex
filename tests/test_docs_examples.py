@@ -64,7 +64,9 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "현재 active quality backlog는 없습니다" in readme
     assert "--rag-figure-text-chunks" in readme
     assert "chunk_type=\"figure_text\"" in readme
-    assert "완료된 Q34-Q105" in readme
+    assert "이미지 업로드 불가 RAG 대응" in readme
+    assert "--manual-domain-adapter-keywords" in readme
+    assert "완료된 Q34-Q106" in readme
     assert "docs/DOCLING_INFORMED_EXTENSION_DESIGN.md" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
@@ -429,6 +431,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q103. Assetless Technical RAG Figure Text Chunks" not in next_plan
     assert "Q104. Docling Benchmark Harness And Comparison Pack" not in next_plan
     assert "Q105. Docling-Informed OCR And Layout Extension Design" not in next_plan
+    assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" not in next_plan
     assert "현재 남은 작업 없음." in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
@@ -468,6 +471,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q103. Assetless Technical RAG Figure Text Chunks" not in development_specs
     assert "Q104. Docling Benchmark Harness And Comparison Pack" not in development_specs
     assert "Q105. Docling-Informed OCR And Layout Extension Design" not in development_specs
+    assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" not in development_specs
     assert "placeholder + figure_text chunk" not in development_specs
     assert "다중 OCR backend" not in development_specs
     assert "현재 active 개발 명세 없음." in development_specs
@@ -519,9 +523,11 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q105" in development_specs
+    assert "완료된 Q34-Q106" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q105. Docling-Informed OCR And Layout Extension Design" in implemented_specs
+    assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" in implemented_specs
+    assert "manual_domain_adapter_keywords" in implemented_specs
     assert "DOCLING_INFORMED_EXTENSION_DESIGN.md" in implemented_specs
     assert "구현 backlog로 바로 승격할 항목은 없다" in docling_design
     assert "DocumentConverter().convert" in docling_design
@@ -722,6 +728,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q84 release readiness sweep" in quality_scorecard
     assert "Q84 Release Readiness Sweep" in quality_scorecard
     assert "Q104-Q105 Docling benchmark/design closure" in quality_scorecard
+    assert "Q106 GUI assetless RAG/manual domain adapter" in quality_scorecard
+    assert "이미지 업로드 불가 RAG 대응" in quality_scorecard
     assert "Docling 미설치 advisory skip" in quality_scorecard
     assert "Q91 Q90 output schema contract alignment" in quality_scorecard
     assert "Q90 cross-reference target index expansion" in quality_scorecard

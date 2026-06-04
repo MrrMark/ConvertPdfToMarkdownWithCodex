@@ -369,6 +369,41 @@ def test_cli_accepts_domain_adapter_option(sample_pdf: Path, tmp_path: Path) -> 
     assert (output_dir / "domain_units_rag.jsonl").exists()
 
 
+def test_cli_accepts_manual_domain_adapter_inputs(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-out-manual-domain-adapter"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--pages",
+        "1",
+        "--rag-profile",
+        "technical_spec_rag",
+        "--domain-adapter",
+        "manual",
+        "--manual-domain-adapter-label",
+        "Customer A Requirements",
+        "--manual-domain-adapter-keywords",
+        "Customer Key, Customer Requirement",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["rag_profile"] == "technical_spec_rag"
+    assert manifest["options"]["domain_adapter"] == "manual"
+    assert manifest["options"]["manual_domain_adapter_label"] == "Customer A Requirements"
+    assert manifest["options"]["manual_domain_adapter_keywords"] == "Customer Key, Customer Requirement"
+    assert report["summary"]["manual_domain_adapter_label"] == "Customer A Requirements"
+    assert report["summary"]["manual_domain_adapter_keywords"] == "Customer Key, Customer Requirement"
+    assert (output_dir / "domain_units_rag.jsonl").exists()
+
+
 def test_cli_accepts_quality_options(sample_pdf: Path, tmp_path: Path) -> None:
     output_dir = tmp_path / "cli-out-quality-options"
     cmd = [

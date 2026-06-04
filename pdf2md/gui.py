@@ -35,6 +35,7 @@ from pdf2md.gui_layout import (
     gui_wrapping_text_keys,
 )
 from pdf2md.gui_presets import (
+    ASSETLESS_TECHNICAL_SPEC_RAG_PRESET,
     GuiOptionPreset,
     apply_preset_to_options,
     normalize_preset,
@@ -116,6 +117,8 @@ class Pdf2MdGuiApp:
         self.table_mode = tk.StringVar(value=TableMode.AUTO.value)
         self.rag_table_output = tk.StringVar(value=RagTableOutputMode.NONE.value)
         self.domain_adapter = tk.StringVar(value=DomainAdapterMode.NONE.value)
+        self.manual_domain_adapter_label = tk.StringVar()
+        self.manual_domain_adapter_keywords = tk.StringVar()
         self.ocr_lang = tk.StringVar(value="eng")
         self.previous_corpus_manifest = tk.StringVar()
         self.skip_existing = tk.BooleanVar(value=False)
@@ -222,6 +225,7 @@ class Pdf2MdGuiApp:
                 ("preserve", "preset_preserve"),
                 ("rag_optimized", "preset_rag_optimized"),
                 ("technical_spec_rag", "preset_technical_spec_rag"),
+                (ASSETLESS_TECHNICAL_SPEC_RAG_PRESET, "preset_assetless_technical_spec_rag"),
                 ("confidential_rag", "preset_confidential_rag"),
                 ("preserve_with_sidecars", "preset_preserve_with_sidecars"),
                 ("custom", "preset_custom"),
@@ -270,15 +274,33 @@ class Pdf2MdGuiApp:
             0,
             option_field="domain_adapter",
         )
+        manual_label_entry = self._add_labeled_entry(
+            options,
+            "manual_domain_adapter_label",
+            self.manual_domain_adapter_label,
+            7,
+            0,
+        )
+        self.advanced_option_widgets.append(manual_label_entry)
+        self.advanced_option_widgets_by_field["manual_domain_adapter_label"] = manual_label_entry
+        manual_keywords_entry = self._add_labeled_entry(
+            options,
+            "manual_domain_adapter_keywords",
+            self.manual_domain_adapter_keywords,
+            8,
+            0,
+        )
+        self.advanced_option_widgets.append(manual_keywords_entry)
+        self.advanced_option_widgets_by_field["manual_domain_adapter_keywords"] = manual_keywords_entry
         self._track_text("previous_corpus_manifest", ttk.Label(options, text=self._t("previous_corpus_manifest"))).grid(
-            row=7,
+            row=9,
             column=0,
             sticky="w",
             padx=(0, 4),
             pady=3,
         )
         ttk.Entry(options, textvariable=self.previous_corpus_manifest).grid(
-            row=7,
+            row=9,
             column=1,
             sticky="ew",
             padx=(0, 8),
@@ -287,11 +309,11 @@ class Pdf2MdGuiApp:
         self._track_text(
             "browse",
             ttk.Button(options, text=self._t("browse"), command=self._browse_previous_corpus_manifest),
-        ).grid(row=7, column=2, sticky="ew", pady=3)
+        ).grid(row=9, column=2, sticky="ew", pady=3)
         self._track_text(
             "reuse_unchanged",
             ttk.Checkbutton(options, text=self._t("reuse_unchanged"), variable=self.reuse_unchanged),
-        ).grid(row=8, column=0, columnspan=2, sticky="w", pady=1)
+        ).grid(row=10, column=0, columnspan=2, sticky="w", pady=1)
 
         flags = ttk.LabelFrame(frame, text=self._t("flags"))
         self._track_text("flags", flags)
@@ -604,6 +626,8 @@ class Pdf2MdGuiApp:
         self.table_mode.set(options.table_mode)
         self.rag_table_output.set(options.rag_table_output)
         self.domain_adapter.set(options.domain_adapter)
+        self.manual_domain_adapter_label.set(options.manual_domain_adapter_label or "")
+        self.manual_domain_adapter_keywords.set(options.manual_domain_adapter_keywords or "")
         self.ocr_lang.set(options.ocr_lang or "eng")
         self.skip_existing.set(options.skip_existing)
         self.confidential_safe_mode.set(options.confidential_safe_mode)
@@ -725,16 +749,22 @@ class Pdf2MdGuiApp:
         )
 
     def _options(self, *, strict_page_workers: bool = True) -> GuiConversionOptions:
+        normalized_preset = normalize_preset(self.option_preset.get())
+        rag_profile = (
+            "technical_spec_rag"
+            if normalized_preset == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET
+            else (normalized_preset if normalized_preset != "custom" else "preserve")
+        )
         return GuiConversionOptions(
             pages=self.pages.get().strip() or None,
             password=self.password.get() or None,
             image_mode=self.image_mode.get(),
             table_mode=self.table_mode.get(),
             rag_table_output=self.rag_table_output.get(),
-            rag_profile=(
-                self.option_preset.get() if normalize_preset(self.option_preset.get()) != "custom" else "preserve"
-            ),
+            rag_profile=rag_profile,
             domain_adapter=self.domain_adapter.get(),
+            manual_domain_adapter_label=self.manual_domain_adapter_label.get().strip() or None,
+            manual_domain_adapter_keywords=self.manual_domain_adapter_keywords.get().strip() or None,
             confidential_safe_mode=self.confidential_safe_mode.get(),
             force_ocr=self.force_ocr.get(),
             ocr_lang=self.ocr_lang.get().strip() or "eng",
