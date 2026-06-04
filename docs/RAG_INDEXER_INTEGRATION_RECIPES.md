@@ -184,7 +184,18 @@ python scripts/benchmark_docling_comparison.py \
   --document-label doc-0001 \
   --rag-profile technical_spec_rag \
   --domain-adapter nvme \
-  --image-mode placeholder
+  --image-mode placeholder \
+  --figure-region-ocr \
+  --rag-generated-figure-descriptions \
+  --figure-structure-extraction
+```
+
+공식 최신 NVMe NVM Command Set Rev. 1.2를 같은 정책으로 점검할 때는 wrapper를 사용한다.
+
+```bash
+python scripts/run_latest_nvme_command_set_eval.py \
+  --input-pdf /tmp/NVM-Express-NVM-Command-Set-Specification-Revision-1.2-2025.08.01-Ratified.pdf \
+  --output-dir /tmp/pdf2md-latest-nvme-command-set
 ```
 
 생성 파일:
@@ -192,6 +203,7 @@ python scripts/benchmark_docling_comparison.py \
 - `docling_benchmark_report.json`: current-tool/Docling 실행 상태, duration/pages/sec, backend availability, validator metric, finding count
 - `docling_artifact_comparison.json`: committed-safe artifact name의 existence/size/SHA-256과 numeric metric delta
 - `docling_scorecard.md`: 사람이 빠르게 검토하는 local scorecard
+- `latest_nvme_command_set_scorecard.md`: latest NVMe Command Set 전용 sanitized metric scorecard
 
 운영 정책:
 

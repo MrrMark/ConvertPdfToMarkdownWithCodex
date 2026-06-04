@@ -184,7 +184,8 @@ Policy:
 
 ## docling_benchmark_report.json
 
-Optional local-only benchmark output written by `scripts/benchmark_docling_comparison.py`.
+Optional local-only benchmark output written by `scripts/benchmark_docling_comparison.py` and reused by
+`scripts/run_latest_nvme_command_set_eval.py`.
 
 Required:
 
@@ -228,6 +229,8 @@ Policy:
 - script는 current-tool metric과 validator status를 계속 생성한다.
 - raw Markdown body, raw Docling document dict, image bytes, input file path는 report에 넣지 않는다.
 - optional OCR backend availability는 module availability boolean만 기록한다.
+- current-tool metrics may include table count, low-quality table count, domain unit count, figure text chunk count,
+  figure description/structure chunk count, and validator pass booleans.
 
 ## docling_artifact_comparison.json
 

@@ -14,6 +14,7 @@ from scripts import inspect_wheel_contract
 from scripts import run_preset_eval
 from scripts import run_gui_cli_parity
 from scripts import run_corpus_eval
+from scripts import run_latest_nvme_command_set_eval
 from scripts import run_release_gates
 
 
@@ -216,6 +217,64 @@ def test_docling_comparison_writes_sanitized_advisory_pack_when_docling_is_missi
     assert comparison["customer_paths_included"] is False
     assert "# Docling Benchmark Scorecard" in scorecard
     assert "docling_not_installed" in scorecard
+
+
+def test_docling_comparison_passes_figure_semantics_options_to_current_tool(
+    monkeypatch,  # noqa: ANN001
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(benchmark_docling_comparison, "_module_available", lambda module_name: False)
+
+    output_dir = tmp_path / "docling-figure-semantics"
+    report = benchmark_docling_comparison.run_docling_comparison(
+        input_pdf=sample_pdf,
+        output_dir=output_dir,
+        document_label="doc-figure-semantics",
+        figure_region_ocr=True,
+        rag_generated_figure_descriptions=True,
+        figure_description_backend="docling",
+        figure_structure_extraction=True,
+    )
+
+    manifest = json.loads((output_dir / "current_tool" / "manifest.json").read_text(encoding="utf-8"))
+    current_metrics = report["runs"][0]["metrics"]
+
+    assert manifest["options"]["figure_region_ocr"] is True
+    assert manifest["options"]["rag_generated_figure_descriptions"] is True
+    assert manifest["options"]["figure_description_backend"] == "docling"
+    assert manifest["options"]["figure_structure_extraction"] is True
+    assert "figure_region_ocr_attempted_count" in current_metrics
+    assert "figure_description_chunk_record_count" in current_metrics
+    assert "figure_structure_chunk_record_count" in current_metrics
+
+
+def test_latest_nvme_command_set_eval_writes_sanitized_scorecard(
+    monkeypatch,  # noqa: ANN001
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(benchmark_docling_comparison, "_module_available", lambda module_name: False)
+
+    output_dir = tmp_path / "latest-nvme-command-set"
+    report = run_latest_nvme_command_set_eval.run_latest_nvme_command_set_eval(
+        input_pdf=sample_pdf,
+        output_dir=output_dir,
+        pages="1",
+        figure_semantics_mode="visual",
+    )
+    scorecard = (output_dir / run_latest_nvme_command_set_eval.SCORECARD_FILENAME).read_text(encoding="utf-8")
+    manifest = json.loads((output_dir / "current_tool" / "manifest.json").read_text(encoding="utf-8"))
+
+    assert (output_dir / benchmark_docling_comparison.REPORT_FILENAME).is_file()
+    assert (output_dir / benchmark_docling_comparison.COMPARISON_FILENAME).is_file()
+    assert report["summary"]["current_tool_status"] in {"success", "partial_success"}
+    assert "NVM Express NVM Command Set Specification Revision 1.2" in scorecard
+    assert "technical_spec_rag + domain_adapter=nvme + image_mode=placeholder" in scorecard
+    assert "Raw PDF text, raw Markdown body, image bytes, and customer paths are not embedded" in scorecard
+    assert manifest["options"]["domain_adapter"] == "nvme"
+    assert manifest["options"]["rag_figure_text_chunks"] is True
+    assert manifest["options"]["rag_generated_figure_descriptions"] is True
 
 
 def test_docling_metric_deltas_are_numeric_when_both_tools_report_numbers() -> None:
