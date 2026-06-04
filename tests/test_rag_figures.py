@@ -4,9 +4,11 @@ import json
 from pathlib import Path
 
 import pdf2md.pipeline as pipeline_module
+import pdf2md.serializers.rag_figure_semantics as figure_semantics_module
 from pdf2md.config import Config
 from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrResult
+from pdf2md.extractors.ocr_backends import OCRBackendMetadata, OCRBackendResult
 from pdf2md.extractors.tables import TableExtractionResult
 from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, RagSidecarScope
 from pdf2md.serializers.rag_chunks import build_retrieval_chunks
@@ -19,6 +21,55 @@ from pdf2md.serializers.rag_figures import build_figure_records, serialize_figur
 from scripts.validate_artifact_integrity import validate_artifact_integrity
 from scripts.validate_index_contract import validate_index_contract
 from scripts.validate_provenance_integrity import validate_provenance_integrity
+
+
+class _FakeRegionImage:
+    width = 1000
+    height = 1000
+
+    def crop(self, box):  # noqa: ANN001, ANN201
+        return {"crop_box": box}
+
+
+class _FakeRegionPage:
+    def render(self, scale: float):  # noqa: ANN201, ARG002
+        return type("FakeBitmap", (), {"to_pil": lambda self: _FakeRegionImage()})()
+
+    def close(self) -> None:
+        return None
+
+
+class _FakeRegionDocument:
+    def __init__(self, path: str) -> None:  # noqa: ARG002
+        self.path = path
+
+    def get_page(self, index: int) -> _FakeRegionPage:  # noqa: ARG002
+        return _FakeRegionPage()
+
+    def close(self) -> None:
+        return None
+
+
+class _FakePdfium:
+    PdfDocument = _FakeRegionDocument
+
+
+class _FakeRegionOCRBackend:
+    metadata = OCRBackendMetadata(name="tesseract", raw_confidence_unit="0_to_100")
+
+    def __init__(self, *, text: str = "NVME1", confidence: str = "90", available: bool = True) -> None:
+        self.text = text
+        self.confidence = confidence
+        self.available = available
+
+    def is_available(self) -> bool:
+        return self.available
+
+    def configure_runtime(self) -> None:
+        return None
+
+    def recognize(self, image, *, lang: str) -> OCRBackendResult:  # noqa: ANN001
+        return OCRBackendResult(text=self.text, confidence_data={"text": [self.text], "conf": [self.confidence]})
 
 
 def test_figure_records_include_available_and_excluded_image_provenance() -> None:
@@ -280,6 +331,93 @@ def test_figure_visual_semantics_sidecars_are_context_only_and_chunkable() -> No
     description_chunk = next(chunk for chunk in chunks if chunk["chunk_type"] == "figure_description")
     assert description_chunk["generated_text"] is True
     assert {ref["source_type"] for ref in description_chunk["source_refs"]} == {"figure", "figure_description"}
+
+
+def test_region_ocr_report_only_promotes_labels_from_figure_bbox(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    monkeypatch.setattr(figure_semantics_module, "pdfium", _FakePdfium)
+    monkeypatch.setattr(
+        figure_semantics_module,
+        "get_ocr_backend",
+        lambda name, *, pytesseract_module: _FakeRegionOCRBackend(text="NVME1", confidence="90"),
+    )
+    figure_records = [
+        {
+            "figure_id": "page-0001-figure-0001",
+            "figure_index": 1,
+            "page": 1,
+            "bbox": [10.0, 20.0, 120.0, 160.0],
+            "detected_labels": [],
+        }
+    ]
+
+    augmented, metrics = augment_figure_records_with_region_ocr(
+        figure_records,
+        pdf_path=tmp_path / "figure.pdf",
+        ocr_lang="eng",
+        ocr_backend="tesseract",
+    )
+
+    diagnostics = augmented[0]["figure_region_ocr"]
+    assert augmented[0]["detected_labels"] == ["NVME1"]
+    assert diagnostics["status"] == "promoted_labels"
+    assert diagnostics["region_ocr"]["status"] == "candidate"
+    assert diagnostics["region_ocr"]["candidate"]["source"] == "region_ocr"
+    assert diagnostics["region_ocr"]["report_only"] is True
+    assert diagnostics["region_ocr"]["text_replaced"] is False
+    assert metrics["figure_region_ocr_render_attempted_count"] == 1
+    assert metrics["figure_region_ocr_region_candidate_count"] == 1
+    assert metrics["figure_region_ocr_accepted_region_count"] == 1
+    assert metrics["figure_region_ocr_rejected_region_count"] == 0
+
+
+def test_region_ocr_report_only_records_runtime_unavailable(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    monkeypatch.setattr(figure_semantics_module, "pdfium", None)
+
+    augmented, metrics = augment_figure_records_with_region_ocr(
+        [
+            {
+                "figure_id": "page-0001-figure-0001",
+                "figure_index": 1,
+                "page": 1,
+                "bbox": [10.0, 20.0, 120.0, 160.0],
+            }
+        ],
+        pdf_path=tmp_path / "figure.pdf",
+    )
+
+    diagnostics = augmented[0]["figure_region_ocr"]
+    assert diagnostics["region_ocr"]["status"] == "runtime_unavailable"
+    assert diagnostics["region_ocr"]["reason"] == "pdfium_unavailable"
+    assert diagnostics["region_ocr"]["report_only"] is True
+    assert metrics["figure_region_ocr_runtime_unavailable_count"] == 1
+    assert metrics["figure_region_ocr_render_attempted_count"] == 0
+
+
+def test_region_ocr_report_only_rejects_invalid_bbox(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    monkeypatch.setattr(figure_semantics_module, "pdfium", _FakePdfium)
+    monkeypatch.setattr(
+        figure_semantics_module,
+        "get_ocr_backend",
+        lambda name, *, pytesseract_module: _FakeRegionOCRBackend(text="NVME1", confidence="90"),
+    )
+
+    augmented, metrics = augment_figure_records_with_region_ocr(
+        [
+            {
+                "figure_id": "page-0001-figure-0001",
+                "figure_index": 1,
+                "page": 1,
+                "bbox": [10.0, 20.0, 10.5, 20.5],
+            }
+        ],
+        pdf_path=tmp_path / "figure.pdf",
+    )
+
+    diagnostics = augmented[0]["figure_region_ocr"]
+    assert diagnostics["region_ocr"]["status"] == "rejected"
+    assert diagnostics["region_ocr"]["reason"] == "invalid_bbox"
+    assert metrics["figure_region_ocr_crop_rejected_count"] == 1
+    assert metrics["figure_region_ocr_rejected_region_count"] == 1
 
 
 def test_pipeline_writes_assetless_figure_text_chunks_with_placeholder_mode(

@@ -2,12 +2,23 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from typing import Any
+
+from pdf2md.extractors.ocr import _extract_confidence_metrics, _is_language_data_missing
+from pdf2md.extractors.ocr_backends import get_ocr_backend
+
+try:
+    import pypdfium2 as pdfium
+except Exception:  # noqa: BLE001
+    pdfium = None
 
 
 FIGURE_REGION_OCR_CONFIDENCE_THRESHOLD = 0.65
 FIGURE_SEMANTIC_LOW_CONFIDENCE_THRESHOLD = 0.65
 FIGURE_LABEL_PATTERN = re.compile(r"\b(?:[A-Z]{2,}[A-Z0-9_-]*-\d+|[A-Z]{2,}[0-9]+|[A-Z][A-Za-z]+)\b")
+REGION_OCR_RENDER_SCALE = 2.0
+REGION_OCR_MIN_CROP_PIXELS = 4
 
 
 def _page_of(record: dict[str, Any]) -> int:
@@ -115,59 +126,286 @@ def _ocr_candidates(record: dict[str, Any]) -> list[dict[str, Any]]:
     return candidates
 
 
-def augment_figure_records_with_region_ocr(records: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Promote existing figure OCR candidates into deterministic region OCR diagnostics."""
+def _runtime_unavailable_result(reason: str, *, backend: str) -> dict[str, Any]:
+    return {
+        "status": "runtime_unavailable",
+        "backend": backend,
+        "reason": reason,
+        "attempted": False,
+        "candidate": None,
+        "rejected": {"reason": reason},
+    }
+
+
+def _region_ocr_runtime(*, ocr_backend: str) -> tuple[object | None, object | None, str | None]:
+    if pdfium is None:
+        return None, None, "pdfium_unavailable"
+    try:
+        import pytesseract
+    except Exception:  # noqa: BLE001
+        pytesseract = None
+    try:
+        backend = get_ocr_backend(ocr_backend, pytesseract_module=pytesseract)
+    except ValueError:
+        return None, None, "unsupported_ocr_backend"
+    if not backend.is_available():
+        return None, None, "dependency_unavailable"
+    runtime_error_reason = backend.configure_runtime()
+    if runtime_error_reason is not None:
+        return None, None, runtime_error_reason
+    return pdfium, backend, None
+
+
+def _crop_box(
+    *,
+    bbox: list[float] | None,
+    image_width: int,
+    image_height: int,
+    scale: float,
+) -> tuple[int, int, int, int] | None:
+    if not bbox or len(bbox) < 4:
+        return None
+    try:
+        x0, top, x1, bottom = (float(value) for value in bbox[:4])
+    except (TypeError, ValueError):
+        return None
+    left = max(0, min(image_width, int(round(x0 * scale))))
+    upper = max(0, min(image_height, int(round(top * scale))))
+    right = max(0, min(image_width, int(round(x1 * scale))))
+    lower = max(0, min(image_height, int(round(bottom * scale))))
+    if right - left < REGION_OCR_MIN_CROP_PIXELS or lower - upper < REGION_OCR_MIN_CROP_PIXELS:
+        return None
+    return left, upper, right, lower
+
+
+def _region_ocr_result(
+    *,
+    document: object | None,
+    backend: object | None,
+    record: dict[str, Any],
+    ocr_lang: str,
+    ocr_backend: str,
+    runtime_unavailable_reason: str | None,
+) -> dict[str, Any]:
+    bbox = _bbox(record)
+    if bbox is None:
+        return {
+            "status": "rejected",
+            "backend": ocr_backend,
+            "reason": "missing_bbox",
+            "attempted": False,
+            "candidate": None,
+            "rejected": {"reason": "missing_bbox"},
+        }
+    if runtime_unavailable_reason is not None:
+        return _runtime_unavailable_result(runtime_unavailable_reason, backend=ocr_backend)
+    if document is None or backend is None:
+        return _runtime_unavailable_result("runtime_not_initialized", backend=ocr_backend)
+
+    page = None
+    try:
+        page = document.get_page(_page_of(record) - 1)
+        bitmap = page.render(scale=REGION_OCR_RENDER_SCALE)
+        image = bitmap.to_pil()
+        crop_box = _crop_box(
+            bbox=bbox,
+            image_width=int(getattr(image, "width", 0)),
+            image_height=int(getattr(image, "height", 0)),
+            scale=REGION_OCR_RENDER_SCALE,
+        )
+        if crop_box is None:
+            return {
+                "status": "rejected",
+                "backend": ocr_backend,
+                "reason": "invalid_bbox",
+                "attempted": False,
+                "candidate": None,
+                "rejected": {"reason": "invalid_bbox", "bbox": bbox},
+            }
+        region_image = image.crop(crop_box)
+        backend_result = backend.recognize(region_image, lang=ocr_lang)
+        metrics = _extract_confidence_metrics(backend_result.confidence_data)
+        confidence = round(metrics.mean / 100.0, 4)
+        text = backend_result.text.strip()
+        if not text:
+            return {
+                "status": "rejected",
+                "backend": ocr_backend,
+                "reason": "empty_result",
+                "attempted": True,
+                "candidate": None,
+                "rejected": {"reason": "empty_result", "confidence": confidence},
+            }
+        return {
+            "status": "candidate",
+            "backend": ocr_backend,
+            "reason": None,
+            "attempted": True,
+            "candidate": {
+                "text": text,
+                "confidence": confidence,
+                "source": "region_ocr",
+                "bbox": bbox,
+                "ocr_confidence_mean": metrics.mean,
+                "ocr_confidence_median": metrics.median,
+                "low_conf_token_ratio": metrics.low_conf_token_ratio,
+            },
+            "rejected": None,
+        }
+    except Exception as exc:  # noqa: BLE001
+        reason = "language_data_missing" if _is_language_data_missing(exc) else "ocr_failed"
+        return {
+            "status": "rejected",
+            "backend": ocr_backend,
+            "reason": reason,
+            "attempted": True,
+            "candidate": None,
+            "rejected": {"reason": reason},
+        }
+    finally:
+        if page is not None:
+            page.close()
+
+
+def augment_figure_records_with_region_ocr(
+    records: list[dict[str, Any]],
+    *,
+    pdf_path: Path | None = None,
+    ocr_lang: str = "eng",
+    ocr_backend: str = "tesseract",
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Promote figure OCR evidence into deterministic report-only region OCR diagnostics."""
     augmented: list[dict[str, Any]] = []
     attempted_count = 0
     candidate_count = 0
     promoted_label_count = 0
     low_confidence_count = 0
+    render_attempted_count = 0
+    region_candidate_count = 0
+    accepted_region_count = 0
+    rejected_region_count = 0
+    crop_rejected_count = 0
+    runtime_unavailable_count = 0
 
-    for record in records:
-        updated = dict(record)
-        attempted_count += 1
-        candidates = _ocr_candidates(record)
-        candidate_count += len(candidates)
-        promoted_labels: list[str] = []
-        rejected: list[dict[str, Any]] = []
-        for candidate in candidates:
-            text = str(candidate.get("text") or "").strip()
-            labels = _labels_from_text(text)
-            confidence = _confidence(candidate.get("confidence"))
-            if not labels:
-                rejected.append({"text": text, "confidence": confidence, "reason": "no_label_pattern"})
-                continue
-            if confidence is None or confidence < FIGURE_REGION_OCR_CONFIDENCE_THRESHOLD:
-                rejected.append({"text": text, "confidence": confidence, "labels": labels, "reason": "low_confidence"})
-                continue
-            promoted_labels.extend(labels)
+    pdfium_module, backend, runtime_unavailable_reason = (
+        _region_ocr_runtime(ocr_backend=ocr_backend) if pdf_path is not None else (None, None, None)
+    )
+    document = None
+    if pdf_path is not None and runtime_unavailable_reason is None and pdfium_module is not None:
+        try:
+            document = pdfium_module.PdfDocument(str(pdf_path))
+        except Exception:  # noqa: BLE001
+            runtime_unavailable_reason = "pdf_open_failed"
 
-        promoted_labels = _ordered_unique(promoted_labels)
-        if not promoted_labels and candidates:
-            low_confidence_count += 1
-        promoted_label_count += len(promoted_labels)
-        if promoted_labels:
-            updated["detected_labels"] = _ordered_unique(_string_list(updated.get("detected_labels")) + promoted_labels)
-            reasons = _string_list(updated.get("classification_reasons"))
-            updated["classification_reasons"] = sorted(dict.fromkeys(reasons + ["figure_region_ocr_promoted_labels"]))
-        updated["figure_region_ocr"] = {
-            "enabled": True,
-            "source": "existing_figure_ocr_candidates",
-            "candidate_count": len(candidates),
-            "promoted_label_count": len(promoted_labels),
-            "promoted_labels": promoted_labels,
-            "rejected_candidate_count": len(rejected),
-            "rejected_candidates": rejected,
-            "confidence_threshold": FIGURE_REGION_OCR_CONFIDENCE_THRESHOLD,
-            "status": "promoted_labels" if promoted_labels else ("no_promoted_labels" if candidates else "no_candidates"),
-        }
-        augmented.append(updated)
+    try:
+        for record in records:
+            updated = dict(record)
+            attempted_count += 1
+            if pdf_path is None:
+                region_result = {
+                    "status": "not_attempted",
+                    "backend": ocr_backend,
+                    "reason": "pdf_path_not_provided",
+                    "attempted": False,
+                    "candidate": None,
+                    "rejected": None,
+                }
+            else:
+                region_result = _region_ocr_result(
+                    document=document,
+                    backend=backend,
+                    record=record,
+                    ocr_lang=ocr_lang,
+                    ocr_backend=ocr_backend,
+                    runtime_unavailable_reason=runtime_unavailable_reason,
+                )
+            if region_result["attempted"]:
+                render_attempted_count += 1
+            if region_result["status"] == "candidate" and region_result["candidate"] is not None:
+                region_candidate_count += 1
+            elif region_result["status"] == "runtime_unavailable":
+                runtime_unavailable_count += 1
+            elif region_result["status"] == "rejected":
+                rejected_region_count += 1
+                if region_result.get("reason") in {"missing_bbox", "invalid_bbox"}:
+                    crop_rejected_count += 1
+
+            candidates = _ocr_candidates(record)
+            if region_result["candidate"] is not None:
+                candidates.append(region_result["candidate"])
+            candidate_count += len(candidates)
+            promoted_labels: list[str] = []
+            rejected: list[dict[str, Any]] = []
+            for candidate in candidates:
+                text = str(candidate.get("text") or "").strip()
+                labels = _labels_from_text(text)
+                confidence = _confidence(candidate.get("confidence"))
+                if not labels:
+                    rejected.append({"text": text, "confidence": confidence, "reason": "no_label_pattern"})
+                    continue
+                if confidence is None or confidence < FIGURE_REGION_OCR_CONFIDENCE_THRESHOLD:
+                    rejected.append(
+                        {"text": text, "confidence": confidence, "labels": labels, "reason": "low_confidence"}
+                    )
+                    continue
+                promoted_labels.extend(labels)
+                if candidate.get("source") == "region_ocr":
+                    accepted_region_count += 1
+
+            promoted_labels = _ordered_unique(promoted_labels)
+            if not promoted_labels and candidates:
+                low_confidence_count += 1
+            promoted_label_count += len(promoted_labels)
+            if promoted_labels:
+                updated["detected_labels"] = _ordered_unique(
+                    _string_list(updated.get("detected_labels")) + promoted_labels
+                )
+                reasons = _string_list(updated.get("classification_reasons"))
+                updated["classification_reasons"] = sorted(
+                    dict.fromkeys(reasons + ["figure_region_ocr_promoted_labels"])
+                )
+            updated["figure_region_ocr"] = {
+                "enabled": True,
+                "source": "existing_figure_ocr_candidates_and_region_ocr",
+                "candidate_count": len(candidates),
+                "promoted_label_count": len(promoted_labels),
+                "promoted_labels": promoted_labels,
+                "rejected_candidate_count": len(rejected),
+                "rejected_candidates": rejected,
+                "confidence_threshold": FIGURE_REGION_OCR_CONFIDENCE_THRESHOLD,
+                "status": "promoted_labels"
+                if promoted_labels
+                else ("no_promoted_labels" if candidates else "no_candidates"),
+                "region_ocr": {
+                    "status": region_result["status"],
+                    "backend": ocr_backend,
+                    "ocr_lang": ocr_lang,
+                    "attempted": region_result["attempted"],
+                    "reason": region_result.get("reason"),
+                    "candidate": region_result["candidate"],
+                    "rejected": region_result["rejected"],
+                    "report_only": True,
+                    "text_replaced": False,
+                },
+            }
+            augmented.append(updated)
+    finally:
+        if document is not None:
+            close = getattr(document, "close", None)
+            if close is not None:
+                close()
 
     return augmented, {
         "figure_region_ocr_attempted_count": attempted_count,
         "figure_region_ocr_candidate_count": candidate_count,
         "figure_region_ocr_promoted_label_count": promoted_label_count,
         "figure_region_ocr_low_confidence_count": low_confidence_count,
+        "figure_region_ocr_render_attempted_count": render_attempted_count,
+        "figure_region_ocr_region_candidate_count": region_candidate_count,
+        "figure_region_ocr_accepted_region_count": accepted_region_count,
+        "figure_region_ocr_rejected_region_count": rejected_region_count,
+        "figure_region_ocr_crop_rejected_count": crop_rejected_count,
+        "figure_region_ocr_runtime_unavailable_count": runtime_unavailable_count,
     }
 
 
