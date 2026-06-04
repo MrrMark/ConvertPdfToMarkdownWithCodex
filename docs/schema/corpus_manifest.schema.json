@@ -26,6 +26,30 @@
           "default": null,
           "title": "Domain Units Rag"
         },
+        "figure_descriptions_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figure Descriptions Rag"
+        },
+        "figure_structures_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figure Structures Rag"
+        },
         "figures_rag": {
           "anyOf": [
             {

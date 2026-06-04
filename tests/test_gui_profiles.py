@@ -33,6 +33,10 @@ def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path)
         force_ocr=True,
         ocr_lang="kor+eng",
         rag_figure_text_chunks=True,
+        figure_region_ocr=True,
+        rag_generated_figure_descriptions=True,
+        figure_description_backend="docling",
+        figure_structure_extraction=True,
         page_workers=4,
         debug=True,
         verbose=True,
@@ -52,6 +56,10 @@ def test_gui_profile_export_omits_paths_password_and_raw_content(tmp_path: Path)
     assert payload["options"]["manual_domain_adapter_label"] == "Customer A Requirements"
     assert payload["options"]["manual_domain_adapter_keywords"] == "Customer ID, Customer Requirement"
     assert payload["options"]["rag_figure_text_chunks"] is True
+    assert payload["options"]["figure_region_ocr"] is True
+    assert payload["options"]["rag_generated_figure_descriptions"] is True
+    assert payload["options"]["figure_description_backend"] == "docling"
+    assert payload["options"]["figure_structure_extraction"] is True
     assert payload["options"]["debug"] is True
     assert payload["options"]["verbose"] is True
     assert "password" not in payload["options"]
@@ -101,6 +109,7 @@ def test_gui_profile_invalid_payload_returns_structured_diagnostics() -> None:
             "output_profile": "turbo",
             "rag_sidecar_scope": "partial",
             "rag_figure_text_chunks": "yes",
+            "figure_description_backend": "remote-vlm",
             "page_workers": 0,
             "debug": "yes",
         },

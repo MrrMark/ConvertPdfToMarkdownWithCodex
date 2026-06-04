@@ -28,6 +28,11 @@ SIDECAR_SPECS = {
     },
     "tables_rag.jsonl": {"source_types": ("table_row",), "id_fields": ("table_row_id",)},
     "figures_rag.jsonl": {"source_types": ("figure", "excluded_figure"), "id_fields": ("figure_id",)},
+    "figure_descriptions_rag.jsonl": {
+        "source_types": ("figure_description",),
+        "id_fields": ("description_id",),
+    },
+    "figure_structures_rag.jsonl": {"source_types": ("figure_structure",), "id_fields": ("structure_id",)},
     "domain_units_rag.jsonl": {"source_types": ("domain_unit",), "id_fields": ("domain_unit_id",)},
     "cross_refs_rag.jsonl": {"source_types": ("cross_ref",), "id_fields": ("ref_id",)},
     "retrieval_chunks_rag.jsonl": {"source_types": ("retrieval_chunk",), "id_fields": ("chunk_id",)},
@@ -45,6 +50,8 @@ REPORT_COUNT_FIELDS = {
     "requirement_traceability_rag.jsonl": "requirement_traceability_record_count",
     "technical_tables_rag.jsonl": "technical_table_record_count",
     "figures_rag.jsonl": "figure_rag_record_count",
+    "figure_descriptions_rag.jsonl": "figure_description_record_count",
+    "figure_structures_rag.jsonl": "figure_structure_record_count",
     "domain_units_rag.jsonl": "domain_unit_record_count",
     "retrieval_chunks_rag.jsonl": "retrieval_chunk_record_count",
 }
@@ -81,6 +88,8 @@ def _record_id(record: dict[str, Any]) -> str | None:
         "table_row_id",
         "table_id",
         "figure_id",
+        "description_id",
+        "structure_id",
         "domain_unit_id",
         "ref_id",
     ):

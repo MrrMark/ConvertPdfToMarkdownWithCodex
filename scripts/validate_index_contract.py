@@ -31,6 +31,8 @@ SIDE_CAR_FILES = (
     "technical_tables_rag.jsonl",
     "tables_rag.jsonl",
     "figures_rag.jsonl",
+    "figure_descriptions_rag.jsonl",
+    "figure_structures_rag.jsonl",
     "domain_units_rag.jsonl",
 )
 JSON_FILES = ("manifest.json", "report.json")
@@ -69,6 +71,8 @@ SOURCE_REF_SIDECARS = {
     "requirement_traceability_rag.jsonl": "trace_id",
     "technical_tables_rag.jsonl": "technical_table_unit_id",
     "figures_rag.jsonl": "figure_id",
+    "figure_descriptions_rag.jsonl": "description_id",
+    "figure_structures_rag.jsonl": "structure_id",
     "domain_units_rag.jsonl": "domain_unit_id",
 }
 TEXT_BLOCK_FIELDS = ("block_id", "page", "block_index", "text")
@@ -179,6 +183,8 @@ def _record_id(record: dict[str, Any]) -> str | None:
         "technical_table_unit_id",
         "table_row_id",
         "figure_id",
+        "description_id",
+        "structure_id",
         "domain_unit_id",
         "block_id",
     ):

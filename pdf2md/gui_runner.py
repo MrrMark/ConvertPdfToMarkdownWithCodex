@@ -121,6 +121,10 @@ class GuiConversionOptions:
     rag_merge_sibling_text_chunks: bool = False
     rag_chunk_relationship_metadata: bool = False
     rag_figure_text_chunks: bool = False
+    figure_region_ocr: bool = False
+    rag_generated_figure_descriptions: bool = False
+    figure_description_backend: str = "local-vlm"
+    figure_structure_extraction: bool = False
     page_workers: int = 1
     debug: bool = False
     verbose: bool = False
@@ -1002,6 +1006,10 @@ def _coerce_options(options: GuiConversionOptions) -> dict:
         "rag_merge_sibling_text_chunks": options.rag_merge_sibling_text_chunks,
         "rag_chunk_relationship_metadata": options.rag_chunk_relationship_metadata,
         "rag_figure_text_chunks": options.rag_figure_text_chunks,
+        "figure_region_ocr": options.figure_region_ocr,
+        "rag_generated_figure_descriptions": options.rag_generated_figure_descriptions,
+        "figure_description_backend": options.figure_description_backend,
+        "figure_structure_extraction": options.figure_structure_extraction,
         "page_workers": options.page_workers,
         "debug": options.debug,
         "verbose": options.verbose,
@@ -1036,6 +1044,10 @@ def _batch_options_from_gui(options: GuiConversionOptions) -> BatchConversionOpt
         rag_merge_sibling_text_chunks=options.rag_merge_sibling_text_chunks,
         rag_chunk_relationship_metadata=options.rag_chunk_relationship_metadata,
         rag_figure_text_chunks=options.rag_figure_text_chunks,
+        figure_region_ocr=options.figure_region_ocr,
+        rag_generated_figure_descriptions=options.rag_generated_figure_descriptions,
+        figure_description_backend=options.figure_description_backend,
+        figure_structure_extraction=options.figure_structure_extraction,
         page_workers=options.page_workers,
         debug=options.debug,
         verbose=options.verbose,
@@ -1071,6 +1083,10 @@ def _batch_options_from_request(request: GuiConversionRequest) -> BatchConversio
         rag_merge_sibling_text_chunks=options.rag_merge_sibling_text_chunks,
         rag_chunk_relationship_metadata=options.rag_chunk_relationship_metadata,
         rag_figure_text_chunks=options.rag_figure_text_chunks,
+        figure_region_ocr=options.figure_region_ocr,
+        rag_generated_figure_descriptions=options.rag_generated_figure_descriptions,
+        figure_description_backend=options.figure_description_backend,
+        figure_structure_extraction=options.figure_structure_extraction,
         page_workers=options.page_workers,
         debug=options.debug,
         verbose=options.verbose,

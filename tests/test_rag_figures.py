@@ -9,6 +9,12 @@ from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrResult
 from pdf2md.extractors.tables import TableExtractionResult
 from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, RagSidecarScope
+from pdf2md.serializers.rag_chunks import build_retrieval_chunks
+from pdf2md.serializers.rag_figure_semantics import (
+    augment_figure_records_with_region_ocr,
+    build_figure_description_records,
+    build_figure_structure_records,
+)
 from pdf2md.serializers.rag_figures import build_figure_records, serialize_figures_jsonl
 from scripts.validate_artifact_integrity import validate_artifact_integrity
 from scripts.validate_index_contract import validate_index_contract
@@ -216,6 +222,66 @@ def test_figure_records_use_nearby_crop_text_for_diagram_labels() -> None:
     assert "outside" not in records[0]["detected_labels"]
 
 
+def test_figure_visual_semantics_sidecars_are_context_only_and_chunkable() -> None:
+    figure_records = [
+        {
+            "figure_id": "page-0001-figure-0001",
+            "page": 1,
+            "figure_index": 1,
+            "bbox": [72.0, 100.0, 420.0, 300.0],
+            "caption_text": "Figure 1: PCIe block diagram",
+            "caption_confidence": 0.9,
+            "heading_path": ["3 Architecture"],
+            "figure_kind": "diagram",
+            "diagram_candidate": True,
+            "detected_labels": ["HOST"],
+            "nearby_text_refs": [{"text": "CTRL DATA", "page": 1}],
+            "ocr_candidates": [{"text": "NVME1 READY", "confidence": 0.88}],
+            "source_refs": [
+                {
+                    "source_type": "figure",
+                    "source_id": "page-0001-figure-0001",
+                    "page": 1,
+                    "bbox": [72.0, 100.0, 420.0, 300.0],
+                    "path": "assets/images/page-0001-figure-001.png",
+                }
+            ],
+        }
+    ]
+
+    augmented, region_metrics = augment_figure_records_with_region_ocr(figure_records)
+    descriptions, description_metrics = build_figure_description_records(augmented, backend="local-vlm")
+    structures, structure_metrics = build_figure_structure_records(augmented)
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        figure_records=augmented,
+        figure_description_records=descriptions,
+        figure_structure_records=structures,
+        source_sha256="a" * 64,
+    )
+
+    assert region_metrics["figure_region_ocr_promoted_label_count"] == 2
+    assert augmented[0]["figure_region_ocr"]["status"] == "promoted_labels"
+    assert "NVME1" in augmented[0]["detected_labels"]
+    assert descriptions[0]["generated_text"] is True
+    assert descriptions[0]["backend_status"] == "not_invoked_context_only"
+    assert descriptions[0]["source_evidence"]["visual_pixels_interpreted"] is False
+    assert "Generated figure description (context-only)." in descriptions[0]["text"]
+    assert description_metrics["figure_description_record_count"] == 1
+    assert structures[0]["structure_type"] == "block_diagram"
+    assert structures[0]["derived_from_context"] is True
+    assert structure_metrics["figure_structure_record_count"] == 1
+    chunk_types = [chunk["chunk_type"] for chunk in chunks]
+    assert "figure_description" in chunk_types
+    assert "figure_structure" in chunk_types
+    description_chunk = next(chunk for chunk in chunks if chunk["chunk_type"] == "figure_description")
+    assert description_chunk["generated_text"] is True
+    assert {ref["source_type"] for ref in description_chunk["source_refs"]} == {"figure", "figure_description"}
+
+
 def test_pipeline_writes_assetless_figure_text_chunks_with_placeholder_mode(
     sample_pdf: Path,
     tmp_path: Path,
@@ -252,31 +318,53 @@ def test_pipeline_writes_assetless_figure_text_chunks_with_placeholder_mode(
             image_mode=ImageMode.PLACEHOLDER,
             rag_sidecar_scope=RagSidecarScope.MINIMAL,
             rag_figure_text_chunks=True,
+            figure_region_ocr=True,
+            rag_generated_figure_descriptions=True,
+            figure_structure_extraction=True,
         )
     )
 
     assert result.exit_code == 0
     assert not (output_dir / "assets" / "images" / "page-0001-figure-001.png").exists()
     assert (output_dir / "figures_rag.jsonl").exists()
+    assert (output_dir / "figure_descriptions_rag.jsonl").exists()
+    assert (output_dir / "figure_structures_rag.jsonl").exists()
     retrieval_records = [
         json.loads(line)
         for line in (output_dir / "retrieval_chunks_rag.jsonl").read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
     figure_chunks = [record for record in retrieval_records if record.get("chunk_type") == "figure_text"]
+    description_chunks = [record for record in retrieval_records if record.get("chunk_type") == "figure_description"]
+    structure_chunks = [record for record in retrieval_records if record.get("chunk_type") == "figure_structure"]
     assert len(figure_chunks) == 1
+    assert len(description_chunks) == 1
+    assert len(structure_chunks) == 1
     assert "caption: Figure 1: State machine diagram" in figure_chunks[0]["text"]
     assert figure_chunks[0]["source_refs"][0]["source_id"] == "page-0001-figure-0001"
     assert "path" not in figure_chunks[0]["source_refs"][0]
+    assert description_chunks[0]["generated_text"] is True
+    assert structure_chunks[0]["derived_from_context"] is True
 
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
     report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
     assert manifest["options"]["rag_figure_text_chunks"] is True
+    assert manifest["options"]["figure_region_ocr"] is True
+    assert manifest["options"]["rag_generated_figure_descriptions"] is True
+    assert manifest["options"]["figure_structure_extraction"] is True
     assert manifest["options"]["rag_sidecar_scope"] == "minimal"
     assert manifest["options"]["figures_rag_jsonl_filename"] == "figures_rag.jsonl"
+    assert manifest["options"]["figure_descriptions_jsonl_filename"] == "figure_descriptions_rag.jsonl"
+    assert manifest["options"]["figure_structures_jsonl_filename"] == "figure_structures_rag.jsonl"
     assert "figures_rag.jsonl" not in manifest["options"]["rag_sidecar_omitted_outputs"]
+    assert "figure_descriptions_rag.jsonl" not in manifest["options"]["rag_sidecar_omitted_outputs"]
+    assert "figure_structures_rag.jsonl" not in manifest["options"]["rag_sidecar_omitted_outputs"]
     assert report["summary"]["figure_text_chunk_record_count"] == 1
+    assert report["summary"]["figure_description_chunk_record_count"] == 1
+    assert report["summary"]["figure_structure_chunk_record_count"] == 1
     assert report["summary"]["figure_rag_record_count"] == 1
+    assert report["summary"]["figure_description_record_count"] == 1
+    assert report["summary"]["figure_structure_record_count"] == 1
 
     assert validate_index_contract(output_dir=output_dir)["passed"] is True
     assert validate_provenance_integrity(output_dir=output_dir)["passed"] is True

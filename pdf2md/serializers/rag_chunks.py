@@ -15,6 +15,8 @@ TEXT_CHUNK_MERGE_REASON = "sibling_text_merge"
 TEXT_CHUNK_MERGE_STRATEGY = "adjacent_text_block_same_section_token_budget"
 CHUNK_RELATIONSHIP_STRATEGY = "chunk_group_prev_next_section_anchor"
 FIGURE_TEXT_CHUNK_TYPE = "figure_text"
+FIGURE_DESCRIPTION_CHUNK_TYPE = "figure_description"
+FIGURE_STRUCTURE_CHUNK_TYPE = "figure_structure"
 FIGURE_TEXT_LOW_CONFIDENCE_THRESHOLD = 0.65
 TokenCounter = Callable[[str], int]
 
@@ -425,6 +427,9 @@ def _make_chunk(
     chunk_group_id: str | None = None,
     embedding_text: str | None = None,
     embedding_text_strategy: str | None = None,
+    generated_text: bool | None = None,
+    generation_strategy: str | None = None,
+    derived_from_context: bool | None = None,
 ) -> dict[str, Any]:
     chunk = {
         "chunk_id": f"chunk-{index:06d}",
@@ -453,6 +458,12 @@ def _make_chunk(
         chunk["embedding_text"] = embedding_text
         chunk["embedding_token_estimate"] = _token_estimate(embedding_text, token_counter)
         chunk["embedding_text_strategy"] = embedding_text_strategy or "contextual_embedding_text"
+    if generated_text is not None:
+        chunk["generated_text"] = generated_text
+    if generation_strategy:
+        chunk["generation_strategy"] = generation_strategy
+    if derived_from_context is not None:
+        chunk["derived_from_context"] = derived_from_context
     return chunk
 
 
@@ -587,6 +598,66 @@ def _figure_text_payload(record: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _figure_semantic_source_refs(
+    record: dict[str, Any],
+    *,
+    source_type: str,
+    id_field: str,
+) -> list[dict[str, Any]]:
+    refs = [dict(ref) for ref in record.get("source_refs") or [] if isinstance(ref, dict)]
+    refs.append(
+        {
+            "source_type": source_type,
+            "source_id": record.get(id_field),
+            "page": _page_of(record),
+            "bbox": _bbox(record),
+            "figure_id": record.get("figure_id"),
+        }
+    )
+    return refs
+
+
+def _figure_semantic_payload(
+    record: dict[str, Any],
+    *,
+    chunk_type: str,
+    source_type: str,
+    id_field: str,
+    priority: int,
+    boundary_reason: str,
+) -> dict[str, Any] | None:
+    text = str(record.get("text") or "").strip()
+    if not text:
+        return None
+    semantic_types = [chunk_type]
+    figure_kind = str(record.get("figure_kind") or "").strip()
+    structure_type = str(record.get("structure_type") or "").strip()
+    if figure_kind:
+        semantic_types.append(figure_kind)
+    if structure_type:
+        semantic_types.append(structure_type)
+    if record.get("generated_text") is True:
+        semantic_types.append("generated_text")
+    if record.get("derived_from_context") is True:
+        semantic_types.append("context_derived")
+    return {
+        "text": text,
+        "source_refs": _figure_semantic_source_refs(record, source_type=source_type, id_field=id_field),
+        "page_range": [_page_of(record), _page_of(record)],
+        "bbox": _bbox(record),
+        "heading_path": _heading_path(record),
+        "semantic_types": semantic_types,
+        "retrieval_priority": priority,
+        "boundary_reasons": [boundary_reason],
+        "chunk_group_id": f"figure-{record.get('figure_id') or 'unknown'}",
+        "generated_text": bool(record.get("generated_text")) if "generated_text" in record else None,
+        "generation_strategy": str(record.get("generation_strategy") or ""),
+        "derived_from_context": bool(record.get("derived_from_context"))
+        if "derived_from_context" in record
+        else None,
+    }
+
+
 def _semantic_source_refs(record: dict[str, Any], *, source_type: str) -> list[dict[str, Any]]:
     refs = list(record.get("source_refs") or [])
     refs.append(
@@ -607,6 +678,8 @@ def build_retrieval_chunks(
     requirements: list[dict[str, Any]],
     rag_tables: list[dict[str, Any]],
     figure_records: list[dict[str, Any]] | None = None,
+    figure_description_records: list[dict[str, Any]] | None = None,
+    figure_structure_records: list[dict[str, Any]] | None = None,
     domain_units: list[dict[str, Any]] | None = None,
     requirement_traceability_records: list[dict[str, Any]] | None = None,
     technical_table_records: list[dict[str, Any]] | None = None,
@@ -790,6 +863,60 @@ def build_retrieval_chunks(
                 boundary_reasons=payload["boundary_reasons"],
                 chunk_group_id=payload["chunk_group_id"],
             )
+
+    for record in sorted(figure_description_records or [], key=lambda item: int(item.get("description_index") or 0)):
+        payload = _figure_semantic_payload(
+            record,
+            chunk_type=FIGURE_DESCRIPTION_CHUNK_TYPE,
+            source_type="figure_description",
+            id_field="description_id",
+            priority=62,
+            boundary_reason="figure_description_boundary",
+        )
+        if payload is None:
+            continue
+        append_chunk(
+            chunk_type=FIGURE_DESCRIPTION_CHUNK_TYPE,
+            text=payload["text"],
+            source_refs=payload["source_refs"],
+            page_range=payload["page_range"],
+            bbox=payload["bbox"],
+            heading_path=payload["heading_path"],
+            semantic_types=payload["semantic_types"],
+            normative_strength=None,
+            retrieval_priority=payload["retrieval_priority"],
+            boundary_reasons=payload["boundary_reasons"],
+            chunk_group_id=payload["chunk_group_id"],
+            generated_text=payload["generated_text"],
+            generation_strategy=payload["generation_strategy"],
+        )
+
+    for record in sorted(figure_structure_records or [], key=lambda item: int(item.get("structure_index") or 0)):
+        payload = _figure_semantic_payload(
+            record,
+            chunk_type=FIGURE_STRUCTURE_CHUNK_TYPE,
+            source_type="figure_structure",
+            id_field="structure_id",
+            priority=64,
+            boundary_reason="figure_structure_boundary",
+        )
+        if payload is None:
+            continue
+        append_chunk(
+            chunk_type=FIGURE_STRUCTURE_CHUNK_TYPE,
+            text=payload["text"],
+            source_refs=payload["source_refs"],
+            page_range=payload["page_range"],
+            bbox=payload["bbox"],
+            heading_path=payload["heading_path"],
+            semantic_types=payload["semantic_types"],
+            normative_strength=None,
+            retrieval_priority=payload["retrieval_priority"],
+            boundary_reasons=payload["boundary_reasons"],
+            chunk_group_id=payload["chunk_group_id"],
+            generated_text=payload["generated_text"],
+            derived_from_context=payload["derived_from_context"],
+        )
 
     for record in flatten_rag_table_records(normalize_rag_table_payload(rag_tables)):
         text = str(record.get("row_text") or "").strip()

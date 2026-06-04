@@ -7,6 +7,10 @@ from pdf2md.extractors.text import PageLayoutMetadata, TextLine
 from pdf2md.models import RagTableOutputMode
 from pdf2md.serializers.rag_chunks import serialize_retrieval_chunks_jsonl
 from pdf2md.serializers.rag_domain_adapters import serialize_domain_units_jsonl
+from pdf2md.serializers.rag_figure_semantics import (
+    serialize_figure_descriptions_jsonl,
+    serialize_figure_structures_jsonl,
+)
 from pdf2md.serializers.rag_figures import serialize_figures_jsonl
 from pdf2md.serializers.rag_requirements import serialize_requirement_traceability_jsonl
 from pdf2md.serializers.rag_semantics import (
@@ -150,6 +154,22 @@ def write_retrieval_chunk_output(config: Config, records: list[dict]) -> tuple[i
 
 def write_figure_rag_output(config: Config, records: list[dict]) -> tuple[int, int]:
     write_text(config.output_dir / config.figures_rag_jsonl_filename, serialize_figures_jsonl(records))
+    return len(records), 1
+
+
+def write_figure_description_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(
+        config.output_dir / config.figure_descriptions_jsonl_filename,
+        serialize_figure_descriptions_jsonl(records),
+    )
+    return len(records), 1
+
+
+def write_figure_structure_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(
+        config.output_dir / config.figure_structures_jsonl_filename,
+        serialize_figure_structures_jsonl(records),
+    )
     return len(records), 1
 
 

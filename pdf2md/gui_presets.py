@@ -50,6 +50,10 @@ GUI_PRESET_LOCKED_OPTION_FIELDS: tuple[str, ...] = (
     "rag_merge_sibling_text_chunks",
     "rag_chunk_relationship_metadata",
     "rag_figure_text_chunks",
+    "figure_region_ocr",
+    "rag_generated_figure_descriptions",
+    "figure_description_backend",
+    "figure_structure_extraction",
     "page_workers",
     "debug",
     "verbose",
@@ -109,6 +113,10 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
         rag_figure_text_chunks=(
             True if normalized == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET else profile_options.rag_figure_text_chunks
         ),
+        figure_region_ocr=profile_options.figure_region_ocr,
+        rag_generated_figure_descriptions=profile_options.rag_generated_figure_descriptions,
+        figure_description_backend=profile_options.figure_description_backend,
+        figure_structure_extraction=profile_options.figure_structure_extraction,
     )
 
 

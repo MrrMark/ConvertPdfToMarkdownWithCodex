@@ -432,7 +432,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q104. Docling Benchmark Harness And Comparison Pack" not in next_plan
     assert "Q105. Docling-Informed OCR And Layout Extension Design" not in next_plan
     assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" not in next_plan
-    assert "Q107. Assetless Figure Visual Semantics Layer" in next_plan
+    assert "Q107. Assetless Figure Visual Semantics Layer" not in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
@@ -473,11 +473,11 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q104. Docling Benchmark Harness And Comparison Pack" not in development_specs
     assert "Q105. Docling-Informed OCR And Layout Extension Design" not in development_specs
     assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" not in development_specs
-    assert "Q107. Assetless Figure Visual Semantics Layer" in development_specs
-    assert "figure_descriptions_rag.jsonl" in development_specs
-    assert "figure_structures_rag.jsonl" in development_specs
-    assert "--rag-generated-figure-descriptions" in development_specs
-    assert "generated_text=true" in development_specs
+    assert "Q107. Assetless Figure Visual Semantics Layer" not in development_specs
+    assert "figure_descriptions_rag.jsonl" not in development_specs
+    assert "figure_structures_rag.jsonl" not in development_specs
+    assert "--rag-generated-figure-descriptions" not in development_specs
+    assert "generated_text=true" not in development_specs
     assert "placeholder + figure_text chunk" not in development_specs
     assert "다중 OCR backend" not in development_specs
     assert "현재 active 개발 명세 없음." not in development_specs
@@ -529,8 +529,13 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q106" in development_specs
+    assert "현재 없음." in development_specs
+    assert "완료된 Q34-Q107" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q107. Assetless Figure Visual Semantics Layer" in implemented_specs
+    assert "figure_descriptions_rag.jsonl" in implemented_specs
+    assert "figure_structures_rag.jsonl" in implemented_specs
+    assert "generated_text=true" in implemented_specs
     assert "Q105. Docling-Informed OCR And Layout Extension Design" in implemented_specs
     assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" in implemented_specs
     assert "manual_domain_adapter_keywords" in implemented_specs
