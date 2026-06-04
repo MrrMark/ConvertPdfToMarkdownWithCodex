@@ -732,6 +732,8 @@ Machine-readable schema는 `docs/schema/`에 있으며, 예를 들어 `docs/sche
 `header_depth`, `header_confidence`, `stub_column_count`, `footnote_row_count`,
 `merged_cell_suspected`, `rag_header_strategy` 같은 optional 필드를 통해
 HTML fallback과 RAG sidecar 생성 판단을 추적할 수 있습니다.
+adaptive table strategy가 fallback 실행을 생략한 표에는 `strategy_runs`,
+`adaptive_skipped_strategies`, `adaptive_skip_reason`이 기록됩니다.
 multi-page table continuation 후보는 `continuation_reasons`,
 `continuation_rejected_reasons`, `continuation_features`로 판단 근거를 남깁니다.
 
@@ -965,8 +967,8 @@ lint / format / packaging tooling 예시:
 ### 현재 안정화 이후 우선순위
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
-- 현재 active quality backlog는 Q101-Q105입니다. 우선순위는 table adaptive strategy, fast output scope 검토, assetless technical RAG figure text chunk, Docling 벤치마킹/확장 설계 순서입니다.
-- 완료된 Q34-Q100 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 현재 active quality backlog는 Q102-Q105입니다. 우선순위는 fast output scope 검토, assetless technical RAG figure text chunk, Docling 벤치마킹/확장 설계 순서입니다.
+- 완료된 Q34-Q101 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 
 ### 이후 후보
 

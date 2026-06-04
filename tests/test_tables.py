@@ -201,6 +201,40 @@ class _FakePdfWithPages:
         return None
 
 
+class _CountingPage(_FakePage):
+    def __init__(self, rows: list[list[str]]) -> None:
+        super().__init__(rows)
+        self.find_table_settings: list[object] = []
+
+    def find_tables(self, table_settings=None):  # noqa: ANN001
+        self.find_table_settings.append(table_settings)
+        return super().find_tables(table_settings=table_settings)
+
+
+def test_collect_table_candidates_skips_fallback_strategies_for_safe_default() -> None:
+    page = _CountingPage([["Field", "Value"], ["alpha", "beta"]])
+
+    result = collect_table_candidates_for_page(page, page_number=1)
+
+    assert len(page.find_table_settings) == 1
+    assert page.find_table_settings == [None]
+    assert result.strategy_runs == ["default"]
+    assert result.adaptive_skipped_strategies == ["lines_strict", "mixed_lines_text"]
+    assert result.adaptive_skip_reason == "default_candidate_quality_sufficient"
+    assert result.candidates[0].metrics.selected_strategy == "default"
+
+
+def test_collect_table_candidates_runs_fallback_strategies_for_complex_default() -> None:
+    page = _CountingPage([["Bits", "Description"], ["63:0", "A" * 130]])
+
+    result = collect_table_candidates_for_page(page, page_number=1)
+
+    assert len(page.find_table_settings) == 3
+    assert result.strategy_runs == ["default", "lines_strict", "mixed_lines_text"]
+    assert result.adaptive_skipped_strategies == []
+    assert result.adaptive_skip_reason is None
+
+
 def test_extract_tables_markdown_mode_never_uses_html(monkeypatch) -> None:
     rows = [["Bits", "Description"], ["63:0", "A" * 130]]
     monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
@@ -261,6 +295,27 @@ def test_extract_tables_materializes_precomputed_page_candidates(monkeypatch) ->
     assert result.assets[0].index == 1
     assert result.assets[0].mode == "gfm"
     assert "| Field | Value |" in result.blocks_by_page[1][0].markdown
+
+
+def test_extract_tables_records_adaptive_strategy_skip_diagnostics(monkeypatch) -> None:
+    rows = [["Field", "Value"], ["alpha", "beta"]]
+    monkeypatch.setattr("pdf2md.extractors.tables.pdfplumber.open", lambda *args, **kwargs: _FakePdf(rows))
+
+    result = extract_tables(
+        pdf_path=SimpleNamespace(),
+        selected_pages=[1],
+        password=None,
+        table_mode=TableMode.AUTO,
+    )
+
+    quality = result.table_quality[0]
+    debug = result.debug_candidates_by_page[1][0]
+    assert quality["strategy_runs"] == ["default"]
+    assert quality["adaptive_skipped_strategies"] == ["lines_strict", "mixed_lines_text"]
+    assert quality["adaptive_skip_reason"] == "default_candidate_quality_sufficient"
+    assert debug["strategy_runs"] == ["default"]
+    assert debug["adaptive_skipped_strategies"] == ["lines_strict", "mixed_lines_text"]
+    assert debug["adaptive_skip_reason"] == "default_candidate_quality_sufficient"
 
 
 def test_extract_tables_legacy_gfm_only_still_falls_back_to_html(monkeypatch) -> None:

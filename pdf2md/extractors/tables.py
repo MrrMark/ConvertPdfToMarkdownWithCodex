@@ -37,6 +37,22 @@ TABLE_STRATEGIES: list[tuple[str, dict[str, Any] | None]] = [
     ),
 ]
 logger = logging.getLogger(__name__)
+TABLE_ADAPTIVE_MIN_HEADER_CONFIDENCE = 0.75
+TABLE_ADAPTIVE_MAX_EMPTY_CELL_RATIO = 0.25
+TABLE_ADAPTIVE_MAX_PLACEHOLDER_HEADER_RATIO = 0.0
+TABLE_ADAPTIVE_SAFE_SKIP_REASON = "default_candidate_quality_sufficient"
+TABLE_ADAPTIVE_BLOCKING_REASONS = frozenset(
+    {
+        TableReason.AMBIGUOUS_GRID,
+        TableReason.HEADER_FRAGMENTED,
+        TableReason.LOW_DATA_DENSITY,
+        TableReason.LOW_HEADER_CONFIDENCE,
+        TableReason.MERGED_CELL_SUSPECTED,
+        TableReason.MULTI_ROW_HEADER,
+        TableReason.SPARSE_LAYOUT,
+        TableReason.STUB_COLUMN,
+    }
+)
 TECHNICAL_HEADER_KEYWORDS = frozenset(
     {
         "access",
@@ -101,6 +117,17 @@ class PageTableCandidateResult:
     page_width: float
     page_height: float
     candidates: list[TableExtractionCandidate] = field(default_factory=list)
+    strategy_runs: list[str] = field(default_factory=list)
+    adaptive_skipped_strategies: list[str] = field(default_factory=list)
+    adaptive_skip_reason: str | None = None
+
+
+@dataclass
+class TableStrategyCollectionResult:
+    candidates: list[TableExtractionCandidate]
+    strategy_runs: list[str]
+    adaptive_skipped_strategies: list[str] = field(default_factory=list)
+    adaptive_skip_reason: str | None = None
 
 
 @dataclass
@@ -781,19 +808,35 @@ def _process_rows(raw_rows: list[list[str]], strategy: str) -> tuple[list[list[s
     return rows, notes, metrics
 
 
-def _collect_candidates_for_page(page: pdfplumber.page.Page) -> list[TableExtractionCandidate]:
-    candidates_by_bbox: dict[tuple[float, float, float, float], TableExtractionCandidate] = {}
-    for strategy, table_settings in TABLE_STRATEGIES:
-        raw_candidates = page.find_tables() if table_settings is None else page.find_tables(table_settings=table_settings)
-        for table_obj in raw_candidates or []:
-            raw_rows = table_obj.extract() or []
-            rows, notes, metrics = _process_rows(raw_rows, strategy)
-            if not rows or not rows[0]:
-                continue
-            table_grid = _build_table_grid(rows, notes, metrics)
-            simple, reasons = analyze_table_complexity(rows)
-            reasons = sorted(set(reasons).union(table_grid.diagnostics.reasons))
-            candidate = TableExtractionCandidate(
+def _placeholder_header_ratio(headers: list[str]) -> float:
+    if not headers:
+        return 0.0
+    placeholder_count = 0
+    for header in headers:
+        normalized = header.strip().lower()
+        if normalized.startswith("column ") and normalized.removeprefix("column ").strip().isdigit():
+            placeholder_count += 1
+    return round(placeholder_count / len(headers), 4)
+
+
+def _extract_strategy_candidates(
+    page: pdfplumber.page.Page,
+    *,
+    strategy: str,
+    table_settings: dict[str, Any] | None,
+) -> list[TableExtractionCandidate]:
+    extracted: list[TableExtractionCandidate] = []
+    raw_candidates = page.find_tables() if table_settings is None else page.find_tables(table_settings=table_settings)
+    for table_obj in raw_candidates or []:
+        raw_rows = table_obj.extract() or []
+        rows, notes, metrics = _process_rows(raw_rows, strategy)
+        if not rows or not rows[0]:
+            continue
+        table_grid = _build_table_grid(rows, notes, metrics)
+        simple, reasons = analyze_table_complexity(rows)
+        reasons = sorted(set(reasons).union(table_grid.diagnostics.reasons))
+        extracted.append(
+            TableExtractionCandidate(
                 strategy=strategy,
                 bbox=tuple(float(v) for v in table_obj.bbox),
                 rows=rows,
@@ -803,25 +846,82 @@ def _collect_candidates_for_page(page: pdfplumber.page.Page) -> list[TableExtrac
                 decision=TableRecoveryDecision(unresolved=bool(reasons) or not simple, reasons=reasons),
                 diagnostics=table_grid.diagnostics,
             )
-            bbox_key = tuple(round(v, 1) for v in candidate.bbox)
-            previous = candidates_by_bbox.get(bbox_key)
-            if previous is None or candidate.quality_score > previous.quality_score:
+        )
+    return extracted
+
+
+def _dedupe_candidates_by_bbox(candidates: list[TableExtractionCandidate]) -> list[TableExtractionCandidate]:
+    candidates_by_bbox: dict[tuple[float, float, float, float], TableExtractionCandidate] = {}
+    for candidate in candidates:
+        bbox_key = tuple(round(v, 1) for v in candidate.bbox)
+        previous = candidates_by_bbox.get(bbox_key)
+        if previous is None or candidate.quality_score > previous.quality_score:
+            candidates_by_bbox[bbox_key] = candidate
+        elif previous is not None and candidate.quality_score == previous.quality_score:
+            prev_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == previous.strategy)
+            curr_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == candidate.strategy)
+            if curr_rank < prev_rank:
                 candidates_by_bbox[bbox_key] = candidate
-            elif previous is not None and candidate.quality_score == previous.quality_score:
-                prev_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == previous.strategy)
-                curr_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == candidate.strategy)
-                if curr_rank < prev_rank:
-                    candidates_by_bbox[bbox_key] = candidate
     return list(candidates_by_bbox.values())
+
+
+def _candidate_allows_adaptive_strategy_skip(candidate: TableExtractionCandidate) -> bool:
+    if candidate.strategy != "default":
+        return False
+    if candidate.decision.unresolved or candidate.decision.reasons:
+        return False
+    if candidate.diagnostics.header_confidence < TABLE_ADAPTIVE_MIN_HEADER_CONFIDENCE:
+        return False
+    if candidate.metrics.empty_cell_ratio > TABLE_ADAPTIVE_MAX_EMPTY_CELL_RATIO:
+        return False
+    if _placeholder_header_ratio(candidate.diagnostics.headers) > TABLE_ADAPTIVE_MAX_PLACEHOLDER_HEADER_RATIO:
+        return False
+    if set(candidate.decision.reasons) & TABLE_ADAPTIVE_BLOCKING_REASONS:
+        return False
+    return True
+
+
+def _can_skip_fallback_table_strategies(default_candidates: list[TableExtractionCandidate]) -> bool:
+    if not default_candidates:
+        return False
+    return all(_candidate_allows_adaptive_strategy_skip(candidate) for candidate in default_candidates)
+
+
+def _collect_candidates_for_page(page: pdfplumber.page.Page) -> TableStrategyCollectionResult:
+    strategy_runs: list[str] = []
+    default_strategy, default_settings = TABLE_STRATEGIES[0]
+    strategy_runs.append(default_strategy)
+    all_candidates = _extract_strategy_candidates(page, strategy=default_strategy, table_settings=default_settings)
+    default_candidates = _dedupe_candidates_by_bbox(all_candidates)
+    if _can_skip_fallback_table_strategies(default_candidates):
+        skipped = [strategy for strategy, _ in TABLE_STRATEGIES[1:]]
+        return TableStrategyCollectionResult(
+            candidates=default_candidates,
+            strategy_runs=strategy_runs,
+            adaptive_skipped_strategies=skipped,
+            adaptive_skip_reason=TABLE_ADAPTIVE_SAFE_SKIP_REASON,
+        )
+
+    for strategy, table_settings in TABLE_STRATEGIES[1:]:
+        strategy_runs.append(strategy)
+        all_candidates.extend(_extract_strategy_candidates(page, strategy=strategy, table_settings=table_settings))
+    return TableStrategyCollectionResult(
+        candidates=_dedupe_candidates_by_bbox(all_candidates),
+        strategy_runs=strategy_runs,
+    )
 
 
 def collect_table_candidates_for_page(page: pdfplumber.page.Page, page_number: int) -> PageTableCandidateResult:
     """Collect page-local raw table candidates without assigning document-level table indexes."""
+    collection = _collect_candidates_for_page(page)
     return PageTableCandidateResult(
         page=page_number,
         page_width=float(page.width),
         page_height=float(page.height),
-        candidates=_collect_candidates_for_page(page),
+        candidates=collection.candidates,
+        strategy_runs=collection.strategy_runs,
+        adaptive_skipped_strategies=collection.adaptive_skipped_strategies,
+        adaptive_skip_reason=collection.adaptive_skip_reason,
     )
 
 
@@ -1441,6 +1541,11 @@ def _materialize_page_table_candidates(
         page_width=candidate_result.page_width,
         page_height=candidate_result.page_height,
     )
+    if candidate_result.strategy_runs or candidate_result.adaptive_skipped_strategies:
+        for debug_item in debug_candidates:
+            debug_item["strategy_runs"] = candidate_result.strategy_runs
+            debug_item["adaptive_skipped_strategies"] = candidate_result.adaptive_skipped_strategies
+            debug_item["adaptive_skip_reason"] = candidate_result.adaptive_skip_reason
     result.debug_candidates_by_page[page_number] = debug_candidates
 
     page_blocks: list[TableBlock] = []
@@ -1576,6 +1681,10 @@ def _materialize_page_table_candidates(
         }
         if candidate.metrics.header_rows_promoted:
             table_quality_item["header_rows_promoted"] = candidate.metrics.header_rows_promoted
+        if candidate_result.adaptive_skipped_strategies:
+            table_quality_item["strategy_runs"] = candidate_result.strategy_runs
+            table_quality_item["adaptive_skipped_strategies"] = candidate_result.adaptive_skipped_strategies
+            table_quality_item["adaptive_skip_reason"] = candidate_result.adaptive_skip_reason
         result.table_quality.append(table_quality_item)
 
         result.table_counts["table_total"] += 1
