@@ -190,6 +190,7 @@ def run_latest_nvme_command_set_eval(
     official_source_url: str = OFFICIAL_SOURCE_URL,
     figure_semantics_mode: str = "visual",
     figure_description_backend: str = "local-vlm",
+    require_docling: bool = False,
 ) -> dict[str, Any]:
     """Run the latest NVMe Command Set current-tool/Docling comparison pack."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -207,6 +208,7 @@ def run_latest_nvme_command_set_eval(
         rag_generated_figure_descriptions=include_visual_semantics,
         figure_description_backend=figure_description_backend,
         figure_structure_extraction=include_visual_semantics,
+        require_docling=require_docling,
     )
     comparison = _read_json(output_dir / COMPARISON_FILENAME)
     scorecard = render_latest_nvme_scorecard(
@@ -241,7 +243,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=SUPPORTED_FIGURE_DESCRIPTION_BACKENDS,
         default="local-vlm",
     )
+    parser.add_argument(
+        "--require-docling",
+        action="store_true",
+        default=False,
+        help="Treat a missing Docling installation as an error for installed-backend benchmark gates.",
+    )
     parser.add_argument("--fail-on-current-tool-failure", action="store_true")
+    parser.add_argument("--fail-on-error", action="store_true")
     return parser
 
 
@@ -256,11 +265,14 @@ def main(argv: list[str] | None = None) -> int:
         official_source_url=args.official_source_url,
         figure_semantics_mode=args.figure_semantics_mode,
         figure_description_backend=args.figure_description_backend,
+        require_docling=args.require_docling,
     )
     print(f"Wrote {args.output_dir / REPORT_FILENAME}")
     print(f"Wrote {args.output_dir / COMPARISON_FILENAME}")
     print(f"Wrote {args.output_dir / SCORECARD_FILENAME}")
     if args.fail_on_current_tool_failure and report.get("summary", {}).get("current_tool_status") == "failed":
+        return 1
+    if args.fail_on_error and report.get("summary", {}).get("error_count", 0):
         return 1
     return 0
 

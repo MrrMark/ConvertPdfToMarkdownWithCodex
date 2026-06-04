@@ -277,6 +277,28 @@ def test_latest_nvme_command_set_eval_writes_sanitized_scorecard(
     assert manifest["options"]["rag_generated_figure_descriptions"] is True
 
 
+def test_docling_comparison_can_require_installed_docling(
+    monkeypatch,  # noqa: ANN001
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(benchmark_docling_comparison, "_module_available", lambda module_name: False)
+
+    report = benchmark_docling_comparison.run_docling_comparison(
+        input_pdf=sample_pdf,
+        output_dir=tmp_path / "docling-required",
+        document_label="docling-required",
+        require_docling=True,
+    )
+
+    assert report["summary"]["docling_status"] == "skipped"
+    assert report["summary"]["error_count"] == 1
+    assert {finding["code"] for finding in report["findings"]} == {
+        "docling_not_installed",
+        "docling_required_not_available",
+    }
+
+
 def test_docling_metric_deltas_are_numeric_when_both_tools_report_numbers() -> None:
     current_run = {
         "duration_ms": 100,
@@ -731,6 +753,55 @@ def test_release_gate_runner_supports_optional_preset_eval_gate(monkeypatch, tmp
     assert "--min-expected-source-coverage" in command
     assert "--min-source-ref-presence-coverage" in command
     assert "--max-chunk-token-p95" in command
+
+
+def test_release_gate_runner_requires_docling_input_pdf(tmp_path: Path) -> None:
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-docling-missing-input",
+            gates=["docling"],
+        )
+    )
+
+    assert payload["passed_release_gate"] is False
+    assert payload["gates"][0]["gate"] == "docling"
+    assert payload["gates"][0]["exit_code"] == 2
+    assert "--docling-input-pdf is required" in payload["gates"][0]["stderr_tail"]
+
+
+def test_release_gate_runner_supports_docling_installed_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):  # noqa: ANN001
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="Wrote docling_benchmark_report.json", stderr="")
+
+    monkeypatch.setattr(run_release_gates.subprocess, "run", fake_run)
+
+    input_pdf = tmp_path / "NVM-Command-Set.pdf"
+    payload = run_release_gates.run_release_gates(
+        run_release_gates.ReleaseGateConfig(
+            output_dir=tmp_path / "release-docling",
+            gates=["docling"],
+            docling_input_pdf=input_pdf,
+            docling_pages="1-2",
+            docling_document_label="latest-nvme-smoke",
+            docling_figure_semantics_mode="visual",
+        )
+    )
+
+    assert payload["passed_release_gate"] is True
+    assert payload["gates"][0]["gate"] == "docling"
+    assert payload["gates"][0]["report_path"].endswith("docling_benchmark_report.json")
+    command = calls[0]
+    assert any(str(part).endswith("run_latest_nvme_command_set_eval.py") for part in command)
+    assert str(input_pdf) in command
+    assert "--require-docling" in command
+    assert "--fail-on-error" in command
+    assert "--fail-on-current-tool-failure" in command
+    assert "--figure-semantics-mode" in command
+    assert "visual" in command
+    assert "--pages" in command
 
 
 def test_release_gate_runner_supports_optional_gui_gate(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001

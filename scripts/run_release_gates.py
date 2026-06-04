@@ -23,6 +23,7 @@ OPTIONAL_GATES = (
     "provenance-integrity",
     "artifact-integrity",
     "preset-eval",
+    "docling",
     "gui",
     "gui-parity",
     "gui-benchmark",
@@ -80,6 +81,11 @@ class ReleaseGateConfig:
     preset_eval_pages: str | None = None
     preset_eval_rag_eval_set: Path | None = None
     preset_eval_min_score: float | None = None
+    docling_input_pdf: Path | None = None
+    docling_pages: str | None = None
+    docling_document_label: str = "nvme-nvm-command-set-rev-1.2-2025-08-01"
+    docling_figure_semantics_mode: str = "visual"
+    docling_figure_description_backend: str = "local-vlm"
 
 
 def _split_gates(raw_gates: str) -> list[str]:
@@ -422,6 +428,42 @@ def _preset_eval_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     return [_run_command(gate="preset-eval", command=command, report_path=report_path)]
 
 
+def _docling_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
+    output_dir = config.output_dir / "docling"
+    report_path = output_dir / "docling_benchmark_report.json"
+    if config.docling_input_pdf is None:
+        return [
+            {
+                "gate": "docling",
+                "command": [],
+                "exit_code": 2,
+                "status": "failed",
+                "report_path": str(report_path),
+                "stdout_tail": "",
+                "stderr_tail": "--docling-input-pdf is required when --gates includes docling.",
+            }
+        ]
+    command = [
+        sys.executable,
+        "scripts/run_latest_nvme_command_set_eval.py",
+        "--input-pdf",
+        str(config.docling_input_pdf),
+        "--output-dir",
+        str(output_dir),
+        "--document-label",
+        config.docling_document_label,
+        "--figure-semantics-mode",
+        config.docling_figure_semantics_mode,
+        "--figure-description-backend",
+        config.docling_figure_description_backend,
+        "--require-docling",
+        "--fail-on-error",
+        "--fail-on-current-tool-failure",
+    ]
+    _append_optional_arg(command, "--pages", config.docling_pages)
+    return [_run_command(gate="docling", command=command, report_path=report_path)]
+
+
 def _gui_gate(config: ReleaseGateConfig) -> list[dict[str, Any]]:
     gui_python = _gui_python_executable()
     output_dir = config.output_dir / "gui"
@@ -643,6 +685,8 @@ def run_release_gates(config: ReleaseGateConfig) -> dict[str, Any]:
             records.extend(_artifact_integrity_gate(config))
         elif gate == "preset-eval":
             records.extend(_preset_eval_gate(config))
+        elif gate == "docling":
+            records.extend(_docling_gate(config))
         elif gate == "gui":
             records.extend(_gui_gate(config))
         elif gate == "gui-parity":
@@ -683,7 +727,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Comma-separated gates: "
             "ocr,corpus,benchmark,schema,packaging,ci-lightweight,dependency-audit,rag,index-contract,provenance-integrity,"
-            "artifact-integrity,preset-eval,gui,gui-parity,gui-benchmark."
+            "artifact-integrity,preset-eval,docling,gui,gui-parity,gui-benchmark."
         ),
     )
     parser.add_argument("--ocr-lang", default="eng")
@@ -740,6 +784,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--preset-eval-pages")
     parser.add_argument("--preset-eval-rag-eval-set", type=Path)
     parser.add_argument("--preset-eval-min-score", type=float)
+    parser.add_argument("--docling-input-pdf", type=Path)
+    parser.add_argument("--docling-pages")
+    parser.add_argument("--docling-document-label", default="nvme-nvm-command-set-rev-1.2-2025-08-01")
+    parser.add_argument("--docling-figure-semantics-mode", choices=("assetless", "visual"), default="visual")
+    parser.add_argument(
+        "--docling-figure-description-backend",
+        choices=("local-vlm", "docling"),
+        default="local-vlm",
+    )
     return parser
 
 
@@ -800,6 +853,11 @@ def main(argv: list[str] | None = None) -> int:
             preset_eval_pages=args.preset_eval_pages,
             preset_eval_rag_eval_set=args.preset_eval_rag_eval_set,
             preset_eval_min_score=args.preset_eval_min_score,
+            docling_input_pdf=args.docling_input_pdf,
+            docling_pages=args.docling_pages,
+            docling_document_label=args.docling_document_label,
+            docling_figure_semantics_mode=args.docling_figure_semantics_mode,
+            docling_figure_description_backend=args.docling_figure_description_backend,
         )
     )
     print(f"Wrote {args.output_dir / 'release_gate_report.json'}")
