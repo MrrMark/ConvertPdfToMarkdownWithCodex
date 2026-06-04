@@ -56,9 +56,9 @@ def test_readme_documents_default_output_and_skip_existing() -> None:
     assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
     assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 Q101-Q105입니다" in readme
-    assert "table adaptive strategy" in readme
-    assert "완료된 Q34-Q100" in readme
+    assert "현재 active quality backlog는 Q102-Q105입니다" in readme
+    assert "fast output scope 검토" in readme
+    assert "완료된 Q34-Q101" in readme
     assert "pdf-outline-" in readme
     assert "target_source_pdf_outline" in readme
     assert "summary.actionable_warning_count" in readme
@@ -132,8 +132,13 @@ def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
     )
     assert "M04는 Q92에서 active backlog와 문서 정합성 1차 정리를 완료했다" in tasks
     assert "M05는 Q95에서 lightweight CI gate를 보강했고, Q96에서 한글/OCR fixture 회귀 방어를 보강했다" in tasks
-    assert "M06은 Q98에서 structure marker OCR lazy 처리, Q99에서 page worker chunked parallelization, Q100에서 OCR page parallelization을 완료했고" in tasks
-    assert "Q101-Q102에서 남은 변환 속도 병목을 품질 보존 방식으로 줄이는 성능 개선 트랙으로 관리한다" in tasks
+    assert (
+        "M06은 Q98에서 structure marker OCR lazy 처리, Q99에서 page worker chunked parallelization, "
+        "Q100에서 OCR page parallelization, Q101에서 adaptive table strategy를 완료했고"
+        in tasks
+    )
+    assert "Q101에서 adaptive table strategy를 완료했고" in tasks
+    assert "Q102에서 남은 output scope 병목을 품질 보존 방식으로 줄이는 성능 개선 트랙으로 관리한다" in tasks
     assert "M07은 Q103-Q105에서 이미지 파일 업로드가 불가능한 RAG 환경과 Docling 벤치마킹/확장 설계를 관리한다" in tasks
 
 
@@ -407,7 +412,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q98. Lazy Structure Marker OCR" not in next_plan
     assert "Q99. Page Worker Chunked Parallelization" not in next_plan
     assert "Q100. OCR Page Parallelization" not in next_plan
-    assert "Q101. Table Strategy Adaptive Mode" in next_plan
+    assert "Q101. Table Strategy Adaptive Mode" not in next_plan
     assert "Q102. Fast Output Profile And Sidecar Scope" in next_plan
     assert "Q103. Assetless Technical RAG Figure Text Chunks" in next_plan
     assert "Q104. Docling Benchmark Harness And Comparison Pack" in next_plan
@@ -446,7 +451,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q98. Lazy Structure Marker OCR" not in development_specs
     assert "Q99. Page Worker Chunked Parallelization" not in development_specs
     assert "Q100. OCR Page Parallelization" not in development_specs
-    assert "Q101. Table Strategy Adaptive Mode" in development_specs
+    assert "Q101. Table Strategy Adaptive Mode" not in development_specs
     assert "Q102. Fast Output Profile And Sidecar Scope" in development_specs
     assert "Q103. Assetless Technical RAG Figure Text Chunks" in development_specs
     assert "Q104. Docling Benchmark Harness And Comparison Pack" in development_specs
@@ -502,7 +507,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "완료된 Q34-Q100" in development_specs
+    assert "완료된 Q34-Q101" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q34. Offline Index Contract Validator" in implemented_specs
     assert "Q42. Full Page Worker Table Candidate Parallelization" in implemented_specs
@@ -638,6 +643,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "tables_rag.jsonl" in output_schema
     assert "actionable_warning_count" in output_schema
     assert "table_expected_fallback_count" in output_schema
+    assert "adaptive_skipped_strategies" in output_schema
+    assert "adaptive_skip_reason" in output_schema
     assert "Warning taxonomy policy" in output_schema
     assert "Advisory warnings" in output_schema
     assert "pdf2md --help" in output_schema

@@ -23,11 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q101. Table Strategy Adaptive Mode
-
-표 추출에서 기본 전략 품질이 충분한 경우 추가 fallback 전략을 생략하는 adaptive mode를 도입한다.
-복잡 표를 억지로 GFM으로 내보내지 않는 기존 안전 정책과 table quality diagnostics는 유지한다.
-
 ### P1 / Q102. Fast Output Profile And Sidecar Scope
 
 `document.md`, `manifest.json`, `report.json` 중심의 opt-in fast profile과 RAG sidecar 생성 범위 `minimal|full`을 검토한다.

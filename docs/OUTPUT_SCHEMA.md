@@ -123,6 +123,12 @@ Stable summary fields:
 - `confidential_safe_mode`
 - `font_heading_candidate_count`, `footnote_candidate_count`, `structure_low_confidence_count`
 
+`summary.table_quality[]` optional diagnostics:
+
+- `strategy_runs`: table extraction strategies actually executed for the page when adaptive strategy skipping occurred.
+- `adaptive_skipped_strategies`: fallback strategies skipped because the default candidate met conservative quality thresholds.
+- `adaptive_skip_reason`: stable reason code for adaptive skipping, currently `default_candidate_quality_sufficient`.
+
 Warning taxonomy policy:
 
 - Known warning codes have a stable domain and default severity in code.

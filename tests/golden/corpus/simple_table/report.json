@@ -148,6 +148,11 @@
     "table_mode_requested": "auto",
     "table_quality": [
       {
+        "adaptive_skip_reason": "default_candidate_quality_sufficient",
+        "adaptive_skipped_strategies": [
+          "lines_strict",
+          "mixed_lines_text"
+        ],
         "all_empty_rows_removed": 0,
         "caption_distance": 27.516,
         "caption_position": "above",
@@ -168,6 +173,9 @@
         "rag_header_strategy": "single_row",
         "reasons": [],
         "selected_strategy": "default",
+        "strategy_runs": [
+          "default"
+        ],
         "stub_column_count": 0,
         "table_index": 1,
         "unresolved": false
