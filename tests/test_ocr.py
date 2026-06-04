@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pdf2md.extractors.ocr as ocr_module
+import pdf2md.extractors.ocr_backends.tesseract as tesseract_backend_module
 from pdf2md.extractors.ocr import run_ocr
 
 
@@ -36,7 +37,7 @@ def _patch_ocr_runtime(monkeypatch, image_to_string, image_to_data) -> None:  # 
     )
     monkeypatch.setattr(ocr_module, "pytesseract", fake_tesseract)
     monkeypatch.setattr(ocr_module, "pdfium", SimpleNamespace(PdfDocument=_FakeDocument))
-    monkeypatch.setattr(ocr_module.shutil, "which", lambda name: "/usr/bin/tesseract")
+    monkeypatch.setattr(tesseract_backend_module.shutil, "which", lambda name: "/usr/bin/tesseract")
 
 
 def test_run_ocr_passes_language_to_tesseract(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
@@ -57,7 +58,7 @@ def test_run_ocr_passes_language_to_tesseract(sample_pdf, monkeypatch) -> None: 
     )
     monkeypatch.setattr(ocr_module, "pytesseract", fake_tesseract)
     monkeypatch.setattr(ocr_module, "pdfium", SimpleNamespace(PdfDocument=_FakeDocument))
-    monkeypatch.setattr(ocr_module.shutil, "which", lambda name: "/usr/bin/tesseract")
+    monkeypatch.setattr(tesseract_backend_module.shutil, "which", lambda name: "/usr/bin/tesseract")
 
     result = run_ocr(sample_pdf, [1], {1: ""}, force_ocr=False, ocr_lang="kor+eng")
 
@@ -122,6 +123,7 @@ def test_run_ocr_reports_empty_result_with_confidence_metrics(sample_pdf, monkey
     assert result.warnings[0].code == "OCR_EMPTY_RESULT"
     assert result.warnings[0].details == {
         "ocr_lang": "eng",
+        "ocr_backend": "tesseract",
         "reason": "empty_result",
         "ocr_confidence_mean": 0.0,
         "ocr_confidence_median": 0.0,
@@ -147,7 +149,11 @@ def test_run_ocr_reports_missing_language_data_as_runtime_diagnostic(sample_pdf,
     assert result.runtime_available is True
     assert result.used_ocr is False
     assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
-    assert result.warnings[0].details == {"ocr_lang": "kor+eng", "reason": "language_data_missing"}
+    assert result.warnings[0].details == {
+        "ocr_lang": "kor+eng",
+        "ocr_backend": "tesseract",
+        "reason": "language_data_missing",
+    }
 
 
 def test_run_ocr_reports_missing_tesseract_executable_with_attempt_context(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
@@ -156,7 +162,7 @@ def test_run_ocr_reports_missing_tesseract_executable_with_attempt_context(sampl
         image_to_string=lambda image, lang: "unused",  # noqa: ARG005
         image_to_data=lambda image, lang, output_type: {},  # noqa: ARG005
     )
-    monkeypatch.setattr(ocr_module, "_resolve_tesseract_cmd", lambda: None)
+    monkeypatch.setattr(tesseract_backend_module, "_resolve_tesseract_cmd", lambda: None)
 
     result = run_ocr(sample_pdf, [1], {1: ""}, force_ocr=False, ocr_lang="kor+eng")
 
@@ -166,6 +172,7 @@ def test_run_ocr_reports_missing_tesseract_executable_with_attempt_context(sampl
     assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
     assert result.warnings[0].details == {
         "ocr_lang": "kor+eng",
+        "ocr_backend": "tesseract",
         "reason": "tesseract_unavailable",
         "attempted_pages": [1],
     }
@@ -183,7 +190,23 @@ def test_run_ocr_runtime_unavailable_records_attempt_without_text(sample_pdf, mo
     assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
     assert result.warnings[0].details == {
         "ocr_lang": "eng",
+        "ocr_backend": "tesseract",
         "reason": "dependency_unavailable",
+        "attempted_pages": [1],
+    }
+
+
+def test_run_ocr_reports_unsupported_backend_without_attempting_text(sample_pdf) -> None:  # noqa: ANN001
+    result = run_ocr(sample_pdf, [1], {1: ""}, force_ocr=False, ocr_lang="eng", ocr_backend="rapidocr")
+
+    assert result.used_ocr is False
+    assert result.runtime_available is False
+    assert result.attempted_pages == [1]
+    assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
+    assert result.warnings[0].details == {
+        "ocr_lang": "eng",
+        "ocr_backend": "rapidocr",
+        "reason": "unsupported_ocr_backend",
         "attempted_pages": [1],
     }
 

@@ -491,10 +491,11 @@ python3 -m pdf2md input.pdf -o output/ --figure-crop-fallback
 ```bash
 python3 scripts/check_ocr_runtime.py --ocr-lang kor+eng
 python3 scripts/probe_ocr_backends.py --ocr-lang kor+eng --backends all --json
-python3 -m pdf2md input.pdf -o output/ --force-ocr --ocr-lang kor+eng
+python3 -m pdf2md input.pdf -o output/ --force-ocr --ocr-lang kor+eng --ocr-backend tesseract
 ```
 
 - 기본값은 `eng`입니다.
+- 변환 경로의 OCR backend 기본값은 `tesseract`이며, 현재 기본 변환에 연결된 backend도 `tesseract`만 지원합니다.
 - 변환 전에 `scripts/check_ocr_runtime.py`로 Tesseract 실행 파일, Python OCR 패키지, `kor+eng` 언어팩 설치 여부를 점검할 수 있습니다.
 - `scripts/probe_ocr_backends.py`는 Tesseract, RapidOCR, EasyOCR, OCRmac, Docling 같은 optional OCR backend의 module/executable/language readiness를 raw document content 없이 점검합니다.
 - OCR runtime이 없거나 confidence가 낮으면 결과를 정답처럼 숨기지 않고 `report.json` warning과 page diagnostics에 남깁니다.
@@ -675,6 +676,7 @@ pdfs/
 - `options.confidential_safe_mode`
 - `options.local_only_processing`
 - `options.ocr_lang`
+- `options.ocr_backend`
 - `options.repair_hyphenation`
 - `options.figure_crop_fallback`
 - 이미지별 `alt_text`
@@ -699,7 +701,7 @@ pdfs/
 - 페이지별 `status`
 - 페이지별 `reading_order_strategy`, `column_count_estimate`
 - 페이지별 `text_layer_char_count`, `ocr_attempted`, `ocr_reason`, `ocr_runtime_available`
-- OCR 실패/저신뢰 warning의 `details.reason`, `ocr_lang`, confidence metrics
+- OCR 실패/저신뢰 warning의 `details.reason`, `ocr_lang`, `ocr_backend`, confidence metrics
 - 페이지별 `header_footer_suppressed_count`
 - `summary.page_status_counts`
 - `summary.actionable_warning_count`
@@ -1016,12 +1018,13 @@ lint / format / packaging tooling 예시:
 
 - 다음 작업은 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`에 등록하고, 완료되면 해당 문서에서 제거합니다.
 - 현재 active quality backlog는 없습니다.
-- 완료된 Q34-Q110 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
+- 완료된 Q34-Q111 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 확인합니다.
 - Docling-informed OCR/layout 확장 판단은 `docs/DOCLING_INFORMED_EXTENSION_DESIGN.md`에서 확인합니다.
 
 ### 이후 후보
 
 - Docling-installed benchmark evidence로 검증된 이미지 설명 생성 옵션
+- Region OCR report-only prototype
 - Docling-installed benchmark evidence로 검증된 backend adapter 확장
 - appendix/comment/json 기반 추가 출력 모드
 

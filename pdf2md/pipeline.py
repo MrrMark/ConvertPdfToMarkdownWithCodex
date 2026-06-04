@@ -707,6 +707,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         page_texts,
         config.force_ocr,
         ocr_lang=config.ocr_lang,
+        ocr_backend=config.ocr_backend,
         worker_count=effective_page_workers,
     )
     finish_stage("ocr", ocr_started)
@@ -1150,6 +1151,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         "table_mode": table_mode.manifest_value(),
         "force_ocr": config.force_ocr,
         "ocr_lang": config.ocr_lang,
+        "ocr_backend": config.ocr_backend,
         "keep_page_markers": config.keep_page_markers,
         "remove_header_footer": config.remove_header_footer,
         "dedupe_images": config.dedupe_images,

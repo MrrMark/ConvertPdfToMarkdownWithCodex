@@ -339,6 +339,7 @@ def test_pipeline_routes_image_only_scanned_pdf_through_ocr_without_correction(
         existing_page_texts,
         force_ocr,
         ocr_lang,
+        ocr_backend,
         worker_count=1,
     ) -> OcrResult:
         assert pdf_path_arg == pdf_path
@@ -346,6 +347,7 @@ def test_pipeline_routes_image_only_scanned_pdf_through_ocr_without_correction(
         assert existing_page_texts == {1: ""}
         assert force_ocr is False
         assert ocr_lang == "eng"
+        assert ocr_backend == "tesseract"
         assert worker_count == 1
         return OcrResult(
             warnings=[
