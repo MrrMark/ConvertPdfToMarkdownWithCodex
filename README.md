@@ -235,8 +235,8 @@ sudo apt-get install -y tesseract-ocr
 - Windows 설치부터 CLI/GUI 실행까지의 빠른 시작 문서: [docs/WINDOWS_INSTALL_RUN_QUICKSTART.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/WINDOWS_INSTALL_RUN_QUICKSTART.md)
 - Windows 전용 상세 운영 문서: [docs/WINDOWS_A_TO_Z_GUIDE.md](/Users/mankiw/VS_Project/ConvertPdfToMarkdown/docs/WINDOWS_A_TO_Z_GUIDE.md)
 - 회사 보안 환경(온라인 설치 제한, `git clone` 제한) 대응 절차 포함
-- ZIP 배포본 기준 원클릭 환경 구성: `scripts\setup_windows_env.ps1`, `scripts\setup_windows_env.bat`
-- ZIP 배포본 기준 폴더 배치 변환: `scripts\run_batch_folder_windows.ps1`, `scripts\run_batch_folder_windows.bat`
+- ZIP 배포본 기준 원클릭 환경 구성: `scripts\setup_windows_env.ps1`, `scripts\setup_windows_env.bat` (기본 `Python 3.14` + `.venv314`, 없으면 `winget` 설치 시도)
+- ZIP 배포본 기준 폴더 배치 변환: `scripts\run_batch_folder_windows.ps1`, `scripts\run_batch_folder_windows.bat` (기본 `.venv314`, 3.11 fallback은 `-PythonVersion 3.11 -VenvDir .venv311`로 명시)
 
 ### macOS GUI 빠른 시작 가이드
 
@@ -587,6 +587,13 @@ Windows ZIP 배포본에서는 아래 스크립트로 동일한 목적의 환경
 ```powershell
 .\scripts\setup_windows_env.bat
 .\scripts\run_batch_folder_windows.bat -InputDir .\pdfs
+```
+
+Windows helper script의 기본값은 exact `Python 3.14` + `.venv314`입니다. Python 3.14 실행기가 없으면 `winget`으로 `Python.Python.3.14` 설치를 시도하고, 실패 시 python.org 수동 설치와 venv fallback 명령을 출력합니다. Python 3.11/3.12/3.13만 설치된 PC에서 새 Python 설치를 원하지 않으면 `-PythonVersion 3.11 -VenvDir .venv311 -SkipWingetInstall`처럼 설치된 minor version을 명시합니다.
+
+```powershell
+.\scripts\setup_windows_env.ps1 -PythonVersion 3.11 -VenvDir .venv311 -SkipWingetInstall
+.\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs -PythonVersion 3.11 -VenvDir .venv311
 ```
 
 ---

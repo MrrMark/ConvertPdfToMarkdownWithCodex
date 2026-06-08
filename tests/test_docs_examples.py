@@ -175,7 +175,10 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "py -3.14 -m venv .venv314" in guide
     assert "scripts\\setup_windows_env.ps1" in guide
     assert "scripts\\run_batch_folder_windows.ps1" in guide
-    assert ".venv314\\Scripts\\python.exe -m pip install -e .[dev]" in guide
+    assert "Python 3.14 기본 / 3.11 fallback" in guide
+    assert '.venv314\\Scripts\\python.exe -m pip install -e ".[dev]"' in guide
+    assert "winget install --exact --id Python.Python.3.14" in guide
+    assert ".\\scripts\\setup_windows_env.ps1 -PythonVersion 3.11 -VenvDir .venv311 -SkipWingetInstall" in guide
     assert "python -m pdf2md --input-dir .\\pdfs" in guide
     assert "ZIP 배포본 + 원클릭 스크립트 경로에서는 필수가 아님" in guide
     assert "status == \"skipped\"" in guide
@@ -277,6 +280,9 @@ def test_windows_quickstart_covers_install_cli_and_gui() -> None:
     assert "이미지 업로드 불가 RAG 대응" in guide
     assert "--image-mode placeholder --rag-figure-text-chunks" in guide
     assert "Domain=manual" in guide
+    assert "Python 3.14`와 `.venv314`" in guide
+    assert "winget`으로 `Python.Python.3.14` 설치" in guide
+    assert ".\\scripts\\setup_windows_env.ps1 -PythonVersion 3.14 -VenvDir .venv314 -RecreateVenv" in guide
     assert "retrieval_chunks_rag.jsonl" in guide
     assert "figures_rag.jsonl" in guide
     assert "tesseract --version" in guide
@@ -892,7 +898,16 @@ def test_windows_script_contracts_are_present() -> None:
     setup_bat_text = setup_bat.read_text(encoding="utf-8")
     run_bat_text = run_bat.read_text(encoding="utf-8")
 
-    assert 'py -3.14 -m venv .venv314' in Path("docs/WINDOWS_A_TO_Z_GUIDE.md").read_text(encoding="utf-8")
+    assert 'py -3.11 -m venv .venv311' in Path("docs/WINDOWS_A_TO_Z_GUIDE.md").read_text(encoding="utf-8")
+    assert '[string]$PythonVersion = "3.14"' in setup_text
+    assert '[string]$VenvDir = ""' in setup_text
+    assert '"Python.Python.$Version"' in setup_text
+    assert "Write-ManualPythonInstallHelp" in setup_text
+    assert "https://www.python.org/downloads/windows/" in setup_text
+    assert "Add python.exe to PATH" in setup_text
+    assert '[string]$PythonVersion = "3.14"' in run_text
+    assert "Test-PythonVersionMatches" in setup_text
+    assert "-RecreateVenv" in run_text
     assert '"-m", "pip", "install", "-e", ".[dev]"' in setup_text
     assert '"Scripts\\python.exe"' in setup_text
     assert '"-m", "pdf2md"' in run_text
