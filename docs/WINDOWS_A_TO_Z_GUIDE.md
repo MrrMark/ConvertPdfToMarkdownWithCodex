@@ -1,4 +1,4 @@
-# Windows A-Z 설치/실행 가이드 (Python 3.14 기준)
+# Windows A-Z 설치/실행 가이드 (Python 3.14 기본 / 3.11 fallback)
 
 이 문서는 **Windows 환경에서 `pdf2md`를 설치하고 실행하는 전체 절차**를 다룹니다.
 대상: 처음 세팅하는 사용자
@@ -30,8 +30,9 @@ PowerShell 스크립트 본체:
 
 기본 정책:
 
-- 최신 안정화 검증축 `Python 3.14`를 기본 사용
+- 기본 실행축은 최신 안정화 검증축인 `Python 3.14`
 - 기본 가상환경 경로는 `.venv314`
+- 최소 지원축 `Python 3.11`은 회사 표준 환경이나 호환성 확인이 필요할 때 명시 옵션으로 사용
 - 배치 모드는 지정 폴더 바로 아래 PDF만 처리
 - 결과는 입력 폴더 내부 `output\` 아래에 생성
 
@@ -48,7 +49,7 @@ PowerShell 스크립트 본체:
 
 - Windows 10/11
 - PowerShell
-- Python 3.14.x
+- Python 3.11.x 이상
 
 선택:
 
@@ -62,24 +63,27 @@ PowerShell 스크립트 본체:
 
 ## 3) Python 3.14 설치
 
-1. [Python 3.14 다운로드](https://www.python.org/downloads/windows/)
+1. [Python 다운로드](https://www.python.org/downloads/windows/)
 2. 설치 시 `Add python.exe to PATH` 체크
 3. 설치 확인
 
 ```powershell
+py -3.14 --version
 python --version
 pip --version
 ```
 
 권장 출력 예시:
 
-- `Python 3.14.x`
+- 기본 실행축: `Python 3.14.x`
+- 최소 지원 fallback: `Python 3.11.x`
 
 버전 정책:
 
 - 최소 지원 버전: `Python 3.11`
-- 최신 안정화 검증은 별도 최신 `Python 3.14.x` 환경에서도 권장
-- 실무 검증은 `3.11`과 최신 안정화 버전을 각각 별도 가상환경으로 분리해 수행
+- 기본 설치/실행축: `Python 3.14`
+- 실무 검증은 기본 `3.14`와 최소 지원 `3.11`을 각각 별도 가상환경으로 분리해 수행
+- setup script 기본값은 exact `3.14`이므로, `3.11`, `3.12`, `3.13`만 설치된 PC에서 새 Python 설치를 원하지 않으면 `-PythonVersion 3.12 -VenvDir .venv312 -SkipWingetInstall`처럼 설치된 minor version을 명시
 
 ---
 
@@ -120,7 +124,7 @@ cd ConvertPdfToMarkdownWithCodex
 py -3.14 -m venv .venv314
 .\.venv314\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -e .[dev]
+python -m pip install -e ".[dev]"
 python -m pdf2md --help
 ```
 
@@ -139,17 +143,23 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 이 스크립트가 하는 일:
 
 1. `py -3.14 --version` 확인
-2. 없으면 `winget`으로 Python 3.14 설치 시도
-3. `.venv314` 생성
-4. `.venv314\Scripts\python.exe -m pip install --upgrade pip`
-5. `.venv314\Scripts\python.exe -m pip install -e .[dev]`
-6. `.venv314\Scripts\python.exe -m pdf2md --help` 검증
+2. `py`가 없으면 `python --version`이 Python 3.14.x인지 확인
+3. 둘 다 없으면 `winget install --exact --id Python.Python.3.14`로 Python 3.14 설치 시도
+4. `.venv314` 생성 또는 재사용
+5. 기존 `.venv314`의 Python 버전이 요청 버전과 같은지 확인
+6. `.venv314\Scripts\python.exe -m pip install --upgrade pip`
+7. `.venv314\Scripts\python.exe -m pip install -e ".[dev]"`
+8. `.venv314\Scripts\python.exe -m pdf2md --help` 검증
+
+`winget`이 없거나 회사 보안 정책으로 설치가 막히면 스크립트는 에러와 함께 python.org 수동 설치 방법, `Add python.exe to PATH`/Python Launcher 확인, 수동 venv 생성 명령을 출력합니다.
 
 직접 PowerShell로 실행할 수도 있습니다.
 
 ```powershell
-.\scripts\setup_windows_env.ps1 -PythonVersion 3.14 -VenvDir .venv314
+.\scripts\setup_windows_env.ps1
 .\scripts\setup_windows_env.ps1 -SkipWingetInstall
+.\scripts\setup_windows_env.ps1 -PythonVersion 3.11 -VenvDir .venv311 -SkipWingetInstall
+.\scripts\setup_windows_env.ps1 -PythonVersion 3.14 -VenvDir .venv314 -RecreateVenv
 ```
 
 완료 후 활성화 명령:
@@ -240,7 +250,7 @@ wheel 설치 환경에서는 repository-level `docs\GUI_USER_GUIDE.md`가 없을
 CLI/GUI 출력 동등성을 릴리스 전에 확인하려면 `scripts\run_gui_cli_parity.py` 또는 `scripts\run_release_gates.py --gates gui-parity`를 실행합니다. `gui_cli_parity_report.json`은 원문 PDF/Markdown 본문 없이 artifact별 normalized hash match 결과만 저장하는 local-only 검증 artifact입니다.
 CLI/GUI headless 성능 차이는 `scripts\benchmark_gui_cli_parity.py` 또는 `scripts\run_release_gates.py --gates gui-benchmark`로 확인합니다. `gui_cli_benchmark_report.json`은 elapsed ms, pages/sec, GUI duration ratio, output hash equality를 기록하며 기본 성능 threshold는 advisory입니다.
 
-Windows 비개발자 기본 배포 경로는 ZIP/source checkout + `.venv314` setup script + `python -m pdf2md.gui`입니다. PyInstaller/native bundle은 Tkinter, PyMuPDF, Tesseract 포함/진단과 code signing smoke가 정리되기 전까지 공식 기본 배포 경로로 보지 않습니다.
+Windows 비개발자 기본 배포 경로는 ZIP/source checkout + `.venv314` setup script + `python -m pdf2md.gui`입니다. Python 3.11은 최소 지원 fallback 또는 호환성 검증이 필요할 때 `.venv311`로 분리해 사용합니다. PyInstaller/native bundle은 Tkinter, PyMuPDF, Tesseract 포함/진단과 code signing smoke가 정리되기 전까지 공식 기본 배포 경로로 보지 않습니다.
 
 CLI 기본 실행:
 
@@ -448,6 +458,7 @@ PowerShell 본체 직접 실행:
 .\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs -SkipExisting
 .\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs -TableMode html -ImageMode referenced
 .\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs -Pages 1-3,5 -NoPageMarkers
+.\scripts\run_batch_folder_windows.ps1 -InputDir .\pdfs -PythonVersion 3.14 -VenvDir .venv314
 ```
 
 품질 개선 옵션을 배치 모드에서 직접 쓰려면 CLI를 사용합니다.
@@ -686,7 +697,7 @@ python -m pytest -q -p no:cacheprovider
 py -3.11 -m venv .venv311
 .\.venv311\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e .[dev]
+python -m pip install -e ".[dev]"
 python -m pytest -q -p no:cacheprovider
 python -m pdf2md --help
 deactivate
@@ -698,7 +709,7 @@ deactivate
 py -3.14 -m venv .venv314
 .\.venv314\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e .[dev]
+python -m pip install -e ".[dev]"
 python -m pytest -q -p no:cacheprovider
 python -m pdf2md --help
 deactivate
@@ -731,7 +742,14 @@ deactivate
 
 ```powershell
 .\.venv314\Scripts\Activate.ps1
-pip install -e .[dev]
+python -m pip install -e ".[dev]"
+```
+
+Python 버전 불일치 메시지가 나오면 가상환경을 분리하거나 재생성하세요.
+
+```powershell
+.\scripts\setup_windows_env.ps1 -PythonVersion 3.14 -VenvDir .venv314 -RecreateVenv
+.\scripts\setup_windows_env.ps1 -PythonVersion 3.11 -VenvDir .venv311 -SkipWingetInstall
 ```
 
 ### C. OCR warning (`OCR_RUNTIME_UNAVAILABLE`)
@@ -767,7 +785,7 @@ pip install -e .[dev]
 
 ```powershell
 .\.venv314\Scripts\Activate.ps1
-python -m pip install -e .[dev]
+python -m pip install -e ".[dev]"
 python -m pdf2md.gui
 ```
 
@@ -791,7 +809,7 @@ Git 기반 작업 시:
 ```powershell
 git pull origin main
 .\.venv314\Scripts\Activate.ps1
-pip install -e .[dev]
+python -m pip install -e ".[dev]"
 ```
 
 ZIP 배포본 사용 시:
@@ -838,6 +856,6 @@ cd C:\Work\ConvertPdfToMarkdownWithCodex
 cd C:\Work\ConvertPdfToMarkdownWithCodex
 py -3.14 -m venv .venv314
 .\.venv314\Scripts\Activate.ps1
-pip install --no-index --find-links .\wheelhouse -e .
+python -m pip install --no-index --find-links .\wheelhouse -e .
 python -m pdf2md .\sample.pdf -o .\output
 ```
