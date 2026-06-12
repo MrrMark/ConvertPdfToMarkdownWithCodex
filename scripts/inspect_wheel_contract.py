@@ -11,6 +11,10 @@ from typing import Any, Sequence
 
 REQUIRED_WHEEL_MEMBERS = (
     "pdf2md/py.typed",
+    "pdf2md/extractors/ocr_backends/__init__.py",
+    "pdf2md/extractors/ocr_backends/base.py",
+    "pdf2md/extractors/ocr_backends/registry.py",
+    "pdf2md/extractors/ocr_backends/tesseract.py",
     "pdf2md/gui.py",
     "pdf2md/gui_help.py",
     "pdf2md/gui_runner.py",
