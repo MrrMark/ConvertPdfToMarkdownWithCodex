@@ -5,6 +5,7 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add a portable AI agent skill/rule pack for pdf2md RAG ingest workflows across Agent Skills-compatible clients and rule-based coding assistants.
 - Fix wheel packaging so nested OCR backend adapters are included and covered by the wheel contract inspector.
 - Add Q107 development spec for opt-in assetless figure visual semantics, covering region OCR, generated figure descriptions, and figure structure sidecars.
 - Add GUI `이미지 업로드 불가 RAG 대응` preset and manual domain adapter inputs for customer requirement table headers.
