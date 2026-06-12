@@ -38,6 +38,7 @@ def test_pyproject_declares_modern_tooling_and_typed_package_contract() -> None:
     assert pyproject["tool"]["ruff"]["target-version"] == "py311"
     assert pyproject["tool"]["ruff"]["line-length"] == 120
     assert pyproject["tool"]["ruff"]["lint"]["select"] == ["E9", "F63", "F7", "F82"]
+    assert pyproject["tool"]["setuptools"]["packages"]["find"]["include"] == ["pdf2md*"]
     assert pyproject["tool"]["setuptools"]["package-data"]["pdf2md"] == ["py.typed"]
     assert Path("pdf2md/py.typed").is_file()
 
@@ -1280,6 +1281,10 @@ def test_wheel_contract_inspector_accepts_gui_resource_and_entry_points(tmp_path
     assert payload["status"] == "passed"
     assert payload["summary"]["failed_count"] == 0
     assert any(check["name"] == "wheel_member:pdf2md/py.typed" for check in payload["checks"])
+    assert any(
+        check["name"] == "wheel_member:pdf2md/extractors/ocr_backends/registry.py"
+        for check in payload["checks"]
+    )
     assert any(check["name"] == "wheel_member:pdf2md/resources/GUI_USER_GUIDE.md" for check in payload["checks"])
     assert any(check["name"] == "console_script:pdf2md-gui" for check in payload["checks"])
 
@@ -1315,6 +1320,36 @@ def test_wheel_contract_inspector_fails_without_gui_help_resource(tmp_path: Path
             "message": "missing",
         }
     ]
+
+
+def test_wheel_contract_inspector_fails_without_ocr_backend_package(tmp_path: Path) -> None:
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    wheel_path = dist_dir / "pdf2md-0.1.0-py3-none-any.whl"
+    members = set(inspect_wheel_contract.REQUIRED_WHEEL_MEMBERS)
+    members.remove("pdf2md/extractors/ocr_backends/registry.py")
+    members.add("pdf2md-0.1.0.dist-info/entry_points.txt")
+    _write_wheel(
+        wheel_path,
+        members,
+        entry_points="\n".join(
+            [
+                "[console_scripts]",
+                "pdf2md = pdf2md.cli:main",
+                "pdf2md-gui = pdf2md.gui:main",
+                "",
+            ]
+        ),
+    )
+
+    payload = inspect_wheel_contract.inspect_wheel_contract(dist_dir)
+
+    assert payload["status"] == "failed"
+    assert {
+        "name": "wheel_member:pdf2md/extractors/ocr_backends/registry.py",
+        "status": "failed",
+        "message": "missing",
+    } in payload["checks"]
 
 
 def _write_wheel(wheel_path: Path, members: set[str], *, entry_points: str) -> None:

@@ -31,7 +31,9 @@ pdf2md = "pdf2md.cli:main"
 pdf2md-gui = "pdf2md.gui:main"
 
 [tool.setuptools]
-packages = ["pdf2md", "pdf2md.extractors", "pdf2md.serializers", "pdf2md.utils", "pdf2md.detectors", "pdf2md.resources"]
+
+[tool.setuptools.packages.find]
+include = ["pdf2md*"]
 
 [tool.setuptools.package-data]
 "pdf2md" = ["py.typed"]
