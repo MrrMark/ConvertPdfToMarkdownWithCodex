@@ -1267,14 +1267,15 @@ def test_wheel_contract_inspector_accepts_gui_resource_and_entry_points(tmp_path
             "pdf2md-0.1.0.dist-info/entry_points.txt",
         },
         entry_points="\n".join(
-            [
-                "[console_scripts]",
-                "pdf2md = pdf2md.cli:main",
-                "pdf2md-gui = pdf2md.gui:main",
-                "",
-            ]
-        ),
-    )
+                [
+                    "[console_scripts]",
+                    "pdf2md = pdf2md.cli:main",
+                    "pdf2md-gui = pdf2md.gui:main",
+                    "pdf2md-mcp = pdf2md.mcp_server:main",
+                    "",
+                ]
+            ),
+        )
 
     payload = inspect_wheel_contract.inspect_wheel_contract(dist_dir)
 
@@ -1300,14 +1301,15 @@ def test_wheel_contract_inspector_fails_without_gui_help_resource(tmp_path: Path
         wheel_path,
         members,
         entry_points="\n".join(
-            [
-                "[console_scripts]",
-                "pdf2md = pdf2md.cli:main",
-                "pdf2md-gui = pdf2md.gui:main",
-                "",
-            ]
-        ),
-    )
+                [
+                    "[console_scripts]",
+                    "pdf2md = pdf2md.cli:main",
+                    "pdf2md-gui = pdf2md.gui:main",
+                    "pdf2md-mcp = pdf2md.mcp_server:main",
+                    "",
+                ]
+            ),
+        )
 
     payload = inspect_wheel_contract.inspect_wheel_contract(dist_dir)
 

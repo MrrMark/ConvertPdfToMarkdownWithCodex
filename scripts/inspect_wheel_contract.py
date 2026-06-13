@@ -20,11 +20,13 @@ REQUIRED_WHEEL_MEMBERS = (
     "pdf2md/gui_runner.py",
     "pdf2md/gui_support.py",
     "pdf2md/gui_profiles.py",
+    "pdf2md/mcp_server.py",
     "pdf2md/resources/GUI_USER_GUIDE.md",
 )
 REQUIRED_CONSOLE_SCRIPTS = {
     "pdf2md": "pdf2md.cli:main",
     "pdf2md-gui": "pdf2md.gui:main",
+    "pdf2md-mcp": "pdf2md.mcp_server:main",
 }
 
 

@@ -3,136 +3,72 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def test_readme_documents_default_output_and_skip_existing() -> None:
+def test_readme_is_concise_project_hub() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert len(readme.splitlines()) <= 220
+    assert max(len(line) for line in readme.splitlines()) <= 240
+    assert "PDF 문서를 **원문 보존 중심 Markdown**으로 변환" in readme
+    assert "핵심 원칙과 지원 범위" not in readme
+    assert "AI Agent 연동 지원" in readme
     assert "python3 -m pdf2md input.pdf" in readme
-    assert "<pdf_stem>_output/" in readme
     assert "python3 -m pdf2md --input-dir ./pdfs --skip-existing" in readme
     assert "python3 -m pdf2md input.pdf -o output/ --password secret" in readme
-    assert "python3.11 -m venv .venv311" in readme
-    assert "brew install python@3.14" in readme
-    assert "./scripts/validate_python_matrix.sh" in readme
-    assert ".\\scripts\\setup_windows_env.bat" in readme
-    assert ".\\scripts\\run_batch_folder_windows.bat -InputDir .\\pdfs" in readme
-    assert '문서별 상태: `success`, `partial_success`, `failed`, `skipped`' in readme
-    assert 'status == "skipped"' in readme
-    assert "summary.page_cache_hits" in readme
-    assert "summary.text_line_extract_count" in readme
+    assert "<pdf_stem>_output/" in readme
+    assert "document.md" in readme
+    assert "manifest.json" in readme
+    assert "report.json" in readme
     assert "text_blocks_rag.jsonl" in readme
-    assert "semantic_units_rag.jsonl" in readme
-    assert "requirements_rag.jsonl" in readme
-    assert "cross_refs_rag.jsonl" in readme
-    assert "requirement_traceability_rag.jsonl" in readme
     assert "technical_tables_rag.jsonl" in readme
-    assert "summary.rag_text_block_record_count" in readme
-    assert "summary.semantic_unit_record_count" in readme
-    assert "summary.normative_requirement_count" in readme
-    assert "summary.technical_table_record_count" in readme
-    assert "--confidential-safe-mode" in readme
-    assert "rag_header_strategy" in readme
-    assert "scripts/run_corpus_eval.py" in readme
-    assert "scripts/benchmark_conversion.py" in readme
-    assert "--min-expected-source-coverage" in readme
-    assert "scripts/check_ocr_runtime.py --ocr-lang kor+eng" in readme
-    assert "scripts/probe_ocr_backends.py" in readme
-    assert "scripts/evaluate_figure_descriptions.py" in readme
-    assert "scripts/run_release_gates.py" in readme
-    assert "--gates gui" in readme
-    assert "scripts/run_ssd_corpus_profile.py" in readme
-    assert "scripts/validate_ssd_rag_contract.py" in readme
-    assert "rag_requirements.py" in readme
-    assert "rag_technical_tables.py" in readme
-    assert "requirement_change_impact_report.json" in readme
-    assert "--ssd-agent-spec-type TCG" in readme
-    assert "release_gate_report.json" in readme
-    assert "--baseline-report pdf/baseline/corpus_eval_report.json" in readme
-    assert "--max-duration-regression 0.2" in readme
-    assert "docs/OUTPUT_SCHEMA.md" in readme
-    assert "docs/schema/manifest.schema.json" in readme
-    assert "docs/schema/corpus_evidence_analysis_report.schema.json" in readme
-    assert "scripts/benchmark_docling_comparison.py" in readme
-    assert "scripts/run_latest_nvme_command_set_eval.py" in readme
-    assert "--layout-comparison-mode summary" in readme
-    assert "--gates docling" in readme
-    assert "--gates ocr-backends" in readme
-    assert "--gates figure-description-eval" in readme
-    assert "docling_benchmark_report.json" in readme
-    assert "docling_artifact_comparison.json" in readme
-    assert "figure_description_eval_report.json" in readme
-    assert "scripts/analyze_corpus_evidence_pack.py" in readme
-    assert "scripts/compare_corpus_evidence_packs.py" in readme
-    assert "scripts/export_output_schema.py --check" in readme
-    assert "--output-profile fast" in readme
-    assert "--rag-sidecar-scope minimal" in readme
-    assert "python -m build" in readme
-    assert "benchmark_report.json" in readme
-    assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
-    assert "docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md" in readme
-    assert "docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md" in readme
-    assert "현재 active quality backlog는 없습니다." in readme
-    assert "--rag-figure-text-chunks" in readme
-    assert "chunk_type=\"figure_text\"" in readme
-    assert "이미지 업로드 불가 RAG 대응" in readme
-    assert "--manual-domain-adapter-keywords" in readme
-    assert "--ocr-backend tesseract" in readme
-    assert "완료된 Q34-Q114" in readme
-    assert "docs/DOCLING_INFORMED_EXTENSION_DESIGN.md" in readme
-    assert "pdf-outline-" in readme
-    assert "target_source_pdf_outline" in readme
-    assert "summary.actionable_warning_count" in readme
-    assert "summary.advisory_warning_count" in readme
-    assert "warning taxonomy registry" in readme
-    assert "summary.table_expected_fallback_count" in readme
-    assert "summary.rag_sidecar_scope" in readme
-    assert "python -m ruff check ." in readme
-    assert "pdf2md/py.typed" in readme
-    assert "--gates dependency-audit" in readme
-    assert "Previous corpus manifest" in readme
-    assert "Reuse unchanged" in readme
-    assert "Open Corpus Diff" in readme
-    assert "wheel_contract_report.json" in readme
-    assert "pdf2md.resources/GUI_USER_GUIDE.md" in readme
-    assert "Expert options" in readme
-    assert "Import profile / Export profile" in readme
-    assert "horizontal scrollbar" in readme
+    assert "retrieval_chunks_rag.jsonl" in readme
+    assert "docs/WINDOWS_INSTALL_RUN_QUICKSTART.md" in readme
+    assert "docs/WINDOWS_A_TO_Z_GUIDE.md" in readme
     assert "docs/MACOS_GUI_QUICKSTART.md" in readme
     assert "docs/GUI_USER_GUIDE.md" in readme
-    assert "python3 -m pdf2md.gui" in readme
-    assert "pdf2md-gui" in readme
-    assert "python3 -m pdf2md.gui --help" in readme
-    assert "python3 -m pdf2md.gui --doctor" in readme
-    assert "scripts/run_gui_smoke_evidence.py" in readme
-    assert "scripts/run_gui_cli_parity.py" in readme
-    assert "scripts/benchmark_gui_cli_parity.py" in readme
-    assert "gui_smoke_evidence.json" in readme
-    assert "gui_cli_parity_report.json" in readme
-    assert "gui_cli_benchmark_report.json" in readme
-    assert "scripts/create_gui_support_bundle.py" in readme
-    assert "gui_support_bundle.json" in readme
-    assert "--json-only" in readme
-    assert "--gates gui-parity" in readme
-    assert "--gates gui-benchmark" in readme
-    assert "--gates ci-lightweight" in readme
-    assert "runtime diagnostic code/message/action" in readme
-    assert "변환 warning message" in readme
-    assert "문서 경계 취소" in readme
-    assert "`기본 모드(원본 유지)`, `RAG 등록용(최적화)`, `기술 스펙 RAG`" in readme
-    assert "`민감정보 보호 RAG`, `원본 유지 + sidecar`, `Optimize Options(유저 선택)`" in readme
-    assert "percent text" in readme
-    assert "page-level 진행률 callback" in readme
-    assert "pages/sec" in readme
-    assert "elapsed time" in readme
-    assert "Open Markdown" in readme
-    assert "Clear recent" in readme
-    assert "PyInstaller/native bundle" in readme
-    assert "GUI 화면의 `Help` 버튼" in readme
-    assert "previous corpus manifest path" in readme
-    assert "로컬 변환 산출물은 `output/`, `<pdf_stem>_output/`, `pdf/`, 또는 `/tmp`" in readme
-    assert "`pdf2md/` 패키지 트리 아래에는 full conversion artifact를 만들지 않습니다" in readme
+    assert "docs/OUTPUT_SCHEMA.md" in readme
+    assert "docs/RAG_INDEXER_INTEGRATION_RECIPES.md" in readme
+    assert "docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md" in readme
+    assert "mcp_server.py" in readme
+    assert "agent-pack/" in readme
+    assert "pdf2md-rag-ingest/" in readme
+    assert "agent-adapters/" in readme
+    assert "docs/AGENT_SKILL_USAGE_GUIDE.md" in readme
+    assert "docs/AGENT_SKILL_PORTABILITY.md" in readme
+    assert "docs/MCP_SERVER_INSTALL_USAGE_GUIDE.md" in readme
+    assert "scripts/install_agent_skill_pack.py" in readme
+    assert 'python -m pip install -e ".[dev]"' in readme
+    assert 'python -m pip install -e ".[mcp]"' in readme
+    assert 'python -m pip install -e ".[dev,mcp]"' in readme
+    assert "Claude Code, Cline, Roo Code, Cursor, Continue" in readme
+    assert 'PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output"' in readme
+    assert "`pdf2md`/`pdf2md-gui`/`pdf2md-mcp` console script metadata" in readme
+    assert "summary.page_cache_hits" not in readme
+    assert "Open Corpus Diff" not in readme
+    assert "runtime diagnostic code/message/action" not in readme
     assert "pdf/v10" not in readme
-    assert "프로젝트 scaffold 생성" not in readme
     assert "metadata.py" not in readme
     assert "html_table.py" not in readme
+
+
+def test_user_facing_markdown_docs_use_portable_links_and_quoted_extras() -> None:
+    docs = [
+        Path("README.md"),
+        Path("docs/AGENT_SKILL_USAGE_GUIDE.md"),
+        Path("docs/AGENT_SKILL_PORTABILITY.md"),
+        Path("docs/GUI_USER_GUIDE.md"),
+        Path("docs/MACOS_GUI_QUICKSTART.md"),
+        Path("docs/MCP_SERVER_DEVELOPMENT_SPEC.md"),
+        Path("docs/MCP_SERVER_INSTALL_USAGE_GUIDE.md"),
+        Path("docs/WINDOWS_A_TO_Z_GUIDE.md"),
+        Path("docs/WINDOWS_INSTALL_RUN_QUICKSTART.md"),
+    ]
+
+    for path in docs:
+        text = path.read_text(encoding="utf-8")
+        assert "/Users/mankiw/VS_Project/ConvertPdfToMarkdown" not in text
+        assert "pip install -e .[dev]" not in text
+        assert "python -m pip install -e .[dev]" not in text
+        assert "python3 -m pip install -e .[dev]" not in text
 
 
 def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
@@ -233,6 +169,7 @@ def test_windows_guide_matches_cli_policy() -> None:
     assert "scripts\\benchmark_gui_cli_parity.py" in guide
     assert "scripts\\create_gui_support_bundle.py" in guide
     assert "wheel_contract_report.json" in guide
+    assert "`pdf2md`/`pdf2md-gui`/`pdf2md-mcp` console script metadata" in guide
     assert "gui_cli_parity_report.json" in guide
     assert "gui_cli_benchmark_report.json" in guide
     assert "pdf2md.resources\\GUI_USER_GUIDE.md" in guide
@@ -294,7 +231,7 @@ def test_macos_gui_quickstart_is_non_developer_friendly() -> None:
     guide = Path("docs/MACOS_GUI_QUICKSTART.md").read_text(encoding="utf-8")
     assert "python3 --version" in guide
     assert "Python 3.11.x" in guide
-    assert "python -m pip install -e .[dev]" in guide
+    assert 'python -m pip install -e ".[dev]"' in guide
     assert "python -m pdf2md.gui" in guide
     assert "pdf2md-gui" in guide
     assert "python -m pdf2md.gui --help" in guide
@@ -351,6 +288,7 @@ def test_gui_user_guide_is_separate_from_cli_docs() -> None:
     assert "scripts/benchmark_gui_cli_parity.py" in guide
     assert "scripts/create_gui_support_bundle.py" in guide
     assert "wheel_contract_report.json" in guide
+    assert "`pdf2md`/`pdf2md-gui`/`pdf2md-mcp` console script metadata" in guide
     assert "gui_cli_parity_report.json" in guide
     assert "gui_cli_benchmark_report.json" in guide
     assert "pdf2md.resources/GUI_USER_GUIDE.md" in guide
