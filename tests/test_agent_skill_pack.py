@@ -54,9 +54,29 @@ def test_agent_skill_pack_references_exist_and_stay_linked() -> None:
 def test_agent_skill_pack_includes_client_adapter_templates() -> None:
     assert (Path("agent-adapters/cursor/pdf2md-rag-ingest.mdc")).is_file()
     assert (Path("agent-adapters/continue/pdf2md-rag-ingest.md")).is_file()
-    assert "agent-pack/skills/pdf2md-rag-ingest" in Path("docs/AGENT_SKILL_PORTABILITY.md").read_text(
-        encoding="utf-8"
-    )
+    portability = Path("docs/AGENT_SKILL_PORTABILITY.md").read_text(encoding="utf-8")
+    assert "agent-pack/skills/pdf2md-rag-ingest" in portability
+    assert "AGENT_SKILL_USAGE_GUIDE.md" in portability
+
+
+def test_agent_skill_usage_guide_documents_common_client_operations() -> None:
+    guide = Path("docs/AGENT_SKILL_USAGE_GUIDE.md").read_text(encoding="utf-8")
+
+    assert "Claude Code, Cline, Roo Code, Cursor, Continue" in guide
+    assert "agent-pack/skills/pdf2md-rag-ingest/" in guide
+    assert ".agents/skills/pdf2md-rag-ingest/" in guide
+    assert ".claude/skills/pdf2md-rag-ingest/" in guide
+    assert ".cline/skills/pdf2md-rag-ingest/" in guide
+    assert ".roo/skills/pdf2md-rag-ingest/" in guide
+    assert ".cursor/rules/pdf2md-rag-ingest.mdc" in guide
+    assert ".continue/rules/pdf2md-rag-ingest.md" in guide
+    assert "--clients all --scope project --mode copy --dry-run" in guide
+    assert "--overwrite" in guide
+    assert "py -3.14 scripts\\install_agent_skill_pack.py" in guide
+    assert "symlink" in guide
+    assert "--workflow assetless-technical-rag" in guide
+    assert "validate --output-dir output/spec --target all" in guide
+    assert "Do not summarize or rewrite PDF text" in guide
 
 
 def test_pdf2md_agent_runner_dry_run_builds_assetless_command() -> None:

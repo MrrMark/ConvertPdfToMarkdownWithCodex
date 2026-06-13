@@ -245,7 +245,7 @@ python scripts\create_gui_support_bundle.py --output-dir "$env:TEMP\pdf2md-gui-s
 
 `gui_support_bundle.json`과 `gui_support_bundle.md`에는 status count, warning code/count, sanitized artifact label, environment/runtime code만 포함합니다. 원문 PDF/Markdown 내용, 표/이미지 내용, 변환 warning message, workspace/home absolute path는 저장하지 않습니다.
 
-wheel 설치 환경에서는 repository-level `docs\GUI_USER_GUIDE.md`가 없을 수 있으므로 GUI help는 packaged `pdf2md.resources\GUI_USER_GUIDE.md` fallback도 지원합니다. release packaging gate는 wheel 안에 GUI module, support/profile helper, packaged help resource, `pdf2md-gui` console script metadata가 포함되는지 검사합니다.
+wheel 설치 환경에서는 repository-level `docs\GUI_USER_GUIDE.md`가 없을 수 있으므로 GUI help는 packaged `pdf2md.resources\GUI_USER_GUIDE.md` fallback도 지원합니다. release packaging gate는 wheel 안에 GUI/MCP module, support/profile helper, packaged help resource, `pdf2md`/`pdf2md-gui`/`pdf2md-mcp` console script metadata가 포함되는지 검사합니다.
 
 CLI/GUI 출력 동등성을 릴리스 전에 확인하려면 `scripts\run_gui_cli_parity.py` 또는 `scripts\run_release_gates.py --gates gui-parity`를 실행합니다. `gui_cli_parity_report.json`은 원문 PDF/Markdown 본문 없이 artifact별 normalized hash match 결과만 저장하는 local-only 검증 artifact입니다.
 CLI/GUI headless 성능 차이는 `scripts\benchmark_gui_cli_parity.py` 또는 `scripts\run_release_gates.py --gates gui-benchmark`로 확인합니다. `gui_cli_benchmark_report.json`은 elapsed ms, pages/sec, GUI duration ratio, output hash equality를 기록하며 기본 성능 threshold는 advisory입니다.
@@ -666,7 +666,7 @@ python scripts\run_release_gates.py --output-dir .\release_gate_gui_benchmark --
 - `corpus_evidence_trend_report.json`: baseline/current evidence pack의 added/persisting/resolved signature 비교와 신규 error gate
 - `requirement_impact_review_pack.json` / `.md`: requirement change impact를 리뷰어/AI Agent가 바로 확인할 수 있게 정리한 provenance 중심 요약
 - `release_gate_report.json`: OCR preflight, corpus quality gate, benchmark performance gate, lightweight CI gate, advisory dependency audit gate, optional RAG calibration gate, optional GUI headless smoke/support redaction gate, optional GUI/CLI parity gate, optional GUI/CLI benchmark gate, schema check, packaging smoke/wheel contract command/status summary
-- `wheel_contract_report.json`: wheel 내부 typed package marker, GUI module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui` console script metadata 검사 결과
+- `wheel_contract_report.json`: wheel 내부 typed package marker, GUI/MCP module, support/profile helper, packaged GUI help resource, `pdf2md`/`pdf2md-gui`/`pdf2md-mcp` console script metadata 검사 결과
 - `gui_cli_parity_report.json`: CLI와 GUI headless runner가 같은 synthetic PDF/옵션에서 생성한 Markdown, manifest, report, RAG sidecar의 normalized hash equality 결과
 - `gui_cli_benchmark_report.json`: CLI와 GUI headless runner의 elapsed ms, pages/sec, GUI duration ratio, output hash equality, optional threshold/advisory policy 결과
 - benchmark는 수동/릴리스 전 검증용이며 기본 테스트에 포함하지 않습니다.
