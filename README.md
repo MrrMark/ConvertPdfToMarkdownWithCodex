@@ -53,7 +53,8 @@ python3 -m pdf2md --input-dir ./pdfs --skip-existing
 | 복잡 표 보존 우선 | `python3 -m pdf2md input.pdf -o output/ --table-mode html` |
 | RAG sidecar 포함 | `python3 -m pdf2md spec.pdf -o output/spec --rag-profile rag_optimized` |
 | 기술 스펙 RAG | `python3 -m pdf2md spec.pdf -o output/spec --rag-profile technical_spec_rag --domain-adapter nvme` |
-| 이미지 업로드 불가 RAG | `python3 -m pdf2md spec.pdf -o output/spec --rag-profile technical_spec_rag --domain-adapter nvme --image-mode placeholder --rag-figure-text-chunks` |
+| 기술 스펙 Visual RAG | `python3 -m pdf2md spec.pdf -o output/spec --rag-profile technical_spec_rag_visual --domain-adapter nvme` |
+| 이미지 업로드 불가 Visual RAG | `python3 -m pdf2md spec.pdf -o output/spec --rag-profile technical_spec_rag_visual --domain-adapter nvme --image-mode placeholder` |
 | 민감정보 보호 | `python3 -m pdf2md customer.pdf -o output/customer --rag-profile confidential_rag` |
 
 ## Outputs

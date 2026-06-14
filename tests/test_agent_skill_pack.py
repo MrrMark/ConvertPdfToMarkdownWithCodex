@@ -104,9 +104,9 @@ def test_pdf2md_agent_runner_dry_run_builds_assetless_command() -> None:
     )
 
     assert completed.returncode == 0
-    assert "--rag-profile technical_spec_rag" in completed.stdout
+    assert "--rag-profile technical_spec_rag_visual" in completed.stdout
     assert "--domain-adapter nvme" in completed.stdout
-    assert "--image-mode placeholder --rag-figure-text-chunks" in completed.stdout
+    assert "--image-mode placeholder" in completed.stdout
 
 
 def test_install_agent_skill_pack_dry_run_lists_all_clients() -> None:

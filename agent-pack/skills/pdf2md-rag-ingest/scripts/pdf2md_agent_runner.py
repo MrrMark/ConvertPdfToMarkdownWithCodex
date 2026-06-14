@@ -14,10 +14,12 @@ WORKFLOW_PROFILES = {
     "preserve": "preserve",
     "rag-optimized": "rag_optimized",
     "technical-rag": "technical_spec_rag",
+    "visual-technical-rag": "technical_spec_rag_visual",
     "confidential-rag": "confidential_rag",
     "preserve-with-sidecars": "preserve_with_sidecars",
-    "assetless-technical-rag": "technical_spec_rag",
+    "assetless-technical-rag": "technical_spec_rag_visual",
 }
+TECHNICAL_WORKFLOWS = {"technical-rag", "visual-technical-rag", "assetless-technical-rag"}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -121,7 +123,7 @@ def run_convert(args: argparse.Namespace, root: Path, python: str) -> int:
             command.extend(["--output-dir", str(args.output_dir)])
 
     command.extend(["--rag-profile", WORKFLOW_PROFILES[args.workflow]])
-    if args.workflow in {"technical-rag", "assetless-technical-rag"}:
+    if args.workflow in TECHNICAL_WORKFLOWS:
         if not args.domain_adapter:
             raise SystemExit(f"--domain-adapter is required for workflow {args.workflow}")
         command.extend(["--domain-adapter", args.domain_adapter])
@@ -129,7 +131,7 @@ def run_convert(args: argparse.Namespace, root: Path, python: str) -> int:
         command.extend(["--domain-adapter", args.domain_adapter])
 
     if args.workflow == "assetless-technical-rag":
-        command.extend(["--image-mode", "placeholder", "--rag-figure-text-chunks"])
+        command.extend(["--image-mode", "placeholder"])
     if args.pages:
         command.extend(["--pages", args.pages])
     if args.password:

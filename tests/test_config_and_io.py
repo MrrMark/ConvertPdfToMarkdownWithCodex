@@ -28,6 +28,14 @@ def test_config_validates_retrieval_chunk_options(tmp_path: Path) -> None:
         Config(input_pdf=input_pdf, output_dir=tmp_path / "out", ocr_backend="rapidocr")
 
 
+def test_config_accepts_visual_technical_spec_rag_profile(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "demo.pdf"
+
+    config = Config(input_pdf=input_pdf, output_dir=tmp_path / "out", rag_profile="technical_spec_rag_visual")
+
+    assert config.rag_profile == "technical_spec_rag_visual"
+
+
 def test_validate_output_bundle_accepts_minimum_valid_outputs(tmp_path: Path) -> None:
     output_dir = tmp_path / "out"
     output_dir.mkdir()

@@ -170,6 +170,138 @@ def test_index_contract_validates_core_sidecar_required_fields(tmp_path: Path) -
     assert report["findings"] == []
 
 
+def test_index_contract_validates_visual_chunk_contract(tmp_path: Path) -> None:
+    figure_ref = {
+        "source_type": "figure",
+        "source_id": "page-0001-figure-0001",
+        "page": 1,
+        "bbox": [72.0, 120.0, 420.0, 320.0],
+    }
+    description_ref = {
+        "source_type": "figure_description",
+        "source_id": "figure-description-000001",
+        "page": 1,
+        "bbox": [72.0, 120.0, 420.0, 320.0],
+    }
+    structure_ref = {
+        "source_type": "figure_structure",
+        "source_id": "figure-structure-000001",
+        "page": 1,
+        "bbox": [72.0, 120.0, 420.0, 320.0],
+    }
+    _write_jsonl(
+        tmp_path / "retrieval_chunks_rag.jsonl",
+        [
+            _valid_chunk(
+                chunk_type="figure_description",
+                text="figure_description: State transition diagram.",
+                source_refs=[figure_ref, description_ref],
+                source_dedupe_key="page-0001-figure-0001|figure-description-000001",
+                semantic_types=["figure_description", "generated_text", "state_machine"],
+                normative_strength=None,
+                retrieval_priority=62,
+                generated_text=True,
+                generation_strategy="deterministic_context_summary",
+            ),
+            _valid_chunk(
+                chunk_id="chunk-000002",
+                chunk_index=2,
+                chunk_type="figure_structure",
+                text="figure_structure: state_machine.",
+                source_refs=[figure_ref, structure_ref],
+                source_dedupe_key="page-0001-figure-0001|figure-structure-000001",
+                semantic_types=["figure_structure", "state_machine"],
+                normative_strength=None,
+                retrieval_priority=64,
+                generated_text=False,
+                derived_from_context=True,
+            ),
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "figure_descriptions_rag.jsonl",
+        [
+            {
+                "description_id": "figure-description-000001",
+                "figure_id": "page-0001-figure-0001",
+                "page": 1,
+                "text": "figure_description: State transition diagram.",
+                "bbox": [72.0, 120.0, 420.0, 320.0],
+                "source_refs": [figure_ref],
+                "generated_text": True,
+                "generation_strategy": "deterministic_context_summary",
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "figure_structures_rag.jsonl",
+        [
+            {
+                "structure_id": "figure-structure-000001",
+                "figure_id": "page-0001-figure-0001",
+                "page": 1,
+                "text": "figure_structure: state_machine.",
+                "bbox": [72.0, 120.0, 420.0, 320.0],
+                "source_refs": [figure_ref],
+                "generated_text": False,
+                "derived_from_context": True,
+            }
+        ],
+    )
+
+    report = validate_index_contract(output_dir=tmp_path, target="all")
+
+    assert report["status"] == "passed"
+    assert report["findings"] == []
+    metadata = _metadata_for_target(
+        json.loads((tmp_path / "retrieval_chunks_rag.jsonl").read_text(encoding="utf-8").splitlines()[0]),
+        "openai",
+    )
+    assert metadata["generated_text"] is True
+    assert metadata["generation_strategy"] == "deterministic_context_summary"
+
+
+def test_index_contract_reports_visual_chunk_contract_errors(tmp_path: Path) -> None:
+    _write_jsonl(
+        tmp_path / "retrieval_chunks_rag.jsonl",
+        [
+            _valid_chunk(
+                chunk_type="figure_description",
+                text="figure_description: missing visual provenance.",
+                source_refs=[{"source_type": "figure_description", "source_id": "figure-description-000001", "page": 1}],
+                source_dedupe_key="figure-description-000001",
+                semantic_types=["figure_description"],
+                normative_strength=None,
+                retrieval_priority=62,
+                generated_text=False,
+                generation_strategy="context_summary",
+            )
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "figure_descriptions_rag.jsonl",
+        [
+            {
+                "description_id": "figure-description-000001",
+                "figure_id": "page-0001-figure-0001",
+                "page": 1,
+                "text": "figure_description: missing strategy.",
+                "source_refs": [{"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1}],
+                "generated_text": False,
+                "generation_strategy": "context_summary",
+            }
+        ],
+    )
+
+    report = validate_index_contract(output_dir=tmp_path, target="openai")
+
+    codes = [finding["code"] for finding in report["findings"]]
+    assert report["status"] == "failed"
+    assert "missing_visual_source_ref" in codes
+    assert "missing_generated_text_flag" in codes
+    assert "invalid_generation_strategy" in codes
+
+
 def test_index_contract_reports_core_sidecar_schema_errors(tmp_path: Path) -> None:
     broken_table = _valid_table_row(headers="Bits", cells=[], quality_score="good")
     broken_trace = _valid_requirement_trace(trace_index="1", page_range=[2, 1], source_refs=[])

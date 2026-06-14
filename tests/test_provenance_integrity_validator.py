@@ -198,6 +198,141 @@ def test_provenance_integrity_accepts_excluded_figure_self_refs(tmp_path: Path) 
     assert report["findings"] == []
 
 
+def test_provenance_integrity_resolves_visual_figure_chunks(tmp_path: Path) -> None:
+    figure_ref = {
+        "source_type": "figure",
+        "source_id": "page-0001-figure-0001",
+        "page": 1,
+        "bbox": [72.0, 120.0, 420.0, 320.0],
+    }
+    description_ref = {
+        "source_type": "figure_description",
+        "source_id": "figure-description-000001",
+        "page": 1,
+        "bbox": [72.0, 120.0, 420.0, 320.0],
+    }
+    structure_ref = {
+        "source_type": "figure_structure",
+        "source_id": "figure-structure-000001",
+        "page": 1,
+        "bbox": [72.0, 120.0, 420.0, 320.0],
+    }
+    _write_jsonl(
+        tmp_path / "figures_rag.jsonl",
+        [
+            {
+                "figure_id": "page-0001-figure-0001",
+                "page": 1,
+                "record_type": "image",
+                "status": "available",
+                "bbox": [72.0, 120.0, 420.0, 320.0],
+                "source_refs": [figure_ref],
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "figure_descriptions_rag.jsonl",
+        [
+            {
+                "description_id": "figure-description-000001",
+                "figure_id": "page-0001-figure-0001",
+                "page": 1,
+                "text": "figure_description: State transition diagram.",
+                "bbox": [72.0, 120.0, 420.0, 320.0],
+                "source_refs": [figure_ref],
+                "generated_text": True,
+                "generation_strategy": "deterministic_context_summary",
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "figure_structures_rag.jsonl",
+        [
+            {
+                "structure_id": "figure-structure-000001",
+                "figure_id": "page-0001-figure-0001",
+                "page": 1,
+                "text": "figure_structure: state_machine.",
+                "bbox": [72.0, 120.0, 420.0, 320.0],
+                "source_refs": [figure_ref],
+                "generated_text": False,
+                "derived_from_context": True,
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "retrieval_chunks_rag.jsonl",
+        [
+            {
+                "chunk_id": "chunk-000001",
+                "schema_version": "1.0",
+                "chunk_index": 1,
+                "chunk_type": "figure_description",
+                "text": "figure_description: State transition diagram.",
+                "source_sha256": SOURCE_SHA256,
+                "source_refs": [figure_ref, description_ref],
+                "page_range": [1, 1],
+                "bbox": [72.0, 120.0, 420.0, 320.0],
+                "heading_path": ["2 State Machine"],
+                "semantic_types": ["figure_description", "generated_text"],
+                "normative_strength": None,
+                "retrieval_priority": 62,
+                "char_count": 45,
+                "token_estimate": 8,
+                "section_path": "2 State Machine",
+                "chunk_group_id": "figure-page-0001-figure-0001",
+                "source_record_count": 2,
+                "source_dedupe_key": "figure-description-000001|page-0001-figure-0001",
+                "chunk_boundary_policy": "source_record",
+                "chunk_boundary_reasons": ["figure_description_boundary"],
+            },
+            {
+                "chunk_id": "chunk-000002",
+                "schema_version": "1.0",
+                "chunk_index": 2,
+                "chunk_type": "figure_structure",
+                "text": "figure_structure: state_machine.",
+                "source_sha256": SOURCE_SHA256,
+                "source_refs": [figure_ref, structure_ref],
+                "page_range": [1, 1],
+                "bbox": [72.0, 120.0, 420.0, 320.0],
+                "heading_path": ["2 State Machine"],
+                "semantic_types": ["figure_structure", "state_machine"],
+                "normative_strength": None,
+                "retrieval_priority": 64,
+                "char_count": 32,
+                "token_estimate": 5,
+                "section_path": "2 State Machine",
+                "chunk_group_id": "figure-page-0001-figure-0001",
+                "source_record_count": 2,
+                "source_dedupe_key": "figure-structure-000001|page-0001-figure-0001",
+                "chunk_boundary_policy": "source_record",
+                "chunk_boundary_reasons": ["figure_structure_boundary"],
+            },
+        ],
+    )
+    (tmp_path / "report.json").write_text(
+        json.dumps(
+            {
+                "summary": {
+                    "figure_rag_record_count": 1,
+                    "figure_description_record_count": 1,
+                    "figure_structure_record_count": 1,
+                    "retrieval_chunk_record_count": 2,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = validate_provenance_integrity(output_dir=tmp_path)
+
+    assert report["status"] == "passed"
+    assert report["summary"]["checked_source_refs"] == 7
+    assert report["summary"]["resolved_source_refs"] == 7
+    assert report["findings"] == []
+
+
 def test_provenance_integrity_reports_unresolved_page_and_dedupe_mismatches(tmp_path: Path) -> None:
     _write_jsonl(
         tmp_path / "text_blocks_rag.jsonl",

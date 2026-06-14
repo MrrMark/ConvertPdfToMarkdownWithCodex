@@ -49,6 +49,7 @@ from pdf2md.output_writers import (
     write_technical_table_output,
 )
 from pdf2md.reporting import build_report, count_structure_marker_reasons, determine_conversion_status, finalize_page_statuses
+from pdf2md.rag_profiles import TECHNICAL_SPEC_RAG_PROFILES
 from pdf2md.serializers.manifest import serialize_manifest
 from pdf2md.serializers.markdown import serialize_markdown_blocks_result
 from pdf2md.serializers.rag_chunks import (
@@ -338,14 +339,14 @@ def _annotate_ocr_warning_context(
 
 
 def _technical_profile_domain_adapter_missing(config: Config, domain_adapter: DomainAdapterMode) -> bool:
-    return config.rag_profile == "technical_spec_rag" and domain_adapter is DomainAdapterMode.NONE
+    return config.rag_profile in TECHNICAL_SPEC_RAG_PROFILES and domain_adapter is DomainAdapterMode.NONE
 
 
 def _technical_profile_domain_adapter_warning(config: Config, domain_adapter: DomainAdapterMode) -> WarningEntry:
     return WarningEntry(
         code=WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING,
         message=(
-            "technical_spec_rag was selected without a domain adapter; "
+            "technical spec RAG profile was selected without a domain adapter; "
             "domain_units_rag.jsonl and domain_unit retrieval chunks will not be generated."
         ),
         details={

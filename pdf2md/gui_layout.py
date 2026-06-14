@@ -28,6 +28,7 @@ GUI_LAYOUT_SECTIONS: tuple[GuiLayoutSection, ...] = (
             "preset_preserve",
             "preset_rag_optimized",
             "preset_technical_spec_rag",
+            "preset_technical_spec_rag_visual",
             "preset_assetless_technical_spec_rag",
             "preset_confidential_rag",
             "preset_preserve_with_sidecars",

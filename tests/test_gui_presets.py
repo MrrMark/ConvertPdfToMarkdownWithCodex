@@ -15,6 +15,7 @@ from pdf2md.models import DomainAdapterMode, ImageMode, RagTableOutputMode, Tabl
 def test_gui_preset_display_names_are_localized() -> None:
     assert preset_display_name("ko", "preserve") == "기본 모드(원본 유지)"
     assert preset_display_name("ko", "technical_spec_rag") == "기술 스펙 RAG"
+    assert preset_display_name("ko", "technical_spec_rag_visual") == "기술 스펙 Visual RAG"
     assert preset_display_name("ko", ASSETLESS_TECHNICAL_SPEC_RAG_PRESET) == "이미지 업로드 불가 RAG 대응"
     assert preset_display_name("en", "custom") == "Optimize Options"
     assert normalize_preset(None) == "preserve"
@@ -105,6 +106,10 @@ def test_purpose_specific_rag_presets_apply_expected_option_matrix() -> None:
     )
     confidential = apply_preset_to_options("confidential_rag", GuiConversionOptions())
     sidecar = apply_preset_to_options("preserve_with_sidecars", GuiConversionOptions(remove_header_footer=True))
+    visual = apply_preset_to_options(
+        "technical_spec_rag_visual",
+        GuiConversionOptions(force_ocr=True, domain_adapter=DomainAdapterMode.OCP.value),
+    )
 
     assert technical.rag_profile == "technical_spec_rag"
     assert technical.rag_table_output == RagTableOutputMode.BOTH.value
@@ -122,19 +127,34 @@ def test_purpose_specific_rag_presets_apply_expected_option_matrix() -> None:
     assert technical.figure_description_backend == "local-vlm"
     assert technical.figure_structure_extraction is False
 
+    assert visual.rag_profile == "technical_spec_rag_visual"
+    assert visual.image_mode == ImageMode.REFERENCED.value
+    assert visual.rag_table_output == RagTableOutputMode.BOTH.value
+    assert visual.domain_adapter == DomainAdapterMode.OCP.value
+    assert visual.force_ocr is False
+    assert visual.retrieval_tokenizer == "regex"
+    assert visual.rag_contextual_embedding_text is True
+    assert visual.rag_merge_sibling_text_chunks is True
+    assert visual.rag_chunk_relationship_metadata is True
+    assert visual.rag_figure_text_chunks is True
+    assert visual.figure_region_ocr is True
+    assert visual.rag_generated_figure_descriptions is True
+    assert visual.figure_description_backend == "local-vlm"
+    assert visual.figure_structure_extraction is True
+
     assetless = apply_preset_to_options(
         ASSETLESS_TECHNICAL_SPEC_RAG_PRESET,
         GuiConversionOptions(domain_adapter=DomainAdapterMode.MANUAL.value, manual_domain_adapter_label="Customer A"),
     )
-    assert assetless.rag_profile == "technical_spec_rag"
+    assert assetless.rag_profile == "technical_spec_rag_visual"
     assert assetless.image_mode == ImageMode.PLACEHOLDER.value
     assert assetless.rag_table_output == RagTableOutputMode.BOTH.value
     assert assetless.domain_adapter == DomainAdapterMode.MANUAL.value
     assert assetless.manual_domain_adapter_label == "Customer A"
     assert assetless.rag_figure_text_chunks is True
-    assert assetless.figure_region_ocr is False
-    assert assetless.rag_generated_figure_descriptions is False
-    assert assetless.figure_structure_extraction is False
+    assert assetless.figure_region_ocr is True
+    assert assetless.rag_generated_figure_descriptions is True
+    assert assetless.figure_structure_extraction is True
 
     assert confidential.confidential_safe_mode is True
     assert confidential.rag_profile == "confidential_rag"
@@ -189,6 +209,7 @@ def test_preset_editable_fields_lock_advanced_options_headlessly() -> None:
     assert rag_fields["domain_adapter"] is False
     assert preset_editable_fields("technical_spec_rag")["retrieval_tokenizer"] is False
     assert preset_editable_fields("technical_spec_rag")["domain_adapter"] is True
+    assert preset_editable_fields("technical_spec_rag_visual")["domain_adapter"] is True
     assert preset_editable_fields(ASSETLESS_TECHNICAL_SPEC_RAG_PRESET)["domain_adapter"] is True
     assert preset_editable_fields(ASSETLESS_TECHNICAL_SPEC_RAG_PRESET)["manual_domain_adapter_label"] is True
     assert preset_editable_fields(ASSETLESS_TECHNICAL_SPEC_RAG_PRESET)["manual_domain_adapter_keywords"] is True

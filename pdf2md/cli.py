@@ -21,7 +21,7 @@ from pdf2md.models import (
     TableMode,
 )
 from pdf2md.pipeline import run_conversion
-from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, rag_profile_options
+from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, TECHNICAL_SPEC_RAG_PROFILES, rag_profile_options
 from pdf2md.utils.logging import configure_logging
 
 
@@ -100,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--require-domain-adapter-for-technical-profile",
         action="store_true",
         default=False,
-        help="Fail fast when --rag-profile technical_spec_rag is used without --domain-adapter.",
+        help="Fail fast when a technical spec RAG profile is used without --domain-adapter.",
     )
     parser.add_argument(
         "--confidential-safe-mode",
@@ -362,10 +362,10 @@ def _selected_domain_adapter(args: argparse.Namespace) -> DomainAdapterMode:
 def _validate_profile_contract(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     if (
         args.require_domain_adapter_for_technical_profile
-        and args.rag_profile == "technical_spec_rag"
+        and args.rag_profile in TECHNICAL_SPEC_RAG_PROFILES
         and _selected_domain_adapter(args) is DomainAdapterMode.NONE
     ):
-        parser.error("--rag-profile technical_spec_rag requires --domain-adapter when strict domain validation is enabled.")
+        parser.error("technical spec RAG profiles require --domain-adapter when strict domain validation is enabled.")
 
 
 def main(argv: Optional[list[str]] = None) -> int:

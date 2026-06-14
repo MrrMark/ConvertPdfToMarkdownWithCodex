@@ -31,6 +31,7 @@ CLI와 GUI preset은 같은 local-only profile matrix를 사용한다.
 | `preserve` | 기본 원문 보존 | RAG table sidecar와 chunk 보강 옵션을 보수적으로 끔 |
 | `rag_optimized` | 일반 RAG ingest | RAG table both, page marker, header/footer removal, hyphen repair, contextual embedding text, sibling merge, relationship metadata |
 | `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg|spdm|manual`와 함께 사용 |
+| `technical_spec_rag_visual` | storage/PCIe/security spec visual ingest | `technical_spec_rag`에 figure text chunk, figure region OCR, deterministic figure description, figure structure sidecar 추가 |
 | `confidential_rag` | 공유/evidence pack | confidential-safe mode, JSONL table sidecar, chunk 보강, sanitized report |
 | `preserve_with_sidecars` | Markdown 원문 보존 + sidecar ingest | 본문 변화 가능성이 있는 header/footer/hyphen repair는 끄고 JSONL sidecar와 relationship metadata만 추가 |
 
@@ -42,14 +43,14 @@ python3 -m pdf2md spec.pdf -o output/share --rag-profile confidential_rag
 ## Assetless Figure Text Chunks
 
 PNG/JPG 같은 image asset을 업로드할 수 없는 팀 RAG 환경에서는 placeholder mode와 figure_text chunk를 함께 사용한다.
-GUI에서는 `이미지 업로드 불가 RAG 대응` preset을 선택하면 같은 조합이 적용된다. 이 GUI preset은 새 CLI profile이 아니라 `technical_spec_rag`에 `image_mode=placeholder`, `rag_figure_text_chunks=true`를 더한 조합이다.
+GUI에서는 `기술 스펙 Visual RAG` preset을 선택하면 figure evidence까지 포함한 profile이 적용된다.
+`이미지 업로드 불가 RAG 대응` preset은 같은 `technical_spec_rag_visual` profile에 `image_mode=placeholder` override를 적용한다.
 
 ```bash
 python3 -m pdf2md spec.pdf -o output/spec \
-  --rag-profile technical_spec_rag \
+  --rag-profile technical_spec_rag_visual \
   --domain-adapter nvme \
-  --image-mode placeholder \
-  --rag-figure-text-chunks
+  --image-mode placeholder
 ```
 
 운영 정책:

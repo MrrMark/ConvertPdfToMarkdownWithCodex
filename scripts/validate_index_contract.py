@@ -64,6 +64,14 @@ RELATIONSHIP_ID_FIELDS = (
     "next_chunk_id",
     "section_anchor_chunk_id",
 )
+VISUAL_CHUNK_TYPES = {"figure_text", "figure_description", "figure_structure"}
+FIGURE_SOURCE_TYPES = {"figure", "excluded_figure"}
+VISUAL_CHUNK_REQUIRED_SOURCE_TYPES = {
+    "figure_text": FIGURE_SOURCE_TYPES,
+    "figure_description": FIGURE_SOURCE_TYPES | {"figure_description"},
+    "figure_structure": FIGURE_SOURCE_TYPES | {"figure_structure"},
+}
+FIGURE_DESCRIPTION_GENERATION_STRATEGY = "deterministic_context_summary"
 SOURCE_REF_SIDECARS = {
     "semantic_units_rag.jsonl": "semantic_id",
     "requirements_rag.jsonl": "semantic_id",
@@ -74,6 +82,24 @@ SOURCE_REF_SIDECARS = {
     "figure_descriptions_rag.jsonl": "description_id",
     "figure_structures_rag.jsonl": "structure_id",
     "domain_units_rag.jsonl": "domain_unit_id",
+}
+FIGURE_DESCRIPTION_REQUIRED_FIELDS = {
+    "description_id",
+    "figure_id",
+    "page",
+    "text",
+    "source_refs",
+    "generated_text",
+    "generation_strategy",
+}
+FIGURE_STRUCTURE_REQUIRED_FIELDS = {
+    "structure_id",
+    "figure_id",
+    "page",
+    "text",
+    "source_refs",
+    "generated_text",
+    "derived_from_context",
 }
 TEXT_BLOCK_FIELDS = ("block_id", "page", "block_index", "text")
 TABLE_ROW_REQUIRED_FIELDS = {
@@ -529,6 +555,113 @@ def _validate_source_refs(
             )
 
 
+def _source_ref_types(value: Any) -> set[str]:
+    if not isinstance(value, list):
+        return set()
+    return {str(ref.get("source_type")) for ref in value if isinstance(ref, dict) and not _is_missing(ref.get("source_type"))}
+
+
+def _validate_bool_value(
+    value: Any,
+    *,
+    findings: list[dict[str, Any]],
+    file_name: str,
+    line: int,
+    record_id: str | None,
+    field: str,
+) -> None:
+    if not isinstance(value, bool):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_boolean_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field=field,
+            message=f"{field} must be a boolean.",
+        )
+
+
+def _validate_visual_chunk_contract(
+    *,
+    record: dict[str, Any],
+    findings: list[dict[str, Any]],
+    line: int,
+    record_id: str | None,
+) -> None:
+    chunk_type = record.get("chunk_type")
+    if chunk_type not in VISUAL_CHUNK_TYPES:
+        return
+    file_name = RETRIEVAL_CHUNKS
+    source_types = _source_ref_types(record.get("source_refs"))
+    required_source_types = VISUAL_CHUNK_REQUIRED_SOURCE_TYPES[str(chunk_type)]
+    missing_required_types = sorted(
+        required
+        for required in required_source_types
+        if required not in source_types and not (required in FIGURE_SOURCE_TYPES and source_types & FIGURE_SOURCE_TYPES)
+    )
+    if missing_required_types:
+        _add_finding(
+            findings,
+            severity="error",
+            code="missing_visual_source_ref",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="source_refs",
+            message=f"{chunk_type} chunks must include source_refs for: {', '.join(missing_required_types)}.",
+        )
+    if "generated_text" in record:
+        _validate_bool_value(
+            record.get("generated_text"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="generated_text",
+        )
+    if "derived_from_context" in record:
+        _validate_bool_value(
+            record.get("derived_from_context"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="derived_from_context",
+        )
+    if chunk_type == "figure_description":
+        if record.get("generated_text") is not True:
+            _add_finding(
+                findings,
+                severity="error",
+                code="missing_generated_text_flag",
+                target="common",
+                file=file_name,
+                line=line,
+                record_id=record_id,
+                field="generated_text",
+                message="figure_description chunks must carry generated_text=true.",
+            )
+        if record.get("generation_strategy") != FIGURE_DESCRIPTION_GENERATION_STRATEGY:
+            _add_finding(
+                findings,
+                severity="error",
+                code="invalid_generation_strategy",
+                target="common",
+                file=file_name,
+                line=line,
+                record_id=record_id,
+                field="generation_strategy",
+                message=(
+                    "figure_description chunks must use "
+                    f"{FIGURE_DESCRIPTION_GENERATION_STRATEGY} generation_strategy."
+                ),
+            )
+
+
 def _validate_retrieval_chunk_record(
     *,
     line: int,
@@ -734,6 +867,7 @@ def _validate_retrieval_chunk_record(
             line=line,
             record_id=record_id,
         )
+    _validate_visual_chunk_contract(record=record, findings=findings, line=line, record_id=record_id)
     for field in RELATIONSHIP_ID_FIELDS:
         if field in record and not isinstance(record.get(field), str):
             _add_finding(
@@ -836,6 +970,9 @@ def _openai_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "relationship_strategy": record.get("relationship_strategy"),
         "schema_version": record.get("schema_version"),
         "source_sha256": record.get("source_sha256"),
+        "generated_text": record.get("generated_text"),
+        "generation_strategy": record.get("generation_strategy"),
+        "derived_from_context": record.get("derived_from_context"),
     }
 
 
@@ -863,6 +1000,9 @@ def _azure_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "related_chunk_ids": record.get("related_chunk_ids"),
         "relationship_strategy": record.get("relationship_strategy"),
         "source_refs_json": source_refs_json,
+        "generated_text": record.get("generated_text"),
+        "generation_strategy": record.get("generation_strategy"),
+        "derived_from_context": record.get("derived_from_context"),
     }
 
 
@@ -887,6 +1027,9 @@ def _document_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
         "related_chunk_ids": record.get("related_chunk_ids"),
         "relationship_strategy": record.get("relationship_strategy"),
+        "generated_text": record.get("generated_text"),
+        "generation_strategy": record.get("generation_strategy"),
+        "derived_from_context": record.get("derived_from_context"),
     }
 
 
@@ -1306,6 +1449,165 @@ def _validate_technical_table_record(
         )
 
 
+def _validate_figure_description_record(
+    *,
+    file_name: str,
+    line: int,
+    record: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> None:
+    record_id = _record_id(record)
+    _validate_required_fields(
+        record,
+        required_fields=FIGURE_DESCRIPTION_REQUIRED_FIELDS,
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+    )
+    for field in ("description_id", "figure_id", "text", "generation_strategy"):
+        if field in record:
+            _validate_string_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    if "page" in record:
+        _validate_int_value(
+            record.get("page"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="page",
+            positive=True,
+        )
+    if "generated_text" in record:
+        _validate_bool_value(
+            record.get("generated_text"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="generated_text",
+        )
+    if record.get("generated_text") is not True:
+        _add_finding(
+            findings,
+            severity="error",
+            code="missing_generated_text_flag",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="generated_text",
+            message="figure description sidecar records must carry generated_text=true.",
+        )
+    if record.get("generation_strategy") != FIGURE_DESCRIPTION_GENERATION_STRATEGY:
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_generation_strategy",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="generation_strategy",
+            message=(
+                "figure description sidecar records must use "
+                f"{FIGURE_DESCRIPTION_GENERATION_STRATEGY} generation_strategy."
+            ),
+        )
+    if "source_refs" in record:
+        _validate_source_refs(
+            record.get("source_refs"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+        )
+    if "bbox" in record:
+        _validate_bbox(
+            record.get("bbox"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="bbox",
+            required=False,
+        )
+
+
+def _validate_figure_structure_record(
+    *,
+    file_name: str,
+    line: int,
+    record: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> None:
+    record_id = _record_id(record)
+    _validate_required_fields(
+        record,
+        required_fields=FIGURE_STRUCTURE_REQUIRED_FIELDS,
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+    )
+    for field in ("structure_id", "figure_id", "text", "structure_type"):
+        if field in record:
+            _validate_string_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+                required=field != "structure_type",
+            )
+    if "page" in record:
+        _validate_int_value(
+            record.get("page"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="page",
+            positive=True,
+        )
+    for field in ("generated_text", "derived_from_context"):
+        if field in record:
+            _validate_bool_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    if "source_refs" in record:
+        _validate_source_refs(
+            record.get("source_refs"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+        )
+    if "bbox" in record:
+        _validate_bbox(
+            record.get("bbox"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="bbox",
+            required=False,
+        )
+
+
 def _validate_optional_sidecar_record(
     *,
     file_name: str,
@@ -1320,6 +1622,10 @@ def _validate_optional_sidecar_record(
         _validate_technical_table_record(file_name=file_name, line=line, record=record, findings=findings)
     elif file_name == "tables_rag.jsonl":
         _validate_table_row_record(file_name=file_name, line=line, record=record, findings=findings)
+    elif file_name == "figure_descriptions_rag.jsonl":
+        _validate_figure_description_record(file_name=file_name, line=line, record=record, findings=findings)
+    elif file_name == "figure_structures_rag.jsonl":
+        _validate_figure_structure_record(file_name=file_name, line=line, record=record, findings=findings)
     elif file_name in SOURCE_REF_SIDECARS:
         id_field = SOURCE_REF_SIDECARS[file_name]
         if _is_missing(record.get(id_field)):

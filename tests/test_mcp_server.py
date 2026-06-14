@@ -23,6 +23,12 @@ def test_list_profiles_exposes_agent_selectable_modes() -> None:
     payload = mcp_server.list_profiles()
 
     assert payload["profiles"]["technical_spec_rag"]["rag_table_output"] == "both"
+    visual = payload["profiles"]["technical_spec_rag_visual"]
+    assert visual["rag_table_output"] == "both"
+    assert visual["rag_figure_text_chunks"] is True
+    assert visual["figure_region_ocr"] is True
+    assert visual["rag_generated_figure_descriptions"] is True
+    assert visual["figure_structure_extraction"] is True
     assert "nvme" in payload["domain_adapters"]
     assert "placeholder" in payload["image_modes"]
     assert "minimal" in payload["rag_sidecar_scopes"]
@@ -98,11 +104,19 @@ def test_convert_pdf_requires_domain_adapter_for_technical_profile(tmp_path: Pat
     input_pdf = tmp_path / "spec.pdf"
     input_pdf.write_bytes(b"%PDF-1.4\n% synthetic placeholder\n")
 
-    with pytest.raises(ValueError, match="technical_spec_rag requires"):
+    with pytest.raises(ValueError, match="technical spec RAG profiles require"):
         mcp_server.convert_pdf(
             input_pdf=str(input_pdf),
             output_dir=str(tmp_path / "out"),
             rag_profile="technical_spec_rag",
+            roots=[tmp_path],
+        )
+
+    with pytest.raises(ValueError, match="technical spec RAG profiles require"):
+        mcp_server.convert_pdf(
+            input_pdf=str(input_pdf),
+            output_dir=str(tmp_path / "out-visual"),
+            rag_profile="technical_spec_rag_visual",
             roots=[tmp_path],
         )
 

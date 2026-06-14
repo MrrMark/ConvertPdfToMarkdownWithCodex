@@ -135,7 +135,7 @@ python -m pdf2md .\sample.pdf -o .\output --rag-profile technical_spec_rag --dom
 이미지 파일을 팀 RAG에 업로드할 수 없는 환경에서는 CLI에서 GUI 프리셋과 같은 조합을 아래처럼 실행한다.
 
 ```powershell
-python -m pdf2md .\sample.pdf -o .\output --rag-profile technical_spec_rag --image-mode placeholder --rag-figure-text-chunks
+python -m pdf2md .\sample.pdf -o .\output --rag-profile technical_spec_rag_visual --image-mode placeholder
 ```
 
 이 조합은 PNG/JPG 파일을 생성하지 않고, `document.md`에는 deterministic placeholder comment를 남긴다. 그림 주변의 관측 텍스트는 `figures_rag.jsonl`과 `retrieval_chunks_rag.jsonl`의 `figure_text` chunk로 보존한다.
@@ -213,7 +213,7 @@ GUI 기본 사용 순서:
 | 공유용 metadata 민감정보 최소화 | `민감정보 보호 RAG` |
 | 세부 옵션 직접 제어 | `Optimize Options(유저 선택)` |
 
-`이미지 업로드 불가 RAG 대응` preset은 내부적으로 `technical_spec_rag`, `image_mode=placeholder`, `rag_figure_text_chunks=true`를 사용한다. `Domain=manual`을 선택하면 고객 requirement용 label과 keyword를 직접 입력할 수 있다.
+`이미지 업로드 불가 RAG 대응` preset은 내부적으로 `technical_spec_rag_visual`, `image_mode=placeholder`를 사용한다. `Domain=manual`을 선택하면 고객 requirement용 label과 keyword를 직접 입력할 수 있다.
 
 ## 8) 결과 확인
 

@@ -47,14 +47,21 @@ python3 -m pdf2md spec.pdf -o output/spec \
 
 For NVMe Base or NVM Command Set PDFs, use `--domain-adapter nvme` and report only sidecar counts plus validation status.
 
+Technical spec RAG with figure/diagram sidecars:
+
+```bash
+python3 -m pdf2md spec.pdf -o output/spec \
+  --rag-profile technical_spec_rag_visual \
+  --domain-adapter nvme
+```
+
 Assetless technical RAG:
 
 ```bash
 python3 -m pdf2md spec.pdf -o output/spec \
-  --rag-profile technical_spec_rag \
+  --rag-profile technical_spec_rag_visual \
   --domain-adapter nvme \
-  --image-mode placeholder \
-  --rag-figure-text-chunks
+  --image-mode placeholder
 ```
 
 Batch conversion:
@@ -67,7 +74,7 @@ Use the bundled runner when a client benefits from a smaller command surface:
 
 ```bash
 python3 agent-pack/skills/pdf2md-rag-ingest/scripts/pdf2md_agent_runner.py convert spec.pdf \
-  --workflow technical-rag \
+  --workflow visual-technical-rag \
   --domain-adapter nvme \
   --output-dir output/spec
 ```

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from scripts.run_rag_eval import apply_calibration_gate, evaluate_queries, main
+from scripts.visual_rag_eval import evaluate_visual_chunks
 
 
 def _chunk(chunk_id: str, text: str, source_id: str, priority: int = 50, source_type: str = "text_block") -> dict:
@@ -189,6 +190,78 @@ def test_rag_eval_reports_relationship_target_coverage() -> None:
     assert report["metrics"]["relationship_target_count"] == 4
     assert report["metrics"]["relationship_target_missing_count"] == 1
     assert report["metrics"]["relationship_target_coverage"] == 0.75
+
+
+def test_visual_rag_eval_reports_aggregate_only_metrics(tmp_path: Path) -> None:
+    output_dir = tmp_path / "visual-output"
+    output_dir.mkdir()
+    (output_dir / "retrieval_chunks_rag.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "chunk_id": "chunk-000001",
+                        "chunk_index": 1,
+                        "chunk_type": "figure_text",
+                        "text": "caption: Figure 1 State machine IDLE READY",
+                        "source_refs": [
+                            {"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1}
+                        ],
+                        "retrieval_priority": 78,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "chunk_id": "chunk-000002",
+                        "chunk_index": 2,
+                        "chunk_type": "figure_description",
+                        "text": "figure_description: State machine transitions.",
+                        "source_refs": [
+                            {"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1},
+                            {
+                                "source_type": "figure_description",
+                                "source_id": "figure-description-000001",
+                                "page": 1,
+                            },
+                        ],
+                        "retrieval_priority": 62,
+                        "generated_text": True,
+                        "generation_strategy": "deterministic_context_summary",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "chunk_id": "chunk-000003",
+                        "chunk_index": 3,
+                        "chunk_type": "figure_structure",
+                        "text": "figure_structure: state_machine.",
+                        "source_refs": [
+                            {"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1},
+                            {"source_type": "figure_structure", "source_id": "figure-structure-000001", "page": 1},
+                        ],
+                        "retrieval_priority": 64,
+                        "generated_text": False,
+                        "derived_from_context": True,
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = evaluate_visual_chunks(output_dir=output_dir, profile="visual-smoke")
+
+    assert report["status"] == "passed"
+    assert report["passed"] is True
+    assert report["query_count"] == 3
+    assert report["visual_chunk_count"] == 3
+    assert report["metrics"]["hit_at_k"] == 1.0
+    assert report["metrics"]["expected_source_coverage"] == 1.0
+    assert report["metrics"]["figure_source_ref_coverage"] == 1.0
+    assert report["queries_included"] is False
+    assert report["retrieved_text_included"] is False
+    assert "State machine transitions" not in json.dumps(report, ensure_ascii=False, sort_keys=True)
 
 
 def test_rag_eval_cli_writes_report(tmp_path: Path) -> None:

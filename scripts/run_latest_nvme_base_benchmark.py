@@ -30,6 +30,11 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from run_rag_eval import evaluate_queries  # type: ignore[no-redef]
 
+try:
+    from scripts.visual_rag_eval import evaluate_visual_chunks
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from visual_rag_eval import evaluate_visual_chunks  # type: ignore[no-redef]
+
 
 SCHEMA_VERSION = "1.0"
 REPORT_FILENAME = "latest_nvme_spec_benchmark_report.json"
@@ -72,6 +77,8 @@ SIDECAR_FILES = (
     "requirement_traceability_rag.jsonl",
     "technical_tables_rag.jsonl",
     "figures_rag.jsonl",
+    "figure_descriptions_rag.jsonl",
+    "figure_structures_rag.jsonl",
     "domain_units_rag.jsonl",
     "retrieval_chunks_rag.jsonl",
     "tables_rag.jsonl",
@@ -80,6 +87,8 @@ SIDECAR_FILES = (
 
 COMMAND_SET_EVAL_PROFILE = "nvme_command_set_p2_retrieval"
 COMMAND_SET_EVAL_TOP_K = 5
+VISUAL_EVAL_PROFILE = "technical_spec_visual_p3_retrieval"
+VISUAL_EVAL_TOP_K = 5
 COMMAND_SET_EVAL_REQUIRED_UNIT_TYPES = (
     "command_opcode",
     "command_dword_field",
@@ -97,6 +106,7 @@ class LatestNvmeSpecBenchmarkConfig:
     source_url: str | None = None
     pages: str | None = None
     page_workers: int = 1
+    visual_mode: bool = False
 
 
 LatestNvmeBaseBenchmarkConfig = LatestNvmeSpecBenchmarkConfig
@@ -192,15 +202,18 @@ def build_option_matrix(
     pages: str | None,
     page_workers: int,
     spec_document_type: str = BASE_SPEC_DOCUMENT,
+    visual_mode: bool = False,
 ) -> dict[str, Any]:
     """Return the sanitized option matrix used by the benchmark conversion."""
-    options = rag_profile_options("technical_spec_rag")
+    rag_profile = "technical_spec_rag_visual" if visual_mode else "technical_spec_rag"
+    options = rag_profile_options(rag_profile)
     return {
         "spec_document_type": spec_document_type,
         "benchmark_mode": mode,
         "pages": _effective_pages(mode, pages),
         "page_workers": page_workers,
-        "rag_profile": "technical_spec_rag",
+        "visual_mode": visual_mode,
+        "rag_profile": rag_profile,
         "domain_adapter": DomainAdapterMode.NVME.value,
         "image_mode": _mode_image_mode(mode),
         "table_mode": TableMode.AUTO.value,
@@ -213,6 +226,11 @@ def build_option_matrix(
         "rag_contextual_embedding_text": options.rag_contextual_embedding_text,
         "rag_merge_sibling_text_chunks": options.rag_merge_sibling_text_chunks,
         "rag_chunk_relationship_metadata": options.rag_chunk_relationship_metadata,
+        "rag_figure_text_chunks": options.rag_figure_text_chunks,
+        "figure_region_ocr": options.figure_region_ocr,
+        "rag_generated_figure_descriptions": options.rag_generated_figure_descriptions,
+        "figure_description_backend": options.figure_description_backend,
+        "figure_structure_extraction": options.figure_structure_extraction,
         "command_set_query_eval": {
             "enabled": spec_document_type == NVM_COMMAND_SET_SPEC_DOCUMENT,
             "profile": COMMAND_SET_EVAL_PROFILE,
@@ -237,6 +255,7 @@ def build_conversion_config(*, config: LatestNvmeSpecBenchmarkConfig, conversion
         pages=config.pages,
         page_workers=config.page_workers,
         spec_document_type=config.spec_document_type,
+        visual_mode=config.visual_mode,
     )
     return Config(
         input_pdf=config.input_pdf,
@@ -255,6 +274,11 @@ def build_conversion_config(*, config: LatestNvmeSpecBenchmarkConfig, conversion
         rag_contextual_embedding_text=matrix["rag_contextual_embedding_text"],
         rag_merge_sibling_text_chunks=matrix["rag_merge_sibling_text_chunks"],
         rag_chunk_relationship_metadata=matrix["rag_chunk_relationship_metadata"],
+        rag_figure_text_chunks=matrix["rag_figure_text_chunks"],
+        figure_region_ocr=matrix["figure_region_ocr"],
+        rag_generated_figure_descriptions=matrix["rag_generated_figure_descriptions"],
+        figure_description_backend=matrix["figure_description_backend"],
+        figure_structure_extraction=matrix["figure_structure_extraction"],
         page_workers=config.page_workers,
     )
 
@@ -490,11 +514,14 @@ def _summary_counts(
     sidecars: dict[str, Any],
     contract: dict[str, Any],
     command_set_eval: dict[str, Any],
+    visual_eval: dict[str, Any],
 ) -> dict[str, Any]:
     conversion_summary = _summary(conversion_report)
     contract_summary = _summary(contract)
     command_eval_metrics = command_set_eval.get("metrics")
     command_eval_metrics = command_eval_metrics if isinstance(command_eval_metrics, dict) else {}
+    visual_eval_metrics = visual_eval.get("metrics")
+    visual_eval_metrics = visual_eval_metrics if isinstance(visual_eval_metrics, dict) else {}
     page_count = _int_value(conversion_summary, "processed_pages")
     if page_count == 0 and isinstance(manifest.get("selected_pages"), list):
         page_count = len(manifest["selected_pages"])
@@ -517,6 +544,33 @@ def _summary_counts(
         "traceability_record_count": _int_value(conversion_summary, "requirement_traceability_record_count"),
         "technical_table_unit_count": _int_value(conversion_summary, "technical_table_record_count"),
         "domain_unit_count": _int_value(conversion_summary, "domain_unit_record_count"),
+        "figure_rag_record_count": _int_value(conversion_summary, "figure_rag_record_count"),
+        "figure_text_chunk_record_count": _int_value(conversion_summary, "figure_text_chunk_record_count"),
+        "figure_description_record_count": _int_value(conversion_summary, "figure_description_record_count"),
+        "figure_description_chunk_record_count": _int_value(
+            conversion_summary,
+            "figure_description_chunk_record_count",
+        ),
+        "figure_structure_record_count": _int_value(conversion_summary, "figure_structure_record_count"),
+        "figure_structure_chunk_record_count": _int_value(conversion_summary, "figure_structure_chunk_record_count"),
+        "figure_region_ocr_attempted_count": _int_value(conversion_summary, "figure_region_ocr_attempted_count"),
+        "figure_region_ocr_promoted_label_count": _int_value(
+            conversion_summary,
+            "figure_region_ocr_promoted_label_count",
+        ),
+        "figure_region_ocr_runtime_unavailable_count": _int_value(
+            conversion_summary,
+            "figure_region_ocr_runtime_unavailable_count",
+        ),
+        "visual_eval_status": visual_eval.get("status", "not_applicable"),
+        "visual_eval_passed": visual_eval.get("passed") is True,
+        "visual_eval_query_count": _int_value(visual_eval, "query_count"),
+        "visual_eval_hit_at_k": _float_value(visual_eval_metrics, "hit_at_k"),
+        "visual_eval_expected_source_coverage": _float_value(visual_eval_metrics, "expected_source_coverage"),
+        "visual_eval_figure_source_ref_coverage": _float_value(
+            visual_eval_metrics,
+            "figure_source_ref_coverage",
+        ),
         "contract_validation_status": contract.get("status"),
         "contract_validation_passed": contract.get("passed") is True,
         "command_set_eval_status": command_set_eval.get("status"),
@@ -560,6 +614,24 @@ def render_scorecard(report: dict[str, Any]) -> str:
         f"| traceability_record_count | {counts.get('traceability_record_count', 0)} |",
         f"| technical_table_unit_count | {counts.get('technical_table_unit_count', 0)} |",
         f"| domain_unit_count | {counts.get('domain_unit_count', 0)} |",
+        f"| figure_rag_record_count | {counts.get('figure_rag_record_count', 0)} |",
+        f"| figure_text_chunk_record_count | {counts.get('figure_text_chunk_record_count', 0)} |",
+        f"| figure_description_record_count | {counts.get('figure_description_record_count', 0)} |",
+        f"| figure_description_chunk_record_count | {counts.get('figure_description_chunk_record_count', 0)} |",
+        f"| figure_structure_record_count | {counts.get('figure_structure_record_count', 0)} |",
+        f"| figure_structure_chunk_record_count | {counts.get('figure_structure_chunk_record_count', 0)} |",
+        f"| figure_region_ocr_attempted_count | {counts.get('figure_region_ocr_attempted_count', 0)} |",
+        f"| figure_region_ocr_promoted_label_count | {counts.get('figure_region_ocr_promoted_label_count', 0)} |",
+        "| figure_region_ocr_runtime_unavailable_count | "
+        f"{counts.get('figure_region_ocr_runtime_unavailable_count', 0)} |",
+        f"| visual_eval_status | {counts.get('visual_eval_status')} |",
+        f"| visual_eval_passed | {counts.get('visual_eval_passed')} |",
+        f"| visual_eval_query_count | {counts.get('visual_eval_query_count', 0)} |",
+        f"| visual_eval_hit_at_k | {counts.get('visual_eval_hit_at_k', 0.0)} |",
+        "| visual_eval_expected_source_coverage | "
+        f"{counts.get('visual_eval_expected_source_coverage', 0.0)} |",
+        "| visual_eval_figure_source_ref_coverage | "
+        f"{counts.get('visual_eval_figure_source_ref_coverage', 0.0)} |",
         f"| contract_validation_passed | {counts.get('contract_validation_passed')} |",
         f"| command_set_eval_status | {counts.get('command_set_eval_status')} |",
         f"| command_set_eval_passed | {counts.get('command_set_eval_passed')} |",
@@ -598,6 +670,25 @@ def run_latest_nvme_spec_benchmark(config: LatestNvmeSpecBenchmarkConfig) -> dic
         output_dir=conversion_output_dir,
         spec_document_type=config.spec_document_type,
     )
+    visual_eval = (
+        evaluate_visual_chunks(output_dir=conversion_output_dir, profile=VISUAL_EVAL_PROFILE, top_k=VISUAL_EVAL_TOP_K)
+        if config.visual_mode
+        else {
+            "status": "not_applicable",
+            "passed": True,
+            "profile": VISUAL_EVAL_PROFILE,
+            "top_k": VISUAL_EVAL_TOP_K,
+            "query_count": 0,
+            "metrics": {
+                "hit_at_k": 0.0,
+                "expected_source_coverage": 0.0,
+                "figure_source_ref_coverage": 0.0,
+            },
+            "queries_included": False,
+            "retrieved_text_included": False,
+            "raw_content_included": False,
+        }
+    )
     metadata = _spec_metadata(config.spec_document_type)
     report_payload = {
         "schema_version": SCHEMA_VERSION,
@@ -615,6 +706,7 @@ def run_latest_nvme_spec_benchmark(config: LatestNvmeSpecBenchmarkConfig) -> dic
             pages=config.pages,
             page_workers=config.page_workers,
             spec_document_type=config.spec_document_type,
+            visual_mode=config.visual_mode,
         ),
         "conversion_exit_code": exit_code,
         "conversion_status": str(conversion_report.get("status") or ""),
@@ -629,10 +721,12 @@ def run_latest_nvme_spec_benchmark(config: LatestNvmeSpecBenchmarkConfig) -> dic
             sidecars=sidecars,
             contract=contract,
             command_set_eval=command_set_eval,
+            visual_eval=visual_eval,
         ),
         "sidecars": sidecars,
         "contract_validation": contract,
         "command_set_eval": command_set_eval,
+        "visual_eval": visual_eval,
     }
     report = LatestNvmeSpecBenchmarkReport.model_validate(report_payload).model_dump(mode="json")
     write_json(config.output_dir / REPORT_FILENAME, report)
@@ -656,6 +750,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source-url", default=None)
     parser.add_argument("--pages", default=None)
     parser.add_argument("--page-workers", type=int, default=1)
+    parser.add_argument("--visual-mode", action="store_true", help="Use technical_spec_rag_visual option bundle.")
     parser.add_argument("--fail-on-contract-error", action="store_true")
     parser.add_argument("--fail-on-command-eval-error", action="store_true")
     return parser
@@ -673,6 +768,7 @@ def main(argv: list[str] | None = None) -> int:
             source_url=args.source_url,
             pages=args.pages,
             page_workers=args.page_workers,
+            visual_mode=args.visual_mode,
         )
     )
     print(f"Wrote {args.output_dir / REPORT_FILENAME}")

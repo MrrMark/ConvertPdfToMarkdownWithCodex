@@ -6,7 +6,7 @@ from typing import Literal
 from pdf2md.gui_i18n import GuiLanguage, translate
 from pdf2md.gui_runner import GuiConversionOptions
 from pdf2md.models import ImageMode
-from pdf2md.rag_profiles import rag_profile_options
+from pdf2md.rag_profiles import TECHNICAL_SPEC_RAG_PROFILES, TECHNICAL_SPEC_RAG_VISUAL_PROFILE, rag_profile_options
 
 
 ASSETLESS_TECHNICAL_SPEC_RAG_PRESET = "assetless_technical_spec_rag"
@@ -14,6 +14,7 @@ GuiOptionPreset = Literal[
     "preserve",
     "rag_optimized",
     "technical_spec_rag",
+    "technical_spec_rag_visual",
     "assetless_technical_spec_rag",
     "confidential_rag",
     "preserve_with_sidecars",
@@ -24,6 +25,7 @@ SUPPORTED_GUI_OPTION_PRESETS: tuple[GuiOptionPreset, ...] = (
     "preserve",
     "rag_optimized",
     "technical_spec_rag",
+    TECHNICAL_SPEC_RAG_VISUAL_PROFILE,
     ASSETLESS_TECHNICAL_SPEC_RAG_PRESET,
     "confidential_rag",
     "preserve_with_sidecars",
@@ -79,7 +81,7 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
     normalized = normalize_preset(str(preset))
     if normalized == "custom":
         return current
-    rag_profile = "technical_spec_rag" if normalized == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET else normalized
+    rag_profile = TECHNICAL_SPEC_RAG_VISUAL_PROFILE if normalized == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET else normalized
     profile_options = rag_profile_options(rag_profile)
     dedupe_images = current.dedupe_images if normalized == "rag_optimized" else profile_options.dedupe_images
     figure_crop_fallback = (
@@ -87,7 +89,7 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
     )
     domain_adapter = (
         current.domain_adapter
-        if normalized in {"technical_spec_rag", ASSETLESS_TECHNICAL_SPEC_RAG_PRESET}
+        if normalized in {*TECHNICAL_SPEC_RAG_PROFILES, ASSETLESS_TECHNICAL_SPEC_RAG_PRESET}
         else profile_options.domain_adapter
     )
     image_mode = ImageMode.PLACEHOLDER.value if normalized == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET else profile_options.image_mode
@@ -110,9 +112,7 @@ def apply_preset_to_options(preset: GuiOptionPreset | str, current: GuiConversio
         rag_contextual_embedding_text=profile_options.rag_contextual_embedding_text,
         rag_merge_sibling_text_chunks=profile_options.rag_merge_sibling_text_chunks,
         rag_chunk_relationship_metadata=profile_options.rag_chunk_relationship_metadata,
-        rag_figure_text_chunks=(
-            True if normalized == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET else profile_options.rag_figure_text_chunks
-        ),
+        rag_figure_text_chunks=profile_options.rag_figure_text_chunks,
         figure_region_ocr=profile_options.figure_region_ocr,
         rag_generated_figure_descriptions=profile_options.rag_generated_figure_descriptions,
         figure_description_backend=profile_options.figure_description_backend,
@@ -130,7 +130,7 @@ def preset_editable_fields(preset: GuiOptionPreset | str) -> dict[str, bool]:
     advanced_editable = preset_allows_custom_options(preset)
     editable = {field: True for field in GUI_ALWAYS_EDITABLE_OPTION_FIELDS}
     editable.update({field: advanced_editable for field in GUI_PRESET_LOCKED_OPTION_FIELDS})
-    if normalize_preset(str(preset)) in {"technical_spec_rag", ASSETLESS_TECHNICAL_SPEC_RAG_PRESET}:
+    if normalize_preset(str(preset)) in {*TECHNICAL_SPEC_RAG_PROFILES, ASSETLESS_TECHNICAL_SPEC_RAG_PRESET}:
         editable["domain_adapter"] = True
         editable["manual_domain_adapter_label"] = True
         editable["manual_domain_adapter_keywords"] = True
