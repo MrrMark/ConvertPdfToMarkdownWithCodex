@@ -23,25 +23,10 @@
 
 ## 남은 작업
 
-### Q115. Visual Technical Spec RAG Profile and Metrics
+현재 남은 작업 없음.
 
-NVMe Base/Command와 OCP spec의 figure, diagram, waveform, register layout 검색성을 강화하기 위해
-`technical_spec_rag_visual` 또는 동등한 공식 visual preset을 추가한다.
-
-범위:
-
-- CLI/MCP/GUI/agent skill에서 같은 visual option bundle을 선택할 수 있게 한다.
-- `figure_text`, `figure_description`, `figure_structure` retrieval chunk 계약을 schema/docs/test로 고정한다.
-- official NVMe/OCP benchmark report에 visual metric을 추가한다.
-- 자세한 명세는 `docs/VISUAL_TECHNICAL_SPEC_RAG_DEVELOPMENT_SPEC.md`를 따른다.
-
-### Q116. SSD Verification Agent PDF2MD Sidecar Handoff
-
-`ssd-verification-agent`가 pdf2md 산출물을 local source-of-truth로 ingest하고 RAG server 검색 결과와 병행 운영할 수 있도록
-handoff 명세를 확정한다.
-
-범위:
-
-- pdf2md 쪽 산출물/validator/MCP 계약을 handoff 문서로 정리한다.
-- `ssd-verification-agent` 쪽 API/MCP/direct ingest/figure evidence/scoring 작업을 분리 명세로 제공한다.
-- 자세한 명세는 `docs/SSD_VERIFICATION_AGENT_PDF2MD_VISUAL_RAG_HANDOFF_SPEC.md`를 따른다.
+Q115/Q116은 구현, 검증, PR merge까지 완료되어 active backlog에서 제거했다.
+완료 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 추적한다.
+Visual profile의 historical implementation contract는 `docs/VISUAL_TECHNICAL_SPEC_RAG_DEVELOPMENT_SPEC.md`에 보관한다.
+`ssd-verification-agent` repo에서 수행할 sidecar direct ingest/API/MCP/SpecAnalysisAgent 연동 작업은
+`docs/SSD_VERIFICATION_AGENT_PDF2MD_VISUAL_RAG_HANDOFF_SPEC.md`를 handoff 기준으로 별도 repo에서 진행한다.

@@ -459,7 +459,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q112. Region OCR Report-Only Prototype" not in next_plan
     assert "Q113. Local-Only Figure Description Evaluation Pack" not in next_plan
     assert "Q114. Docling Layout Adapter Comparison Mode" not in next_plan
-    assert "현재 남은 작업 없음." not in next_plan
+    assert "Q115. Visual Technical Spec RAG Profile and Metrics" not in next_plan
+    assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" not in next_plan
+    assert "현재 남은 작업 없음." in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in next_plan
@@ -507,13 +509,15 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q112. Region OCR Report-Only Prototype" not in development_specs
     assert "Q113. Local-Only Figure Description Evaluation Pack" not in development_specs
     assert "Q114. Docling Layout Adapter Comparison Mode" not in development_specs
+    assert "Q115. Visual Technical Spec RAG Profile and Metrics" not in development_specs
+    assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" not in development_specs
     assert "figure_descriptions_rag.jsonl" not in development_specs
     assert "figure_structures_rag.jsonl" not in development_specs
     assert "--rag-generated-figure-descriptions" not in development_specs
     assert "generated_text=true" not in development_specs
     assert "placeholder + figure_text chunk" not in development_specs
     assert "다중 OCR backend" not in development_specs
-    assert "현재 active 개발 명세 없음." not in development_specs
+    assert "현재 active 개발 명세 없음." in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in development_specs
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in development_specs
@@ -562,16 +566,17 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "Q115. Visual Technical Spec RAG Profile and Metrics" in next_plan
-    assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" in next_plan
+    assert "Q115/Q116은 구현, 검증, PR merge까지 완료" in next_plan
+    assert "ssd-verification-agent` repo에서 수행할 sidecar direct ingest/API/MCP/SpecAnalysisAgent" in next_plan
     assert "docs/VISUAL_TECHNICAL_SPEC_RAG_DEVELOPMENT_SPEC.md" in next_plan
     assert "docs/SSD_VERIFICATION_AGENT_PDF2MD_VISUAL_RAG_HANDOFF_SPEC.md" in next_plan
-    assert "Q115. Visual Technical Spec RAG Profile and Metrics" in development_specs
-    assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" in development_specs
-    assert "docs/VISUAL_TECHNICAL_SPEC_RAG_DEVELOPMENT_SPEC.md" in development_specs
-    assert "docs/SSD_VERIFICATION_AGENT_PDF2MD_VISUAL_RAG_HANDOFF_SPEC.md" in development_specs
-    assert "완료된 Q34-Q114" in development_specs
+    assert "완료된 Q34-Q116" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q115. Visual Technical Spec RAG Profile and Metrics" in implemented_specs
+    assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" in implemented_specs
+    assert "technical_spec_rag_visual" in implemented_specs
+    assert "scripts/visual_rag_eval.py" in implemented_specs
+    assert "ingest_pdf2md_sidecars" in implemented_specs
     assert "Q114. Docling Layout Adapter Comparison Mode" in implemented_specs
     assert "layout_comparison_mode" in implemented_specs
     assert "--layout-comparison-mode" in implemented_specs
