@@ -20,7 +20,7 @@ Use artifact metadata before reading raw Markdown content. Prefer `report.json`,
 | `semantic_units_rag.jsonl` | Conservative semantic units such as requirements and definitions |
 | `requirements_rag.jsonl` | Filtered normative requirement view |
 | `requirement_traceability_rag.jsonl` | Requirement ID, condition, dependency, exception, testability hints |
-| `technical_tables_rag.jsonl` | Register/bitfield/opcode/log page typed rows |
+| `technical_tables_rag.jsonl` | Register/bitfield/opcode/log page/CDW/pointer/status taxonomy typed rows |
 | `tables_rag.jsonl` | Row-oriented table JSONL when requested |
 | `rag_tables.md` | Row-oriented Markdown when requested |
 | `figures_rag.jsonl` | Figure/image provenance, captions, bbox, nearby refs |
@@ -43,4 +43,5 @@ When reporting to users:
 - Include conversion status, exit code, processed pages, warning count, and output directory.
 - Mention warning codes and affected pages when available.
 - Mention whether outputs are full, minimal, or fast sidecar scope.
+- For NVMe Base and NVM Command Set, summarize `domain_units_rag.jsonl`, `technical_tables_rag.jsonl`, command relationship metadata coverage, and validation status; do not paste raw spec rows.
 - Do not paste raw PDF text, full Markdown, customer filenames, or image bytes unless explicitly requested and safe.

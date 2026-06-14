@@ -16,8 +16,10 @@ from scripts import probe_ocr_backends
 from scripts import run_preset_eval
 from scripts import run_gui_cli_parity
 from scripts import run_corpus_eval
+from scripts import run_latest_nvme_base_benchmark
 from scripts import run_latest_nvme_command_set_eval
 from scripts import run_release_gates
+from fixtures.pdf_builder import build_nvme_base_slice_pdf, build_nvme_command_set_slice_pdf
 
 
 def _write_jsonl(path: Path, records: list[dict]) -> None:
@@ -351,6 +353,150 @@ def test_latest_nvme_command_set_eval_writes_sanitized_scorecard(
     assert manifest["options"]["domain_adapter"] == "nvme"
     assert manifest["options"]["rag_figure_text_chunks"] is True
     assert manifest["options"]["rag_generated_figure_descriptions"] is True
+
+
+def test_latest_nvme_base_benchmark_writes_sanitized_summary(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "NVM-Express-Base-Synthetic.pdf"
+    build_nvme_base_slice_pdf(input_pdf)
+    output_dir = tmp_path / "latest-nvme-base-benchmark"
+
+    report = run_latest_nvme_base_benchmark.run_latest_nvme_spec_benchmark(
+        run_latest_nvme_base_benchmark.LatestNvmeSpecBenchmarkConfig(
+            input_pdf=input_pdf,
+            output_dir=output_dir,
+            spec_document_type=run_latest_nvme_base_benchmark.BASE_SPEC_DOCUMENT,
+            mode=run_latest_nvme_base_benchmark.FAST_SMOKE_MODE,
+            source_url=run_latest_nvme_base_benchmark.OFFICIAL_SOURCE_URL,
+        )
+    )
+    persisted = json.loads(
+        (output_dir / run_latest_nvme_base_benchmark.REPORT_FILENAME).read_text(encoding="utf-8")
+    )
+    scorecard = (output_dir / run_latest_nvme_base_benchmark.SCORECARD_FILENAME).read_text(encoding="utf-8")
+    counts = report["summary_counts"]
+
+    assert persisted == report
+    assert report["purpose"] == "latest_nvme_spec_benchmark"
+    assert report["spec_document_type"] == "base"
+    assert report["source_url"] == "https://nvmexpress.org/specifications/"
+    assert len(report["source_sha256"]) == 64
+    assert report["mode"] == "fast_smoke"
+    assert report["expected_spec_title"] == "NVM Express Base Specification"
+    assert report["option_matrix"]["pages"] == "1-5"
+    assert report["option_matrix"]["spec_document_type"] == "base"
+    assert report["option_matrix"]["command_set_query_eval"]["enabled"] is False
+    assert report["option_matrix"]["domain_adapter"] == "nvme"
+    assert report["option_matrix"]["image_mode"] == "placeholder"
+    assert counts["page_count"] == 5
+    assert counts["retrieval_chunk_count"] > 0
+    assert counts["requirement_count"] > 0
+    assert counts["traceability_record_count"] >= 3
+    assert counts["technical_table_unit_count"] >= 4
+    assert counts["domain_unit_count"] >= 4
+    assert counts["contract_validation_status"] == "passed"
+    assert counts["contract_validation_passed"] is True
+    assert counts["command_set_eval_status"] == "not_applicable"
+    assert counts["command_set_eval_passed"] is True
+    assert report["command_set_eval"]["queries_included"] is False
+    assert report["command_set_eval"]["retrieved_text_included"] is False
+    assert counts["sidecar_file_sizes"]["retrieval_chunks_rag.jsonl"] > 0
+    assert report["raw_content_included"] is False
+    assert report["image_bytes_included"] is False
+    assert report["local_input_paths_included"] is False
+    assert "Raw PDF text, raw Markdown body, generated queries, retrieved text, image bytes" in scorecard
+
+    serialized = json.dumps(report, ensure_ascii=False, sort_keys=True)
+    assert str(input_pdf) not in serialized
+    assert "The controller shall report synthetic health status when requested." not in serialized
+    assert "Command = Identify" not in serialized
+
+
+def test_latest_nvme_command_spec_benchmark_uses_same_contract(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "NVM-Express-NVM-Command-Set-Synthetic.pdf"
+    build_nvme_command_set_slice_pdf(input_pdf)
+    output_dir = tmp_path / "latest-nvme-command-spec-benchmark"
+
+    report = run_latest_nvme_base_benchmark.run_latest_nvme_spec_benchmark(
+        run_latest_nvme_base_benchmark.LatestNvmeSpecBenchmarkConfig(
+            input_pdf=input_pdf,
+            output_dir=output_dir,
+            spec_document_type=run_latest_nvme_base_benchmark.NVM_COMMAND_SET_SPEC_DOCUMENT,
+            mode=run_latest_nvme_base_benchmark.FAST_SMOKE_MODE,
+        )
+    )
+    counts = report["summary_counts"]
+    scorecard = (output_dir / run_latest_nvme_base_benchmark.SCORECARD_FILENAME).read_text(encoding="utf-8")
+
+    assert report["spec_document_type"] == "nvm_command_set"
+    assert report["expected_spec_title"] == "NVM Express NVM Command Set Specification"
+    assert report["expected_revision"] == "1.2"
+    assert report["source_url"].endswith("NVM-Express-NVM-Command-Set-Specification-Revision-1.2-2025.08.01-Ratified.pdf")
+    assert report["option_matrix"]["domain_adapter"] == "nvme"
+    assert report["option_matrix"]["rag_profile"] == "technical_spec_rag"
+    assert report["option_matrix"]["command_set_query_eval"]["enabled"] is True
+    assert counts["retrieval_chunk_count"] > 0
+    assert counts["technical_table_unit_count"] >= 4
+    assert counts["domain_unit_count"] >= 4
+    assert counts["contract_validation_passed"] is True
+    assert counts["command_set_eval_status"] == "passed"
+    assert counts["command_set_eval_passed"] is True
+    assert counts["command_set_eval_query_count"] == 4
+    assert counts["command_set_eval_expected_source_coverage"] == 1.0
+    assert report["command_set_eval"]["status"] == "passed"
+    assert report["command_set_eval"]["profile"] == "nvme_command_set_p2_retrieval"
+    assert report["command_set_eval"]["query_count"] == 4
+    assert report["command_set_eval"]["missing_unit_types"] == []
+    assert report["command_set_eval"]["covered_unit_types"] == [
+        "command_opcode",
+        "command_dword_field",
+        "command_pointer_field",
+        "status_code",
+    ]
+    assert report["command_set_eval"]["metrics"]["hit_at_k"] == 1.0
+    assert report["command_set_eval"]["metrics"]["expected_source_coverage"] == 1.0
+    assert report["command_set_eval"]["metrics"]["table_field_coverage"] == 1.0
+    assert report["command_set_eval"]["raw_content_included"] is False
+    assert report["command_set_eval"]["queries_included"] is False
+    assert report["command_set_eval"]["retrieved_text_included"] is False
+    assert "| command_set_eval_status | passed |" in scorecard
+    assert "| command_set_eval_expected_source_coverage | 1.0 |" in scorecard
+
+    serialized = json.dumps(report, ensure_ascii=False, sort_keys=True)
+    assert str(input_pdf) not in serialized
+    assert "The controller shall report synthetic health status when requested." not in serialized
+    assert "The controller shall process a synthetic read command request." not in serialized
+    assert "Command Dword = CDW10" not in serialized
+    assert "Metadata Pointer = MPTR" not in serialized
+
+
+def test_latest_nvme_base_benchmark_distinguishes_full_and_smoke_modes() -> None:
+    full = run_latest_nvme_base_benchmark.build_option_matrix(
+        mode=run_latest_nvme_base_benchmark.FULL_PRECISION_MODE,
+        pages=None,
+        page_workers=1,
+        spec_document_type=run_latest_nvme_base_benchmark.BASE_SPEC_DOCUMENT,
+    )
+    smoke = run_latest_nvme_base_benchmark.build_option_matrix(
+        mode=run_latest_nvme_base_benchmark.FAST_SMOKE_MODE,
+        pages=None,
+        page_workers=1,
+        spec_document_type=run_latest_nvme_base_benchmark.NVM_COMMAND_SET_SPEC_DOCUMENT,
+    )
+
+    assert full["pages"] is None
+    assert full["image_mode"] == "referenced"
+    assert full["spec_document_type"] == "base"
+    assert full["command_set_query_eval"]["enabled"] is False
+    assert smoke["pages"] == "1-5"
+    assert smoke["image_mode"] == "placeholder"
+    assert smoke["spec_document_type"] == "nvm_command_set"
+    assert smoke["command_set_query_eval"]["enabled"] is True
+    assert smoke["command_set_query_eval"]["required_unit_types"] == [
+        "command_opcode",
+        "command_dword_field",
+        "command_pointer_field",
+        "status_code",
+    ]
 
 
 def test_docling_comparison_can_require_installed_docling(

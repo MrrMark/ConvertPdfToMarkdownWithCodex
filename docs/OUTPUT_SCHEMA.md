@@ -25,6 +25,7 @@
 - `docs/schema/artifact_integrity_report.schema.json`
 - `docs/schema/docling_benchmark_report.schema.json`
 - `docs/schema/docling_artifact_comparison.schema.json`
+- `docs/schema/latest_nvme_spec_benchmark_report.schema.json`
 - `docs/schema/ocr_backend_probe_report.schema.json`
 - `docs/schema/figure_description_eval_report.schema.json`
 - `docs/schema/local_corpus_evidence_pack.schema.json`
@@ -283,6 +284,56 @@ Policy:
 - Docling Markdown/dict exports are not written as raw files by the harness; only virtual artifact hash and size are recorded.
 - Layout comparison mode is comparison-only. It records count metrics and metric deltas; it does not merge Docling layout into `document.md`, tables, figures, or RAG sidecars.
 
+## latest_nvme_spec_benchmark_report.json
+
+Optional local-only benchmark summary written by `scripts/run_latest_nvme_spec_benchmark.py`.
+
+Required:
+
+- `schema_version`
+- `purpose="latest_nvme_spec_benchmark"`
+- `spec_document_type`: `base` or `nvm_command_set`
+- `latest_spec_set`
+- `latest_release_date`
+- `expected_spec_title`
+- `source_url`
+- `source_sha256`
+- `mode`: `full_precision` or `fast_smoke`
+- `option_matrix`
+- `summary_counts`
+- `command_set_eval`
+
+Stable summary fields:
+
+- `page_count`
+- `conversion_duration_ms`
+- `sidecar_file_count`
+- `sidecar_total_bytes`
+- `sidecar_file_sizes`
+- `retrieval_chunk_count`
+- `requirement_count`
+- `traceability_record_count`
+- `technical_table_unit_count`
+- `domain_unit_count`
+- `contract_validation_status`
+- `contract_validation_passed`
+- `command_set_eval_status`
+- `command_set_eval_passed`
+- `command_set_eval_query_count`
+- `command_set_eval_expected_source_coverage`
+- `warning_count`
+- `error_count`
+
+Policy:
+
+- This report covers the latest NVMe Base and NVM Command Set benchmark paths under the same `technical_spec_rag + domain_adapter=nvme` contract.
+- `full_precision` is for whole-document local evaluation. `fast_smoke` defaults to the first five pages unless `--pages` overrides it.
+- For `spec_document_type="nvm_command_set"`, `command_set_eval` records the P2 local query gate for representative `command_opcode`, `command_dword_field`, `command_pointer_field`, and `status_code` rows.
+- `command_set_eval` is metrics-only: status, pass/fail, query count, required/covered/missing unit types, and aggregate retrieval metrics such as `hit_at_k`, `mrr`, `expected_source_coverage`, and `table_field_coverage`.
+- The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, sanitized SSD contract status, and sanitized Command Set eval status only.
+- Raw spec text, raw Markdown body, generated query strings, retrieved chunk text, table row content, image bytes, and local input PDF paths are not embedded.
+- The converted output directory is referenced by label only (`conversion`); keep the source PDF and full converted output outside committed fixtures unless intentionally creating sanitized test artifacts.
+
 ## ocr_backend_probe_report.json
 
 Optional local-only OCR backend readiness probe written by `scripts/probe_ocr_backends.py`.
@@ -482,6 +533,13 @@ Required per JSONL record:
 
 - Same field contract as `semantic_units_rag.jsonl`
 
+Additional stable identity fields when an input source hash is available:
+
+- `source_sha256`
+- `source_dedupe_key`
+- `stable_source_id`
+- `stable_requirement_seed`
+
 Policy:
 
 - Only clear normative keywords such as `shall`, `shall not`, `should`, `may`, `required`, `prohibited`, `mandatory`, and `optional` are emitted.
@@ -536,12 +594,32 @@ Required per JSONL record:
 - `bbox`
 - `heading_path`
 - `source_refs`
+- `candidate_kind`
+- `is_requirement_candidate`
+- `exclusion_reason`
+- `domain_unit_id`
+- `technical_table_unit_id`
+- `table_id`
+- `table_row_id`
+- `section_path`
+- `verification_intent`
+- `conditions`
+- `exceptions`
+- `applicability_hint`
+- `source_sha256`
+- `source_dedupe_key`
+- `stable_source_id`
+- `stable_requirement_seed`
 - `classification_confidence`
 - `classification_reasons`
 
 Policy:
 
 - Records are derived from conservative requirement semantic units and stable table rows such as OCP-style `Requirement ID / Description` tables.
+- NVMe Base and NVM Command Set specs use the same candidate contract: explicit requirement IDs are preserved when present, and requirement-like paragraphs without explicit IDs still carry `stable_requirement_seed` for downstream ID generation.
+- `candidate_kind` may be `normative_requirement`, `structured_requirement`, `technical_parameter`, `definition`, `note`, `example`, `front_matter`, or `review_only`.
+- `is_requirement_candidate=false` and `exclusion_reason` tell downstream systems not to auto-promote definitions, notes, examples, legal/front matter, or other review-only records into business requirement IDs.
+- Precision filters are metadata-only: source text is preserved, and filtered candidates are marked with `candidate_kind` / `exclusion_reason` instead of being rewritten.
 - `testability_hint` is deterministic metadata only. It is not a generated test case.
 - Customer-confidential source text is preserved only in local output; use `--confidential-safe-mode` when sharing metadata outside the local workspace.
 
@@ -569,16 +647,43 @@ Required per JSONL record:
 - `requirement_ref`
 - `opcode`
 - `command`
+- `command_dword`
+- `command_scope`
+- `queue_type`
+- `pointer_type`
+- `command_context`
+- `command_context_source`
+- `related_command_unit_id`
+- `related_command_opcode`
+- `relationship_hints`
 - `log_identifier`
 - `feature_identifier`
+- `register_name`
+- `offset`
+- `status_code_type`
+- `status_code_value`
+- `status_code_group`
+- `error_class`
+- `retry_hint`
+- `controller_support`
+- `namespace_support`
+- `scope`
 - `bbox`
 - `source_refs`
+- `source_sha256`
+- `source_dedupe_key`
+- `stable_source_id`
+- `stable_requirement_seed`
 - `classification_confidence`
 - `classification_reasons`
 
 Policy:
 
-- `unit_type` is conservative and may include `command_opcode`, `opcode`, `log_page`, `feature_identifier`, `register_field`, `bitfield`, `enum_value`, `requirement_row`, `security_method`, `security_object`, `security_authority`, `security_field`, or `technical_parameter`.
+- `unit_type` is conservative and may include `command_opcode`, `opcode`, `command_dword_field`, `command_pointer_field`, `log_page`, `feature_identifier`, `register_field`, `status_code`, `queue_field`, `namespace_field`, `controller_field`, `support_requirement`, `data_structure_field`, `bitfield`, `enum_value`, `requirement_row`, `security_method`, `security_object`, `security_authority`, `security_field`, or `technical_parameter`.
+- NVMe Base and NVM Command Set specs share the `domain_adapter="nvme"` contract. Command-set tables commonly map to `command_opcode`, `command_dword_field`, `command_pointer_field`, `status_code`, `feature_identifier`, `log_page`, `data_structure_field`, and `technical_parameter`; Base tables additionally commonly map to controller/register/queue/namespace fields.
+- Command Set records may include normalized command metadata: `command_dword` such as `CDW10`, `command_scope`/`queue_type` such as `admin` or `io`, and `pointer_type` such as `metadata` or `data`.
+- Command Set relationship metadata may include `command_context`, `command_context_source`, `related_command_unit_id`, `related_command_opcode`, and `relationship_hints`. These fields connect command opcode anchors with nearby CDW, pointer, and command-specific status rows when heading/table evidence is clear.
+- Status code records may include deterministic taxonomy hints: `status_code_group`, `error_class`, and `retry_hint`. These are metadata hints only; `text` and `raw_cells` remain the source of truth.
 - Original `raw_cells` and `text` remain the source of truth. Normalized fields are populated only when header/cell evidence is clear.
 
 ## retrieval_chunks_rag.jsonl
@@ -606,13 +711,15 @@ Required per JSONL record:
 - `chunk_group_id`
 - `source_record_count`
 - `source_dedupe_key`
+- `stable_source_id`
+- `stable_requirement_seed`
 - `chunk_boundary_policy`
 - `chunk_boundary_reasons`
 - `parent_chunk_id` / `chunk_part_index` / `chunk_part_count` when a source chunk is split by token budget
 
 Optional per JSONL record:
 
-- `embedding_text`: context-prefixed text for index embedding. It may add section, caption, header, table id, or unit type context for table-like chunks.
+- `embedding_text`: context-prefixed text for index embedding. It may add section, caption, header, table id, unit type, or NVMe command relationship context for table-like chunks.
 - `embedding_token_estimate`: token budget estimate for `embedding_text`.
 - `embedding_text_strategy`: deterministic strategy label such as `table_context_prefix`.
 - `merged_source_chunk_ids`: original chunk ids represented by a merged sibling text chunk.
@@ -646,6 +753,7 @@ Policy:
 
 - `text` remains extracted source text or deterministic row text, not a summary or paraphrase.
 - `embedding_text`, when present, is an index helper only. It must not replace `text` for citation or source-of-truth checks.
+- Command Spec technical table chunks use higher `retrieval_priority` for command opcode, CDW, pointer, and command-linked status records. This is a deterministic re-ranking hint, not a change to source text.
 - `rag_merge_sibling_text_chunks`, when enabled, only merges adjacent `text_block` chunks with the same page/section/heading context and only while the combined `token_estimate` stays within `retrieval_chunk_max_tokens`.
 - Merged sibling text chunks use `chunk_boundary_policy="merged_sibling_text_blocks"` and keep every original source id in `source_refs`; requirement, requirement trace, table row, technical table, and domain unit chunks are not merged by this policy.
 - `rag_chunk_relationship_metadata`, when enabled, is added after merge/split optimization so `previous_chunk_id`, `next_chunk_id`, and `section_anchor_chunk_id` point to final chunk ids in the same JSONL file.
@@ -772,6 +880,10 @@ Required per JSONL record:
 - `page_range`
 - `bbox`
 - `heading_path`
+- `source_sha256`
+- `source_dedupe_key`
+- `stable_source_id`
+- `stable_requirement_seed`
 - `classification_confidence`
 - `classification_reasons`
 
@@ -779,10 +891,12 @@ Policy:
 
 - Default adapter is `none`, so this file is only written when a domain adapter is explicitly selected.
 - Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`, and `manual`.
+- NVMe domain units cover both NVMe Base and NVM Command Set specs. They may use `command`, `command_dword_field`, `command_pointer_field`, `log_page`, `feature`, `register_field`, `status_code`, `queue_field`, `namespace_field`, `controller_field`, `support_requirement`, `data_structure_field`, or `enum_value`. Their `normalized_fields` may include `canonical_name`, `opcode`, `command_dword`, `command_scope`, `queue_type`, `pointer_type`, `command_context`, `command_context_source`, `related_command_unit_id`, `related_command_opcode`, `relationship_hints`, `log_identifier`, `feature_identifier`, `register_name`, `offset`, `bit_range`, `field_name`, `status_code_type`, `status_code_value`, `status_code_group`, `error_class`, `retry_hint`, `controller_support`, `namespace_support`, `scope`, `access`, `reset_default`, and `requirement_ref`; empty values are omitted.
 - TCG domain units may use `security_method`, `security_object`, `security_authority`, `security_field`, `security_provider`, `locking_range`, `key_management`, or `session_state`; TCG is expected to map to SSD `HIL/TCG` without a CustomerRequirement fallback.
 - SPDM domain units may use `spdm_message`, `spdm_request_response`, `spdm_measurement`, `spdm_certificate`, `spdm_algorithm`, `spdm_key_exchange`, or `spdm_session`; SPDM maps to SSD `HIL/SPDM`.
 - Manual domain units keep `domain="manual"` and set `adapter_profile` to `--manual-domain-adapter-label` when provided, otherwise `manual`. `--manual-domain-adapter-keywords` only expands deterministic table header recognition; record `text`, `name`, `value`, and `description` are copied from observed table/technical-table provenance and are not generated.
 - Adapter profiles consume the typed technical table sidecar where possible and keep domain heuristics out of the default conversion path.
+- `stable_source_id` and `stable_requirement_seed` are deterministic metadata seeds. They do not replace the ordinal `domain_unit_id`; downstream systems should prefer them when generating business IDs across repeated conversions.
 
 ## corpus_manifest.json
 

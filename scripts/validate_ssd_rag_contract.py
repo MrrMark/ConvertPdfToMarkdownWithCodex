@@ -74,6 +74,21 @@ SPDM_DOMAIN_UNIT_TYPES = {
     "spdm_key_exchange",
     "spdm_session",
 }
+NVME_CORE_DOMAIN_UNIT_TYPES = {"command", "log_page", "feature", "register_field"}
+NVME_NORMALIZED_FIELD_REQUIREMENTS = {
+    "command": ("opcode",),
+    "log_page": ("log_identifier",),
+    "feature": ("feature_identifier",),
+    "register_field": ("field_name",),
+    "status_code": ("status_code_value",),
+    "queue_field": ("field_name",),
+    "namespace_field": ("field_name",),
+    "controller_field": ("field_name",),
+    "data_structure_field": ("field_name",),
+    "command_dword_field": ("command_dword", "field_name", "bit_range"),
+    "command_pointer_field": ("pointer_type", "field_name"),
+}
+STABLE_METADATA_FIELDS = ("source_sha256", "source_dedupe_key", "stable_source_id", "stable_requirement_seed")
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -191,6 +206,56 @@ def _validate_table_rows(
             _add_issue(target, path=path, code="missing_bbox", message="bbox is not available for this row.")
 
 
+def _validate_stable_metadata(
+    records: list[dict[str, Any]],
+    *,
+    sidecar_name: str,
+    errors: list[dict[str, Any]],
+) -> None:
+    for index, record in enumerate(records, start=1):
+        path = f"{sidecar_name}[{index}]"
+        for field in STABLE_METADATA_FIELDS:
+            if record.get(field) in {None, ""}:
+                _add_issue(errors, path=path, code="missing_stable_metadata", message=f"Missing {field}.")
+
+
+def _validate_nvme_domain_units(domain_units: list[dict[str, Any]], *, errors: list[dict[str, Any]]) -> None:
+    if domain_units and not any(record.get("unit_type") in NVME_CORE_DOMAIN_UNIT_TYPES for record in domain_units):
+        _add_issue(
+            errors,
+            path="domain_units_rag.jsonl",
+            code="missing_nvme_core_domain_unit",
+            message="NVMe domain output must include at least one command, log_page, feature, or register_field unit.",
+        )
+    for index, record in enumerate(domain_units, start=1):
+        unit_type = str(record.get("unit_type") or "")
+        normalized_fields = record.get("normalized_fields")
+        path = f"domain_units_rag.jsonl[{index}]"
+        if not isinstance(normalized_fields, dict):
+            _add_issue(errors, path=path, code="missing_nvme_normalized_fields", message="Missing normalized_fields object.")
+            continue
+        required_any = NVME_NORMALIZED_FIELD_REQUIREMENTS.get(unit_type)
+        if required_any and not any(normalized_fields.get(field) not in {None, ""} for field in required_any):
+            _add_issue(
+                errors,
+                path=path,
+                code="missing_nvme_normalized_field",
+                message=f"{unit_type} requires one of: {', '.join(required_any)}.",
+            )
+
+
+def _validate_nvme_technical_tables(technical_tables: list[dict[str, Any]], *, errors: list[dict[str, Any]]) -> None:
+    for index, record in enumerate(technical_tables, start=1):
+        path = f"technical_tables_rag.jsonl[{index}]"
+        if not isinstance(record.get("source_refs"), list) or not record["source_refs"]:
+            _add_issue(
+                errors,
+                path=path,
+                code="missing_technical_table_source_refs",
+                message="technical table units must retain source_refs.",
+            )
+
+
 def validate_ssd_rag_contract(
     *,
     output_dir: Path,
@@ -226,6 +291,13 @@ def validate_ssd_rag_contract(
                 code="adapter_spec_type_mismatch",
                 message=f"{adapter} maps to {expected_spec_type}, not {ssd_agent_spec_type}.",
             )
+    elif ssd_agent_spec_type == "NVMe":
+        _add_issue(
+            warnings,
+            path="profile.domain_adapter",
+            code="domain_adapter_none_for_nvme",
+            message="NVMe technical RAG validation should use --domain-adapter nvme for domain-unit coverage.",
+        )
 
     sidecar_paths = {
         "retrieval_chunks_rag": output_dir / "retrieval_chunks_rag.jsonl",
@@ -238,6 +310,8 @@ def validate_ssd_rag_contract(
         sidecar_paths["tables_rag"] = output_dir / "tables_rag.jsonl"
     if require_domain_units:
         sidecar_paths["domain_units_rag"] = output_dir / "domain_units_rag.jsonl"
+    if adapter == "nvme":
+        sidecar_paths["requirement_traceability_rag"] = output_dir / "requirement_traceability_rag.jsonl"
     for name, path in sidecar_paths.items():
         if not path.exists():
             _add_issue(errors, path=name, code="missing_sidecar", message=f"Missing {path.name}.")
@@ -253,6 +327,7 @@ def validate_ssd_rag_contract(
     tables = _optional_jsonl(output_dir / "tables_rag.jsonl")
     technical_tables = _optional_jsonl(output_dir / "technical_tables_rag.jsonl")
     domain_units = _optional_jsonl(output_dir / "domain_units_rag.jsonl")
+    requirement_traceability = _optional_jsonl(output_dir / "requirement_traceability_rag.jsonl")
     if require_tables:
         _validate_table_rows(
             tables,
@@ -293,6 +368,26 @@ def validate_ssd_rag_contract(
                 code="missing_spdm_security_unit",
                 message="SPDM domain output must include at least one SPDM security unit.",
             )
+        if adapter == "nvme":
+            _validate_nvme_domain_units(domain_units, errors=errors)
+
+    if adapter == "nvme":
+        _validate_nvme_technical_tables(technical_tables, errors=errors)
+        _validate_stable_metadata(
+            technical_tables,
+            sidecar_name="technical_tables_rag.jsonl",
+            errors=errors,
+        )
+        _validate_stable_metadata(
+            domain_units,
+            sidecar_name="domain_units_rag.jsonl",
+            errors=errors,
+        )
+        _validate_stable_metadata(
+            requirement_traceability,
+            sidecar_name="requirement_traceability_rag.jsonl",
+            errors=errors,
+        )
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -309,6 +404,7 @@ def validate_ssd_rag_contract(
             "table_row_count": len(tables),
             "technical_table_row_count": len(technical_tables),
             "domain_unit_count": len(domain_units),
+            "requirement_traceability_count": len(requirement_traceability),
             "error_count": len(errors),
             "warning_count": len(warnings),
         },

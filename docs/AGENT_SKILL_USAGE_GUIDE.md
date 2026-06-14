@@ -129,7 +129,7 @@ Use the pdf2md-rag-ingest skill. Convert input.pdf to output/input with source-p
 기술 스펙 RAG 요청 예시:
 
 ```text
-Use the pdf2md-rag-ingest skill. Convert spec.pdf with technical_spec_rag and the nvme domain adapter, generate RAG sidecars, validate the output bundle, and summarize only counts, artifact paths, and actionable warnings.
+Use the pdf2md-rag-ingest skill. Convert the NVMe Base or NVM Command Set spec PDF with technical_spec_rag and the nvme domain adapter, generate RAG sidecars, validate the output bundle, and summarize only counts, artifact paths, and actionable warnings.
 ```
 
 이미지 업로드가 불가능한 RAG 환경:
@@ -171,6 +171,8 @@ python3 agent-pack/skills/pdf2md-rag-ingest/scripts/pdf2md_agent_runner.py conve
   --output-dir output/spec \
   --rag-table-output jsonl
 ```
+
+NVMe Base와 NVM Command Set은 모두 같은 `--domain-adapter nvme` 계약을 사용한다. NVM Command Set 산출물은 CDW layout, command pointer, command scope, status taxonomy metadata를 추가로 포함할 수 있으며, Agent 응답에는 raw spec 전문, full Markdown body, table row content, image bytes, local input path를 붙이지 말고 sidecar count와 validator 결과만 요약한다.
 
 이미지 업로드 불가 RAG:
 

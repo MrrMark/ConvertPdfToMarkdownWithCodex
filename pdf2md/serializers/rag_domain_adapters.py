@@ -6,17 +6,70 @@ from typing import Any
 
 from pdf2md.models import DomainAdapterMode
 from pdf2md.serializers.rag_tables import flatten_rag_table_records, normalize_rag_table_payload
+from pdf2md.serializers.rag_stable_ids import with_stable_source_metadata
 from pdf2md.serializers.rag_technical_tables import build_technical_table_records
 
 
 NVME_HEADER_TOKENS = {
+    "access",
+    "attributes",
     "bits",
+    "bit",
+    "cdw",
     "command",
+    "commanddword",
+    "commandname",
+    "commandopcode",
+    "commandscope",
+    "commandtype",
+    "controller",
+    "controllerfield",
+    "controllersupport",
+    "controllersupportrequirements",
+    "datastructure",
+    "datastructurefield",
     "description",
+    "dword",
+    "feature",
+    "featureidentifier",
+    "fid",
     "field",
+    "fieldname",
+    "lid",
+    "log",
+    "logidentifier",
+    "logpage",
+    "logpageidentifier",
     "name",
+    "namespace",
+    "namespacefield",
+    "namespacesupport",
+    "namespacesupportrequirements",
+    "nvmsubsystem",
+    "offset",
     "opcode",
     "parameter",
+    "pointer",
+    "pointerfield",
+    "pointertype",
+    "property",
+    "queue",
+    "queuefield",
+    "queuetype",
+    "register",
+    "registername",
+    "reset",
+    "resetdefault",
+    "sc",
+    "scope",
+    "sct",
+    "status",
+    "statuscode",
+    "statuscodetype",
+    "statuscodevalue",
+    "structure",
+    "subsystem",
+    "support",
     "value",
 }
 PCIE_HEADER_TOKENS = {
@@ -145,6 +198,17 @@ def _cell_value(cells: dict[str, Any], *names: str) -> str | None:
     return None
 
 
+def _nvme_pointer_type(value: str | None) -> str | None:
+    text = str(value or "").strip().lower()
+    if not text:
+        return None
+    if re.search(r"\bmetadata\s+pointer\b", text) or "mptr" in text:
+        return "metadata"
+    if re.search(r"\bdata\s+pointer\b", text) or re.search(r"\bdptr\b", text):
+        return "data"
+    return str(value).strip()
+
+
 def _manual_token_cell_value(cells: dict[str, Any], manual_tokens: set[str]) -> tuple[str, str] | None:
     for key, value in cells.items():
         if _clean_key(str(key)) not in manual_tokens:
@@ -177,13 +241,32 @@ def _unit_from_row(
     cells = record.get("cells")
     if not isinstance(cells, dict):
         return None
+    headers = record.get("headers")
+    row_keys = {_clean_key(str(key)) for key in cells}
+    if isinstance(headers, list):
+        row_keys.update(_clean_key(str(header)) for header in headers)
     prefix = _reason_prefix(domain_adapter)
-    command = _cell_value(cells, "Command", "Name")
-    opcode = _cell_value(cells, "Opcode")
-    field = _cell_value(cells, "Field", "Parameter")
-    bits = _cell_value(cells, "Bits")
+    command = _cell_value(cells, "Command", "Command Name", "Name")
+    opcode = _cell_value(cells, "Opcode", "Command Opcode")
+    field = _cell_value(
+        cells,
+        "Field",
+        "Field Name",
+        "Parameter",
+        "Command Dword Field",
+        "CDW Field",
+        "Dword Field",
+        "Pointer Field",
+        "Data Pointer Field",
+        "Metadata Pointer Field",
+        "Queue Field",
+        "Namespace Field",
+        "Controller Field",
+        "Data Structure Field",
+    )
+    bits = _cell_value(cells, "Bits", "Bit", "Bit Range")
     value = _cell_value(cells, "Value")
-    description = _cell_value(cells, "Description", "Requirement Description", "Security Description")
+    description = _cell_value(cells, "Description", "Meaning", "Requirement Description", "Security Description")
     requirement_id = _cell_value(cells, "Requirement ID", "Req ID", "ID", "Requirement")
     capability = _cell_value(cells, "Capability", "Register", "Register Name")
     method = _cell_value(cells, "Method", "Method ID")
@@ -265,6 +348,66 @@ def _unit_from_row(
     if domain_adapter is DomainAdapterMode.PCIE and (capability or field):
         return "register_field", capability or field or "", bits or value, description, [f"{prefix}_register_or_capability_row"]
 
+    if domain_adapter is DomainAdapterMode.NVME:
+        log_identifier = _cell_value(cells, "Log Identifier", "LID", "Log Page", "Log Page Identifier", "Identifier")
+        feature_identifier = _cell_value(cells, "Feature Identifier", "FID", "Feature")
+        register = _cell_value(cells, "Register", "Register Name", "Property")
+        offset = _cell_value(cells, "Offset", "Address")
+        status_code_type = _cell_value(cells, "Status Code Type", "SCT")
+        status_code_value = _cell_value(cells, "Status Code", "Status Code Value", "SC", "Code")
+        controller_support = _cell_value(cells, "Controller Support", "Controller Support Requirements")
+        namespace_support = _cell_value(cells, "Namespace Support", "Namespace Support Requirements", "NVM Subsystem")
+        support = _cell_value(cells, "Support", "Supported", "Support Requirement")
+        scope = _cell_value(cells, "Scope", "NVM Subsystem")
+        queue = _cell_value(cells, "Queue", "Queue Type")
+        data_structure = _cell_value(cells, "Data Structure", "Structure")
+        command_dword = _cell_value(cells, "Command Dword", "Command DW", "CDW", "Dword", "DW")
+        pointer = _cell_value(cells, "Pointer", "Pointer Type", "Command Pointer", "Data Pointer", "Metadata Pointer")
+        if command and opcode:
+            return "command", command, opcode, description, [f"{prefix}_command_opcode_row"]
+        if log_identifier:
+            return "log_page", log_identifier, log_identifier, description, [f"{prefix}_log_identifier_row"]
+        if feature_identifier:
+            return "feature", feature_identifier, feature_identifier, description, [f"{prefix}_feature_identifier_row"]
+        if status_code_type and status_code_value:
+            return "status_code", status_code_value, status_code_value, description, [f"{prefix}_status_code_row"]
+        if command_dword and (field or bits):
+            return "command_dword_field", field or command_dword, bits or command_dword, description, [
+                f"{prefix}_command_dword_row"
+            ]
+        if pointer and (field or description):
+            return "command_pointer_field", field or pointer, _nvme_pointer_type(pointer), description, [
+                f"{prefix}_command_pointer_row"
+            ]
+        if controller_support or namespace_support or support:
+            name = _cell_value(cells, "Requirement", "Requirement ID", "Name") or scope or "support_requirement"
+            return (
+                "support_requirement",
+                name,
+                controller_support or namespace_support or support,
+                description,
+                [f"{prefix}_support_requirement_row"],
+            )
+        if field and (queue or {"queue", "queuefield"} & row_keys):
+            return "queue_field", field, bits or value, description, [f"{prefix}_queue_field_row"]
+        if field and (
+            namespace_support
+            or (scope or "").lower() == "namespace"
+            or _cell_value(cells, "Namespace", "NVM Subsystem")
+            or {"namespace", "namespacefield", "nvmsubsystem"} & row_keys
+        ):
+            return "namespace_field", field, bits or value, description, [f"{prefix}_namespace_field_row"]
+        if field and (_cell_value(cells, "Controller", "Controller Field") or {"controller", "controllerfield"} & row_keys):
+            return "controller_field", field, bits or value, description, [f"{prefix}_controller_field_row"]
+        if field and (data_structure or {"datastructure", "datastructurefield", "structure"} & row_keys):
+            return "data_structure_field", field, bits or value, description, [f"{prefix}_data_structure_field_row"]
+        if field and (register or offset):
+            return "register_field", field, bits or value or offset, description, [f"{prefix}_register_field_row"]
+        if field and bits:
+            return "register_field", field, bits, description, [f"{prefix}_register_field_row"]
+        if value and description:
+            return "enum_value", value, value, description, [f"{prefix}_enum_value_row"]
+
     if command and opcode:
         return "command", command, opcode, description, [f"{prefix}_command_opcode_row"]
     if opcode:
@@ -313,16 +456,47 @@ def _unit_from_technical_record(
     log_identifier = str(record.get("log_identifier") or "").strip()
     feature_identifier = str(record.get("feature_identifier") or "").strip()
     requirement_ref = str(record.get("requirement_ref") or "").strip()
+    status_code_value = str(record.get("status_code_value") or "").strip()
+    controller_support = str(record.get("controller_support") or "").strip()
+    namespace_support = str(record.get("namespace_support") or "").strip()
+    scope = str(record.get("scope") or "").strip()
+    offset = str(record.get("offset") or "").strip()
+    command_dword = str(record.get("command_dword") or "").strip()
+    pointer_type = str(record.get("pointer_type") or "").strip()
 
     if domain_adapter is DomainAdapterMode.NVME:
         if unit_type == "command_opcode" and command:
-            return "command", command, value or None, description, ["nvme_command_opcode_row"]
+            opcode = str(record.get("opcode") or value).strip()
+            return "command", command, opcode or None, description, ["nvme_command_opcode_row"]
         if unit_type == "log_page" and log_identifier:
             return "log_page", log_identifier, log_identifier, description, ["nvme_log_identifier_row"]
         if unit_type == "feature_identifier" and feature_identifier:
             return "feature", feature_identifier, feature_identifier, description, ["nvme_feature_identifier_row"]
+        if unit_type == "status_code" and status_code_value:
+            return "status_code", status_code_value, status_code_value, description, ["nvme_status_code_row"]
+        if unit_type == "command_dword_field" and (field or command_dword):
+            return "command_dword_field", field or command_dword, value or command_dword or None, description, [
+                "nvme_command_dword_row"
+            ]
+        if unit_type == "command_pointer_field" and (field or pointer_type):
+            return "command_pointer_field", field or pointer_type, pointer_type or value or None, description, [
+                "nvme_command_pointer_row"
+            ]
+        if unit_type == "support_requirement":
+            name = _cell_value(raw_cells, "Requirement", "Requirement ID", "Name") or scope or requirement_ref or "support_requirement"
+            return (
+                "support_requirement",
+                name,
+                controller_support or namespace_support or value or None,
+                description,
+                ["nvme_support_requirement_row"],
+            )
+        if unit_type in {"queue_field", "namespace_field", "controller_field", "data_structure_field"} and field:
+            return unit_type, field, value or None, description, [f"nvme_{unit_type}_row"]
         if unit_type in {"bitfield", "register_field"} and field:
-            return "register_field", field, value or None, description, ["nvme_register_field_row"]
+            return "register_field", field, value or offset or None, description, ["nvme_register_field_row"]
+        if unit_type == "enum_value" and value:
+            return "enum_value", value, value, description, ["nvme_enum_value_row"]
 
     if domain_adapter is DomainAdapterMode.PCIE:
         register = _cell_value(raw_cells, "Register", "Capability", "Field", "Name") or field
@@ -425,7 +599,11 @@ def _heading_path(record: dict[str, Any]) -> list[str]:
 
 
 def _without_empty_fields(payload: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in payload.items() if value not in {None, ""}}
+    return {
+        key: value
+        for key, value in payload.items()
+        if value is not None and value != "" and value != []
+    }
 
 
 def _normalized_domain_fields(
@@ -459,6 +637,66 @@ def _normalized_domain_fields(
                 "security_field": _cell_value(cells, "Security Field", "Field", "Parameter"),
             }
         )
+    if domain_adapter is DomainAdapterMode.NVME:
+        fields.update(
+            {
+                "canonical_name": name,
+                "opcode": fields.get("opcode") or _cell_value(cells, "Opcode", "Command Opcode"),
+                "log_identifier": fields.get("log_identifier")
+                or _cell_value(cells, "Log Identifier", "LID", "Log Page", "Log Page Identifier", "Identifier"),
+                "feature_identifier": fields.get("feature_identifier")
+                or _cell_value(cells, "Feature Identifier", "FID", "Feature"),
+                "register_name": fields.get("register_name") or _cell_value(cells, "Register", "Register Name", "Property"),
+                "offset": fields.get("offset") or _cell_value(cells, "Offset", "Address"),
+                "bit_range": fields.get("bit_range") or _cell_value(cells, "Bits", "Bit", "Bit Range"),
+                "field_name": fields.get("field_name")
+                or _cell_value(
+                    cells,
+                    "Field",
+                    "Field Name",
+                    "Parameter",
+                    "Command Dword Field",
+                    "CDW Field",
+                    "Dword Field",
+                    "Pointer Field",
+                    "Data Pointer Field",
+                    "Metadata Pointer Field",
+                    "Queue Field",
+                    "Namespace Field",
+                    "Controller Field",
+                    "Data Structure Field",
+                ),
+                "command_dword": fields.get("command_dword")
+                or _cell_value(cells, "Command Dword", "Command DW", "CDW", "Dword", "DW"),
+                "command_scope": fields.get("command_scope")
+                or _cell_value(cells, "Command Scope", "Command Type", "Queue Type", "Scope", "Command Set"),
+                "queue_type": fields.get("queue_type") or _cell_value(cells, "Queue Type", "Command Type"),
+                "pointer_type": fields.get("pointer_type")
+                or _nvme_pointer_type(
+                    _cell_value(cells, "Pointer", "Pointer Type", "Command Pointer", "Data Pointer", "Metadata Pointer")
+                ),
+                "command_context": fields.get("command_context"),
+                "command_context_source": fields.get("command_context_source"),
+                "related_command_unit_id": fields.get("related_command_unit_id"),
+                "related_command_opcode": fields.get("related_command_opcode"),
+                "relationship_hints": fields.get("relationship_hints"),
+                "status_code_type": fields.get("status_code_type") or _cell_value(cells, "Status Code Type", "SCT"),
+                "status_code_value": fields.get("status_code_value")
+                or _cell_value(cells, "Status Code", "Status Code Value", "SC", "Code"),
+                "status_code_group": fields.get("status_code_group"),
+                "error_class": fields.get("error_class"),
+                "retry_hint": fields.get("retry_hint"),
+                "controller_support": fields.get("controller_support")
+                or _cell_value(cells, "Controller Support", "Controller Support Requirements"),
+                "namespace_support": fields.get("namespace_support")
+                or _cell_value(cells, "Namespace Support", "Namespace Support Requirements", "NVM Subsystem"),
+                "scope": fields.get("scope") or _cell_value(cells, "Scope", "NVM Subsystem"),
+                "access": fields.get("access") or _cell_value(cells, "Access", "Attributes"),
+                "reset_default": fields.get("reset_default") or _cell_value(cells, "Reset", "Default", "Reset Default"),
+                "requirement_ref": fields.get("requirement_ref")
+                or _cell_value(cells, "Requirement ID", "Requirement", "Req ID", "ID"),
+            }
+        )
     if domain_adapter is DomainAdapterMode.SPDM:
         fields.update(
             {
@@ -490,6 +728,7 @@ def build_domain_units(
     technical_table_records: list[dict[str, Any]] | None = None,
     manual_adapter_label: str | None = None,
     manual_adapter_keywords: str | None = None,
+    source_sha256: str = "",
 ) -> list[dict[str, Any]]:
     """Build opt-in domain-specific RAG records from deterministic table provenance."""
     if not isinstance(domain_adapter, DomainAdapterMode):
@@ -501,7 +740,9 @@ def build_domain_units(
     manual_tokens = set(_split_manual_adapter_keywords(manual_adapter_keywords))
     adapter_profile = _adapter_profile(domain_adapter, manual_adapter_label)
     adapter_technical_records = (
-        technical_table_records if technical_table_records is not None else build_technical_table_records(rag_tables)
+        technical_table_records
+        if technical_table_records is not None
+        else build_technical_table_records(rag_tables, source_sha256=source_sha256)
     )
     for technical_record in adapter_technical_records:
         unit = _unit_from_technical_record(
@@ -524,40 +765,67 @@ def build_domain_units(
             }
         )
         records.append(
-            {
-                "domain_unit_id": f"domain-{domain_adapter.value}-{index:06d}",
-                "domain_unit_index": index,
-                "domain": domain_adapter.value,
-                "adapter_profile": adapter_profile,
-                "adapter_version": "1.0",
-                "unit_type": unit_type,
-                "name": name,
-                "value": value,
-                "description": description,
-                "text": str(technical_record.get("text") or "").strip(),
-                "normalized_fields": _normalized_domain_fields(
-                    cells=technical_record.get("raw_cells") if isinstance(technical_record.get("raw_cells"), dict) else {},
-                    domain_adapter=domain_adapter,
-                    unit_type=unit_type,
-                    name=name,
-                    value=value,
-                    base_fields={
-                        "bit_range": technical_record.get("bit_range"),
-                        "opcode": technical_record.get("opcode"),
-                        "log_identifier": technical_record.get("log_identifier"),
-                        "feature_identifier": technical_record.get("feature_identifier"),
-                        "requirement_ref": technical_record.get("requirement_ref"),
-                        "access": technical_record.get("access"),
-                        "reset_default": technical_record.get("reset_default"),
-                    },
-                ),
-                "source_refs": source_refs,
-                "page_range": [page, page],
-                "bbox": technical_record.get("bbox"),
-                "heading_path": _heading_path(technical_record),
-                "classification_confidence": 0.9,
-                "classification_reasons": reasons,
-            }
+            with_stable_source_metadata(
+                {
+                    "domain_unit_id": f"domain-{domain_adapter.value}-{index:06d}",
+                    "domain_unit_index": index,
+                    "domain": domain_adapter.value,
+                    "adapter_profile": adapter_profile,
+                    "adapter_version": "1.0",
+                    "unit_type": unit_type,
+                    "name": name,
+                    "value": value,
+                    "description": description,
+                    "text": str(technical_record.get("text") or "").strip(),
+                    "normalized_fields": _normalized_domain_fields(
+                        cells=technical_record.get("raw_cells")
+                        if isinstance(technical_record.get("raw_cells"), dict)
+                        else {},
+                        domain_adapter=domain_adapter,
+                        unit_type=unit_type,
+                        name=name,
+                        value=value,
+                        base_fields={
+                            "bit_range": technical_record.get("bit_range"),
+                            "field_name": technical_record.get("field_name"),
+                            "opcode": technical_record.get("opcode"),
+                            "command_dword": technical_record.get("command_dword"),
+                            "command_scope": technical_record.get("command_scope"),
+                            "queue_type": technical_record.get("queue_type"),
+                            "pointer_type": technical_record.get("pointer_type"),
+                            "command_context": technical_record.get("command_context"),
+                            "command_context_source": technical_record.get("command_context_source"),
+                            "related_command_unit_id": technical_record.get("related_command_unit_id"),
+                            "related_command_opcode": technical_record.get("related_command_opcode"),
+                            "relationship_hints": technical_record.get("relationship_hints"),
+                            "log_identifier": technical_record.get("log_identifier"),
+                            "feature_identifier": technical_record.get("feature_identifier"),
+                            "register_name": technical_record.get("register_name"),
+                            "offset": technical_record.get("offset"),
+                            "status_code_type": technical_record.get("status_code_type"),
+                            "status_code_value": technical_record.get("status_code_value"),
+                            "status_code_group": technical_record.get("status_code_group"),
+                            "error_class": technical_record.get("error_class"),
+                            "retry_hint": technical_record.get("retry_hint"),
+                            "controller_support": technical_record.get("controller_support"),
+                            "namespace_support": technical_record.get("namespace_support"),
+                            "scope": technical_record.get("scope"),
+                            "requirement_ref": technical_record.get("requirement_ref"),
+                            "access": technical_record.get("access"),
+                            "reset_default": technical_record.get("reset_default"),
+                        },
+                    ),
+                    "source_refs": source_refs,
+                    "page_range": [page, page],
+                    "bbox": technical_record.get("bbox"),
+                    "heading_path": _heading_path(technical_record),
+                    "relationship_hints": list(technical_record.get("relationship_hints") or []),
+                    "classification_confidence": 0.9,
+                    "classification_reasons": reasons,
+                },
+                source_sha256=source_sha256,
+                requirement_locator_id=str(technical_record.get("table_row_id") or ""),
+            )
         )
 
     for table_row in flatten_rag_table_records(normalize_rag_table_payload(rag_tables)):
@@ -570,40 +838,44 @@ def build_domain_units(
         page = _page(table_row)
         index = len(records) + 1
         records.append(
-            {
-                "domain_unit_id": f"domain-{domain_adapter.value}-{index:06d}",
-                "domain_unit_index": index,
-                "domain": domain_adapter.value,
-                "adapter_profile": adapter_profile,
-                "adapter_version": "1.0",
-                "unit_type": unit_type,
-                "name": name,
-                "value": value,
-                "description": description,
-                "text": str(table_row.get("row_text") or "").strip(),
-                "normalized_fields": _normalized_domain_fields(
-                    cells=table_row.get("cells") if isinstance(table_row.get("cells"), dict) else {},
-                    domain_adapter=domain_adapter,
-                    unit_type=unit_type,
-                    name=name,
-                    value=value,
-                ),
-                "source_refs": [
-                    {
-                        "source_type": "table_row",
-                        "source_id": table_row.get("table_row_id"),
-                        "page": page,
-                        "table_id": table_row.get("table_id"),
-                        "row_index": table_row.get("row_index"),
-                        "bbox": table_row.get("bbox"),
-                    }
-                ],
-                "page_range": [page, page],
-                "bbox": table_row.get("bbox"),
-                "heading_path": _heading_path(table_row),
-                "classification_confidence": 0.88,
-                "classification_reasons": reasons,
-            }
+            with_stable_source_metadata(
+                {
+                    "domain_unit_id": f"domain-{domain_adapter.value}-{index:06d}",
+                    "domain_unit_index": index,
+                    "domain": domain_adapter.value,
+                    "adapter_profile": adapter_profile,
+                    "adapter_version": "1.0",
+                    "unit_type": unit_type,
+                    "name": name,
+                    "value": value,
+                    "description": description,
+                    "text": str(table_row.get("row_text") or "").strip(),
+                    "normalized_fields": _normalized_domain_fields(
+                        cells=table_row.get("cells") if isinstance(table_row.get("cells"), dict) else {},
+                        domain_adapter=domain_adapter,
+                        unit_type=unit_type,
+                        name=name,
+                        value=value,
+                    ),
+                    "source_refs": [
+                        {
+                            "source_type": "table_row",
+                            "source_id": table_row.get("table_row_id"),
+                            "page": page,
+                            "table_id": table_row.get("table_id"),
+                            "row_index": table_row.get("row_index"),
+                            "bbox": table_row.get("bbox"),
+                        }
+                    ],
+                    "page_range": [page, page],
+                    "bbox": table_row.get("bbox"),
+                    "heading_path": _heading_path(table_row),
+                    "classification_confidence": 0.88,
+                    "classification_reasons": reasons,
+                },
+                source_sha256=source_sha256,
+                requirement_locator_id=str(table_row.get("table_row_id") or ""),
+            )
         )
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str | None]] = set()

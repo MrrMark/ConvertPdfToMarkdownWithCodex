@@ -432,6 +432,165 @@ def build_table_accuracy_pack_pdf(path: Path) -> None:
     )
 
 
+def build_nvme_base_slice_pdf(path: Path) -> None:
+    """Build a sanitized NVMe-shaped slice without copying official specification text."""
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("1 NVMe Synthetic Slice", 72, 800, 14),
+                    PositionedText("The controller shall report synthetic health status when requested.", 72, 760, 10),
+                    PositionedText("NOTE: Synthetic notes are review-only adapter evidence.", 72, 742, 10),
+                    PositionedText("Example: A host may issue Identify for demonstration.", 72, 724, 10),
+                ]
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 1: Command opcode slice", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Command", "Opcode", "Description"],
+                            ["Identify", "06h", "Synthetic identify command"],
+                        ],
+                        72,
+                        760,
+                        [120, 80, 210],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 2: Log page identifier slice", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Log Identifier", "Description"],
+                            ["02h", "Synthetic health log"],
+                        ],
+                        72,
+                        760,
+                        [140, 220],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 3: Feature identifier slice", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Feature Identifier", "Value", "Description"],
+                            ["0Ch", "Async Event", "Synthetic event feature"],
+                        ],
+                        72,
+                        760,
+                        [140, 120, 210],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[PositionedText("Table 4: Register bitfield slice", 72, 790, 10)],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Register", "Offset", "Bits", "Field", "Reset Default", "Access", "Description"],
+                            ["CAP", "0x0000", "15:0", "MQES", "0h", "RO", "Synthetic max queue entries"],
+                        ],
+                        72,
+                        760,
+                        [72, 76, 54, 64, 92, 60, 150],
+                        font_size=8,
+                    )
+                ],
+            ),
+        ],
+    )
+
+
+def build_nvme_command_set_slice_pdf(path: Path) -> None:
+    """Build a sanitized NVM Command Set-shaped slice without official specification text."""
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("1 NVMe Command Set Synthetic Slice", 72, 800, 14),
+                    PositionedText("The controller shall process a synthetic read command request.", 72, 760, 10),
+                    PositionedText("NOTE: Synthetic command details are adapter-only evidence.", 72, 742, 10),
+                ]
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("2 Read Command", 72, 800, 14),
+                    PositionedText("Table 1: Command opcode slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Command", "Queue Type", "Opcode", "Description"],
+                            ["Read", "I/O", "02h", "Synthetic read command"],
+                        ],
+                        72,
+                        730,
+                        [110, 86, 70, 210],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("2.1 Read Command Dwords", 72, 800, 14),
+                    PositionedText("Table 2: Command dword field slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Command Dword", "Bits", "Field", "Description"],
+                            ["CDW10", "31:00", "SLBA", "Synthetic starting LBA"],
+                        ],
+                        72,
+                        730,
+                        [120, 76, 82, 210],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("2.2 Read Command Pointers", 72, 800, 14),
+                    PositionedText("Table 3: Command pointer slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Pointer", "Field", "Description"],
+                            ["Metadata Pointer", "MPTR", "Synthetic metadata pointer"],
+                        ],
+                        72,
+                        730,
+                        [140, 86, 220],
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("2.3 Read Command Status", 72, 800, 14),
+                    PositionedText("Table 4: Status code slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Status Code Type", "Status Code", "Description"],
+                            ["Command Specific Status", "80h", "Synthetic LBA out of range; correct command before retry"],
+                        ],
+                        72,
+                        730,
+                        [150, 92, 280],
+                        font_size=8,
+                    )
+                ],
+            ),
+        ],
+    )
+
+
 def build_diagram_suite_pdf(path: Path) -> None:
     """Build vector-rendered diagram pages for figure crop fallback provenance."""
     state_machine_graphics = [

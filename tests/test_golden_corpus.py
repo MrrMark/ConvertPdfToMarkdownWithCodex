@@ -15,6 +15,8 @@ from fixtures.pdf_builder import (
     build_image_only_pdf,
     build_korean_text_pdf,
     build_layout_stress_pdf,
+    build_nvme_base_slice_pdf,
+    build_nvme_command_set_slice_pdf,
     build_password_pdf,
     build_repeated_template_table_pdf,
     build_repeated_header_footer_pdf,
@@ -32,22 +34,49 @@ from fixtures.pdf_builder import (
 )
 
 from pdf2md.config import Config
-from pdf2md.models import RagTableOutputMode
+from pdf2md.models import DomainAdapterMode, RagTableOutputMode
 from pdf2md.pipeline import run_conversion
 from helpers.normalize_outputs import normalize_manifest, normalize_report
 
 
 GOLDEN_ROOT = Path("tests/golden/corpus")
+STABLE_METADATA_FIELDS = {
+    "source_sha256",
+    "source_dedupe_key",
+    "stable_source_id",
+    "stable_requirement_seed",
+}
+
+
+def _read_jsonl(path: Path) -> list[dict]:
+    if not path.exists() or not path.read_text(encoding="utf-8").strip():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _nvme_base_slice_options() -> dict:
+    return {
+        "rag_profile": "technical_spec_rag",
+        "rag_table_output": RagTableOutputMode.BOTH,
+        "domain_adapter": DomainAdapterMode.NVME,
+        "repair_hyphenation": True,
+        "retrieval_tokenizer": "regex",
+        "rag_contextual_embedding_text": True,
+        "rag_merge_sibling_text_chunks": True,
+        "rag_chunk_relationship_metadata": True,
+    }
 
 
 def _normalize_jsonl_sidecar(content: str, sidecar_name: str) -> str:
-    if sidecar_name not in {"figures_rag.jsonl", "retrieval_chunks_rag.jsonl"} or not content.strip():
+    if not sidecar_name.endswith(".jsonl") or not content.strip():
         return content
     records = []
     for line in content.splitlines():
         if not line.strip():
             continue
         record = json.loads(line)
+        for field in STABLE_METADATA_FIELDS:
+            record.pop(field, None)
         if sidecar_name == "figures_rag.jsonl":
             if record.get("sha256"):
                 record["sha256"] = "<sha256>"
@@ -55,7 +84,6 @@ def _normalize_jsonl_sidecar(content: str, sidecar_name: str) -> str:
                 record["crop_content_ratio"] = "<crop_content_ratio>"
         if sidecar_name == "retrieval_chunks_rag.jsonl":
             record.pop("schema_version", None)
-            record.pop("source_sha256", None)
         records.append(record)
     return "\n".join(json.dumps(record, ensure_ascii=False) for record in records) + ("\n" if records else "")
 
@@ -70,6 +98,8 @@ def test_deterministic_pdf_fixture_builder_covers_priority_corpus(tmp_path: Path
         "complex_table.pdf": build_complex_table_pdf,
         "continued_table.pdf": build_continued_table_pdf,
         "table_accuracy_pack.pdf": build_table_accuracy_pack_pdf,
+        "nvme_base_slice.pdf": build_nvme_base_slice_pdf,
+        "nvme_command_set_slice.pdf": build_nvme_command_set_slice_pdf,
         "diagram_suite.pdf": build_diagram_suite_pdf,
         "repeated_template_table.pdf": build_repeated_template_table_pdf,
         "repeated_image.pdf": build_repeated_image_pdf,
@@ -106,6 +136,7 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         "complex_table": (build_complex_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
         "continued_table": (build_continued_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
         "table_accuracy_pack": (build_table_accuracy_pack_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
+        "nvme_base_slice": (build_nvme_base_slice_pdf, _nvme_base_slice_options()),
         "diagram_suite": (build_diagram_suite_pdf, {"figure_crop_fallback": True}),
         "repeated_template_table": (
             build_repeated_template_table_pdf,
@@ -162,6 +193,7 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
             "cross_refs_rag.jsonl",
             "requirement_traceability_rag.jsonl",
             "technical_tables_rag.jsonl",
+            "domain_units_rag.jsonl",
             "retrieval_chunks_rag.jsonl",
             "figures_rag.jsonl",
         ):
@@ -173,3 +205,53 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
                 )
             else:
                 assert not output_sidecar.exists()
+
+
+def test_nvme_base_slice_golden_sidecars_cover_adapter_contract(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "nvme_base_slice.pdf"
+    output_dir = tmp_path / "nvme_base_slice"
+    build_nvme_base_slice_pdf(pdf_path)
+
+    result = run_conversion(
+        Config(
+            input_pdf=pdf_path,
+            output_dir=output_dir,
+            keep_page_markers=True,
+            **_nvme_base_slice_options(),
+        )
+    )
+
+    assert result.exit_code == 0
+    technical_tables = _read_jsonl(output_dir / "technical_tables_rag.jsonl")
+    domain_units = _read_jsonl(output_dir / "domain_units_rag.jsonl")
+    traces = _read_jsonl(output_dir / "requirement_traceability_rag.jsonl")
+
+    assert {"command_opcode", "log_page", "feature_identifier", "register_field"} <= {
+        record["unit_type"] for record in technical_tables
+    }
+    assert all(record["table_row_id"] for record in technical_tables)
+    assert all(record["stable_source_id"] and record["stable_requirement_seed"] for record in technical_tables)
+    command_table = next(record for record in technical_tables if record["unit_type"] == "command_opcode")
+    assert command_table["command_context"] == "Identify"
+    assert command_table["related_command_unit_id"] == command_table["technical_table_unit_id"]
+    assert command_table["relationship_hints"] == ["command_anchor"]
+
+    units_by_type = {record["unit_type"]: record for record in domain_units}
+    assert {"command", "log_page", "feature", "register_field"} <= set(units_by_type)
+    assert units_by_type["command"]["normalized_fields"]["opcode"] == "06h"
+    assert units_by_type["command"]["normalized_fields"]["command_context"] == "Identify"
+    assert units_by_type["command"]["normalized_fields"]["relationship_hints"] == ["command_anchor"]
+    assert units_by_type["log_page"]["normalized_fields"]["log_identifier"] == "02h"
+    assert units_by_type["feature"]["normalized_fields"]["feature_identifier"] == "0Ch"
+    assert units_by_type["register_field"]["normalized_fields"]["register_name"] == "CAP"
+    assert units_by_type["register_field"]["normalized_fields"]["offset"] == "0x0000"
+    assert all(record["source_refs"][0]["source_type"] == "table_row" for record in domain_units)
+    assert all(record["source_refs"][1]["source_type"] == "technical_table_unit" for record in domain_units)
+    assert all(record["stable_source_id"] and record["stable_requirement_seed"] for record in domain_units)
+
+    trace_kinds = {record["candidate_kind"]: record for record in traces}
+    assert trace_kinds["normative_requirement"]["is_requirement_candidate"] is True
+    assert trace_kinds["normative_requirement"]["requirement_id"] is None
+    assert trace_kinds["note"]["is_requirement_candidate"] is False
+    assert trace_kinds["example"]["is_requirement_candidate"] is False
+    assert all(record["stable_source_id"] and record["stable_requirement_seed"] for record in traces)
