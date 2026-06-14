@@ -562,7 +562,14 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "현재 없음." in development_specs
+    assert "Q115. Visual Technical Spec RAG Profile and Metrics" in next_plan
+    assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" in next_plan
+    assert "docs/VISUAL_TECHNICAL_SPEC_RAG_DEVELOPMENT_SPEC.md" in next_plan
+    assert "docs/SSD_VERIFICATION_AGENT_PDF2MD_VISUAL_RAG_HANDOFF_SPEC.md" in next_plan
+    assert "Q115. Visual Technical Spec RAG Profile and Metrics" in development_specs
+    assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" in development_specs
+    assert "docs/VISUAL_TECHNICAL_SPEC_RAG_DEVELOPMENT_SPEC.md" in development_specs
+    assert "docs/SSD_VERIFICATION_AGENT_PDF2MD_VISUAL_RAG_HANDOFF_SPEC.md" in development_specs
     assert "완료된 Q34-Q114" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q114. Docling Layout Adapter Comparison Mode" in implemented_specs

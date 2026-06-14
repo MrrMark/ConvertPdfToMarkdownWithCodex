@@ -23,7 +23,53 @@
 
 ## 현재 Active Development Specs
 
-현재 없음.
+### Q115. Visual Technical Spec RAG Profile and Metrics
+
+개발 명세: `docs/VISUAL_TECHNICAL_SPEC_RAG_DEVELOPMENT_SPEC.md`
+
+목표:
+
+- NVMe Base/Command와 OCP spec의 image/figure/diagram evidence를 `ssd-verification-agent`가 안정적으로 사용할 수 있게 한다.
+- 기존 `technical_spec_rag`는 backward compatible하게 유지하고, visual semantics를 켠 공식 preset 또는 동등한 option bundle을 제공한다.
+
+주요 작업:
+
+- `technical_spec_rag_visual` profile 후보 추가
+- CLI/MCP/GUI/agent-pack workflow 노출
+- visual sidecar and retrieval chunk schema/docs 갱신
+- validator의 figure provenance/source ref 검증 강화
+- latest NVMe/OCP benchmark visual metric 추가
+
+검증:
+
+```bash
+.venv311/bin/python -m pytest tests/test_rag_figures.py tests/test_rag_chunks.py -q
+.venv311/bin/python -m pytest tests/test_mcp_server.py tests/test_gui_presets.py -q
+.venv311/bin/python -m pytest tests/test_output_schema_contract.py tests/test_docs_examples.py -q
+.venv311/bin/python -m pytest tests/test_quality_gate_scripts.py -q
+git diff --check
+```
+
+### Q116. SSD Verification Agent PDF2MD Sidecar Handoff
+
+Handoff 명세: `docs/SSD_VERIFICATION_AGENT_PDF2MD_VISUAL_RAG_HANDOFF_SPEC.md`
+
+목표:
+
+- `ssd-verification-agent`가 pdf2md sidecar bundle을 direct ingest하고 local evidence를 source of truth로 사용할 수 있게 작업 범위를 분리한다.
+- RAG server upload-only 경로와 local sidecar direct ingest 경로의 책임을 분명히 한다.
+
+주요 작업:
+
+- `ssd-verification-agent`에 추가할 API/MCP/direct ingest 작업 정의
+- figure sidecar, generated figure description, figure structure evidence ingest 기준 정의
+- `SpecAnalysisAgent` visual source quality/scoring 개선 기준 정의
+- RAG server result와 local sidecar reconciliation 기준 정의
+
+검증:
+
+- 이 repo에서는 문서/계약 검증과 `git diff --check`를 수행한다.
+- 실제 구현 검증은 `ssd-verification-agent` repo의 unit/replay/MCP/API test에서 수행한다.
 
 ## 완료 명세 Archive
 
