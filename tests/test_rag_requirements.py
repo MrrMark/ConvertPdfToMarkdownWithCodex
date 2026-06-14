@@ -87,6 +87,53 @@ def test_requirement_traceability_extracts_ocp_style_table_rows() -> None:
     assert json.loads(jsonl)["classification_reasons"] == ["table_description", "table_requirement_id"]
 
 
+def test_requirement_traceability_extracts_mixed_case_ocp_requirement_ids() -> None:
+    rag_tables = [
+        {
+            "page": 3,
+            "table_index": 1,
+            "headers": ["Requirement ID", "Requirement Description", "SSD"],
+            "records": [
+                {
+                    "page": 3,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Requirement ID", "Requirement Description", "SSD"],
+                    "cells": {
+                        "Requirement ID": "NVMe-IO-6",
+                        "Requirement Description": "SSD shall support a synthetic command requirement.",
+                        "SSD": "Required",
+                    },
+                    "row_text": (
+                        "Requirement ID = NVMe-IO-6 | Requirement Description = SSD shall support a synthetic "
+                        "command requirement. | SSD = Required"
+                    ),
+                },
+                {
+                    "page": 3,
+                    "table_index": 1,
+                    "row_index": 2,
+                    "headers": ["Requirement ID", "Requirement Description", "SSD"],
+                    "cells": {
+                        "Requirement ID": "STD-LOG-1",
+                        "Requirement Description": "SSD shall support a synthetic log requirement.",
+                        "SSD": "Required",
+                    },
+                    "row_text": (
+                        "Requirement ID = STD-LOG-1 | Requirement Description = SSD shall support a synthetic "
+                        "log requirement. | SSD = Required"
+                    ),
+                },
+            ],
+        }
+    ]
+
+    records = build_requirement_traceability_records(requirements=[], rag_tables=rag_tables, source_sha256="f" * 64)
+
+    assert [record["requirement_id"] for record in records] == ["NVMe-IO-6", "STD-LOG-1"]
+    assert all(record["candidate_kind"] == "structured_requirement" for record in records)
+
+
 def test_requirement_traceability_marks_review_only_semantic_candidates() -> None:
     semantic_units = [
         {

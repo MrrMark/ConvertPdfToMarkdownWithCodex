@@ -513,6 +513,141 @@ def test_domain_adapter_profiles_extract_pcie_ocp_tcg_and_customer_units() -> No
     assert customer[0]["classification_reasons"] == ["customer_requirement_id_row"]
 
 
+def test_ocp_domain_adapter_populates_requirement_taxonomy_and_related_hints() -> None:
+    rag_tables = normalize_rag_table_payload(
+        [
+            {
+                "page": 4,
+                "table_index": 1,
+                "headers": ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                "records": [
+                    {
+                        "page": 4,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                        "cells": {
+                            "Requirement ID": "NVMe-IO-6",
+                            "SSD": "Required",
+                            "Requirement Description": "SSD shall support Write Zeroes command.",
+                            "Section": "NVMe",
+                        },
+                        "row_text": (
+                            "Requirement ID = NVMe-IO-6 | SSD = Required | "
+                            "Requirement Description = SSD shall support Write Zeroes command. | Section = NVMe"
+                        ),
+                    },
+                    {
+                        "page": 4,
+                        "table_index": 1,
+                        "row_index": 2,
+                        "headers": ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                        "cells": {
+                            "Requirement ID": "STD-LOG-1",
+                            "SSD": "Required",
+                            "Requirement Description": "SSD shall expose Error Information Log Identifier 01h.",
+                            "Section": "Logs",
+                        },
+                        "row_text": (
+                            "Requirement ID = STD-LOG-1 | SSD = Required | "
+                            "Requirement Description = SSD shall expose Error Information Log Identifier 01h. | "
+                            "Section = Logs"
+                        ),
+                    },
+                    {
+                        "page": 4,
+                        "table_index": 1,
+                        "row_index": 3,
+                        "headers": ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                        "cells": {
+                            "Requirement ID": "NVMe-OPT-2",
+                            "SSD": "Optional",
+                            "Requirement Description": "SSD should support Feature Identifier 0Eh.",
+                            "Section": "Feature",
+                        },
+                        "row_text": (
+                            "Requirement ID = NVMe-OPT-2 | SSD = Optional | "
+                            "Requirement Description = SSD should support Feature Identifier 0Eh. | Section = Feature"
+                        ),
+                    },
+                    {
+                        "page": 4,
+                        "table_index": 1,
+                        "row_index": 4,
+                        "headers": ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                        "cells": {
+                            "Requirement ID": "TEL-1",
+                            "SSD": "Required",
+                            "Requirement Description": "SSD shall report telemetry Statistic Identifier 0001h.",
+                            "Section": "Telemetry",
+                        },
+                        "row_text": (
+                            "Requirement ID = TEL-1 | SSD = Required | "
+                            "Requirement Description = SSD shall report telemetry Statistic Identifier 0001h. | "
+                            "Section = Telemetry"
+                        ),
+                    },
+                    {
+                        "page": 4,
+                        "table_index": 1,
+                        "row_index": 5,
+                        "headers": ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                        "cells": {
+                            "Requirement ID": "SEC-43",
+                            "SSD": "Required",
+                            "Requirement Description": "SSD shall support SPDM authentication and TCG handoff.",
+                            "Section": "Security",
+                        },
+                        "row_text": (
+                            "Requirement ID = SEC-43 | SSD = Required | "
+                            "Requirement Description = SSD shall support SPDM authentication and TCG handoff. | "
+                            "Section = Security"
+                        ),
+                    },
+                    {
+                        "page": 4,
+                        "table_index": 1,
+                        "row_index": 6,
+                        "headers": ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                        "cells": {
+                            "Requirement ID": "FF-1",
+                            "SSD": "Required",
+                            "Requirement Description": "SSD shall fit the E1.S form factor envelope.",
+                            "Section": "Mechanical",
+                        },
+                        "row_text": (
+                            "Requirement ID = FF-1 | SSD = Required | "
+                            "Requirement Description = SSD shall fit the E1.S form factor envelope. | "
+                            "Section = Mechanical"
+                        ),
+                    },
+                ],
+            }
+        ]
+    )
+
+    records = build_domain_units(domain_adapter=DomainAdapterMode.OCP, rag_tables=rag_tables, source_sha256="a" * 64)
+    fields_by_id = {record["normalized_fields"]["requirement_id"]: record["normalized_fields"] for record in records}
+
+    assert len(records) == 6
+    assert all(record["unit_type"] == "requirement" for record in records)
+    assert fields_by_id["NVMe-IO-6"]["requirement_prefix"] == "NVMe-IO"
+    assert fields_by_id["NVMe-IO-6"]["requirement_number"] == "6"
+    assert fields_by_id["NVMe-IO-6"]["requirement_family"] == "nvme"
+    assert fields_by_id["NVMe-IO-6"]["related_command"] == "Write Zeroes"
+    assert fields_by_id["STD-LOG-1"]["requirement_family"] == "log_page"
+    assert fields_by_id["STD-LOG-1"]["related_log_identifier"] == "01h"
+    assert fields_by_id["NVMe-OPT-2"]["related_feature_identifier"] == "0Eh"
+    assert fields_by_id["NVMe-OPT-2"]["normative_strength"] == "should"
+    assert fields_by_id["TEL-1"]["requirement_family"] == "telemetry"
+    assert fields_by_id["TEL-1"]["related_statistic_identifier"] == "0001h"
+    assert fields_by_id["SEC-43"]["requirement_family"] == "security"
+    assert fields_by_id["SEC-43"]["related_security_protocol"] == "SPDM"
+    assert fields_by_id["FF-1"]["requirement_family"] == "form_factor"
+    assert fields_by_id["FF-1"]["related_form_factor"] == "E1.S"
+    assert fields_by_id["FF-1"]["source_table_row_id"] == "page-0004-table-0001-row-0006"
+
+
 def test_tcg_domain_adapter_extracts_security_method_authority_object_and_field_units() -> None:
     tcg_tables = [
         {

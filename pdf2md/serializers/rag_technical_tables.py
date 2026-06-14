@@ -10,7 +10,7 @@ from pdf2md.serializers.rag_stable_ids import with_stable_source_metadata
 
 BIT_RANGE_PATTERN = re.compile(r"^\s*(?:bits?\s*)?(?P<bits>\d+(?::\d+)?)\s*$", re.IGNORECASE)
 HEX_VALUE_PATTERN = re.compile(r"\b(?:0x[0-9a-f]+|[0-9a-f]+h)\b", re.IGNORECASE)
-REQ_ID_PATTERN = re.compile(r"\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-\d+\b")
+REQ_ID_PATTERN = re.compile(r"\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-\d+\b", re.IGNORECASE)
 COMMAND_DWORD_PATTERN = re.compile(r"\b(?:command\s+dword|cdw|dword|dw)\s*(?P<index>\d{1,2})\b", re.IGNORECASE)
 COMMAND_CONTEXT_PATTERN = re.compile(r"(?P<name>[A-Za-z][A-Za-z0-9 /_-]{1,80}?)\s+commands?\b", re.IGNORECASE)
 COMMAND_CONTEXT_SKIP = {"admin", "i/o", "io", "nvm", "nvm command set", "command set"}

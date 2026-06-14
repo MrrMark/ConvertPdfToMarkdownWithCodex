@@ -732,6 +732,52 @@ class LatestNvmeSpecBenchmarkReport(BaseModel):
     command_set_eval: dict[str, Any] = Field(default_factory=dict)
 
 
+class LatestOcpDatacenterNvmeSsdBenchmarkSummary(BaseModel):
+    page_count: int = 0
+    conversion_duration_ms: Optional[int] = None
+    sidecar_file_count: int = 0
+    sidecar_total_bytes: int = 0
+    sidecar_file_sizes: dict[str, int] = Field(default_factory=dict)
+    retrieval_chunk_count: int = 0
+    requirement_count: int = 0
+    traceability_record_count: int = 0
+    technical_table_unit_count: int = 0
+    domain_unit_count: int = 0
+    ocp_requirement_unit_count: int = 0
+    contract_validation_status: str = "not_run"
+    contract_validation_passed: bool = False
+    warning_count: int = 0
+    error_count: int = 0
+    conversion_warning_count: int = 0
+    contract_warning_count: int = 0
+    conversion_error_count: int = 0
+    contract_error_count: int = 0
+
+
+class LatestOcpDatacenterNvmeSsdBenchmarkReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "latest_ocp_datacenter_nvme_ssd_benchmark"
+    expected_spec_title: str = "Datacenter NVMe SSD Specification"
+    expected_version: Optional[str] = "2.7"
+    expected_date_marker: Optional[str] = "01082026"
+    source_url: str
+    source_sha256: str
+    mode: str
+    option_matrix: dict[str, Any] = Field(default_factory=dict)
+    conversion_exit_code: int = 0
+    conversion_status: str = "not_run"
+    conversion_output_label: str = "conversion"
+    local_only: bool = True
+    raw_content_included: bool = False
+    image_bytes_included: bool = False
+    local_input_paths_included: bool = False
+    summary_counts: LatestOcpDatacenterNvmeSsdBenchmarkSummary = Field(
+        default_factory=LatestOcpDatacenterNvmeSsdBenchmarkSummary
+    )
+    sidecars: dict[str, Any] = Field(default_factory=dict)
+    contract_validation: dict[str, Any] = Field(default_factory=dict)
+
+
 class OCRBackendDependency(BaseModel):
     name: str
     kind: str

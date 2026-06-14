@@ -1,0 +1,212 @@
+{
+  "excluded_images": [],
+  "images": [],
+  "input_file": "ocp_datacenter_nvme_ssd_slice.pdf",
+  "ocr_pages": [],
+  "options": {
+    "confidential_safe_mode": false,
+    "cross_refs_jsonl_filename": "cross_refs_rag.jsonl",
+    "debug": false,
+    "dedupe_images": false,
+    "domain_adapter": "ocp",
+    "domain_units_jsonl_filename": "domain_units_rag.jsonl",
+    "external_embedding_calls": false,
+    "external_llm_calls": false,
+    "figure_crop_fallback": false,
+    "figures_rag_jsonl_filename": "figures_rag.jsonl",
+    "figures_rag_output": "jsonl",
+    "force_ocr": false,
+    "image_mode": "referenced",
+    "keep_page_markers": true,
+    "local_only_processing": true,
+    "ocr_backend": "tesseract",
+    "ocr_lang": "eng",
+    "page_parallel_enabled": false,
+    "page_worker_effective_count": 1,
+    "page_workers": 1,
+    "pages": null,
+    "path_redaction": "disabled",
+    "rag_chunk_relationship_metadata": true,
+    "rag_contextual_embedding_text": true,
+    "rag_merge_sibling_text_chunks": true,
+    "rag_profile": "technical_spec_rag",
+    "rag_table_output": "both",
+    "rag_text_blocks_jsonl_filename": "text_blocks_rag.jsonl",
+    "rag_text_blocks_output": "jsonl",
+    "remove_header_footer": false,
+    "repair_hyphenation": true,
+    "requirement_traceability_jsonl_filename": "requirement_traceability_rag.jsonl",
+    "requirement_traceability_output": "jsonl",
+    "requirements_jsonl_filename": "requirements_rag.jsonl",
+    "retrieval_chunk_max_tokens": 512,
+    "retrieval_chunks_jsonl_filename": "retrieval_chunks_rag.jsonl",
+    "retrieval_chunks_output": "jsonl",
+    "retrieval_tokenizer": "regex",
+    "semantic_layer_output": "jsonl",
+    "semantic_units_jsonl_filename": "semantic_units_rag.jsonl",
+    "source_filename_masked": false,
+    "table_mode": "auto",
+    "technical_tables_jsonl_filename": "technical_tables_rag.jsonl",
+    "technical_tables_output": "jsonl",
+    "version": "0.1.0"
+  },
+  "schema_version": "1.0",
+  "selected_pages": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "tables": [
+    {
+      "anchor_line_index": 2,
+      "anchor_top": 112.0,
+      "bbox": [
+        36.0,
+        112.0,
+        568.0,
+        160.0
+      ],
+      "caption_source": "nearby_table_caption",
+      "caption_text": "Table 1: OCP command requirement slice",
+      "continuation_confidence": null,
+      "continuation_features": {},
+      "continuation_group": null,
+      "continuation_reasons": [],
+      "continuation_rejected_reasons": [],
+      "continued_from_page": null,
+      "continued_to_page": null,
+      "fallback_reasons": [],
+      "index": 1,
+      "mode": "gfm",
+      "page": 2,
+      "quality_score": 1.0
+    },
+    {
+      "anchor_line_index": 2,
+      "anchor_top": 112.0,
+      "bbox": [
+        36.0,
+        112.0,
+        568.0,
+        160.0
+      ],
+      "caption_source": "nearby_table_caption",
+      "caption_text": "Table 2: OCP log requirement slice",
+      "continuation_confidence": null,
+      "continuation_features": {
+        "bbox_alignment_similarity": 1.0,
+        "current_caption_distance": 27.93,
+        "header_similarity": 1.0,
+        "page_gap": 1,
+        "repeated_template_penalty": 0.0
+      },
+      "continuation_group": null,
+      "continuation_reasons": [],
+      "continuation_rejected_reasons": [
+        "current_caption_present"
+      ],
+      "continued_from_page": null,
+      "continued_to_page": null,
+      "fallback_reasons": [
+        "STUB_COLUMN"
+      ],
+      "index": 1,
+      "mode": "html",
+      "page": 3,
+      "quality_score": 1.0
+    },
+    {
+      "anchor_line_index": 2,
+      "anchor_top": 112.0,
+      "bbox": [
+        36.0,
+        112.0,
+        568.0,
+        184.0
+      ],
+      "caption_source": "nearby_table_caption",
+      "caption_text": "Table 3: OCP feature requirement slice",
+      "continuation_confidence": null,
+      "continuation_features": {
+        "bbox_alignment_similarity": 1.0,
+        "current_caption_distance": 27.93,
+        "header_similarity": 1.0,
+        "page_gap": 1,
+        "repeated_template_penalty": 0.0
+      },
+      "continuation_group": null,
+      "continuation_reasons": [],
+      "continuation_rejected_reasons": [
+        "current_caption_present"
+      ],
+      "continued_from_page": null,
+      "continued_to_page": null,
+      "fallback_reasons": [
+        "STUB_COLUMN"
+      ],
+      "index": 1,
+      "mode": "html",
+      "page": 4,
+      "quality_score": 1.0
+    },
+    {
+      "anchor_line_index": 2,
+      "anchor_top": 112.0,
+      "bbox": [
+        36.0,
+        112.0,
+        568.0,
+        184.0
+      ],
+      "caption_source": "nearby_table_caption",
+      "caption_text": "Table 4: OCP security requirement slice",
+      "continuation_confidence": null,
+      "continuation_features": {
+        "bbox_alignment_similarity": 1.0,
+        "current_caption_distance": 27.93,
+        "header_similarity": 1.0,
+        "page_gap": 1,
+        "repeated_template_penalty": 0.0
+      },
+      "continuation_group": null,
+      "continuation_reasons": [],
+      "continuation_rejected_reasons": [
+        "current_caption_present"
+      ],
+      "continued_from_page": null,
+      "continued_to_page": null,
+      "fallback_reasons": [],
+      "index": 1,
+      "mode": "gfm",
+      "page": 5,
+      "quality_score": 1.0
+    }
+  ],
+  "total_pages": 5,
+  "warnings": [
+    {
+      "code": "TABLE_COMPLEXITY_HTML_FALLBACK",
+      "details": {
+        "reasons": [
+          "STUB_COLUMN"
+        ],
+        "table_index": 1
+      },
+      "message": "Table was treated as complex and serialized as HTML fallback.",
+      "page": 3
+    },
+    {
+      "code": "TABLE_COMPLEXITY_HTML_FALLBACK",
+      "details": {
+        "reasons": [
+          "STUB_COLUMN"
+        ],
+        "table_index": 1
+      },
+      "message": "Table was treated as complex and serialized as HTML fallback.",
+      "page": 4
+    }
+  ]
+}

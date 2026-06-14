@@ -16,10 +16,15 @@ from scripts import probe_ocr_backends
 from scripts import run_preset_eval
 from scripts import run_gui_cli_parity
 from scripts import run_corpus_eval
+from scripts import run_latest_ocp_datacenter_nvme_ssd_benchmark
 from scripts import run_latest_nvme_base_benchmark
 from scripts import run_latest_nvme_command_set_eval
 from scripts import run_release_gates
-from fixtures.pdf_builder import build_nvme_base_slice_pdf, build_nvme_command_set_slice_pdf
+from fixtures.pdf_builder import (
+    build_nvme_base_slice_pdf,
+    build_nvme_command_set_slice_pdf,
+    build_ocp_datacenter_nvme_ssd_slice_pdf,
+)
 
 
 def _write_jsonl(path: Path, records: list[dict]) -> None:
@@ -467,6 +472,81 @@ def test_latest_nvme_command_spec_benchmark_uses_same_contract(tmp_path: Path) -
     assert "The controller shall process a synthetic read command request." not in serialized
     assert "Command Dword = CDW10" not in serialized
     assert "Metadata Pointer = MPTR" not in serialized
+
+
+def test_latest_ocp_datacenter_nvme_ssd_benchmark_writes_sanitized_summary(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "OCP-Datacenter-NVMe-SSD-Synthetic.pdf"
+    build_ocp_datacenter_nvme_ssd_slice_pdf(input_pdf)
+    output_dir = tmp_path / "latest-ocp-datacenter-nvme-ssd-benchmark"
+
+    report = run_latest_ocp_datacenter_nvme_ssd_benchmark.run_latest_ocp_datacenter_nvme_ssd_benchmark(
+        run_latest_ocp_datacenter_nvme_ssd_benchmark.LatestOcpDatacenterNvmeSsdBenchmarkConfig(
+            input_pdf=input_pdf,
+            output_dir=output_dir,
+            mode=run_latest_ocp_datacenter_nvme_ssd_benchmark.FAST_SMOKE_MODE,
+        )
+    )
+    persisted = json.loads(
+        (output_dir / run_latest_ocp_datacenter_nvme_ssd_benchmark.REPORT_FILENAME).read_text(encoding="utf-8")
+    )
+    scorecard = (
+        output_dir / run_latest_ocp_datacenter_nvme_ssd_benchmark.SCORECARD_FILENAME
+    ).read_text(encoding="utf-8")
+    counts = report["summary_counts"]
+
+    assert persisted == report
+    assert report["purpose"] == "latest_ocp_datacenter_nvme_ssd_benchmark"
+    assert report["expected_spec_title"] == "Datacenter NVMe SSD Specification"
+    assert report["expected_version"] == "2.7"
+    assert report["expected_date_marker"] == "01082026"
+    assert report["source_url"] == run_latest_ocp_datacenter_nvme_ssd_benchmark.OFFICIAL_SOURCE_URL
+    assert len(report["source_sha256"]) == 64
+    assert report["option_matrix"]["pages"] == "1-5"
+    assert report["option_matrix"]["domain_adapter"] == "ocp"
+    assert report["option_matrix"]["rag_profile"] == "technical_spec_rag"
+    assert report["option_matrix"]["image_mode"] == "placeholder"
+    assert report["option_matrix"]["contract_validator"]["ssd_agent_spec_type"] == "OCP"
+    assert report["option_matrix"]["ocp_query_eval"]["enabled"] is False
+    assert counts["page_count"] == 5
+    assert counts["retrieval_chunk_count"] > 0
+    assert counts["traceability_record_count"] >= 6
+    assert counts["technical_table_unit_count"] >= 6
+    assert counts["domain_unit_count"] >= 6
+    assert counts["ocp_requirement_unit_count"] >= 6
+    assert counts["contract_validation_status"] == "passed"
+    assert counts["contract_validation_passed"] is True
+    assert counts["sidecar_file_sizes"]["domain_units_rag.jsonl"] > 0
+    assert report["raw_content_included"] is False
+    assert report["image_bytes_included"] is False
+    assert report["local_input_paths_included"] is False
+    assert "Raw PDF text, raw Markdown body, generated queries, retrieved text, image bytes" in scorecard
+    assert "| ocp_requirement_unit_count |" in scorecard
+
+    serialized = json.dumps(report, ensure_ascii=False, sort_keys=True)
+    assert str(input_pdf) not in serialized
+    assert "SSD shall support Write Zeroes command" not in serialized
+    assert "Requirement ID = NVMe-IO-6" not in serialized
+
+
+def test_latest_ocp_datacenter_nvme_ssd_benchmark_distinguishes_full_and_smoke_modes() -> None:
+    full = run_latest_ocp_datacenter_nvme_ssd_benchmark.build_option_matrix(
+        mode=run_latest_ocp_datacenter_nvme_ssd_benchmark.FULL_PRECISION_MODE,
+        pages=None,
+        page_workers=2,
+    )
+    smoke = run_latest_ocp_datacenter_nvme_ssd_benchmark.build_option_matrix(
+        mode=run_latest_ocp_datacenter_nvme_ssd_benchmark.FAST_SMOKE_MODE,
+        pages=None,
+        page_workers=1,
+    )
+
+    assert full["pages"] is None
+    assert full["image_mode"] == "referenced"
+    assert full["page_workers"] == 2
+    assert full["domain_adapter"] == "ocp"
+    assert smoke["pages"] == "1-5"
+    assert smoke["image_mode"] == "placeholder"
+    assert smoke["contract_validator"]["ssd_agent_spec_type"] == "OCP"
 
 
 def test_latest_nvme_base_benchmark_distinguishes_full_and_smoke_modes() -> None:
