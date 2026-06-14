@@ -84,11 +84,28 @@ PCIE_HEADER_TOKENS = {
     "value",
 }
 OCP_HEADER_TOKENS = {
+    "command",
     "description",
+    "feature",
+    "featureidentifier",
+    "formfactor",
+    "id",
+    "log",
+    "logidentifier",
+    "must",
+    "nvme",
     "optional",
+    "profile",
     "requirement",
+    "requirementdescription",
     "requirementid",
+    "requirementtext",
+    "section",
+    "security",
+    "shall",
     "ssd",
+    "status",
+    "telemetry",
 }
 TCG_HEADER_TOKENS = {
     "authority",
@@ -196,6 +213,142 @@ def _cell_value(cells: dict[str, Any], *names: str) -> str | None:
         if text:
             return text
     return None
+
+
+OCP_REQUIREMENT_ID_PATTERN = re.compile(
+    r"^(?P<prefix>[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*)-(?P<number>\d+[A-Za-z]?)$",
+    re.IGNORECASE,
+)
+OCP_HEX_ID_PATTERN = re.compile(
+    r"\b(?:0x[0-9A-Fa-f]{1,4}|[0-9A-Fa-f]{1,4}h)\b",
+)
+OCP_COMMAND_NAMES = (
+    "Dataset Management",
+    "Directive Receive",
+    "Directive Send",
+    "Format NVM",
+    "Get Features",
+    "Get Log Page",
+    "Identify",
+    "Sanitize",
+    "Set Features",
+    "Write Zeroes",
+    "Compare",
+    "Flush",
+    "Read",
+    "Write",
+)
+OCP_SECURITY_PROTOCOLS = ("SPDM", "TCG", "IEEE 1667", "Opal")
+OCP_FORM_FACTORS = ("E1.S", "E1.L", "E3.S", "E3.L", "E3", "M.2", "U.2", "U.3", "SFF-8639")
+
+
+def _ocp_requirement_id(value: str | None) -> str | None:
+    text = re.sub(r"\s+", "", str(value or "").strip())
+    if not text:
+        return None
+    return text
+
+
+def _ocp_requirement_prefix(requirement_id: str | None) -> str | None:
+    req_id = _ocp_requirement_id(requirement_id)
+    if not req_id:
+        return None
+    match = OCP_REQUIREMENT_ID_PATTERN.fullmatch(req_id)
+    if match:
+        return match.group("prefix")
+    if "-" in req_id:
+        return req_id.rsplit("-", 1)[0]
+    return None
+
+
+def _ocp_requirement_number(requirement_id: str | None) -> str | None:
+    req_id = _ocp_requirement_id(requirement_id)
+    if not req_id:
+        return None
+    match = OCP_REQUIREMENT_ID_PATTERN.fullmatch(req_id)
+    if match:
+        return match.group("number")
+    if "-" in req_id:
+        return req_id.rsplit("-", 1)[1]
+    return None
+
+
+def _ocp_requirement_family(prefix: str | None, text: str) -> str | None:
+    upper = str(prefix or "").upper()
+    lowered = text.lower()
+    if upper.startswith("NVME"):
+        return "nvme"
+    if "LOG" in upper or upper in {"GLP", "SLOG", "ERL"} or "log identifier" in lowered or "log page" in lowered:
+        return "log_page"
+    if upper.startswith("TEL") or upper.startswith("LM") or "telemetry" in lowered:
+        return "telemetry"
+    if upper.startswith("CTO") or "command timeout" in lowered:
+        return "command_timeout"
+    if upper.startswith("SEC") or upper.startswith("TCG") or upper.startswith("SPDM"):
+        return "security"
+    if any(protocol.lower() in lowered for protocol in OCP_SECURITY_PROTOCOLS):
+        return "security"
+    if upper.startswith("PCI"):
+        return "pcie"
+    if upper.startswith("THM") or "thermal" in lowered:
+        return "thermal"
+    if upper.startswith("FF") or any(form_factor.lower() in lowered for form_factor in OCP_FORM_FACTORS):
+        return "form_factor"
+    if upper.startswith("PLP") or "power loss" in lowered:
+        return "power_loss_protection"
+    if upper.startswith("REL") or "reliability" in lowered:
+        return "reliability"
+    if upper.startswith(("END", "EOL", "SLIFE", "RETC")):
+        return "endurance"
+    if upper.startswith("LABL") or "label" in lowered:
+        return "labeling"
+    if upper.startswith("COMP") or "compliance" in lowered:
+        return "compliance"
+    if not upper:
+        return None
+    return re.sub(r"[^a-z0-9]+", "_", upper.lower()).strip("_")
+
+
+def _ocp_normative_strength(text: str) -> str | None:
+    lowered = text.lower()
+    if re.search(r"\bshall\b", lowered):
+        return "shall"
+    if re.search(r"\bmust\b", lowered):
+        return "must"
+    if re.search(r"\bshould\b", lowered):
+        return "should"
+    if re.search(r"\bmay\b", lowered):
+        return "may"
+    if re.search(r"\boptional\b", lowered):
+        return "optional"
+    return None
+
+
+def _ocp_first_hex_after(text: str, *labels: str) -> str | None:
+    for label in labels:
+        pattern = re.compile(rf"\b{re.escape(label)}\b\s*(?:=|is|:)?\s*(?P<value>0x[0-9A-Fa-f]+|[0-9A-Fa-f]{{1,4}}h)\b", re.IGNORECASE)
+        match = pattern.search(text)
+        if match:
+            return match.group("value")
+    return None
+
+
+def _ocp_related_command(text: str) -> str | None:
+    for command in OCP_COMMAND_NAMES:
+        if re.search(rf"\b{re.escape(command)}\b(?:\s+command)?", text, re.IGNORECASE):
+            return command
+    return None
+
+
+def _ocp_related_token(text: str, candidates: tuple[str, ...]) -> str | None:
+    for candidate in candidates:
+        if re.search(rf"\b{re.escape(candidate)}\b", text, re.IGNORECASE):
+            return candidate
+    return None
+
+
+def _ocp_text_from_cells(cells: dict[str, Any]) -> str:
+    return " ".join(str(value).strip() for value in cells.values() if str(value).strip())
 
 
 def _nvme_pointer_type(value: str | None) -> str | None:
@@ -623,6 +776,9 @@ def _normalized_domain_fields(
             "value": value,
         }
     )
+    if domain_adapter is not DomainAdapterMode.OCP:
+        fields.pop("source_table_id", None)
+        fields.pop("source_table_row_id", None)
     if domain_adapter is DomainAdapterMode.TCG:
         fields.update(
             {
@@ -695,6 +851,70 @@ def _normalized_domain_fields(
                 "reset_default": fields.get("reset_default") or _cell_value(cells, "Reset", "Default", "Reset Default"),
                 "requirement_ref": fields.get("requirement_ref")
                 or _cell_value(cells, "Requirement ID", "Requirement", "Req ID", "ID"),
+            }
+        )
+    if domain_adapter is DomainAdapterMode.OCP:
+        requirement_id = _ocp_requirement_id(
+            fields.get("requirement_ref")
+            or _cell_value(cells, "Requirement ID", "Requirement", "Req ID", "ID")
+            or (value if unit_type == "requirement" else None)
+        )
+        description = _cell_value(cells, "Requirement Description", "Requirement Text", "Description", "Meaning")
+        full_text = f"{_ocp_text_from_cells(cells)} {description or ''} {name} {value or ''}"
+        prefix = _ocp_requirement_prefix(requirement_id)
+        family = _ocp_requirement_family(prefix, full_text)
+        related_log_identifier = (
+            fields.get("log_identifier")
+            or _cell_value(cells, "Log Identifier", "LID", "Log Page", "Log Page Identifier")
+            or _ocp_first_hex_after(full_text, "Log Identifier", "LID")
+        )
+        related_feature_identifier = (
+            fields.get("feature_identifier")
+            or _cell_value(cells, "Feature Identifier", "FID", "Feature")
+            or _ocp_first_hex_after(full_text, "Feature Identifier", "FID")
+        )
+        related_statistic_identifier = _cell_value(
+            cells,
+            "Statistic Identifier",
+            "Statistic ID",
+            "Telemetry Statistic Identifier",
+        ) or _ocp_first_hex_after(full_text, "Statistic Identifier", "Statistic ID")
+        related_command = _cell_value(cells, "Command", "Command Name") or _ocp_related_command(full_text)
+        relationship_hints: list[str] = []
+        if related_command:
+            relationship_hints.append("references_nvme_command")
+        if related_log_identifier:
+            relationship_hints.append("references_nvme_log_page")
+        if related_feature_identifier:
+            relationship_hints.append("references_nvme_feature")
+        if related_statistic_identifier:
+            relationship_hints.append("references_telemetry_statistic")
+        security_protocol = _ocp_related_token(full_text, OCP_SECURITY_PROTOCOLS)
+        form_factor = _ocp_related_token(full_text, OCP_FORM_FACTORS)
+        if security_protocol:
+            relationship_hints.append("references_security_protocol")
+        if form_factor:
+            relationship_hints.append("references_form_factor")
+        fields.update(
+            {
+                "requirement_id": requirement_id,
+                "requirement_prefix": prefix,
+                "requirement_number": _ocp_requirement_number(requirement_id),
+                "requirement_family": family,
+                "requirement_description": description,
+                "normative_strength": _ocp_normative_strength(full_text),
+                "ssd_requirement_status": _cell_value(cells, "SSD", "Required", "Optional", "Status"),
+                "ocp_profile": _cell_value(cells, "OCP Profile", "Profile", "SSD Profile"),
+                "topic": family,
+                "related_command": related_command,
+                "related_log_identifier": related_log_identifier,
+                "related_feature_identifier": related_feature_identifier,
+                "related_statistic_identifier": related_statistic_identifier,
+                "related_security_protocol": security_protocol,
+                "related_form_factor": form_factor,
+                "relationship_hints": relationship_hints,
+                "source_table_id": fields.get("source_table_id"),
+                "source_table_row_id": fields.get("source_table_row_id"),
             }
         )
     if domain_adapter is DomainAdapterMode.SPDM:
@@ -813,6 +1033,8 @@ def build_domain_units(
                             "requirement_ref": technical_record.get("requirement_ref"),
                             "access": technical_record.get("access"),
                             "reset_default": technical_record.get("reset_default"),
+                            "source_table_id": technical_record.get("table_id"),
+                            "source_table_row_id": technical_record.get("table_row_id"),
                         },
                     ),
                     "source_refs": source_refs,
@@ -856,6 +1078,10 @@ def build_domain_units(
                         unit_type=unit_type,
                         name=name,
                         value=value,
+                        base_fields={
+                            "source_table_id": table_row.get("table_id"),
+                            "source_table_row_id": table_row.get("table_row_id"),
+                        },
                     ),
                     "source_refs": [
                         {

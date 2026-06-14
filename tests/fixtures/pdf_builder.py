@@ -591,6 +591,116 @@ def build_nvme_command_set_slice_pdf(path: Path) -> None:
     )
 
 
+def build_ocp_datacenter_nvme_ssd_slice_pdf(path: Path) -> None:
+    """Build a sanitized OCP Datacenter NVMe SSD-shaped slice without official specification text."""
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("1 OCP Datacenter NVMe SSD Synthetic Slice", 72, 800, 14),
+                    PositionedText("This synthetic slice shall preserve requirement traceability metadata.", 72, 760, 10),
+                    PositionedText("NOTE: These rows are fixture-only adapter evidence.", 72, 742, 10),
+                ]
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("2 NVMe I/O Requirements", 72, 800, 14),
+                    PositionedText("Table 1: OCP command requirement slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                            [
+                                "NVMe-IO-6",
+                                "Required",
+                                "SSD shall support Write Zeroes command for synthetic compliance.",
+                                "NVMe",
+                            ],
+                        ],
+                        36,
+                        730,
+                        [96, 70, 308, 58],
+                        font_size=7,
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("3 Standard Log Requirements", 72, 800, 14),
+                    PositionedText("Table 2: OCP log requirement slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                            [
+                                "STD-LOG-1",
+                                "Required",
+                                "SSD shall expose Error Information Log Identifier 01h for test collection.",
+                                "Logs",
+                            ],
+                        ],
+                        36,
+                        730,
+                        [96, 70, 308, 58],
+                        font_size=7,
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("4 Feature Requirements", 72, 800, 14),
+                    PositionedText("Table 3: OCP feature requirement slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                            [
+                                "NVMe-OPT-2",
+                                "Optional",
+                                "SSD should support Feature Identifier 0Eh for timestamp handling.",
+                                "Feature",
+                            ],
+                            [
+                                "TEL-1",
+                                "Required",
+                                "SSD shall report telemetry Statistic Identifier 0001h.",
+                                "Telemetry",
+                            ],
+                        ],
+                        36,
+                        730,
+                        [96, 70, 308, 58],
+                        font_size=7,
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("5 Security and Form Factor Requirements", 72, 800, 14),
+                    PositionedText("Table 4: OCP security requirement slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Requirement ID", "SSD", "Requirement Description", "Section"],
+                            ["SEC-43", "Required", "SSD shall support SPDM authentication and TCG handoff.", "Security"],
+                            ["FF-1", "Required", "SSD shall fit the E1.S form factor envelope.", "Mechanical"],
+                        ],
+                        36,
+                        730,
+                        [96, 70, 308, 58],
+                        font_size=7,
+                    )
+                ],
+            ),
+        ],
+    )
+
+
 def build_diagram_suite_pdf(path: Path) -> None:
     """Build vector-rendered diagram pages for figure crop fallback provenance."""
     state_machine_graphics = [

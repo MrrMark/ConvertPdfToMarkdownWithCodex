@@ -353,6 +353,191 @@ def test_ssd_rag_contract_accepts_nvme_deep_shape(tmp_path: Path) -> None:
     assert report["summary"]["requirement_traceability_count"] == 1
 
 
+def test_ssd_rag_contract_accepts_ocp_deep_shape(tmp_path: Path) -> None:
+    source_sha256 = "f" * 64
+    stable = {
+        "source_sha256": source_sha256,
+        "source_dedupe_key": "page-0002-table-0001-row-0001|tech-table-000001",
+        "stable_source_id": "1" * 40,
+        "stable_requirement_seed": "2" * 40,
+    }
+    _write_jsonl(
+        tmp_path / "retrieval_chunks_rag.jsonl",
+        [
+            {
+                "chunk_id": "chunk-000001",
+                "schema_version": "1.0",
+                "chunk_index": 1,
+                "chunk_type": "domain_unit",
+                "text": "Requirement ID = NVMe-IO-6 | Requirement Description = SSD shall support Write Zeroes.",
+                "source_sha256": source_sha256,
+                "source_refs": [{"source_type": "domain_unit", "source_id": "domain-ocp-000001", "page": 2}],
+                "page_range": [2, 2],
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+                "heading_path": ["OCP Requirements"],
+                "semantic_types": ["requirement"],
+                "normative_strength": "shall",
+                "retrieval_priority": 96,
+                "char_count": 92,
+                "token_estimate": 20,
+                "section_path": "OCP Requirements",
+                "chunk_group_id": "domain-ocp",
+                "source_record_count": 1,
+                "source_dedupe_key": "domain-ocp-000001",
+                "chunk_boundary_policy": "source_record",
+                "chunk_boundary_reasons": ["domain_unit_boundary"],
+            }
+        ],
+    )
+    _write_jsonl(tmp_path / "requirements_rag.jsonl", [])
+    _write_jsonl(
+        tmp_path / "technical_tables_rag.jsonl",
+        [
+            {
+                "technical_table_unit_id": "tech-table-000001",
+                "unit_type": "requirement_row",
+                "page": 2,
+                "table_id": "page-0002-table-0001",
+                "table_row_id": "page-0002-table-0001-row-0001",
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0002-table-0001-row-0001"}],
+            }
+            | stable,
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "tables_rag.jsonl",
+        [
+            {
+                "table_row_id": "page-0002-table-0001-row-0001",
+                "table_id": "page-0002-table-0001",
+                "page": 2,
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "domain_units_rag.jsonl",
+        [
+            {
+                "domain_unit_id": "domain-ocp-000001",
+                "domain": "ocp",
+                "unit_type": "requirement",
+                "source_refs": [
+                    {"source_type": "table_row", "source_id": "page-0002-table-0001-row-0001"},
+                    {"source_type": "technical_table_unit", "source_id": "tech-table-000001"},
+                ],
+                "normalized_fields": {
+                    "unit_type": "requirement",
+                    "name": "NVMe-IO-6",
+                    "value": "NVMe-IO-6",
+                    "requirement_id": "NVMe-IO-6",
+                    "requirement_prefix": "NVMe-IO",
+                    "requirement_number": "6",
+                    "requirement_family": "nvme",
+                    "related_command": "Write Zeroes",
+                    "source_table_id": "page-0002-table-0001",
+                    "source_table_row_id": "page-0002-table-0001-row-0001",
+                },
+            }
+            | stable,
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "requirement_traceability_rag.jsonl",
+        [
+            {
+                "trace_id": "req-trace-000001",
+                "trace_index": 1,
+                "requirement_id": "NVMe-IO-6",
+                "text": "SSD shall support Write Zeroes.",
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0002-table-0001-row-0001", "page": 2}],
+                "page_range": [2, 2],
+            }
+            | stable
+        ],
+    )
+    _write_jsonl(tmp_path / "cross_refs_rag.jsonl", [])
+    _write_jsonl(tmp_path / "figures_rag.jsonl", [])
+
+    report = validate_ssd_rag_contract(
+        output_dir=tmp_path,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="OCP",
+        domain_adapter="ocp",
+        source_sha256=source_sha256,
+    )
+
+    assert report["passed"] is True
+    assert report["summary"]["domain_unit_count"] == 1
+    assert report["summary"]["requirement_traceability_count"] == 1
+
+
+def test_ssd_rag_contract_rejects_invalid_ocp_deep_shape(tmp_path: Path) -> None:
+    source_sha256 = "e" * 64
+    stable = {
+        "source_sha256": source_sha256,
+        "source_dedupe_key": "page-0002-table-0001-row-0001|tech-table-000001",
+        "stable_source_id": "1" * 40,
+        "stable_requirement_seed": "2" * 40,
+    }
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [])
+    _write_jsonl(tmp_path / "requirements_rag.jsonl", [])
+    _write_jsonl(
+        tmp_path / "technical_tables_rag.jsonl",
+        [
+            {
+                "technical_table_unit_id": "tech-table-000001",
+                "unit_type": "requirement_row",
+                "page": 2,
+                "table_id": "page-0002-table-0001",
+                "table_row_id": "page-0002-table-0001-row-0001",
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0002-table-0001-row-0001"}],
+            }
+            | stable,
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "tables_rag.jsonl",
+        [
+            {
+                "table_row_id": "page-0002-table-0001-row-0001",
+                "table_id": "page-0002-table-0001",
+                "page": 2,
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "domain_units_rag.jsonl",
+        [
+            {
+                "domain_unit_id": "domain-ocp-000001",
+                "domain": "ocp",
+                "unit_type": "requirement",
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0002-table-0001-row-0001"}],
+                "normalized_fields": {"requirement_id": "NVMe-IO-6"},
+            }
+            | stable,
+        ],
+    )
+    _write_jsonl(tmp_path / "requirement_traceability_rag.jsonl", [])
+    _write_jsonl(tmp_path / "cross_refs_rag.jsonl", [])
+    _write_jsonl(tmp_path / "figures_rag.jsonl", [])
+
+    report = validate_ssd_rag_contract(
+        output_dir=tmp_path,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="OCP",
+        domain_adapter="ocp",
+        source_sha256=source_sha256,
+    )
+
+    assert report["passed"] is False
+    assert "missing_ocp_normalized_field" in {error["code"] for error in report["errors"]}
+
+
 def test_ssd_rag_contract_rejects_invalid_nvme_deep_shape(tmp_path: Path) -> None:
     source_sha256 = "d" * 64
     _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [])

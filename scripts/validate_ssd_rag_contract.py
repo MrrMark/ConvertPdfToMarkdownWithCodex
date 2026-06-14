@@ -75,6 +75,8 @@ SPDM_DOMAIN_UNIT_TYPES = {
     "spdm_session",
 }
 NVME_CORE_DOMAIN_UNIT_TYPES = {"command", "log_page", "feature", "register_field"}
+OCP_CORE_DOMAIN_UNIT_TYPES = {"requirement"}
+OCP_NORMALIZED_FIELD_REQUIREMENTS = ("requirement_id", "requirement_prefix", "requirement_family")
 NVME_NORMALIZED_FIELD_REQUIREMENTS = {
     "command": ("opcode",),
     "log_page": ("log_identifier",),
@@ -244,6 +246,43 @@ def _validate_nvme_domain_units(domain_units: list[dict[str, Any]], *, errors: l
             )
 
 
+def _validate_ocp_domain_units(domain_units: list[dict[str, Any]], *, errors: list[dict[str, Any]]) -> None:
+    if domain_units and not any(record.get("unit_type") in OCP_CORE_DOMAIN_UNIT_TYPES for record in domain_units):
+        _add_issue(
+            errors,
+            path="domain_units_rag.jsonl",
+            code="missing_ocp_requirement_domain_unit",
+            message="OCP domain output must include at least one requirement unit.",
+        )
+    for index, record in enumerate(domain_units, start=1):
+        path = f"domain_units_rag.jsonl[{index}]"
+        if record.get("unit_type") != "requirement":
+            continue
+        normalized_fields = record.get("normalized_fields")
+        if not isinstance(normalized_fields, dict):
+            _add_issue(errors, path=path, code="missing_ocp_normalized_fields", message="Missing normalized_fields object.")
+            continue
+        missing = [
+            field
+            for field in OCP_NORMALIZED_FIELD_REQUIREMENTS
+            if normalized_fields.get(field) in {None, ""}
+        ]
+        if missing:
+            _add_issue(
+                errors,
+                path=path,
+                code="missing_ocp_normalized_field",
+                message=f"OCP requirement requires: {', '.join(missing)}.",
+            )
+        if normalized_fields.get("source_table_row_id") in {None, ""}:
+            _add_issue(
+                errors,
+                path=path,
+                code="missing_ocp_requirement_source_row",
+                message="OCP requirement normalized fields must retain source_table_row_id.",
+            )
+
+
 def _validate_nvme_technical_tables(technical_tables: list[dict[str, Any]], *, errors: list[dict[str, Any]]) -> None:
     for index, record in enumerate(technical_tables, start=1):
         path = f"technical_tables_rag.jsonl[{index}]"
@@ -310,7 +349,7 @@ def validate_ssd_rag_contract(
         sidecar_paths["tables_rag"] = output_dir / "tables_rag.jsonl"
     if require_domain_units:
         sidecar_paths["domain_units_rag"] = output_dir / "domain_units_rag.jsonl"
-    if adapter == "nvme":
+    if adapter in {"nvme", "ocp"}:
         sidecar_paths["requirement_traceability_rag"] = output_dir / "requirement_traceability_rag.jsonl"
     for name, path in sidecar_paths.items():
         if not path.exists():
@@ -370,12 +409,32 @@ def validate_ssd_rag_contract(
             )
         if adapter == "nvme":
             _validate_nvme_domain_units(domain_units, errors=errors)
+        if adapter == "ocp":
+            _validate_ocp_domain_units(domain_units, errors=errors)
 
     if adapter == "nvme":
         _validate_nvme_technical_tables(technical_tables, errors=errors)
         _validate_stable_metadata(
             technical_tables,
             sidecar_name="technical_tables_rag.jsonl",
+            errors=errors,
+        )
+
+    if adapter == "ocp":
+        _validate_nvme_technical_tables(technical_tables, errors=errors)
+        _validate_stable_metadata(
+            technical_tables,
+            sidecar_name="technical_tables_rag.jsonl",
+            errors=errors,
+        )
+        _validate_stable_metadata(
+            domain_units,
+            sidecar_name="domain_units_rag.jsonl",
+            errors=errors,
+        )
+        _validate_stable_metadata(
+            requirement_traceability,
+            sidecar_name="requirement_traceability_rag.jsonl",
             errors=errors,
         )
         _validate_stable_metadata(

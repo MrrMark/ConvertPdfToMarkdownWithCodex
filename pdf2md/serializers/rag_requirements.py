@@ -9,10 +9,11 @@ from pdf2md.serializers.rag_stable_ids import normalize_seed_text, with_stable_s
 
 
 REQ_ID_PATTERN = re.compile(
-    r"\b(?:REQ|RQT|SHALL|MUST|OCP|LABL|RETC|SLIFE|EOL|TCG|TCGCE|GLP|SLOG|NVME|PCIe?)[A-Z0-9_-]*-\d+\b",
+    r"\b(?:REQ|RQT|SHALL|MUST|OCP|COMP|CTO|EOL|ERL|FF|GLP|LABL|LM|NVME|PCIe?|PLP|RETC|SEC|"
+    r"SLOG|SLIFE|SPDM|STD|TCG|TCGCE|TEL|THM)[A-Z0-9_-]*-\d+\b",
     re.IGNORECASE,
 )
-GENERIC_REQ_ID_PATTERN = re.compile(r"\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-\d+\b")
+GENERIC_REQ_ID_PATTERN = re.compile(r"\b[A-Z][A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})*-\d+\b", re.IGNORECASE)
 CONDITION_PATTERN = re.compile(r"\b(?:if|when|where|unless|provided that)\b[^.;]*", re.IGNORECASE)
 EXCEPTION_PATTERN = re.compile(r"\b(?:except|unless|excluding)\b[^.;]*", re.IGNORECASE)
 DEPENDENCY_PATTERN = re.compile(

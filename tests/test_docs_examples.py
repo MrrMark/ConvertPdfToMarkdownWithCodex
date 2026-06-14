@@ -90,6 +90,21 @@ def test_nvme_base_and_command_spec_contracts_are_documented() -> None:
     assert "`spec_document_type`으로 `base`와 `nvm_command_set`을 구분" in nvme_spec
 
 
+def test_ocp_datacenter_nvme_ssd_contract_is_documented() -> None:
+    output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
+    rag_recipes = Path("docs/RAG_INDEXER_INTEGRATION_RECIPES.md").read_text(encoding="utf-8")
+    ocp_spec = Path("docs/OCP_DATACENTER_NVME_SSD_RAG_ADAPTER_DEVELOPMENT_SPEC.md").read_text(encoding="utf-8")
+
+    assert "latest_ocp_datacenter_nvme_ssd_benchmark_report.json" in output_schema
+    assert "technical_spec_rag + domain_adapter=ocp" in output_schema
+    assert "`requirement_id`, `requirement_prefix`, `requirement_family`" in output_schema
+    assert "run_latest_ocp_datacenter_nvme_ssd_benchmark.py" in rag_recipes
+    assert "--ssd-agent-spec-type OCP --domain-adapter ocp" in rag_recipes
+    assert "Official source URL은 `https://www.opencompute.org/documents/datacenter-nvme-ssd-specification-v2-7-final-pdf-1`" in rag_recipes
+    assert "OCP Datacenter NVMe SSD RAG Adapter Development Spec" in ocp_spec
+    assert "P0-1: Official OCP benchmark wrapper and sanitized report model." in ocp_spec
+
+
 def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
     gitignore = Path(".gitignore").read_text(encoding="utf-8")
     tasks = Path("tasks.md").read_text(encoding="utf-8")

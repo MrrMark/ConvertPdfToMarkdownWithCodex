@@ -26,6 +26,7 @@
 - `docs/schema/docling_benchmark_report.schema.json`
 - `docs/schema/docling_artifact_comparison.schema.json`
 - `docs/schema/latest_nvme_spec_benchmark_report.schema.json`
+- `docs/schema/latest_ocp_datacenter_nvme_ssd_benchmark_report.schema.json`
 - `docs/schema/ocr_backend_probe_report.schema.json`
 - `docs/schema/figure_description_eval_report.schema.json`
 - `docs/schema/local_corpus_evidence_pack.schema.json`
@@ -333,6 +334,49 @@ Policy:
 - The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, sanitized SSD contract status, and sanitized Command Set eval status only.
 - Raw spec text, raw Markdown body, generated query strings, retrieved chunk text, table row content, image bytes, and local input PDF paths are not embedded.
 - The converted output directory is referenced by label only (`conversion`); keep the source PDF and full converted output outside committed fixtures unless intentionally creating sanitized test artifacts.
+
+## latest_ocp_datacenter_nvme_ssd_benchmark_report.json
+
+Optional local-only benchmark summary written by `scripts/run_latest_ocp_datacenter_nvme_ssd_benchmark.py`.
+
+Required:
+
+- `schema_version`
+- `purpose="latest_ocp_datacenter_nvme_ssd_benchmark"`
+- `expected_spec_title="Datacenter NVMe SSD Specification"`
+- `expected_version="2.7"`
+- `expected_date_marker="01082026"`
+- `source_url`
+- `source_sha256`
+- `mode`: `full_precision` or `fast_smoke`
+- `option_matrix`
+- `summary_counts`
+
+Stable summary fields:
+
+- `page_count`
+- `conversion_duration_ms`
+- `sidecar_file_count`
+- `sidecar_total_bytes`
+- `sidecar_file_sizes`
+- `retrieval_chunk_count`
+- `requirement_count`
+- `traceability_record_count`
+- `technical_table_unit_count`
+- `domain_unit_count`
+- `ocp_requirement_unit_count`
+- `contract_validation_status`
+- `contract_validation_passed`
+- `warning_count`
+- `error_count`
+
+Policy:
+
+- This report covers the latest OCP Datacenter NVMe SSD benchmark path under `technical_spec_rag + domain_adapter=ocp`.
+- OCP validation requires requirement domain units with normalized `requirement_id`, `requirement_prefix`, `requirement_family`, and source table row metadata.
+- The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, and sanitized SSD contract status only.
+- Raw spec text, raw Markdown body, generated query strings, retrieved chunk text, table row content, image bytes, and local input PDF paths are not embedded.
+- OCP P2 query eval is intentionally tracked as a planned metrics-only extension and is not enabled in the P0 benchmark report.
 
 ## ocr_backend_probe_report.json
 
@@ -892,6 +936,7 @@ Policy:
 - Default adapter is `none`, so this file is only written when a domain adapter is explicitly selected.
 - Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`, and `manual`.
 - NVMe domain units cover both NVMe Base and NVM Command Set specs. They may use `command`, `command_dword_field`, `command_pointer_field`, `log_page`, `feature`, `register_field`, `status_code`, `queue_field`, `namespace_field`, `controller_field`, `support_requirement`, `data_structure_field`, or `enum_value`. Their `normalized_fields` may include `canonical_name`, `opcode`, `command_dword`, `command_scope`, `queue_type`, `pointer_type`, `command_context`, `command_context_source`, `related_command_unit_id`, `related_command_opcode`, `relationship_hints`, `log_identifier`, `feature_identifier`, `register_name`, `offset`, `bit_range`, `field_name`, `status_code_type`, `status_code_value`, `status_code_group`, `error_class`, `retry_hint`, `controller_support`, `namespace_support`, `scope`, `access`, `reset_default`, and `requirement_ref`; empty values are omitted.
+- OCP domain units use `requirement`. Their `normalized_fields` include `requirement_id`, `requirement_prefix`, `requirement_number`, `requirement_family`, `normative_strength`, `ssd_requirement_status`, related NVMe hints such as `related_command`, `related_log_identifier`, `related_feature_identifier`, and source row fields `source_table_id`/`source_table_row_id`; empty values are omitted.
 - TCG domain units may use `security_method`, `security_object`, `security_authority`, `security_field`, `security_provider`, `locking_range`, `key_management`, or `session_state`; TCG is expected to map to SSD `HIL/TCG` without a CustomerRequirement fallback.
 - SPDM domain units may use `spdm_message`, `spdm_request_response`, `spdm_measurement`, `spdm_certificate`, `spdm_algorithm`, `spdm_key_exchange`, or `spdm_session`; SPDM maps to SSD `HIL/SPDM`.
 - Manual domain units keep `domain="manual"` and set `adapter_profile` to `--manual-domain-adapter-label` when provided, otherwise `manual`. `--manual-domain-adapter-keywords` only expands deterministic table header recognition; record `text`, `name`, `value`, and `description` are copied from observed table/technical-table provenance and are not generated.

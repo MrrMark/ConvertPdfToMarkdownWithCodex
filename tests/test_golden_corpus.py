@@ -17,6 +17,7 @@ from fixtures.pdf_builder import (
     build_layout_stress_pdf,
     build_nvme_base_slice_pdf,
     build_nvme_command_set_slice_pdf,
+    build_ocp_datacenter_nvme_ssd_slice_pdf,
     build_password_pdf,
     build_repeated_template_table_pdf,
     build_repeated_header_footer_pdf,
@@ -67,6 +68,19 @@ def _nvme_base_slice_options() -> dict:
     }
 
 
+def _ocp_datacenter_nvme_ssd_slice_options() -> dict:
+    return {
+        "rag_profile": "technical_spec_rag",
+        "rag_table_output": RagTableOutputMode.BOTH,
+        "domain_adapter": DomainAdapterMode.OCP,
+        "repair_hyphenation": True,
+        "retrieval_tokenizer": "regex",
+        "rag_contextual_embedding_text": True,
+        "rag_merge_sibling_text_chunks": True,
+        "rag_chunk_relationship_metadata": True,
+    }
+
+
 def _normalize_jsonl_sidecar(content: str, sidecar_name: str) -> str:
     if not sidecar_name.endswith(".jsonl") or not content.strip():
         return content
@@ -100,6 +114,7 @@ def test_deterministic_pdf_fixture_builder_covers_priority_corpus(tmp_path: Path
         "table_accuracy_pack.pdf": build_table_accuracy_pack_pdf,
         "nvme_base_slice.pdf": build_nvme_base_slice_pdf,
         "nvme_command_set_slice.pdf": build_nvme_command_set_slice_pdf,
+        "ocp_datacenter_nvme_ssd_slice.pdf": build_ocp_datacenter_nvme_ssd_slice_pdf,
         "diagram_suite.pdf": build_diagram_suite_pdf,
         "repeated_template_table.pdf": build_repeated_template_table_pdf,
         "repeated_image.pdf": build_repeated_image_pdf,
@@ -137,6 +152,10 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
         "continued_table": (build_continued_table_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
         "table_accuracy_pack": (build_table_accuracy_pack_pdf, {"rag_table_output": RagTableOutputMode.BOTH}),
         "nvme_base_slice": (build_nvme_base_slice_pdf, _nvme_base_slice_options()),
+        "ocp_datacenter_nvme_ssd_slice": (
+            build_ocp_datacenter_nvme_ssd_slice_pdf,
+            _ocp_datacenter_nvme_ssd_slice_options(),
+        ),
         "diagram_suite": (build_diagram_suite_pdf, {"figure_crop_fallback": True}),
         "repeated_template_table": (
             build_repeated_template_table_pdf,
@@ -255,3 +274,47 @@ def test_nvme_base_slice_golden_sidecars_cover_adapter_contract(tmp_path: Path) 
     assert trace_kinds["note"]["is_requirement_candidate"] is False
     assert trace_kinds["example"]["is_requirement_candidate"] is False
     assert all(record["stable_source_id"] and record["stable_requirement_seed"] for record in traces)
+
+
+def test_ocp_datacenter_nvme_ssd_slice_golden_sidecars_cover_adapter_contract(tmp_path: Path) -> None:
+    pdf_path = tmp_path / "ocp_datacenter_nvme_ssd_slice.pdf"
+    output_dir = tmp_path / "ocp_datacenter_nvme_ssd_slice"
+    build_ocp_datacenter_nvme_ssd_slice_pdf(pdf_path)
+
+    result = run_conversion(
+        Config(
+            input_pdf=pdf_path,
+            output_dir=output_dir,
+            keep_page_markers=True,
+            **_ocp_datacenter_nvme_ssd_slice_options(),
+        )
+    )
+
+    assert result.exit_code == 0
+    technical_tables = _read_jsonl(output_dir / "technical_tables_rag.jsonl")
+    domain_units = _read_jsonl(output_dir / "domain_units_rag.jsonl")
+    traces = _read_jsonl(output_dir / "requirement_traceability_rag.jsonl")
+
+    assert len(technical_tables) >= 5
+    assert len(domain_units) >= 5
+    assert len(traces) >= 5
+    assert all(record["table_row_id"] for record in technical_tables)
+    assert all(record["stable_source_id"] and record["stable_requirement_seed"] for record in technical_tables)
+    assert all(record["unit_type"] == "requirement" for record in domain_units)
+    assert all(record["source_refs"][0]["source_type"] == "table_row" for record in domain_units)
+    assert all(record["source_refs"][1]["source_type"] == "technical_table_unit" for record in domain_units)
+    assert all(record["stable_source_id"] and record["stable_requirement_seed"] for record in domain_units)
+
+    fields_by_id = {record["normalized_fields"]["requirement_id"]: record["normalized_fields"] for record in domain_units}
+    assert fields_by_id["NVMe-IO-6"]["requirement_family"] == "nvme"
+    assert fields_by_id["NVMe-IO-6"]["related_command"] == "Write Zeroes"
+    assert fields_by_id["STD-LOG-1"]["requirement_family"] == "log_page"
+    assert fields_by_id["STD-LOG-1"]["related_log_identifier"] == "01h"
+    assert fields_by_id["NVMe-OPT-2"]["related_feature_identifier"] == "0Eh"
+    assert fields_by_id["TEL-1"]["requirement_family"] == "telemetry"
+    assert fields_by_id["TEL-1"]["related_statistic_identifier"] == "0001h"
+    assert fields_by_id["SEC-43"]["related_security_protocol"] == "SPDM"
+    assert fields_by_id["FF-1"]["related_form_factor"] == "E1.S"
+    assert {"NVMe-IO-6", "STD-LOG-1", "NVMe-OPT-2", "TEL-1", "SEC-43", "FF-1"} <= {
+        record["requirement_id"] for record in traces
+    }
