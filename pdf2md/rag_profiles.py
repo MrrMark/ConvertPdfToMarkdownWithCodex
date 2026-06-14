@@ -10,14 +10,19 @@ RagPurposeProfile = Literal[
     "preserve",
     "rag_optimized",
     "technical_spec_rag",
+    "technical_spec_rag_visual",
     "confidential_rag",
     "preserve_with_sidecars",
 ]
 DEFAULT_RAG_PURPOSE_PROFILE: RagPurposeProfile = "preserve"
+TECHNICAL_SPEC_RAG_PROFILE = "technical_spec_rag"
+TECHNICAL_SPEC_RAG_VISUAL_PROFILE = "technical_spec_rag_visual"
+TECHNICAL_SPEC_RAG_PROFILES = (TECHNICAL_SPEC_RAG_PROFILE, TECHNICAL_SPEC_RAG_VISUAL_PROFILE)
 SUPPORTED_RAG_PURPOSE_PROFILES: tuple[RagPurposeProfile, ...] = (
     "preserve",
     "rag_optimized",
-    "technical_spec_rag",
+    TECHNICAL_SPEC_RAG_PROFILE,
+    TECHNICAL_SPEC_RAG_VISUAL_PROFILE,
     "confidential_rag",
     "preserve_with_sidecars",
 )
@@ -71,7 +76,7 @@ def rag_profile_options(profile: RagPurposeProfile | str | None) -> RagProfileOp
             rag_merge_sibling_text_chunks=True,
             rag_chunk_relationship_metadata=True,
         )
-    if normalized == "technical_spec_rag":
+    if normalized == TECHNICAL_SPEC_RAG_PROFILE:
         return RagProfileOptions(
             rag_table_output=RagTableOutputMode.BOTH.value,
             keep_page_markers=True,
@@ -81,6 +86,22 @@ def rag_profile_options(profile: RagPurposeProfile | str | None) -> RagProfileOp
             rag_contextual_embedding_text=True,
             rag_merge_sibling_text_chunks=True,
             rag_chunk_relationship_metadata=True,
+        )
+    if normalized == TECHNICAL_SPEC_RAG_VISUAL_PROFILE:
+        return RagProfileOptions(
+            rag_table_output=RagTableOutputMode.BOTH.value,
+            keep_page_markers=True,
+            remove_header_footer=True,
+            repair_hyphenation=True,
+            retrieval_tokenizer="regex",
+            rag_contextual_embedding_text=True,
+            rag_merge_sibling_text_chunks=True,
+            rag_chunk_relationship_metadata=True,
+            rag_figure_text_chunks=True,
+            figure_region_ocr=True,
+            rag_generated_figure_descriptions=True,
+            figure_description_backend="local-vlm",
+            figure_structure_extraction=True,
         )
     if normalized == "confidential_rag":
         return RagProfileOptions(

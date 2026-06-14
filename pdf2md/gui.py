@@ -230,6 +230,7 @@ class Pdf2MdGuiApp:
                 ("preserve", "preset_preserve"),
                 ("rag_optimized", "preset_rag_optimized"),
                 ("technical_spec_rag", "preset_technical_spec_rag"),
+                ("technical_spec_rag_visual", "preset_technical_spec_rag_visual"),
                 (ASSETLESS_TECHNICAL_SPEC_RAG_PRESET, "preset_assetless_technical_spec_rag"),
                 ("confidential_rag", "preset_confidential_rag"),
                 ("preserve_with_sidecars", "preset_preserve_with_sidecars"),
@@ -772,7 +773,7 @@ class Pdf2MdGuiApp:
     def _options(self, *, strict_page_workers: bool = True) -> GuiConversionOptions:
         normalized_preset = normalize_preset(self.option_preset.get())
         rag_profile = (
-            "technical_spec_rag"
+            "technical_spec_rag_visual"
             if normalized_preset == ASSETLESS_TECHNICAL_SPEC_RAG_PRESET
             else (normalized_preset if normalized_preset != "custom" else "preserve")
         )

@@ -19,7 +19,7 @@ from pdf2md.models import (
     TableMode,
 )
 from pdf2md.pipeline import ConversionResult, run_conversion
-from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, rag_profile_options
+from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, TECHNICAL_SPEC_RAG_PROFILES, rag_profile_options
 
 
 SERVER_NAME = "pdf2md"
@@ -195,10 +195,10 @@ def _build_config(
     selected_domain_adapter = domain_adapter if domain_adapter is not None else profile_options.domain_adapter
     if (
         require_domain_adapter_for_technical_profile
-        and rag_profile == "technical_spec_rag"
+        and rag_profile in TECHNICAL_SPEC_RAG_PROFILES
         and selected_domain_adapter == DomainAdapterMode.NONE.value
     ):
-        raise ValueError("technical_spec_rag requires a non-none domain_adapter when strict validation is enabled.")
+        raise ValueError("technical spec RAG profiles require a non-none domain_adapter when strict validation is enabled.")
 
     selected_image_mode = image_mode if image_mode is not None else profile_options.image_mode
     selected_rag_figure_text = profile_options.rag_figure_text_chunks
@@ -608,6 +608,17 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
             "rag_profile='technical_spec_rag', "
             f"domain_adapter={domain_adapter!r}), then validate the output. "
             "Report domain sidecar availability, table/requirement counts, and actionable warnings only."
+        )
+
+    @mcp.prompt()
+    def convert_visual_technical_spec(input_pdf: str, output_dir: str, domain_adapter: str) -> str:
+        """Prompt for storage/security technical-spec RAG conversion with visual sidecars."""
+        return (
+            "Convert this technical specification with figure evidence enabled and conservative provenance handling. "
+            f"Use pdf2md_convert_pdf(input_pdf={input_pdf!r}, output_dir={output_dir!r}, "
+            "rag_profile='technical_spec_rag_visual', "
+            f"domain_adapter={domain_adapter!r}), then validate the output. "
+            "Report visual sidecar counts, domain sidecar availability, and actionable warnings only."
         )
 
     @mcp.prompt()

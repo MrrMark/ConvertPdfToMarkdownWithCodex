@@ -88,6 +88,15 @@ Stable nested fields:
 - `tables[].continuation_group`, `continued_from_page`, `continued_to_page`, `continuation_confidence`
 - `tables[].continuation_reasons`, `continuation_rejected_reasons`, `continuation_features`
 
+Supported `options.rag_profile` values:
+
+- `preserve`
+- `rag_optimized`
+- `technical_spec_rag`
+- `technical_spec_rag_visual`
+- `confidential_rag`
+- `preserve_with_sidecars`
+
 ## report.json
 
 Required:
@@ -152,6 +161,14 @@ Assetless figure text summary fields:
 - `figure_structure_extraction`: present and `true` when `--figure-structure-extraction` was enabled.
 - `figure_structure_record_count`, `figure_structure_file_count`, `figure_structure_low_confidence_count`, `figure_structure_skipped_no_structure_count`, `figure_structure_chunk_record_count`: conservative figure structure sidecar and chunk counters.
 - `manual_domain_adapter_label`, `manual_domain_adapter_keywords`: present only when `--domain-adapter manual` was selected and those inputs were provided.
+
+Visual retrieval chunk contract:
+
+- `chunk_type="figure_text"` must include a `source_refs[]` entry whose `source_type` is `figure` or `excluded_figure`.
+- `chunk_type="figure_description"` must include both figure provenance and `figure_description` provenance in `source_refs[]`.
+- `chunk_type="figure_description"` must carry `generated_text=true` and `generation_strategy="deterministic_context_summary"`.
+- `chunk_type="figure_structure"` must include both figure provenance and `figure_structure` provenance in `source_refs[]`.
+- Visual chunks must not embed image bytes or local PDF paths. Image identity is represented by sidecar refs, page, bbox, and optional asset-relative path in `figures_rag.jsonl`.
 
 `summary.table_quality[]` optional diagnostics:
 
@@ -316,6 +333,21 @@ Stable summary fields:
 - `traceability_record_count`
 - `technical_table_unit_count`
 - `domain_unit_count`
+- `figure_rag_record_count`
+- `figure_text_chunk_record_count`
+- `figure_description_record_count`
+- `figure_description_chunk_record_count`
+- `figure_structure_record_count`
+- `figure_structure_chunk_record_count`
+- `figure_region_ocr_attempted_count`
+- `figure_region_ocr_promoted_label_count`
+- `figure_region_ocr_runtime_unavailable_count`
+- `visual_eval_status`
+- `visual_eval_passed`
+- `visual_eval_query_count`
+- `visual_eval_hit_at_k`
+- `visual_eval_expected_source_coverage`
+- `visual_eval_figure_source_ref_coverage`
 - `contract_validation_status`
 - `contract_validation_passed`
 - `command_set_eval_status`
@@ -329,8 +361,10 @@ Policy:
 
 - This report covers the latest NVMe Base and NVM Command Set benchmark paths under the same `technical_spec_rag + domain_adapter=nvme` contract.
 - `full_precision` is for whole-document local evaluation. `fast_smoke` defaults to the first five pages unless `--pages` overrides it.
+- `--visual-mode` switches the conversion option matrix to `technical_spec_rag_visual` and records visual sidecar counts plus aggregate visual eval metrics.
 - For `spec_document_type="nvm_command_set"`, `command_set_eval` records the P2 local query gate for representative `command_opcode`, `command_dword_field`, `command_pointer_field`, and `status_code` rows.
 - `command_set_eval` is metrics-only: status, pass/fail, query count, required/covered/missing unit types, and aggregate retrieval metrics such as `hit_at_k`, `mrr`, `expected_source_coverage`, and `table_field_coverage`.
+- `visual_eval` is metrics-only: status, pass/fail, query count, `hit_at_k`, `expected_source_coverage`, and `figure_source_ref_coverage`. Query strings and retrieved text are not included.
 - The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, sanitized SSD contract status, and sanitized Command Set eval status only.
 - Raw spec text, raw Markdown body, generated query strings, retrieved chunk text, table row content, image bytes, and local input PDF paths are not embedded.
 - The converted output directory is referenced by label only (`conversion`); keep the source PDF and full converted output outside committed fixtures unless intentionally creating sanitized test artifacts.
@@ -365,6 +399,21 @@ Stable summary fields:
 - `technical_table_unit_count`
 - `domain_unit_count`
 - `ocp_requirement_unit_count`
+- `figure_rag_record_count`
+- `figure_text_chunk_record_count`
+- `figure_description_record_count`
+- `figure_description_chunk_record_count`
+- `figure_structure_record_count`
+- `figure_structure_chunk_record_count`
+- `figure_region_ocr_attempted_count`
+- `figure_region_ocr_promoted_label_count`
+- `figure_region_ocr_runtime_unavailable_count`
+- `visual_eval_status`
+- `visual_eval_passed`
+- `visual_eval_query_count`
+- `visual_eval_hit_at_k`
+- `visual_eval_expected_source_coverage`
+- `visual_eval_figure_source_ref_coverage`
 - `contract_validation_status`
 - `contract_validation_passed`
 - `ocp_eval_status`
@@ -380,8 +429,10 @@ Policy:
 
 - This report covers the latest OCP Datacenter NVMe SSD benchmark path under `technical_spec_rag + domain_adapter=ocp`.
 - OCP validation requires requirement domain units with normalized `requirement_id`, `requirement_prefix`, `requirement_family`, and source table row metadata.
+- `--visual-mode` switches the conversion option matrix to `technical_spec_rag_visual` and records visual sidecar counts plus aggregate visual eval metrics.
 - `ocp_eval` records the P2 local query gate for representative OCP requirement, log page, feature, telemetry, security, and form-factor/thermal buckets.
 - `ocp_eval` is metrics-only: status, pass/fail, query count, required/covered/missing buckets, and aggregate retrieval metrics such as `hit_at_k`, `mrr`, `expected_source_coverage`, and `table_field_coverage`.
+- `visual_eval` is metrics-only: status, pass/fail, query count, `hit_at_k`, `expected_source_coverage`, and `figure_source_ref_coverage`. Query strings and retrieved text are not included.
 - The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, sanitized SSD contract status, and sanitized OCP eval status only.
 - Raw spec text, raw Markdown body, generated query strings, retrieved chunk text, table row content, image bytes, and local input PDF paths are not embedded.
 

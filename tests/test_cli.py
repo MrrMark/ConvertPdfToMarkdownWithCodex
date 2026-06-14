@@ -102,6 +102,45 @@ def test_cli_technical_spec_profile_without_domain_adapter_emits_advisory(
     assert report["summary"]["advisory_warning_count"] == 1
 
 
+def test_cli_visual_technical_spec_profile_enables_visual_sidecars(
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "cli-technical-visual"
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--pages",
+        "1",
+        "--rag-profile",
+        "technical_spec_rag_visual",
+        "--domain-adapter",
+        "nvme",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["rag_profile"] == "technical_spec_rag_visual"
+    assert manifest["options"]["image_mode"] == "referenced"
+    assert manifest["options"]["rag_figure_text_chunks"] is True
+    assert manifest["options"]["figure_region_ocr"] is True
+    assert manifest["options"]["rag_generated_figure_descriptions"] is True
+    assert manifest["options"]["figure_structure_extraction"] is True
+    assert (output_dir / "figure_descriptions_rag.jsonl").exists()
+    assert (output_dir / "figure_structures_rag.jsonl").exists()
+    assert report["summary"]["rag_figure_text_chunks"] is True
+    assert report["summary"]["figure_region_ocr"] is True
+    assert report["summary"]["rag_generated_figure_descriptions"] is True
+    assert report["summary"]["figure_structure_extraction"] is True
+
+
 def test_cli_technical_spec_profile_strict_mode_requires_domain_adapter(
     sample_pdf: Path,
     tmp_path: Path,
@@ -124,7 +163,7 @@ def test_cli_technical_spec_profile_strict_mode_requires_domain_adapter(
     completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
 
     assert completed.returncode == 2
-    assert "requires --domain-adapter" in completed.stderr
+    assert "technical spec RAG profiles require --domain-adapter" in completed.stderr
 
 
 def test_cli_uses_default_output_dir_when_output_dir_is_omitted(sample_pdf: Path) -> None:

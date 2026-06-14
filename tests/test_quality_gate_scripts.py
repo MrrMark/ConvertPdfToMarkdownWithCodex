@@ -392,23 +392,33 @@ def test_latest_nvme_base_benchmark_writes_sanitized_summary(tmp_path: Path) -> 
     assert report["option_matrix"]["command_set_query_eval"]["enabled"] is False
     assert report["option_matrix"]["domain_adapter"] == "nvme"
     assert report["option_matrix"]["image_mode"] == "placeholder"
+    assert report["option_matrix"]["visual_mode"] is False
+    assert report["option_matrix"]["rag_figure_text_chunks"] is False
     assert counts["page_count"] == 5
     assert counts["retrieval_chunk_count"] > 0
     assert counts["requirement_count"] > 0
     assert counts["traceability_record_count"] >= 3
     assert counts["technical_table_unit_count"] >= 4
     assert counts["domain_unit_count"] >= 4
+    assert counts["figure_text_chunk_record_count"] == 0
+    assert counts["figure_description_chunk_record_count"] == 0
+    assert counts["figure_structure_chunk_record_count"] == 0
     assert counts["contract_validation_status"] == "passed"
     assert counts["contract_validation_passed"] is True
     assert counts["command_set_eval_status"] == "not_applicable"
     assert counts["command_set_eval_passed"] is True
+    assert counts["visual_eval_status"] == "not_applicable"
+    assert counts["visual_eval_passed"] is True
     assert report["command_set_eval"]["queries_included"] is False
     assert report["command_set_eval"]["retrieved_text_included"] is False
+    assert report["visual_eval"]["queries_included"] is False
+    assert report["visual_eval"]["retrieved_text_included"] is False
     assert counts["sidecar_file_sizes"]["retrieval_chunks_rag.jsonl"] > 0
     assert report["raw_content_included"] is False
     assert report["image_bytes_included"] is False
     assert report["local_input_paths_included"] is False
     assert "Raw PDF text, raw Markdown body, generated queries, retrieved text, image bytes" in scorecard
+    assert "| figure_rag_record_count |" in scorecard
 
     serialized = json.dumps(report, ensure_ascii=False, sort_keys=True)
     assert str(input_pdf) not in serialized
@@ -438,6 +448,7 @@ def test_latest_nvme_command_spec_benchmark_uses_same_contract(tmp_path: Path) -
     assert report["source_url"].endswith("NVM-Express-NVM-Command-Set-Specification-Revision-1.2-2025.08.01-Ratified.pdf")
     assert report["option_matrix"]["domain_adapter"] == "nvme"
     assert report["option_matrix"]["rag_profile"] == "technical_spec_rag"
+    assert report["option_matrix"]["visual_mode"] is False
     assert report["option_matrix"]["command_set_query_eval"]["enabled"] is True
     assert counts["retrieval_chunk_count"] > 0
     assert counts["technical_table_unit_count"] >= 4
@@ -505,6 +516,8 @@ def test_latest_ocp_datacenter_nvme_ssd_benchmark_writes_sanitized_summary(tmp_p
     assert report["option_matrix"]["domain_adapter"] == "ocp"
     assert report["option_matrix"]["rag_profile"] == "technical_spec_rag"
     assert report["option_matrix"]["image_mode"] == "placeholder"
+    assert report["option_matrix"]["visual_mode"] is False
+    assert report["option_matrix"]["rag_figure_text_chunks"] is False
     assert report["option_matrix"]["contract_validator"]["ssd_agent_spec_type"] == "OCP"
     assert report["option_matrix"]["ocp_query_eval"]["enabled"] is True
     assert report["option_matrix"]["ocp_query_eval"]["profile"] == "ocp_datacenter_nvme_ssd_p2_retrieval"
@@ -514,10 +527,15 @@ def test_latest_ocp_datacenter_nvme_ssd_benchmark_writes_sanitized_summary(tmp_p
     assert counts["technical_table_unit_count"] >= 6
     assert counts["domain_unit_count"] >= 6
     assert counts["ocp_requirement_unit_count"] >= 6
+    assert counts["figure_text_chunk_record_count"] == 0
+    assert counts["figure_description_chunk_record_count"] == 0
+    assert counts["figure_structure_chunk_record_count"] == 0
     assert counts["contract_validation_status"] == "passed"
     assert counts["contract_validation_passed"] is True
     assert counts["ocp_eval_status"] == "passed"
     assert counts["ocp_eval_passed"] is True
+    assert counts["visual_eval_status"] == "not_applicable"
+    assert counts["visual_eval_passed"] is True
     assert counts["ocp_eval_query_count"] == 6
     assert counts["ocp_eval_expected_source_coverage"] == 1.0
     assert counts["ocp_eval_hit_at_k"] == 1.0
@@ -555,6 +573,9 @@ def test_latest_ocp_datacenter_nvme_ssd_benchmark_distinguishes_full_and_smoke_m
 
     assert full["pages"] is None
     assert full["image_mode"] == "referenced"
+    assert full["visual_mode"] is False
+    assert full["rag_profile"] == "technical_spec_rag"
+    assert full["rag_figure_text_chunks"] is False
     assert full["page_workers"] == 2
     assert full["domain_adapter"] == "ocp"
     assert full["ocp_query_eval"]["enabled"] is True
@@ -569,6 +590,20 @@ def test_latest_ocp_datacenter_nvme_ssd_benchmark_distinguishes_full_and_smoke_m
     assert smoke["pages"] == "1-5"
     assert smoke["image_mode"] == "placeholder"
     assert smoke["contract_validator"]["ssd_agent_spec_type"] == "OCP"
+
+    visual = run_latest_ocp_datacenter_nvme_ssd_benchmark.build_option_matrix(
+        mode=run_latest_ocp_datacenter_nvme_ssd_benchmark.FULL_PRECISION_MODE,
+        pages=None,
+        page_workers=1,
+        visual_mode=True,
+    )
+    assert visual["visual_mode"] is True
+    assert visual["rag_profile"] == "technical_spec_rag_visual"
+    assert visual["image_mode"] == "referenced"
+    assert visual["rag_figure_text_chunks"] is True
+    assert visual["figure_region_ocr"] is True
+    assert visual["rag_generated_figure_descriptions"] is True
+    assert visual["figure_structure_extraction"] is True
 
 
 def test_latest_nvme_base_benchmark_distinguishes_full_and_smoke_modes() -> None:
@@ -587,6 +622,9 @@ def test_latest_nvme_base_benchmark_distinguishes_full_and_smoke_modes() -> None
 
     assert full["pages"] is None
     assert full["image_mode"] == "referenced"
+    assert full["visual_mode"] is False
+    assert full["rag_profile"] == "technical_spec_rag"
+    assert full["rag_figure_text_chunks"] is False
     assert full["spec_document_type"] == "base"
     assert full["command_set_query_eval"]["enabled"] is False
     assert smoke["pages"] == "1-5"
@@ -599,6 +637,22 @@ def test_latest_nvme_base_benchmark_distinguishes_full_and_smoke_modes() -> None
         "command_pointer_field",
         "status_code",
     ]
+
+    visual = run_latest_nvme_base_benchmark.build_option_matrix(
+        mode=run_latest_nvme_base_benchmark.FULL_PRECISION_MODE,
+        pages=None,
+        page_workers=1,
+        spec_document_type=run_latest_nvme_base_benchmark.NVM_COMMAND_SET_SPEC_DOCUMENT,
+        visual_mode=True,
+    )
+    assert visual["visual_mode"] is True
+    assert visual["rag_profile"] == "technical_spec_rag_visual"
+    assert visual["image_mode"] == "referenced"
+    assert visual["rag_figure_text_chunks"] is True
+    assert visual["figure_region_ocr"] is True
+    assert visual["rag_generated_figure_descriptions"] is True
+    assert visual["figure_structure_extraction"] is True
+    assert visual["command_set_query_eval"]["enabled"] is True
 
 
 def test_docling_comparison_can_require_installed_docling(

@@ -255,7 +255,7 @@ def test_windows_quickstart_covers_install_cli_and_gui() -> None:
     assert "pdf2md-gui" in guide
     assert "python -m pdf2md.gui --doctor" in guide
     assert "이미지 업로드 불가 RAG 대응" in guide
-    assert "--image-mode placeholder --rag-figure-text-chunks" in guide
+    assert "--rag-profile technical_spec_rag_visual --image-mode placeholder" in guide
     assert "Domain=manual" in guide
     assert "Python 3.14`와 `.venv314`" in guide
     assert "winget`으로 `Python.Python.3.14` 설치" in guide

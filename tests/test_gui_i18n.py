@@ -15,6 +15,7 @@ def test_gui_i18n_supports_english_catalog() -> None:
     assert translate("en", "start_conversion") == "Start conversion"
     assert translate("en", "preset_rag_optimized") == "RAG optimized"
     assert translate("en", "preset_technical_spec_rag") == "Technical spec RAG"
+    assert translate("en", "preset_technical_spec_rag_visual") == "Visual technical spec RAG"
     assert translate("en", "preset_assetless_technical_spec_rag") == "Assetless technical RAG"
 
 
@@ -25,6 +26,7 @@ def test_gui_i18n_formats_placeholders_and_falls_back() -> None:
     assert translate("ko", "page_progress", current=1, total=3, percent=33, page=1) == "페이지 1/3 (33%) 1쪽"
     assert translate("ko", "conversion_finished_percent", percent="100%") == "변환 완료 (100%)"
     assert translate("ko", "reuse_unchanged") == "변경 없는 문서 재사용"
+    assert translate("ko", "preset_technical_spec_rag_visual") == "기술 스펙 Visual RAG"
     assert translate("ko", "preset_assetless_technical_spec_rag") == "이미지 업로드 불가 RAG 대응"
     assert translate("en", "open_corpus_diff") == "Open Corpus Diff"
     assert translate("ko", "missing_key") == "missing_key"

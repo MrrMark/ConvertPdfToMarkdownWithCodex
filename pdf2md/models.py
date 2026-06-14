@@ -693,6 +693,21 @@ class LatestNvmeSpecBenchmarkSummary(BaseModel):
     traceability_record_count: int = 0
     technical_table_unit_count: int = 0
     domain_unit_count: int = 0
+    figure_rag_record_count: int = 0
+    figure_text_chunk_record_count: int = 0
+    figure_description_record_count: int = 0
+    figure_description_chunk_record_count: int = 0
+    figure_structure_record_count: int = 0
+    figure_structure_chunk_record_count: int = 0
+    figure_region_ocr_attempted_count: int = 0
+    figure_region_ocr_promoted_label_count: int = 0
+    figure_region_ocr_runtime_unavailable_count: int = 0
+    visual_eval_status: str = "not_applicable"
+    visual_eval_passed: bool = True
+    visual_eval_query_count: int = 0
+    visual_eval_hit_at_k: float = 0.0
+    visual_eval_expected_source_coverage: float = 0.0
+    visual_eval_figure_source_ref_coverage: float = 0.0
     contract_validation_status: str = "not_run"
     contract_validation_passed: bool = False
     command_set_eval_status: str = "not_applicable"
@@ -730,6 +745,7 @@ class LatestNvmeSpecBenchmarkReport(BaseModel):
     sidecars: dict[str, Any] = Field(default_factory=dict)
     contract_validation: dict[str, Any] = Field(default_factory=dict)
     command_set_eval: dict[str, Any] = Field(default_factory=dict)
+    visual_eval: dict[str, Any] = Field(default_factory=dict)
 
 
 class LatestOcpDatacenterNvmeSsdBenchmarkSummary(BaseModel):
@@ -744,6 +760,21 @@ class LatestOcpDatacenterNvmeSsdBenchmarkSummary(BaseModel):
     technical_table_unit_count: int = 0
     domain_unit_count: int = 0
     ocp_requirement_unit_count: int = 0
+    figure_rag_record_count: int = 0
+    figure_text_chunk_record_count: int = 0
+    figure_description_record_count: int = 0
+    figure_description_chunk_record_count: int = 0
+    figure_structure_record_count: int = 0
+    figure_structure_chunk_record_count: int = 0
+    figure_region_ocr_attempted_count: int = 0
+    figure_region_ocr_promoted_label_count: int = 0
+    figure_region_ocr_runtime_unavailable_count: int = 0
+    visual_eval_status: str = "not_applicable"
+    visual_eval_passed: bool = True
+    visual_eval_query_count: int = 0
+    visual_eval_hit_at_k: float = 0.0
+    visual_eval_expected_source_coverage: float = 0.0
+    visual_eval_figure_source_ref_coverage: float = 0.0
     contract_validation_status: str = "not_run"
     contract_validation_passed: bool = False
     ocp_eval_status: str = "not_run"
@@ -783,6 +814,7 @@ class LatestOcpDatacenterNvmeSsdBenchmarkReport(BaseModel):
     sidecars: dict[str, Any] = Field(default_factory=dict)
     contract_validation: dict[str, Any] = Field(default_factory=dict)
     ocp_eval: dict[str, Any] = Field(default_factory=dict)
+    visual_eval: dict[str, Any] = Field(default_factory=dict)
 
 
 class OCRBackendDependency(BaseModel):

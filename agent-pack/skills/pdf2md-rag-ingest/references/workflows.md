@@ -9,9 +9,10 @@ Choose conservative defaults. If a request is ambiguous, prefer source preservat
 | Basic Markdown conversion | `--rag-profile preserve` or no profile override |
 | General RAG ingest | `--rag-profile rag_optimized` |
 | Technical specification RAG | `--rag-profile technical_spec_rag --domain-adapter <adapter>` |
+| Technical specification RAG with visual sidecars | `--rag-profile technical_spec_rag_visual --domain-adapter <adapter>` |
 | Confidential/customer evidence pack | `--rag-profile confidential_rag` |
 | Preserve Markdown while emitting sidecars | `--rag-profile preserve_with_sidecars` |
-| Image upload is not supported by target RAG | `--image-mode placeholder --rag-figure-text-chunks` |
+| Image upload is not supported by target RAG | `--rag-profile technical_spec_rag_visual --image-mode placeholder` |
 | Fast core artifact generation | `--output-profile fast` |
 
 ## Domain Adapters
