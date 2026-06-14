@@ -94,15 +94,21 @@ def test_ocp_datacenter_nvme_ssd_contract_is_documented() -> None:
     output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
     rag_recipes = Path("docs/RAG_INDEXER_INTEGRATION_RECIPES.md").read_text(encoding="utf-8")
     ocp_spec = Path("docs/OCP_DATACENTER_NVME_SSD_RAG_ADAPTER_DEVELOPMENT_SPEC.md").read_text(encoding="utf-8")
+    ocp_handoff = Path("docs/OCP_SPEC_ANALYSIS_AGENT_HANDOFF.md").read_text(encoding="utf-8")
 
     assert "latest_ocp_datacenter_nvme_ssd_benchmark_report.json" in output_schema
     assert "technical_spec_rag + domain_adapter=ocp" in output_schema
     assert "`requirement_id`, `requirement_prefix`, `requirement_family`" in output_schema
+    assert "`ocp_eval` records the P2 local query gate" in output_schema
     assert "run_latest_ocp_datacenter_nvme_ssd_benchmark.py" in rag_recipes
     assert "--ssd-agent-spec-type OCP --domain-adapter ocp" in rag_recipes
+    assert "--fail-on-ocp-eval-error" in rag_recipes
     assert "Official source URL은 `https://www.opencompute.org/documents/datacenter-nvme-ssd-specification-v2-7-final-pdf-1`" in rag_recipes
     assert "OCP Datacenter NVMe SSD RAG Adapter Development Spec" in ocp_spec
     assert "P0-1: Official OCP benchmark wrapper and sanitized report model." in ocp_spec
+    assert "OCP SpecAnalysisAgent Handoff" in ocp_handoff
+    assert "`related_statistic_identifier`" in ocp_handoff
+    assert "`ocp_eval`은 query/result 원문을 저장하지 않고 aggregate metric만 저장" in ocp_handoff
 
 
 def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:

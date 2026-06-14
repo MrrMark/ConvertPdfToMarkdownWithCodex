@@ -320,6 +320,26 @@ OCP 전용 adapter는 `requirement`만 만들지 않고, agent filter/rerank에 
 7. P2-2: official full PDF validation and scorecard.
 8. P3: SpecAnalysisAgent handoff recipe.
 
+## 7.1 Implementation Status
+
+Current status:
+
+- P0 completed: official OCP benchmark wrapper, synthetic fixture/golden, normalized requirement fields, and OCP deep contract validation are implemented.
+- Official full validation completed locally against `Datacenter NVMe SSD Specification v2.7 Final.pdf`: 253 pages, `contract_validation_passed=true`, `error_count=0`.
+- P1 completed: OCP requirement chunks keep source `text` unchanged and use metadata-only `embedding_text` context for requirement ID, family, section context, related command/log/feature/statistic/security/form-factor hints.
+- P2 completed: `ocp_datacenter_nvme_ssd_p2_retrieval` metrics-only eval gate is implemented with required buckets for requirement, log page, feature, telemetry, security, and form-factor/thermal requirements.
+- P3 completed: `docs/OCP_SPEC_ANALYSIS_AGENT_HANDOFF.md` documents the `SpecAnalysisAgent` handoff contract and representative question set.
+
+Latest local full benchmark result:
+
+- `page_count=253`
+- `domain_unit_count=1722`
+- `ocp_requirement_unit_count=1722`
+- `ocp_eval_query_count=6`
+- `ocp_eval_expected_source_coverage=1.0`
+- `ocp_eval_hit_at_k=1.0`
+- `ocp_eval_table_field_coverage=1.0`
+
 ## 8. Test Plan
 
 Required local tests:

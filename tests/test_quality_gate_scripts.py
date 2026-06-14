@@ -506,7 +506,8 @@ def test_latest_ocp_datacenter_nvme_ssd_benchmark_writes_sanitized_summary(tmp_p
     assert report["option_matrix"]["rag_profile"] == "technical_spec_rag"
     assert report["option_matrix"]["image_mode"] == "placeholder"
     assert report["option_matrix"]["contract_validator"]["ssd_agent_spec_type"] == "OCP"
-    assert report["option_matrix"]["ocp_query_eval"]["enabled"] is False
+    assert report["option_matrix"]["ocp_query_eval"]["enabled"] is True
+    assert report["option_matrix"]["ocp_query_eval"]["profile"] == "ocp_datacenter_nvme_ssd_p2_retrieval"
     assert counts["page_count"] == 5
     assert counts["retrieval_chunk_count"] > 0
     assert counts["traceability_record_count"] >= 6
@@ -515,17 +516,29 @@ def test_latest_ocp_datacenter_nvme_ssd_benchmark_writes_sanitized_summary(tmp_p
     assert counts["ocp_requirement_unit_count"] >= 6
     assert counts["contract_validation_status"] == "passed"
     assert counts["contract_validation_passed"] is True
+    assert counts["ocp_eval_status"] == "passed"
+    assert counts["ocp_eval_passed"] is True
+    assert counts["ocp_eval_query_count"] == 6
+    assert counts["ocp_eval_expected_source_coverage"] == 1.0
+    assert counts["ocp_eval_hit_at_k"] == 1.0
+    assert counts["ocp_eval_table_field_coverage"] == 1.0
+    assert report["ocp_eval"]["status"] == "passed"
+    assert report["ocp_eval"]["missing_buckets"] == []
+    assert report["ocp_eval"]["queries_included"] is False
+    assert report["ocp_eval"]["retrieved_text_included"] is False
     assert counts["sidecar_file_sizes"]["domain_units_rag.jsonl"] > 0
     assert report["raw_content_included"] is False
     assert report["image_bytes_included"] is False
     assert report["local_input_paths_included"] is False
     assert "Raw PDF text, raw Markdown body, generated queries, retrieved text, image bytes" in scorecard
     assert "| ocp_requirement_unit_count |" in scorecard
+    assert "| ocp_eval_status | passed |" in scorecard
 
     serialized = json.dumps(report, ensure_ascii=False, sort_keys=True)
     assert str(input_pdf) not in serialized
     assert "SSD shall support Write Zeroes command" not in serialized
     assert "Requirement ID = NVMe-IO-6" not in serialized
+    assert "log_page_requirement NVMe-IO-6" not in serialized
 
 
 def test_latest_ocp_datacenter_nvme_ssd_benchmark_distinguishes_full_and_smoke_modes() -> None:
@@ -544,6 +557,15 @@ def test_latest_ocp_datacenter_nvme_ssd_benchmark_distinguishes_full_and_smoke_m
     assert full["image_mode"] == "referenced"
     assert full["page_workers"] == 2
     assert full["domain_adapter"] == "ocp"
+    assert full["ocp_query_eval"]["enabled"] is True
+    assert full["ocp_query_eval"]["required_buckets"] == [
+        "requirement",
+        "log_page_requirement",
+        "feature_requirement",
+        "telemetry_requirement",
+        "security_requirement",
+        "form_factor_or_thermal_requirement",
+    ]
     assert smoke["pages"] == "1-5"
     assert smoke["image_mode"] == "placeholder"
     assert smoke["contract_validator"]["ssd_agent_spec_type"] == "OCP"

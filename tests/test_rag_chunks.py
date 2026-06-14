@@ -192,6 +192,44 @@ def test_retrieval_chunks_boost_command_spec_context_for_embedding() -> None:
     assert chunks[1]["embedding_text_strategy"] == "technical_table_context_prefix"
 
 
+def test_retrieval_chunks_boost_ocp_requirement_context_without_changing_text() -> None:
+    domain_unit = {
+        "domain_unit_id": "domain-ocp-000001",
+        "domain_unit_index": 1,
+        "domain": "ocp",
+        "unit_type": "requirement",
+        "text": "Requirement ID = STD-LOG-1 | Requirement Description = SSD shall expose Log Identifier 01h.",
+        "source_refs": [{"source_type": "technical_table_unit", "source_id": "tech-table-000001", "page": 2}],
+        "page_range": [2, 2],
+        "normalized_fields": {
+            "requirement_id": "STD-LOG-1",
+            "requirement_prefix": "STD-LOG",
+            "requirement_family": "log_page",
+            "ocp_section_context": "log_page",
+            "related_log_identifier": "01h",
+            "relationship_hints": ["references_nvme_log_page"],
+        },
+    }
+
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        domain_units=[domain_unit],
+        contextual_embedding_text=True,
+        source_sha256="e" * 64,
+    )
+
+    assert chunks[0]["chunk_type"] == "domain_unit"
+    assert chunks[0]["retrieval_priority"] == 98
+    assert chunks[0]["text"] == domain_unit["text"]
+    assert "Requirement ID: STD-LOG-1" in chunks[0]["embedding_text"]
+    assert "Requirement family: log_page" in chunks[0]["embedding_text"]
+    assert "Related log identifier: 01h" in chunks[0]["embedding_text"]
+    assert chunks[0]["embedding_text_strategy"] == "domain_unit_context_prefix"
+
+
 def test_retrieval_chunks_mark_review_only_traceability_records() -> None:
     trace = {
         "trace_id": "req-trace-000001",

@@ -115,7 +115,11 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     )
     assert latest_ocp_schema["properties"]["purpose"]["default"] == "latest_ocp_datacenter_nvme_ssd_benchmark"
     assert latest_ocp_schema["properties"]["expected_version"]["default"] == "2.7"
+    assert "ocp_eval" in latest_ocp_schema["properties"]
     assert "ocp_requirement_unit_count" in latest_ocp_schema["$defs"][
+        "LatestOcpDatacenterNvmeSsdBenchmarkSummary"
+    ]["properties"]
+    assert "ocp_eval_expected_source_coverage" in latest_ocp_schema["$defs"][
         "LatestOcpDatacenterNvmeSsdBenchmarkSummary"
     ]["properties"]
     ocr_probe_schema = json.loads((output_dir / "ocr_backend_probe_report.schema.json").read_text(encoding="utf-8"))

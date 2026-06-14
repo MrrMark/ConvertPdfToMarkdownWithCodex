@@ -276,15 +276,17 @@ def _ocp_requirement_number(requirement_id: str | None) -> str | None:
 def _ocp_requirement_family(prefix: str | None, text: str) -> str | None:
     upper = str(prefix or "").upper()
     lowered = text.lower()
+    if upper.startswith("NVME-OPT") or "feature identifier" in lowered:
+        return "feature"
     if upper.startswith("NVME"):
         return "nvme"
-    if "LOG" in upper or upper in {"GLP", "SLOG", "ERL"} or "log identifier" in lowered or "log page" in lowered:
+    if "LOG" in upper or upper in {"GLP", "SLOG", "ERL", "SMART"} or "log identifier" in lowered or "log page" in lowered:
         return "log_page"
-    if upper.startswith("TEL") or upper.startswith("LM") or "telemetry" in lowered:
+    if upper.startswith(("TEL", "LM", "STAT", "EVT")) or "telemetry" in lowered or "statistic identifier" in lowered:
         return "telemetry"
     if upper.startswith("CTO") or "command timeout" in lowered:
         return "command_timeout"
-    if upper.startswith("SEC") or upper.startswith("TCG") or upper.startswith("SPDM"):
+    if upper.startswith(("SEC", "TCG", "SPDM", "S1667")):
         return "security"
     if any(protocol.lower() in lowered for protocol in OCP_SECURITY_PROTOCOLS):
         return "security"
@@ -307,6 +309,27 @@ def _ocp_requirement_family(prefix: str | None, text: str) -> str | None:
     if not upper:
         return None
     return re.sub(r"[^a-z0-9]+", "_", upper.lower()).strip("_")
+
+
+def _ocp_section_context(value: str | None, full_text: str) -> str | None:
+    text = f"{value or ''} {full_text}".lower()
+    if "telemetry" in text or "statistic" in text or "event fifo" in text:
+        return "telemetry"
+    if "feature" in text:
+        return "feature"
+    if "log page" in text or "log identifier" in text or "smart" in text:
+        return "log_page"
+    if "security" in text or "spdm" in text or "tcg" in text:
+        return "security"
+    if "thermal" in text:
+        return "thermal"
+    if "form factor" in text or any(form_factor.lower() in text for form_factor in OCP_FORM_FACTORS):
+        return "form_factor"
+    if "pcie" in text or "pci express" in text:
+        return "pcie"
+    if "nvme" in text:
+        return "nvme"
+    return None
 
 
 def _ocp_normative_strength(text: str) -> str | None:
@@ -905,6 +928,10 @@ def _normalized_domain_fields(
                 "normative_strength": _ocp_normative_strength(full_text),
                 "ssd_requirement_status": _cell_value(cells, "SSD", "Required", "Optional", "Status"),
                 "ocp_profile": _cell_value(cells, "OCP Profile", "Profile", "SSD Profile"),
+                "ocp_section_context": _ocp_section_context(
+                    fields.get("section_path") or _cell_value(cells, "Section", "Clause"),
+                    full_text,
+                ),
                 "topic": family,
                 "related_command": related_command,
                 "related_log_identifier": related_log_identifier,
@@ -915,6 +942,7 @@ def _normalized_domain_fields(
                 "relationship_hints": relationship_hints,
                 "source_table_id": fields.get("source_table_id"),
                 "source_table_row_id": fields.get("source_table_row_id"),
+                "section_path": fields.get("section_path"),
             }
         )
     if domain_adapter is DomainAdapterMode.SPDM:
@@ -1035,6 +1063,7 @@ def build_domain_units(
                             "reset_default": technical_record.get("reset_default"),
                             "source_table_id": technical_record.get("table_id"),
                             "source_table_row_id": technical_record.get("table_row_id"),
+                            "section_path": " > ".join(_heading_path(technical_record)),
                         },
                     ),
                     "source_refs": source_refs,
@@ -1081,6 +1110,7 @@ def build_domain_units(
                         base_fields={
                             "source_table_id": table_row.get("table_id"),
                             "source_table_row_id": table_row.get("table_row_id"),
+                            "section_path": " > ".join(_heading_path(table_row)),
                         },
                     ),
                     "source_refs": [
