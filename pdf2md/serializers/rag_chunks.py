@@ -5,6 +5,7 @@ import re
 from typing import Any, Callable
 
 from pdf2md.serializers.rag_tables import flatten_rag_table_records, normalize_rag_table_payload
+from pdf2md.serializers.rag_stable_ids import source_dedupe_key, with_stable_source_metadata
 
 
 RAG_CHUNK_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+")
@@ -18,6 +19,18 @@ FIGURE_TEXT_CHUNK_TYPE = "figure_text"
 FIGURE_DESCRIPTION_CHUNK_TYPE = "figure_description"
 FIGURE_STRUCTURE_CHUNK_TYPE = "figure_structure"
 FIGURE_TEXT_LOW_CONFIDENCE_THRESHOLD = 0.65
+COMMAND_TECHNICAL_PRIORITIES = {
+    "command_opcode": 96,
+    "command_dword_field": 94,
+    "command_pointer_field": 94,
+    "status_code": 90,
+}
+COMMAND_DOMAIN_PRIORITIES = {
+    "command": 98,
+    "command_dword_field": 97,
+    "command_pointer_field": 97,
+    "status_code": 96,
+}
 TokenCounter = Callable[[str], int]
 
 
@@ -116,10 +129,7 @@ def _ordered_unique_source_refs(records: list[dict[str, Any]]) -> list[dict[str,
 
 
 def _source_dedupe_key(source_refs: list[dict[str, Any]]) -> str | None:
-    dedupe_key = "|".join(
-        sorted(str(ref.get("source_id")) for ref in source_refs if isinstance(ref, dict) and ref.get("source_id"))
-    )
-    return dedupe_key or None
+    return source_dedupe_key(source_refs)
 
 
 def _coerce_bbox(value: Any) -> list[float] | None:
@@ -189,7 +199,7 @@ def _merge_text_records(records: list[dict[str, Any]], token_counter: TokenCount
     first["merge_strategy"] = TEXT_CHUNK_MERGE_STRATEGY
     for split_field in ("parent_chunk_id", "chunk_part_index", "chunk_part_count"):
         first.pop(split_field, None)
-    return first
+    return with_stable_source_metadata(first, source_sha256=str(first.get("source_sha256") or ""))
 
 
 def _flush_merge_buffer(
@@ -400,7 +410,9 @@ def optimize_retrieval_chunks(
             split_record["chunk_boundary_reasons"] = sorted(
                 dict.fromkeys(list(record.get("chunk_boundary_reasons") or []) + ["token_budget_split"])
             )
-            optimized.append(split_record)
+            optimized.append(
+                with_stable_source_metadata(split_record, source_sha256=str(split_record.get("source_sha256") or ""))
+            )
 
     for index, record in enumerate(optimized, start=1):
         record["chunk_id"] = f"chunk-{index:06d}"
@@ -464,7 +476,45 @@ def _make_chunk(
         chunk["generation_strategy"] = generation_strategy
     if derived_from_context is not None:
         chunk["derived_from_context"] = derived_from_context
-    return chunk
+    return with_stable_source_metadata(chunk, source_sha256=source_sha256)
+
+
+def _record_metadata_value(record: dict[str, Any], field: str) -> Any:
+    value = record.get(field)
+    if value is not None and value != "":
+        return value
+    normalized_fields = record.get("normalized_fields")
+    if isinstance(normalized_fields, dict):
+        return normalized_fields.get(field)
+    return None
+
+
+def _format_context_value(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, list):
+        items = [str(item).strip() for item in value if str(item).strip()]
+        return " | ".join(items) if items else None
+    return str(value).strip()
+
+
+def _append_metadata_context(context_parts: list[str], record: dict[str, Any], label: str, field: str) -> None:
+    text = _format_context_value(_record_metadata_value(record, field))
+    if text:
+        context_parts.append(f"{label}: {text}")
+
+
+def _technical_table_retrieval_priority(record: dict[str, Any]) -> int:
+    unit_type = str(record.get("unit_type") or "")
+    priority = COMMAND_TECHNICAL_PRIORITIES.get(unit_type, 88)
+    if unit_type == "status_code" and _record_metadata_value(record, "command_context"):
+        return max(priority, 92)
+    return priority
+
+
+def _domain_unit_retrieval_priority(record: dict[str, Any]) -> int:
+    unit_type = str(record.get("unit_type") or "")
+    return COMMAND_DOMAIN_PRIORITIES.get(unit_type, 96)
 
 
 def _contextual_embedding_text(chunk_type: str, text: str, record: dict[str, Any]) -> str | None:
@@ -486,6 +536,20 @@ def _contextual_embedding_text(chunk_type: str, text: str, record: dict[str, Any
     unit_type = record.get("unit_type")
     if unit_type:
         context_parts.append(f"Unit type: {unit_type}")
+    for label, field in (
+        ("Command context", "command_context"),
+        ("Command scope", "command_scope"),
+        ("Queue type", "queue_type"),
+        ("Related command opcode", "related_command_opcode"),
+        ("Related command unit", "related_command_unit_id"),
+        ("Command dword", "command_dword"),
+        ("Pointer type", "pointer_type"),
+        ("Status code group", "status_code_group"),
+        ("Error class", "error_class"),
+        ("Retry hint", "retry_hint"),
+        ("Relationship hints", "relationship_hints"),
+    ):
+        _append_metadata_context(context_parts, record, label, field)
     if not context_parts:
         return None
     return "\n".join(context_parts + [f"Text: {text}"])
@@ -746,6 +810,13 @@ def build_retrieval_chunks(
         text = str(record.get("text") or "").strip()
         if not text:
             continue
+        candidate_kind = str(record.get("candidate_kind") or "requirement_trace")
+        is_requirement_candidate = record.get("is_requirement_candidate") is not False
+        semantic_types = ["requirement_trace"]
+        if candidate_kind != "requirement_trace":
+            semantic_types.append(candidate_kind)
+        if not is_requirement_candidate:
+            semantic_types.append("review_only")
         append_chunk(
             chunk_type="requirement_trace",
             text=text,
@@ -761,10 +832,11 @@ def build_retrieval_chunks(
             page_range=_page_range_from_record(record),
             bbox=_bbox(record),
             heading_path=_heading_path(record),
-            semantic_types=["requirement_trace"],
+            semantic_types=semantic_types,
             normative_strength=str(record.get("normative_strength") or "unknown"),
-            retrieval_priority=98,
-            boundary_reasons=["traceability_boundary"],
+            retrieval_priority=98 if is_requirement_candidate else 60,
+            boundary_reasons=["traceability_boundary"]
+            + ([] if is_requirement_candidate else ["review_only_trace"]),
             chunk_group_id=f"requirement-trace-page-{_page_range_from_record(record)[0]:04d}",
         )
 
@@ -810,9 +882,13 @@ def build_retrieval_chunks(
             heading_path=_heading_path(record),
             semantic_types=[str(record.get("unit_type") or "domain_unit")],
             normative_strength=None,
-            retrieval_priority=96,
+            retrieval_priority=_domain_unit_retrieval_priority(record),
             boundary_reasons=["domain_unit_boundary"],
             chunk_group_id=f"domain-{record.get('domain') or 'unknown'}",
+            embedding_text=_contextual_embedding_text("domain_unit", text, record)
+            if contextual_embedding_text
+            else None,
+            embedding_text_strategy="domain_unit_context_prefix",
         )
 
     for record in sorted(technical_table_records or [], key=lambda item: int(item.get("technical_table_unit_index") or 0)):
@@ -836,7 +912,7 @@ def build_retrieval_chunks(
             heading_path=_heading_path(record),
             semantic_types=[str(record.get("unit_type") or "technical_table")],
             normative_strength=None,
-            retrieval_priority=88,
+            retrieval_priority=_technical_table_retrieval_priority(record),
             boundary_reasons=["technical_table_row_boundary"],
             chunk_group_id=f"technical-table-{record.get('table_id') or 'unknown'}",
             embedding_text=_contextual_embedding_text("technical_table", text, record)

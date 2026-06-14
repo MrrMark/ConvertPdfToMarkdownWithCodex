@@ -71,6 +71,25 @@ def test_user_facing_markdown_docs_use_portable_links_and_quoted_extras() -> Non
         assert "python3 -m pip install -e .[dev]" not in text
 
 
+def test_nvme_base_and_command_spec_contracts_are_documented() -> None:
+    output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
+    rag_recipes = Path("docs/RAG_INDEXER_INTEGRATION_RECIPES.md").read_text(encoding="utf-8")
+    agent_guide = Path("docs/AGENT_SKILL_USAGE_GUIDE.md").read_text(encoding="utf-8")
+    nvme_spec = Path("docs/NVME_BASE_RAG_ADAPTER_DEVELOPMENT_SPEC.md").read_text(encoding="utf-8")
+
+    assert "NVMe Base and NVM Command Set specs use the same candidate contract" in output_schema
+    assert "latest_nvme_spec_benchmark_report.json" in output_schema
+    assert "`spec_document_type`: `base` or `nvm_command_set`" in output_schema
+    assert "`command_set_eval` is metrics-only" in output_schema
+    assert "--spec-document nvm_command_set" in rag_recipes
+    assert "--fail-on-command-eval-error" in rag_recipes
+    assert "NVM Command Set도 같은 `technical_spec_rag + domain_adapter=nvme` contract" in rag_recipes
+    assert "query/result 원문 없이 aggregate metric만 기록" in nvme_spec
+    assert "NVMe Base와 NVM Command Set은 모두 같은 `--domain-adapter nvme` 계약" in agent_guide
+    assert "NVMe Base and Command Set RAG Adapter Development Spec" in nvme_spec
+    assert "`spec_document_type`으로 `base`와 `nvm_command_set`을 구분" in nvme_spec
+
+
 def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
     gitignore = Path(".gitignore").read_text(encoding="utf-8")
     tasks = Path("tasks.md").read_text(encoding="utf-8")

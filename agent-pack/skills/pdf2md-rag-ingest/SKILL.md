@@ -45,6 +45,8 @@ python3 -m pdf2md spec.pdf -o output/spec \
   --rag-table-output jsonl
 ```
 
+For NVMe Base or NVM Command Set PDFs, use `--domain-adapter nvme` and report only sidecar counts plus validation status.
+
 Assetless technical RAG:
 
 ```bash

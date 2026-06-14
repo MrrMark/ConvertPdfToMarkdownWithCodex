@@ -64,6 +64,7 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "artifact_integrity_report.schema.json",
         "docling_benchmark_report.schema.json",
         "docling_artifact_comparison.schema.json",
+        "latest_nvme_spec_benchmark_report.schema.json",
         "ocr_backend_probe_report.schema.json",
         "figure_description_eval_report.schema.json",
         "local_corpus_evidence_pack.schema.json",
@@ -97,6 +98,17 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     )
     assert docling_comparison_schema["properties"]["purpose"]["default"] == "docling_sanitized_artifact_comparison"
     assert "layout_comparable" in docling_comparison_schema["$defs"]["DoclingArtifactSummary"]["properties"]
+    latest_nvme_schema = json.loads(
+        (output_dir / "latest_nvme_spec_benchmark_report.schema.json").read_text(encoding="utf-8")
+    )
+    assert latest_nvme_schema["properties"]["purpose"]["default"] == "latest_nvme_spec_benchmark"
+    assert "spec_document_type" in latest_nvme_schema["properties"]
+    assert "command_set_eval" in latest_nvme_schema["properties"]
+    assert "sidecar_file_sizes" in latest_nvme_schema["$defs"]["LatestNvmeSpecBenchmarkSummary"]["properties"]
+    assert (
+        "command_set_eval_expected_source_coverage"
+        in latest_nvme_schema["$defs"]["LatestNvmeSpecBenchmarkSummary"]["properties"]
+    )
     ocr_probe_schema = json.loads((output_dir / "ocr_backend_probe_report.schema.json").read_text(encoding="utf-8"))
     assert ocr_probe_schema["properties"]["purpose"]["default"] == "multi_ocr_backend_probe"
     figure_eval_schema = json.loads(

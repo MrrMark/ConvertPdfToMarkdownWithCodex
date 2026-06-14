@@ -45,7 +45,7 @@ def test_nvme_domain_adapter_extracts_command_and_register_units() -> None:
         ]
     )
 
-    records = build_domain_units(domain_adapter=DomainAdapterMode.NVME, rag_tables=rag_tables)
+    records = build_domain_units(domain_adapter=DomainAdapterMode.NVME, rag_tables=rag_tables, source_sha256="f" * 64)
 
     assert [record["unit_type"] for record in records] == ["command", "register_field"]
     assert records[0]["domain_unit_id"] == "domain-nvme-000001"
@@ -55,9 +55,306 @@ def test_nvme_domain_adapter_extracts_command_and_register_units() -> None:
     assert records[0]["source_refs"][1]["source_type"] == "technical_table_unit"
     assert records[0]["source_refs"][1]["source_id"] == "tech-table-000001"
     assert records[1]["source_refs"][0]["source_id"] == "page-0001-table-0002-row-0001"
+    assert records[0]["source_sha256"] == "f" * 64
+    assert records[0]["source_dedupe_key"] == "page-0001-table-0001-row-0001|tech-table-000001"
+    assert len(records[0]["stable_source_id"]) == 40
+    assert len(records[0]["stable_requirement_seed"]) == 40
 
     jsonl = serialize_domain_units_jsonl(records)
     assert json.loads(jsonl.splitlines()[0])["domain"] == "nvme"
+
+
+def test_nvme_domain_adapter_populates_expanded_normalized_fields() -> None:
+    rag_tables = normalize_rag_table_payload(
+        [
+            {
+                "page": 2,
+                "table_index": 1,
+                "headers": ["SCT", "SC", "Description"],
+                "records": [
+                    {
+                        "page": 2,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["SCT", "SC", "Description"],
+                        "cells": {"SCT": "generic", "SC": "0x00", "Description": "Successful completion"},
+                        "row_text": "SCT = generic | SC = 0x00 | Description = Successful completion",
+                    }
+                ],
+            },
+            {
+                "page": 2,
+                "table_index": 2,
+                "headers": ["Property", "Offset", "Field", "Attributes", "Reset Default", "Description"],
+                "records": [
+                    {
+                        "page": 2,
+                        "table_index": 2,
+                        "row_index": 1,
+                        "headers": ["Property", "Offset", "Field", "Attributes", "Reset Default", "Description"],
+                        "cells": {
+                            "Property": "CAP",
+                            "Offset": "0x0000",
+                            "Field": "MQES",
+                            "Attributes": "RO",
+                            "Reset Default": "0h",
+                            "Description": "Maximum queue entries supported",
+                        },
+                        "row_text": (
+                            "Property = CAP | Offset = 0x0000 | Field = MQES | Attributes = RO | "
+                            "Reset Default = 0h | Description = Maximum queue entries supported"
+                        ),
+                    }
+                ],
+            },
+            {
+                "page": 2,
+                "table_index": 3,
+                "headers": ["Controller Support", "Namespace Support", "Scope", "Description"],
+                "records": [
+                    {
+                        "page": 2,
+                        "table_index": 3,
+                        "row_index": 1,
+                        "headers": ["Controller Support", "Namespace Support", "Scope", "Description"],
+                        "cells": {
+                            "Controller Support": "mandatory",
+                            "Namespace Support": "optional",
+                            "Scope": "controller",
+                            "Description": "Telemetry support requirement",
+                        },
+                        "row_text": (
+                            "Controller Support = mandatory | Namespace Support = optional | Scope = controller | "
+                            "Description = Telemetry support requirement"
+                        ),
+                    }
+                ],
+            },
+            {
+                "page": 2,
+                "table_index": 4,
+                "headers": ["Queue Field", "Bits", "Description"],
+                "records": [
+                    {
+                        "page": 2,
+                        "table_index": 4,
+                        "row_index": 1,
+                        "headers": ["Queue Field", "Bits", "Description"],
+                        "cells": {
+                            "Queue Field": "SQID",
+                            "Bits": "15:0",
+                            "Description": "Submission queue identifier",
+                        },
+                        "row_text": "Queue Field = SQID | Bits = 15:0 | Description = Submission queue identifier",
+                    }
+                ],
+            },
+        ]
+    )
+
+    records = build_domain_units(domain_adapter=DomainAdapterMode.NVME, rag_tables=rag_tables)
+
+    assert [record["unit_type"] for record in records] == [
+        "status_code",
+        "register_field",
+        "support_requirement",
+        "queue_field",
+    ]
+    status_fields = records[0]["normalized_fields"]
+    register_fields = records[1]["normalized_fields"]
+    support_fields = records[2]["normalized_fields"]
+    queue_fields = records[3]["normalized_fields"]
+    assert status_fields["canonical_name"] == "0x00"
+    assert status_fields["status_code_type"] == "generic"
+    assert status_fields["status_code_value"] == "0x00"
+    assert register_fields["canonical_name"] == "MQES"
+    assert register_fields["register_name"] == "CAP"
+    assert register_fields["offset"] == "0x0000"
+    assert register_fields["field_name"] == "MQES"
+    assert register_fields["access"] == "RO"
+    assert register_fields["reset_default"] == "0h"
+    assert support_fields["controller_support"] == "mandatory"
+    assert support_fields["namespace_support"] == "optional"
+    assert support_fields["scope"] == "controller"
+    assert queue_fields["bit_range"] == "15:0"
+    assert queue_fields["field_name"] == "SQID"
+    assert records[0]["classification_reasons"] == ["nvme_status_code_row"]
+    assert records[2]["classification_reasons"] == ["nvme_support_requirement_row"]
+
+
+def test_nvme_domain_adapter_preserves_command_spec_p0_fields() -> None:
+    rag_tables = normalize_rag_table_payload(
+        [
+            {
+                "page": 5,
+                "table_index": 1,
+                "headers": ["Command", "Queue Type", "Opcode", "Description"],
+                "records": [
+                    {
+                        "page": 5,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Command", "Queue Type", "Opcode", "Description"],
+                        "cells": {
+                            "Command": "Read",
+                            "Queue Type": "I/O",
+                            "Opcode": "02h",
+                            "Description": "Read command",
+                        },
+                        "row_text": "Command = Read | Queue Type = I/O | Opcode = 02h | Description = Read command",
+                    }
+                ],
+            },
+            {
+                "page": 5,
+                "table_index": 2,
+                "headers": ["Command Dword", "Bits", "Field", "Description"],
+                "records": [
+                    {
+                        "page": 5,
+                        "table_index": 2,
+                        "row_index": 1,
+                        "headers": ["Command Dword", "Bits", "Field", "Description"],
+                        "cells": {
+                            "Command Dword": "CDW10",
+                            "Bits": "31:00",
+                            "Field": "SLBA",
+                            "Description": "Starting LBA",
+                        },
+                        "row_text": "Command Dword = CDW10 | Bits = 31:00 | Field = SLBA | Description = Starting LBA",
+                    }
+                ],
+            },
+            {
+                "page": 5,
+                "table_index": 3,
+                "headers": ["Pointer", "Field", "Description"],
+                "records": [
+                    {
+                        "page": 5,
+                        "table_index": 3,
+                        "row_index": 1,
+                        "headers": ["Pointer", "Field", "Description"],
+                        "cells": {
+                            "Pointer": "Metadata Pointer",
+                            "Field": "MPTR",
+                            "Description": "Metadata pointer field",
+                        },
+                        "row_text": "Pointer = Metadata Pointer | Field = MPTR | Description = Metadata pointer field",
+                    }
+                ],
+            },
+            {
+                "page": 5,
+                "table_index": 4,
+                "headers": ["SCT", "SC", "Description"],
+                "records": [
+                    {
+                        "page": 5,
+                        "table_index": 4,
+                        "row_index": 1,
+                        "headers": ["SCT", "SC", "Description"],
+                        "cells": {
+                            "SCT": "Command Specific Status",
+                            "SC": "80h",
+                            "Description": "LBA out of range; correct the command before retry.",
+                        },
+                        "row_text": (
+                            "SCT = Command Specific Status | SC = 80h | "
+                            "Description = LBA out of range; correct the command before retry."
+                        ),
+                    }
+                ],
+            },
+        ]
+    )
+
+    records = build_domain_units(domain_adapter=DomainAdapterMode.NVME, rag_tables=rag_tables)
+
+    assert [record["unit_type"] for record in records] == [
+        "command",
+        "command_dword_field",
+        "command_pointer_field",
+        "status_code",
+    ]
+    command_fields = records[0]["normalized_fields"]
+    dword_fields = records[1]["normalized_fields"]
+    pointer_fields = records[2]["normalized_fields"]
+    status_fields = records[3]["normalized_fields"]
+    assert command_fields["opcode"] == "02h"
+    assert command_fields["command_scope"] == "io"
+    assert command_fields["queue_type"] == "io"
+    assert dword_fields["command_dword"] == "CDW10"
+    assert dword_fields["field_name"] == "SLBA"
+    assert dword_fields["bit_range"] == "31:00"
+    assert pointer_fields["pointer_type"] == "metadata"
+    assert pointer_fields["field_name"] == "MPTR"
+    assert status_fields["status_code_group"] == "command_specific"
+    assert status_fields["error_class"] == "invalid_address"
+    assert status_fields["retry_hint"] == "correct_command"
+    assert records[1]["classification_reasons"] == ["nvme_command_dword_row"]
+    assert records[2]["classification_reasons"] == ["nvme_command_pointer_row"]
+
+
+def test_nvme_domain_adapter_preserves_command_spec_relationship_context() -> None:
+    heading_path = ["NVM Command Set", "Read Command"]
+    rag_tables = normalize_rag_table_payload(
+        [
+            {
+                "page": 6,
+                "table_index": 1,
+                "headers": ["Command", "Queue Type", "Opcode", "Description"],
+                "records": [
+                    {
+                        "page": 6,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Command", "Queue Type", "Opcode", "Description"],
+                        "heading_path": heading_path,
+                        "cells": {
+                            "Command": "Read",
+                            "Queue Type": "I/O",
+                            "Opcode": "02h",
+                            "Description": "Read command",
+                        },
+                        "row_text": "Command = Read | Queue Type = I/O | Opcode = 02h | Description = Read command",
+                    }
+                ],
+            },
+            {
+                "page": 6,
+                "table_index": 2,
+                "headers": ["Command Dword", "Bits", "Field", "Description"],
+                "records": [
+                    {
+                        "page": 6,
+                        "table_index": 2,
+                        "row_index": 1,
+                        "headers": ["Command Dword", "Bits", "Field", "Description"],
+                        "heading_path": heading_path,
+                        "cells": {
+                            "Command Dword": "CDW10",
+                            "Bits": "31:00",
+                            "Field": "SLBA",
+                            "Description": "Starting LBA",
+                        },
+                        "row_text": "Command Dword = CDW10 | Bits = 31:00 | Field = SLBA | Description = Starting LBA",
+                    }
+                ],
+            },
+        ]
+    )
+
+    records = build_domain_units(domain_adapter=DomainAdapterMode.NVME, rag_tables=rag_tables)
+
+    fields = records[1]["normalized_fields"]
+    assert records[1]["unit_type"] == "command_dword_field"
+    assert records[1]["relationship_hints"] == ["belongs_to_command", "command_dword_layout"]
+    assert fields["command_context"] == "Read"
+    assert fields["command_context_source"] == "heading_path"
+    assert fields["related_command_unit_id"] == "tech-table-000001"
+    assert fields["related_command_opcode"] == "02h"
+    assert fields["relationship_hints"] == ["belongs_to_command", "command_dword_layout"]
 
 
 def test_domain_adapter_is_opt_in_and_feeds_retrieval_chunks() -> None:

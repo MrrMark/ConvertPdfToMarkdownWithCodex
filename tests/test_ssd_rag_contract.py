@@ -190,6 +190,241 @@ def test_ssd_rag_contract_rejects_adapter_spec_type_mismatch(tmp_path: Path) -> 
     assert "adapter_spec_type_mismatch" in {error["code"] for error in report["errors"]}
 
 
+def test_ssd_rag_contract_accepts_nvme_deep_shape(tmp_path: Path) -> None:
+    source_sha256 = "c" * 64
+    stable = {
+        "source_sha256": source_sha256,
+        "source_dedupe_key": "page-0001-table-0001-row-0001",
+        "stable_source_id": "1" * 40,
+        "stable_requirement_seed": "2" * 40,
+    }
+    _write_jsonl(
+        tmp_path / "retrieval_chunks_rag.jsonl",
+        [
+            {
+                "chunk_id": "chunk-000001",
+                "schema_version": "1.0",
+                "chunk_index": 1,
+                "chunk_type": "domain_unit",
+                "text": "Command = Identify | Opcode = 0x06 | Description = Identify command",
+                "source_sha256": source_sha256,
+                "source_refs": [{"source_type": "domain_unit", "source_id": "domain-nvme-000001", "page": 1}],
+                "page_range": [1, 1],
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+                "heading_path": ["NVMe Commands"],
+                "semantic_types": ["command"],
+                "normative_strength": None,
+                "retrieval_priority": 96,
+                "char_count": 70,
+                "token_estimate": 18,
+                "section_path": "NVMe Commands",
+                "chunk_group_id": "domain-nvme",
+                "source_record_count": 1,
+                "source_dedupe_key": "domain-nvme-000001",
+                "chunk_boundary_policy": "source_record",
+                "chunk_boundary_reasons": ["domain_unit_boundary"],
+            }
+        ],
+    )
+    _write_jsonl(tmp_path / "requirements_rag.jsonl", [])
+    _write_jsonl(
+        tmp_path / "technical_tables_rag.jsonl",
+        [
+            {
+                "technical_table_unit_id": "tech-table-000001",
+                "unit_type": "command_opcode",
+                "page": 1,
+                "table_id": "page-0001-table-0001",
+                "table_row_id": "page-0001-table-0001-row-0001",
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0001-row-0001"}],
+            }
+            | stable,
+            {
+                "technical_table_unit_id": "tech-table-000002",
+                "unit_type": "command_dword_field",
+                "page": 1,
+                "table_id": "page-0001-table-0002",
+                "table_row_id": "page-0001-table-0002-row-0001",
+                "bbox": [72.0, 130.0, 300.0, 150.0],
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0002-row-0001"}],
+            }
+            | stable,
+            {
+                "technical_table_unit_id": "tech-table-000003",
+                "unit_type": "command_pointer_field",
+                "page": 1,
+                "table_id": "page-0001-table-0003",
+                "table_row_id": "page-0001-table-0003-row-0001",
+                "bbox": [72.0, 160.0, 300.0, 180.0],
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0003-row-0001"}],
+            }
+            | stable,
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "tables_rag.jsonl",
+        [
+            {
+                "table_row_id": "page-0001-table-0001-row-0001",
+                "table_id": "page-0001-table-0001",
+                "page": 1,
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            },
+            {
+                "table_row_id": "page-0001-table-0002-row-0001",
+                "table_id": "page-0001-table-0002",
+                "page": 1,
+                "bbox": [72.0, 130.0, 300.0, 150.0],
+            },
+            {
+                "table_row_id": "page-0001-table-0003-row-0001",
+                "table_id": "page-0001-table-0003",
+                "page": 1,
+                "bbox": [72.0, 160.0, 300.0, 180.0],
+            },
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "domain_units_rag.jsonl",
+        [
+            {
+                "domain_unit_id": "domain-nvme-000001",
+                "domain": "nvme",
+                "unit_type": "command",
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0001-row-0001"}],
+                "normalized_fields": {"unit_type": "command", "canonical_name": "Identify", "opcode": "0x06"},
+            }
+            | stable,
+            {
+                "domain_unit_id": "domain-nvme-000002",
+                "domain": "nvme",
+                "unit_type": "command_dword_field",
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0002-row-0001"}],
+                "normalized_fields": {
+                    "unit_type": "command_dword_field",
+                    "canonical_name": "SLBA",
+                    "command_dword": "CDW10",
+                    "field_name": "SLBA",
+                    "bit_range": "31:00",
+                },
+            }
+            | stable,
+            {
+                "domain_unit_id": "domain-nvme-000003",
+                "domain": "nvme",
+                "unit_type": "command_pointer_field",
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0003-row-0001"}],
+                "normalized_fields": {
+                    "unit_type": "command_pointer_field",
+                    "canonical_name": "MPTR",
+                    "pointer_type": "metadata",
+                    "field_name": "MPTR",
+                },
+            }
+            | stable,
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "requirement_traceability_rag.jsonl",
+        [
+            {
+                "trace_id": "req-trace-000001",
+                "trace_index": 1,
+                "text": "The controller shall support Identify.",
+                "source_refs": [{"source_type": "text_block", "source_id": "page-0001-block-0001", "page": 1}],
+                "page_range": [1, 1],
+            }
+            | stable
+        ],
+    )
+    _write_jsonl(tmp_path / "cross_refs_rag.jsonl", [])
+    _write_jsonl(tmp_path / "figures_rag.jsonl", [])
+
+    report = validate_ssd_rag_contract(
+        output_dir=tmp_path,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="NVMe",
+        domain_adapter="nvme",
+        source_sha256=source_sha256,
+    )
+
+    assert report["passed"] is True
+    assert report["summary"]["requirement_traceability_count"] == 1
+
+
+def test_ssd_rag_contract_rejects_invalid_nvme_deep_shape(tmp_path: Path) -> None:
+    source_sha256 = "d" * 64
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [])
+    _write_jsonl(tmp_path / "requirements_rag.jsonl", [])
+    _write_jsonl(
+        tmp_path / "technical_tables_rag.jsonl",
+        [
+            {
+                "technical_table_unit_id": "tech-table-000001",
+                "unit_type": "status_code",
+                "page": 1,
+                "table_id": "page-0001-table-0001",
+                "table_row_id": "page-0001-table-0001-row-0001",
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "tables_rag.jsonl",
+        [{"table_row_id": "page-0001-table-0001-row-0001", "table_id": "page-0001-table-0001", "page": 1}],
+    )
+    _write_jsonl(
+        tmp_path / "domain_units_rag.jsonl",
+        [
+            {
+                "domain_unit_id": "domain-nvme-000001",
+                "domain": "nvme",
+                "unit_type": "status_code",
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0001-row-0001"}],
+                "normalized_fields": {"unit_type": "status_code"},
+            }
+        ],
+    )
+    _write_jsonl(tmp_path / "requirement_traceability_rag.jsonl", [{"trace_id": "req-trace-000001"}])
+    _write_jsonl(tmp_path / "cross_refs_rag.jsonl", [])
+    _write_jsonl(tmp_path / "figures_rag.jsonl", [])
+
+    report = validate_ssd_rag_contract(
+        output_dir=tmp_path,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="NVMe",
+        domain_adapter="nvme",
+        source_sha256=source_sha256,
+    )
+
+    codes = {error["code"] for error in report["errors"]}
+    assert report["passed"] is False
+    assert "missing_nvme_core_domain_unit" in codes
+    assert "missing_nvme_normalized_field" in codes
+    assert "missing_technical_table_source_refs" in codes
+    assert "missing_stable_metadata" in codes
+
+
+def test_ssd_rag_contract_warns_when_nvme_adapter_is_missing(tmp_path: Path) -> None:
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [])
+    _write_jsonl(tmp_path / "requirements_rag.jsonl", [])
+    _write_jsonl(tmp_path / "technical_tables_rag.jsonl", [])
+    _write_jsonl(tmp_path / "cross_refs_rag.jsonl", [])
+    _write_jsonl(tmp_path / "figures_rag.jsonl", [])
+
+    report = validate_ssd_rag_contract(
+        output_dir=tmp_path,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="NVMe",
+        require_tables=False,
+        require_domain_units=False,
+    )
+
+    assert report["passed"] is True
+    assert {warning["code"] for warning in report["warnings"]} == {"domain_adapter_none_for_nvme"}
+
+
 def test_ssd_corpus_profile_dry_run_builds_required_command_and_tcg_mapping(tmp_path: Path) -> None:
     profile = tmp_path / "profile.json"
     profile.write_text(

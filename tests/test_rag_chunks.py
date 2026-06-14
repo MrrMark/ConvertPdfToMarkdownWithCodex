@@ -85,6 +85,18 @@ def test_retrieval_chunks_include_text_semantic_requirement_and_table_provenance
     assert chunks[3]["source_refs"][0]["source_id"] == "page-0001-table-0001-row-0001"
     assert chunks[0]["chunk_boundary_reasons"] == ["text_block_boundary"]
     assert chunks[0]["section_path"] == "1 Requirements"
+    assert len(chunks[1]["stable_source_id"]) == 40
+    assert len(chunks[1]["stable_requirement_seed"]) == 40
+
+    repeated_chunks = build_retrieval_chunks(
+        text_block_records=text_blocks,
+        semantic_units=[requirement, definition],
+        requirements=[requirement],
+        rag_tables=rag_tables,
+        source_sha256="a" * 64,
+    )
+    assert repeated_chunks[1]["stable_source_id"] == chunks[1]["stable_source_id"]
+    assert repeated_chunks[1]["stable_requirement_seed"] == chunks[1]["stable_requirement_seed"]
 
     jsonl = serialize_retrieval_chunks_jsonl(chunks)
     assert json.loads(jsonl.splitlines()[1])["normative_strength"] == "required"
@@ -116,11 +128,93 @@ def test_retrieval_chunks_include_traceability_and_technical_table_units() -> No
         rag_tables=[],
         requirement_traceability_records=[trace],
         technical_table_records=[technical],
+        source_sha256="c" * 64,
     )
 
     assert [chunk["chunk_type"] for chunk in chunks] == ["requirement_trace", "technical_table"]
     assert chunks[0]["retrieval_priority"] == 98
+    assert chunks[0]["semantic_types"] == ["requirement_trace"]
     assert chunks[1]["semantic_types"] == ["log_page"]
+    assert len(chunks[0]["stable_requirement_seed"]) == 40
+    assert len(chunks[1]["stable_source_id"]) == 40
+
+
+def test_retrieval_chunks_boost_command_spec_context_for_embedding() -> None:
+    domain_unit = {
+        "domain_unit_id": "domain-nvme-000001",
+        "domain_unit_index": 1,
+        "domain": "nvme",
+        "unit_type": "command_dword_field",
+        "text": "Command Dword = CDW10 | Bits = 31:00 | Field = SLBA",
+        "source_refs": [{"source_type": "technical_table_unit", "source_id": "tech-table-000001", "page": 2}],
+        "page_range": [2, 2],
+        "normalized_fields": {
+            "command_context": "Read",
+            "command_dword": "CDW10",
+            "field_name": "SLBA",
+            "related_command_opcode": "02h",
+            "relationship_hints": ["belongs_to_command", "command_dword_layout"],
+        },
+    }
+    technical = {
+        "technical_table_unit_id": "tech-table-000001",
+        "technical_table_unit_index": 1,
+        "unit_type": "command_dword_field",
+        "text": "Command Dword = CDW10 | Bits = 31:00 | Field = SLBA",
+        "page": 2,
+        "table_id": "page-0002-table-0001",
+        "source_refs": [{"source_type": "table_row", "source_id": "page-0002-table-0001-row-0001", "page": 2}],
+        "heading_path": ["NVM Command Set", "Read Command"],
+        "command_context": "Read",
+        "command_dword": "CDW10",
+        "related_command_opcode": "02h",
+        "relationship_hints": ["belongs_to_command", "command_dword_layout"],
+    }
+
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        domain_units=[domain_unit],
+        technical_table_records=[technical],
+        contextual_embedding_text=True,
+        source_sha256="d" * 64,
+    )
+
+    assert [chunk["chunk_type"] for chunk in chunks] == ["domain_unit", "technical_table"]
+    assert chunks[0]["retrieval_priority"] == 97
+    assert chunks[1]["retrieval_priority"] == 94
+    assert chunks[0]["text"] == domain_unit["text"]
+    assert "Command context: Read" in chunks[0]["embedding_text"]
+    assert "Related command opcode: 02h" in chunks[0]["embedding_text"]
+    assert "Relationship hints: belongs_to_command | command_dword_layout" in chunks[1]["embedding_text"]
+    assert chunks[1]["embedding_text_strategy"] == "technical_table_context_prefix"
+
+
+def test_retrieval_chunks_mark_review_only_traceability_records() -> None:
+    trace = {
+        "trace_id": "req-trace-000001",
+        "trace_index": 1,
+        "text": "Controller: The device component that processes commands.",
+        "source_refs": [{"source_type": "text_block", "source_id": "page-0001-block-0001", "page": 1}],
+        "page_range": [1, 1],
+        "normative_strength": "informative",
+        "candidate_kind": "definition",
+        "is_requirement_candidate": False,
+    }
+
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        requirement_traceability_records=[trace],
+    )
+
+    assert chunks[0]["retrieval_priority"] == 60
+    assert chunks[0]["semantic_types"] == ["definition", "requirement_trace", "review_only"]
+    assert "review_only_trace" in chunks[0]["chunk_boundary_reasons"]
 
 
 def test_retrieval_chunks_can_include_assetless_figure_text_chunks() -> None:

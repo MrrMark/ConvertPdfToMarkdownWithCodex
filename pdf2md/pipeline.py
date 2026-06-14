@@ -1007,6 +1007,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             text_block_records=text_block_result.records,
             rag_tables=contextual_rag_tables,
             pdf_outline_targets=pdf_outline_targets,
+            source_sha256=source_sha256,
         )
         semantic_units = semantic_result.semantic_units
         requirements = semantic_result.requirements
@@ -1033,6 +1034,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         requirement_traceability_records = build_requirement_traceability_records(
             requirements=semantic_result.requirements,
             rag_tables=contextual_rag_tables,
+            semantic_units=semantic_result.semantic_units,
+            source_sha256=source_sha256,
         )
         if write_full_rag_sidecars:
             requirement_traceability_record_count, requirement_traceability_file_count = (
@@ -1044,7 +1047,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         finish_stage("rag_requirement_traceability", requirement_traceability_started)
 
         technical_tables_started = stage_start()
-        technical_table_records = build_technical_table_records(contextual_rag_tables)
+        technical_table_records = build_technical_table_records(contextual_rag_tables, source_sha256=source_sha256)
         if write_full_rag_sidecars:
             technical_table_record_count, technical_table_file_count = write_technical_table_output(
                 config,
@@ -1060,6 +1063,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 technical_table_records=technical_table_records,
                 manual_adapter_label=config.manual_domain_adapter_label,
                 manual_adapter_keywords=config.manual_domain_adapter_keywords,
+                source_sha256=source_sha256,
             )
             if write_full_rag_sidecars:
                 domain_unit_record_count, domain_unit_file_count = write_domain_unit_output(config, domain_units)

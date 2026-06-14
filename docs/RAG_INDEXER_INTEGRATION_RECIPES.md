@@ -198,6 +198,49 @@ python scripts/run_latest_nvme_command_set_eval.py \
   --output-dir /tmp/pdf2md-latest-nvme-command-set
 ```
 
+공식 최신 NVMe Base와 NVM Command Set은 repo 밖에 내려받은 PDF를 대상으로 sanitized benchmark만 공유한다.
+NVM Express 공식 specifications 페이지 기준 최신 NVMe specification set은 NVMe 2.3이며 2025-08-05에 공개되었다.
+공식 페이지는 NVMe 2.3 specification set에 Base specification과 NVM Command Set 같은 Command Set specification이 함께 포함된다고 설명한다.
+
+```bash
+python scripts/run_latest_nvme_spec_benchmark.py \
+  --input-pdf /tmp/NVMe-Base-latest.pdf \
+  --output-dir /tmp/pdf2md-latest-nvme-base \
+  --spec-document base \
+  --mode full_precision \
+  --source-url https://nvmexpress.org/specifications/ \
+  --fail-on-contract-error
+```
+
+NVM Command Set도 같은 `technical_spec_rag + domain_adapter=nvme` contract와 summary-only report 정책을 사용한다.
+Command Set 전용 표는 `command_dword_field`, `command_pointer_field`, `command_scope`/`queue_type`,
+`pointer_type`, `status_code_group`, `error_class`, `retry_hint` metadata를 추가로 가질 수 있다.
+P1 관계 metadata로 `command_context`, `related_command_unit_id`, `related_command_opcode`,
+`relationship_hints`가 채워지면 command opcode row와 CDW/pointer/status row를 같은 command 검색 결과로 묶을 수 있다.
+이 값들은 reranking/filter hint이며, citation source는 항상 `text`, `raw_cells`, `source_refs`를 기준으로 확인한다.
+P2 benchmark는 변환 후 `command_opcode`, `command_dword_field`, `command_pointer_field`, `status_code`
+대표 row를 대상으로 local query eval을 실행하고, report에는 query/result 원문 없이 aggregate metric만 남긴다.
+
+```bash
+python scripts/run_latest_nvme_spec_benchmark.py \
+  --input-pdf /tmp/NVM-Express-NVM-Command-Set-Specification-Revision-1.2-2025.08.01-Ratified.pdf \
+  --output-dir /tmp/pdf2md-latest-nvme-command-set-benchmark \
+  --spec-document nvm_command_set \
+  --mode full_precision \
+  --fail-on-contract-error \
+  --fail-on-command-eval-error
+```
+
+빠른 회귀 확인은 기본 1-5페이지 smoke mode로 실행한다.
+
+```bash
+python scripts/run_latest_nvme_spec_benchmark.py \
+  --input-pdf /tmp/NVMe-Base-latest.pdf \
+  --output-dir /tmp/pdf2md-latest-nvme-base-smoke \
+  --spec-document base \
+  --mode fast_smoke
+```
+
 Docling이 실제 설치된 환경에서만 통과해야 하는 release gate는 다음과 같이 실행한다.
 
 ```bash
@@ -213,10 +256,13 @@ python scripts/run_release_gates.py \
 - `docling_artifact_comparison.json`: committed-safe artifact name의 existence/size/SHA-256과 numeric metric delta
 - `docling_scorecard.md`: 사람이 빠르게 검토하는 local scorecard
 - `latest_nvme_command_set_scorecard.md`: latest NVMe Command Set 전용 sanitized metric scorecard
+- `latest_nvme_spec_benchmark_report.json`: latest NVMe Base/NVM Command Set 전용 source URL, source_sha256, option matrix, summary count, sanitized Command Set P2 query-eval summary
+- `latest_nvme_spec_benchmark_scorecard.md`: latest NVMe Base/NVM Command Set 전용 sanitized metric scorecard
 
 운영 정책:
 
 - raw Markdown body, Docling raw document dict, image bytes, 고객 파일 경로는 comparison pack에 넣지 않는다.
+- latest NVMe spec benchmark report에도 raw spec 전문, Markdown body, generated query, retrieved text, table row content, image bytes, local input path를 넣지 않는다.
 - Docling Markdown/dict export는 파일로 저장하지 않고 in-memory virtual artifact hash/size만 기록한다.
 - `--require-docling` 또는 release gate `--gates docling`은 Docling 미설치를 실패로 처리한다.
 - Q105 확장 설계는 `docs/DOCLING_INFORMED_EXTENSION_DESIGN.md`에서 관리하며, 이 comparison pack에서 확인된 metric/finding을 근거로 adapter/opt-in 후보를 정한다.
@@ -318,7 +364,7 @@ python scripts/analyze_corpus_evidence_pack.py --evidence-pack local_corpus_evid
 python scripts/compare_corpus_evidence_packs.py --baseline old_evidence_pack.json --current local_corpus_evidence_pack.json --fail-on-new-signature
 ```
 
-운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg|spdm|manual`를 필수로 지정한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
+운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg|spdm|manual`를 필수로 지정한다. `--domain-adapter nvme` 검증은 NVMe Base와 NVM Command Set 모두에 대해 core NVMe domain unit, Command Set CDW/pointer/status taxonomy normalized fields, command relationship metadata, technical table provenance, stable metadata, `requirement_traceability_rag.jsonl` 존재 여부까지 확인한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
 
 ## Azure AI Search
 

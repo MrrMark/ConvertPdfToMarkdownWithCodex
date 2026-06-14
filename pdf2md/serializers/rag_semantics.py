@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from pdf2md.serializers.rag_tables import flatten_rag_table_records, normalize_rag_table_payload
+from pdf2md.serializers.rag_stable_ids import with_stable_source_metadata
 
 
 PROHIBITED_PATTERN = re.compile(
@@ -813,6 +814,7 @@ def build_semantic_layer(
     text_block_records: list[dict[str, Any]],
     rag_tables: list[dict[str, Any]],
     pdf_outline_targets: list[dict[str, Any]] | None = None,
+    source_sha256: str = "",
 ) -> SemanticLayerBuildResult:
     """Build deterministic, non-generative semantic sidecars for spec RAG."""
     sorted_text_blocks = sorted(
@@ -1129,6 +1131,10 @@ def build_semantic_layer(
             result.unresolved_cross_ref_count += int(not resolved)
 
     result.semantic_units = semantic_recorder.records
+    if source_sha256:
+        result.requirements = [
+            with_stable_source_metadata(record, source_sha256=source_sha256) for record in result.requirements
+        ]
     result.cross_refs = cross_ref_recorder.records
     return result
 

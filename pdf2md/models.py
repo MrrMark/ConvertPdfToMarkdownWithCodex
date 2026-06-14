@@ -682,6 +682,56 @@ class DoclingArtifactComparisonReport(BaseModel):
     findings: list[DoclingBenchmarkFinding] = Field(default_factory=list)
 
 
+class LatestNvmeSpecBenchmarkSummary(BaseModel):
+    page_count: int = 0
+    conversion_duration_ms: Optional[int] = None
+    sidecar_file_count: int = 0
+    sidecar_total_bytes: int = 0
+    sidecar_file_sizes: dict[str, int] = Field(default_factory=dict)
+    retrieval_chunk_count: int = 0
+    requirement_count: int = 0
+    traceability_record_count: int = 0
+    technical_table_unit_count: int = 0
+    domain_unit_count: int = 0
+    contract_validation_status: str = "not_run"
+    contract_validation_passed: bool = False
+    command_set_eval_status: str = "not_applicable"
+    command_set_eval_passed: bool = True
+    command_set_eval_query_count: int = 0
+    command_set_eval_expected_source_coverage: float = 0.0
+    warning_count: int = 0
+    error_count: int = 0
+    conversion_warning_count: int = 0
+    contract_warning_count: int = 0
+    conversion_error_count: int = 0
+    contract_error_count: int = 0
+
+
+class LatestNvmeSpecBenchmarkReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "latest_nvme_spec_benchmark"
+    spec_document_type: str
+    latest_spec_set: str
+    latest_release_date: str
+    expected_spec_title: str
+    expected_revision: Optional[str] = None
+    source_url: str
+    source_sha256: str
+    mode: str
+    option_matrix: dict[str, Any] = Field(default_factory=dict)
+    conversion_exit_code: int = 0
+    conversion_status: str = "not_run"
+    conversion_output_label: str = "conversion"
+    local_only: bool = True
+    raw_content_included: bool = False
+    image_bytes_included: bool = False
+    local_input_paths_included: bool = False
+    summary_counts: LatestNvmeSpecBenchmarkSummary = Field(default_factory=LatestNvmeSpecBenchmarkSummary)
+    sidecars: dict[str, Any] = Field(default_factory=dict)
+    contract_validation: dict[str, Any] = Field(default_factory=dict)
+    command_set_eval: dict[str, Any] = Field(default_factory=dict)
+
+
 class OCRBackendDependency(BaseModel):
     name: str
     kind: str
