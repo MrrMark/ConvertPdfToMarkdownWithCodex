@@ -1,5 +1,8 @@
 # Visual Technical Spec RAG Development Spec
 
+Status: Implemented in ConvertPdfToMarkdown. Active backlog tracking has moved to
+`docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md` under Q115/Q116.
+
 ## 1. Purpose
 
 이 문서는 NVMe Base Specification, NVM Command Set Specification, OCP Datacenter NVMe SSD Specification처럼
@@ -197,6 +200,8 @@ For generated descriptions:
 `figure_region_ocr.region_ocr.text_replaced` must remain `false`.
 
 ## 6. Implementation Plan
+
+Implementation status: P0-P3 are complete in this repo. The checklist below is retained as the historical implementation contract.
 
 ### P0. Visual Profile and Option Wiring
 

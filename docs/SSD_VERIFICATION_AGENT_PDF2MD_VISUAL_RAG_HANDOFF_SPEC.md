@@ -1,5 +1,8 @@
 # SSD Verification Agent PDF2MD Visual RAG Handoff Spec
 
+Status: Handoff complete in ConvertPdfToMarkdown. The implementation items in this document are intended for the
+`ssd-verification-agent` repo unless explicitly marked as ConvertPdfToMarkdown responsibility.
+
 ## 1. Purpose
 
 이 문서는 `ssd-verification-agent` repo에서 pdf2md 산출물을 사용해 NVMe Base Specification,

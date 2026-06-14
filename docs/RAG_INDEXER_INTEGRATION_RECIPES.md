@@ -18,7 +18,9 @@
 3. `technical_tables_rag.jsonl`
 4. `tables_rag.jsonl`
 5. `figures_rag.jsonl`
-6. `cross_refs_rag.jsonl`
+6. `figure_descriptions_rag.jsonl`
+7. `figure_structures_rag.jsonl`
+8. `cross_refs_rag.jsonl`
 
 Vector DB에는 보통 `retrieval_chunks_rag.jsonl`만 넣고, 나머지 sidecar는 citation expansion, impact analysis, UI drilldown, test script 수정 범위 계산에 사용한다.
 
@@ -40,9 +42,9 @@ python3 -m pdf2md spec.pdf -o output/spec --rag-profile technical_spec_rag --dom
 python3 -m pdf2md spec.pdf -o output/share --rag-profile confidential_rag
 ```
 
-## Assetless Figure Text Chunks
+## Visual Figure Evidence
 
-PNG/JPG 같은 image asset을 업로드할 수 없는 팀 RAG 환경에서는 placeholder mode와 figure_text chunk를 함께 사용한다.
+NVMe Base/Command, OCP, PCIe, security spec처럼 figure/diagram/waveform이 분석 품질에 영향을 주는 문서는 `technical_spec_rag_visual`을 사용한다.
 GUI에서는 `기술 스펙 Visual RAG` preset을 선택하면 figure evidence까지 포함한 profile이 적용된다.
 `이미지 업로드 불가 RAG 대응` preset은 같은 `technical_spec_rag_visual` profile에 `image_mode=placeholder` override를 적용한다.
 
@@ -57,11 +59,13 @@ python3 -m pdf2md spec.pdf -o output/spec \
 
 - `document.md`에는 image link 대신 placeholder comment가 남는다.
 - `figures_rag.jsonl`은 caption, heading path, bbox, detected labels, nearby text refs를 원문 provenance로 보존한다.
-- `retrieval_chunks_rag.jsonl`에는 `chunk_type="figure_text"` record가 추가된다.
+- `figure_descriptions_rag.jsonl`과 `figure_structures_rag.jsonl`은 deterministic context-only visual sidecar로 생성된다.
+- `retrieval_chunks_rag.jsonl`에는 `chunk_type="figure_text"`, `chunk_type="figure_description"`, `chunk_type="figure_structure"` record가 추가된다.
 - `figure_text.text`는 관측된 caption/heading/label/nearby text와 conservative figure kind만 사용한다.
-- 생성형 picture description, VLM 설명, 사람이 읽기 좋게 만든 요약은 기본 출력에 넣지 않는다.
+- 외부 VLM/LLM picture description이나 pixel interpretation은 사용하지 않으며, deterministic description은 `document.md` 본문이 아니라 sidecar와 retrieval chunk에만 기록한다.
 - `figure_text.source_refs[]`는 `figures_rag.jsonl`의 `figure_id`, page, bbox로 해소되어야 하며 image path는 넣지 않는다.
-- `--rag-sidecar-scope minimal`을 함께 쓰더라도 `--rag-figure-text-chunks`가 켜져 있으면 `figures_rag.jsonl`은 provenance 해소를 위해 함께 생성된다.
+- `figure_description`과 `figure_structure` chunk는 figure provenance와 해당 generated sidecar provenance를 함께 가져야 한다.
+- `--rag-sidecar-scope minimal`을 함께 쓰더라도 visual chunk가 켜져 있으면 figure provenance 해소에 필요한 visual sidecar는 함께 생성된다.
 
 ## Manual Domain Adapter
 
