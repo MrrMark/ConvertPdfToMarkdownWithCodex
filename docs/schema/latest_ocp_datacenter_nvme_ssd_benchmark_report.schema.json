@@ -54,6 +54,36 @@
           "title": "Error Count",
           "type": "integer"
         },
+        "ocp_eval_expected_source_coverage": {
+          "default": 0.0,
+          "title": "Ocp Eval Expected Source Coverage",
+          "type": "number"
+        },
+        "ocp_eval_hit_at_k": {
+          "default": 0.0,
+          "title": "Ocp Eval Hit At K",
+          "type": "number"
+        },
+        "ocp_eval_passed": {
+          "default": false,
+          "title": "Ocp Eval Passed",
+          "type": "boolean"
+        },
+        "ocp_eval_query_count": {
+          "default": 0,
+          "title": "Ocp Eval Query Count",
+          "type": "integer"
+        },
+        "ocp_eval_status": {
+          "default": "not_run",
+          "title": "Ocp Eval Status",
+          "type": "string"
+        },
+        "ocp_eval_table_field_coverage": {
+          "default": 0.0,
+          "title": "Ocp Eval Table Field Coverage",
+          "type": "number"
+        },
         "ocp_requirement_unit_count": {
           "default": 0,
           "title": "Ocp Requirement Unit Count",
@@ -179,6 +209,11 @@
     "mode": {
       "title": "Mode",
       "type": "string"
+    },
+    "ocp_eval": {
+      "additionalProperties": true,
+      "title": "Ocp Eval",
+      "type": "object"
     },
     "option_matrix": {
       "additionalProperties": true,

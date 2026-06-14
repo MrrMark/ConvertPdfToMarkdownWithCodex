@@ -31,6 +31,17 @@ COMMAND_DOMAIN_PRIORITIES = {
     "command_pointer_field": 97,
     "status_code": 96,
 }
+OCP_REQUIREMENT_PRIORITY_BY_FAMILY = {
+    "log_page": 98,
+    "feature": 98,
+    "telemetry": 98,
+    "security": 98,
+    "form_factor": 97,
+    "thermal": 97,
+    "command_timeout": 97,
+    "nvme": 96,
+    "pcie": 96,
+}
 TokenCounter = Callable[[str], int]
 
 
@@ -498,6 +509,14 @@ def _format_context_value(value: Any) -> str | None:
     return str(value).strip()
 
 
+def _metadata_search_key(value: Any) -> str | None:
+    text = _format_context_value(value)
+    if not text:
+        return None
+    key = re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_")
+    return key or None
+
+
 def _append_metadata_context(context_parts: list[str], record: dict[str, Any], label: str, field: str) -> None:
     text = _format_context_value(_record_metadata_value(record, field))
     if text:
@@ -514,6 +533,9 @@ def _technical_table_retrieval_priority(record: dict[str, Any]) -> int:
 
 def _domain_unit_retrieval_priority(record: dict[str, Any]) -> int:
     unit_type = str(record.get("unit_type") or "")
+    if record.get("domain") == "ocp" and unit_type == "requirement":
+        family = str(_record_metadata_value(record, "requirement_family") or "")
+        return OCP_REQUIREMENT_PRIORITY_BY_FAMILY.get(family, 96)
     return COMMAND_DOMAIN_PRIORITIES.get(unit_type, 96)
 
 
@@ -536,7 +558,22 @@ def _contextual_embedding_text(chunk_type: str, text: str, record: dict[str, Any
     unit_type = record.get("unit_type")
     if unit_type:
         context_parts.append(f"Unit type: {unit_type}")
+    requirement_key = _metadata_search_key(_record_metadata_value(record, "requirement_id"))
+    if requirement_key:
+        context_parts.append(f"Requirement key: {requirement_key}")
     for label, field in (
+        ("Requirement ID", "requirement_id"),
+        ("Requirement prefix", "requirement_prefix"),
+        ("Requirement family", "requirement_family"),
+        ("OCP section context", "ocp_section_context"),
+        ("OCP profile", "ocp_profile"),
+        ("SSD requirement status", "ssd_requirement_status"),
+        ("Related command", "related_command"),
+        ("Related log identifier", "related_log_identifier"),
+        ("Related feature identifier", "related_feature_identifier"),
+        ("Related statistic identifier", "related_statistic_identifier"),
+        ("Related security protocol", "related_security_protocol"),
+        ("Related form factor", "related_form_factor"),
         ("Command context", "command_context"),
         ("Command scope", "command_scope"),
         ("Queue type", "queue_type"),

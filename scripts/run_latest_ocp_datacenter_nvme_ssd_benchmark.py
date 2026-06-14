@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,11 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from validate_ssd_rag_contract import DOMAIN_ADAPTER_TO_SPEC_TYPE, validate_ssd_rag_contract  # type: ignore[no-redef]
 
+try:
+    from scripts.run_rag_eval import evaluate_queries
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from run_rag_eval import evaluate_queries  # type: ignore[no-redef]
+
 
 SCHEMA_VERSION = "1.0"
 REPORT_FILENAME = "latest_ocp_datacenter_nvme_ssd_benchmark_report.json"
@@ -40,6 +46,16 @@ OFFICIAL_SOURCE_URL = "https://www.opencompute.org/documents/datacenter-nvme-ssd
 EXPECTED_SPEC_TITLE = "Datacenter NVMe SSD Specification"
 EXPECTED_VERSION = "2.7"
 EXPECTED_DATE_MARKER = "01082026"
+OCP_EVAL_PROFILE = "ocp_datacenter_nvme_ssd_p2_retrieval"
+OCP_EVAL_TOP_K = 8
+OCP_EVAL_REQUIRED_BUCKETS = (
+    "requirement",
+    "log_page_requirement",
+    "feature_requirement",
+    "telemetry_requirement",
+    "security_requirement",
+    "form_factor_or_thermal_requirement",
+)
 
 SIDECAR_FILES = (
     "text_blocks_rag.jsonl",
@@ -121,6 +137,11 @@ def _int_value(mapping: dict[str, Any], key: str, default: int = 0) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else default
 
 
+def _float_value(mapping: dict[str, Any], key: str, default: float = 0.0) -> float:
+    value = mapping.get(key)
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else default
+
+
 def _effective_pages(mode: str, pages: str | None) -> str | None:
     if pages is not None:
         return pages
@@ -163,9 +184,11 @@ def build_option_matrix(*, mode: str, pages: str | None, page_workers: int) -> d
             "require_domain_units": True,
         },
         "ocp_query_eval": {
-            "enabled": False,
-            "profile": "ocp_datacenter_nvme_ssd_p2_retrieval",
-            "report_policy": "planned_metrics_only",
+            "enabled": True,
+            "profile": OCP_EVAL_PROFILE,
+            "top_k": OCP_EVAL_TOP_K,
+            "required_buckets": list(OCP_EVAL_REQUIRED_BUCKETS),
+            "report_policy": "sanitized_metrics_only",
         },
     }
 
@@ -249,12 +272,184 @@ def _contract_summary(output_dir: Path, *, source_sha256: str) -> dict[str, Any]
     }
 
 
+def _text_value(record: dict[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        value = record.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return None
+
+
+def _normalized_fields(record: dict[str, Any]) -> dict[str, Any]:
+    fields = record.get("normalized_fields")
+    return fields if isinstance(fields, dict) else {}
+
+
+def _bucket_for_record(record: dict[str, Any]) -> str | None:
+    fields = _normalized_fields(record)
+    family = str(fields.get("requirement_family") or "")
+    if fields.get("related_log_identifier") or family == "log_page":
+        return "log_page_requirement"
+    if fields.get("related_feature_identifier") or family == "feature":
+        return "feature_requirement"
+    if fields.get("related_statistic_identifier") or family == "telemetry":
+        return "telemetry_requirement"
+    if fields.get("related_security_protocol") or family == "security":
+        return "security_requirement"
+    if fields.get("related_form_factor") or family in {"form_factor", "thermal"}:
+        return "form_factor_or_thermal_requirement"
+    return None
+
+
+def _record_query_terms(record: dict[str, Any], *, bucket: str) -> str:
+    fields = _normalized_fields(record)
+    requirement_id = _text_value(fields, "requirement_id")
+    requirement_key = None
+    if requirement_id:
+        requirement_key = re.sub(r"[^A-Za-z0-9]+", "_", requirement_id).strip("_")
+    terms = [
+        bucket,
+        requirement_id,
+        requirement_key,
+        _text_value(fields, "requirement_prefix"),
+        _text_value(fields, "requirement_family"),
+        _text_value(fields, "ocp_section_context"),
+        _text_value(fields, "related_command"),
+        _text_value(fields, "related_log_identifier"),
+        _text_value(fields, "related_feature_identifier"),
+        _text_value(fields, "related_statistic_identifier"),
+        _text_value(fields, "related_security_protocol"),
+        _text_value(fields, "related_form_factor"),
+    ]
+    return " ".join(term for term in terms if term)
+
+
+def _ocp_eval_queries(domain_units: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+    by_bucket: dict[str, dict[str, Any]] = {}
+    first_requirement: dict[str, Any] | None = None
+    for record in domain_units:
+        if record.get("domain") != DomainAdapterMode.OCP.value or record.get("unit_type") != "requirement":
+            continue
+        first_requirement = first_requirement or record
+        bucket = _bucket_for_record(record)
+        if bucket and bucket not in by_bucket:
+            by_bucket[bucket] = record
+    if first_requirement is not None:
+        by_bucket.setdefault("requirement", first_requirement)
+
+    queries: list[dict[str, Any]] = []
+    covered_buckets: list[str] = []
+    for bucket in OCP_EVAL_REQUIRED_BUCKETS:
+        record = by_bucket.get(bucket)
+        source_id = _text_value(record or {}, "domain_unit_id")
+        if record is None or source_id is None:
+            continue
+        queries.append(
+            {
+                "query": _record_query_terms(record, bucket=bucket),
+                "expected_source_ids": [source_id],
+                "expected_source_types": ["domain_unit"],
+                "expected_table_field_source_ids": [source_id],
+                "expected_table_field_source_types": ["domain_unit"],
+            }
+        )
+        covered_buckets.append(bucket)
+    missing_buckets = [bucket for bucket in OCP_EVAL_REQUIRED_BUCKETS if bucket not in by_bucket]
+    return queries, covered_buckets, missing_buckets
+
+
+def _ocp_eval_summary(output_dir: Path) -> dict[str, Any]:
+    try:
+        domain_units = _read_jsonl_records(output_dir / "domain_units_rag.jsonl")
+        retrieval_chunks = _read_jsonl_records(output_dir / "retrieval_chunks_rag.jsonl")
+        queries, covered_buckets, missing_buckets = _ocp_eval_queries(domain_units)
+        if not retrieval_chunks or not queries:
+            return {
+                "status": "failed",
+                "passed": False,
+                "profile": OCP_EVAL_PROFILE,
+                "top_k": OCP_EVAL_TOP_K,
+                "query_count": len(queries),
+                "required_buckets": list(OCP_EVAL_REQUIRED_BUCKETS),
+                "covered_buckets": covered_buckets,
+                "missing_buckets": missing_buckets,
+                "metrics": {
+                    "hit_at_k": 0.0,
+                    "mrr": 0.0,
+                    "expected_source_coverage": 0.0,
+                    "table_field_coverage": 0.0,
+                },
+                "raw_content_included": False,
+                "queries_included": False,
+                "retrieved_text_included": False,
+            }
+        eval_report = evaluate_queries(chunks=retrieval_chunks, queries=queries, top_k=OCP_EVAL_TOP_K)
+    except Exception as exc:  # pragma: no cover - defensive runner boundary
+        return {
+            "status": "failed",
+            "passed": False,
+            "profile": OCP_EVAL_PROFILE,
+            "top_k": OCP_EVAL_TOP_K,
+            "query_count": 0,
+            "required_buckets": list(OCP_EVAL_REQUIRED_BUCKETS),
+            "covered_buckets": [],
+            "missing_buckets": list(OCP_EVAL_REQUIRED_BUCKETS),
+            "metrics": {
+                "hit_at_k": 0.0,
+                "mrr": 0.0,
+                "expected_source_coverage": 0.0,
+                "table_field_coverage": 0.0,
+            },
+            "failure_type": type(exc).__name__,
+            "raw_content_included": False,
+            "queries_included": False,
+            "retrieved_text_included": False,
+        }
+
+    metrics = eval_report.get("metrics") if isinstance(eval_report.get("metrics"), dict) else {}
+    sanitized_metrics = {
+        "hit_at_k": _float_value(metrics, "hit_at_k"),
+        "mrr": _float_value(metrics, "mrr"),
+        "expected_source_coverage": _float_value(metrics, "expected_source_coverage"),
+        "expected_source_hit_count": _int_value(metrics, "expected_source_hit_count"),
+        "expected_source_total_count": _int_value(metrics, "expected_source_total_count"),
+        "expected_source_miss_count": _int_value(metrics, "expected_source_miss_count"),
+        "table_field_coverage": _float_value(metrics, "table_field_coverage"),
+        "table_contextual_embedding_coverage": _float_value(metrics, "table_contextual_embedding_coverage"),
+        "relationship_target_coverage": _float_value(metrics, "relationship_target_coverage", 1.0),
+    }
+    passed = (
+        not missing_buckets
+        and sanitized_metrics["hit_at_k"] >= 1.0
+        and sanitized_metrics["expected_source_coverage"] >= 1.0
+        and sanitized_metrics["table_field_coverage"] >= 1.0
+    )
+    return {
+        "status": "passed" if passed else "failed",
+        "passed": passed,
+        "profile": OCP_EVAL_PROFILE,
+        "top_k": OCP_EVAL_TOP_K,
+        "query_count": len(queries),
+        "required_buckets": list(OCP_EVAL_REQUIRED_BUCKETS),
+        "covered_buckets": covered_buckets,
+        "missing_buckets": missing_buckets,
+        "metrics": sanitized_metrics,
+        "raw_content_included": False,
+        "queries_included": False,
+        "retrieved_text_included": False,
+    }
+
+
 def _summary_counts(
     *,
     manifest: dict[str, Any],
     conversion_report: dict[str, Any],
     sidecars: dict[str, Any],
     contract: dict[str, Any],
+    ocp_eval: dict[str, Any],
     output_dir: Path,
 ) -> dict[str, Any]:
     conversion_summary = _summary(conversion_report)
@@ -264,6 +459,8 @@ def _summary_counts(
         page_count = len(manifest["selected_pages"])
     conversion_error_count = 1 if str(conversion_report.get("status") or "") == "failed" else 0
     contract_error_count = _int_value(contract_summary, "error_count")
+    ocp_eval_metrics = ocp_eval.get("metrics")
+    ocp_eval_metrics = ocp_eval_metrics if isinstance(ocp_eval_metrics, dict) else {}
     conversion_warning_count = _int_value(conversion_summary, "warning_count")
     contract_warning_count = _int_value(contract_summary, "warning_count")
     domain_units = _read_jsonl_records(output_dir / "domain_units_rag.jsonl")
@@ -289,6 +486,12 @@ def _summary_counts(
         ),
         "contract_validation_status": contract.get("status"),
         "contract_validation_passed": contract.get("passed") is True,
+        "ocp_eval_status": ocp_eval.get("status"),
+        "ocp_eval_passed": ocp_eval.get("passed") is True,
+        "ocp_eval_query_count": _int_value(ocp_eval, "query_count"),
+        "ocp_eval_expected_source_coverage": _float_value(ocp_eval_metrics, "expected_source_coverage"),
+        "ocp_eval_hit_at_k": _float_value(ocp_eval_metrics, "hit_at_k"),
+        "ocp_eval_table_field_coverage": _float_value(ocp_eval_metrics, "table_field_coverage"),
         "warning_count": conversion_warning_count + contract_warning_count,
         "error_count": conversion_error_count + contract_error_count,
         "conversion_warning_count": conversion_warning_count,
@@ -324,6 +527,12 @@ def render_scorecard(report: dict[str, Any]) -> str:
         f"| domain_unit_count | {counts.get('domain_unit_count', 0)} |",
         f"| ocp_requirement_unit_count | {counts.get('ocp_requirement_unit_count', 0)} |",
         f"| contract_validation_passed | {counts.get('contract_validation_passed')} |",
+        f"| ocp_eval_status | {counts.get('ocp_eval_status')} |",
+        f"| ocp_eval_passed | {counts.get('ocp_eval_passed')} |",
+        f"| ocp_eval_query_count | {counts.get('ocp_eval_query_count', 0)} |",
+        f"| ocp_eval_expected_source_coverage | {counts.get('ocp_eval_expected_source_coverage', 0.0)} |",
+        f"| ocp_eval_hit_at_k | {counts.get('ocp_eval_hit_at_k', 0.0)} |",
+        f"| ocp_eval_table_field_coverage | {counts.get('ocp_eval_table_field_coverage', 0.0)} |",
         f"| warning_count | {counts.get('warning_count', 0)} |",
         f"| error_count | {counts.get('error_count', 0)} |",
     ]
@@ -354,6 +563,7 @@ def run_latest_ocp_datacenter_nvme_ssd_benchmark(
     manifest = _read_json(conversion_output_dir / "manifest.json")
     sidecars = collect_sidecar_summary(conversion_output_dir)
     contract = _contract_summary(conversion_output_dir, source_sha256=source_sha256)
+    ocp_eval = _ocp_eval_summary(conversion_output_dir)
     report_payload = {
         "schema_version": SCHEMA_VERSION,
         "purpose": "latest_ocp_datacenter_nvme_ssd_benchmark",
@@ -376,10 +586,12 @@ def run_latest_ocp_datacenter_nvme_ssd_benchmark(
             conversion_report=conversion_report,
             sidecars=sidecars,
             contract=contract,
+            ocp_eval=ocp_eval,
             output_dir=conversion_output_dir,
         ),
         "sidecars": sidecars,
         "contract_validation": contract,
+        "ocp_eval": ocp_eval,
     }
     report = LatestOcpDatacenterNvmeSsdBenchmarkReport.model_validate(report_payload).model_dump(mode="json")
     write_json(config.output_dir / REPORT_FILENAME, report)
@@ -396,6 +608,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--pages", default=None)
     parser.add_argument("--page-workers", type=int, default=1)
     parser.add_argument("--fail-on-contract-error", action="store_true")
+    parser.add_argument("--fail-on-ocp-eval-error", action="store_true")
     return parser
 
 
@@ -414,6 +627,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Wrote {args.output_dir / REPORT_FILENAME}")
     print(f"Wrote {args.output_dir / SCORECARD_FILENAME}")
     if args.fail_on_contract_error and not report.get("summary_counts", {}).get("contract_validation_passed"):
+        return 1
+    if args.fail_on_ocp_eval_error and not report.get("summary_counts", {}).get("ocp_eval_passed"):
         return 1
     return 0
 

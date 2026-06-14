@@ -249,7 +249,8 @@ python scripts/run_latest_ocp_datacenter_nvme_ssd_benchmark.py \
   --input-pdf /tmp/datacenter-nvme-ssd-specification-v2-7-final.pdf \
   --output-dir /tmp/pdf2md-latest-ocp-datacenter-nvme-ssd \
   --mode full_precision \
-  --fail-on-contract-error
+  --fail-on-contract-error \
+  --fail-on-ocp-eval-error
 ```
 
 빠른 OCP 회귀 확인은 기본 1-5페이지 smoke mode로 실행한다.
@@ -259,7 +260,8 @@ python scripts/run_latest_ocp_datacenter_nvme_ssd_benchmark.py \
   --input-pdf /tmp/datacenter-nvme-ssd-specification-v2-7-final.pdf \
   --output-dir /tmp/pdf2md-latest-ocp-datacenter-nvme-ssd-smoke \
   --mode fast_smoke \
-  --fail-on-contract-error
+  --fail-on-contract-error \
+  --fail-on-ocp-eval-error
 ```
 
 Docling이 실제 설치된 환경에서만 통과해야 하는 release gate는 다음과 같이 실행한다.
@@ -279,7 +281,7 @@ python scripts/run_release_gates.py \
 - `latest_nvme_command_set_scorecard.md`: latest NVMe Command Set 전용 sanitized metric scorecard
 - `latest_nvme_spec_benchmark_report.json`: latest NVMe Base/NVM Command Set 전용 source URL, source_sha256, option matrix, summary count, sanitized Command Set P2 query-eval summary
 - `latest_nvme_spec_benchmark_scorecard.md`: latest NVMe Base/NVM Command Set 전용 sanitized metric scorecard
-- `latest_ocp_datacenter_nvme_ssd_benchmark_report.json`: latest OCP Datacenter NVMe SSD 전용 source URL, source_sha256, option matrix, summary count, sanitized contract summary
+- `latest_ocp_datacenter_nvme_ssd_benchmark_report.json`: latest OCP Datacenter NVMe SSD 전용 source URL, source_sha256, option matrix, summary count, sanitized contract summary, sanitized OCP P2 query-eval summary
 - `latest_ocp_datacenter_nvme_ssd_benchmark_scorecard.md`: latest OCP Datacenter NVMe SSD 전용 sanitized metric scorecard
 
 운영 정책:

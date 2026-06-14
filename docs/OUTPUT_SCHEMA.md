@@ -367,6 +367,12 @@ Stable summary fields:
 - `ocp_requirement_unit_count`
 - `contract_validation_status`
 - `contract_validation_passed`
+- `ocp_eval_status`
+- `ocp_eval_passed`
+- `ocp_eval_query_count`
+- `ocp_eval_expected_source_coverage`
+- `ocp_eval_hit_at_k`
+- `ocp_eval_table_field_coverage`
 - `warning_count`
 - `error_count`
 
@@ -374,9 +380,10 @@ Policy:
 
 - This report covers the latest OCP Datacenter NVMe SSD benchmark path under `technical_spec_rag + domain_adapter=ocp`.
 - OCP validation requires requirement domain units with normalized `requirement_id`, `requirement_prefix`, `requirement_family`, and source table row metadata.
-- The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, and sanitized SSD contract status only.
+- `ocp_eval` records the P2 local query gate for representative OCP requirement, log page, feature, telemetry, security, and form-factor/thermal buckets.
+- `ocp_eval` is metrics-only: status, pass/fail, query count, required/covered/missing buckets, and aggregate retrieval metrics such as `hit_at_k`, `mrr`, `expected_source_coverage`, and `table_field_coverage`.
+- The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, sanitized SSD contract status, and sanitized OCP eval status only.
 - Raw spec text, raw Markdown body, generated query strings, retrieved chunk text, table row content, image bytes, and local input PDF paths are not embedded.
-- OCP P2 query eval is intentionally tracked as a planned metrics-only extension and is not enabled in the P0 benchmark report.
 
 ## ocr_backend_probe_report.json
 

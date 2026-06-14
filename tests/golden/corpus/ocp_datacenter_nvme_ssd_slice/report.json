@@ -8,7 +8,7 @@
     "tables": true
   },
   "failed_pages": [],
-  "finished_at": "2026-06-14T07:07:38.541598Z",
+  "finished_at": "2026-06-14T07:27:01.863763Z",
   "page_results": [
     {
       "char_count": 164,
@@ -117,7 +117,7 @@
     }
   ],
   "schema_version": "1.0",
-  "started_at": "2026-06-14T07:07:38.455991Z",
+  "started_at": "2026-06-14T07:27:01.778451Z",
   "status": "success",
   "summary": {
     "actionable_warning_count": 0,
@@ -154,7 +154,7 @@
     },
     "page_worker_count": 1,
     "page_worker_effective_count": 1,
-    "pages_per_second": 58.4064,
+    "pages_per_second": 58.6084,
     "partial_success": false,
     "pdf_open_count": 2,
     "processed_pages": 5,
@@ -194,8 +194,8 @@
       "rag_technical_tables": 2,
       "rag_text_blocks": 0,
       "reporting": 0,
-      "table_extraction": 8,
-      "text_extraction": 61
+      "table_extraction": 7,
+      "text_extraction": 62
     },
     "structure_low_confidence_count": 0,
     "structure_marker_recovered_context_count": 0,
