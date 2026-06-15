@@ -147,6 +147,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Opt-in page crop fallback for captioned figures without embedded image objects.",
     )
     parser.add_argument(
+        "--image-extraction-page-timeout-seconds",
+        type=float,
+        default=None,
+        help="Optional per-page image extraction timeout. Timed-out pages are skipped with structured warnings.",
+    )
+    parser.add_argument(
+        "--image-extraction-stage-timeout-seconds",
+        type=float,
+        default=None,
+        help="Optional image extraction stage timeout. Remaining image pages are skipped on timeout.",
+    )
+    parser.add_argument(
+        "--figure-semantics-stage-timeout-seconds",
+        type=float,
+        default=None,
+        help="Optional timeout for figure OCR, generated descriptions, and structure sidecars.",
+    )
+    parser.add_argument(
         "--retrieval-chunk-max-tokens",
         type=int,
         default=None,
@@ -246,6 +264,9 @@ def _build_single_config(args: argparse.Namespace) -> Config:
         dedupe_images=_option_value(args.dedupe_images, profile_options.dedupe_images),
         repair_hyphenation=_option_value(args.repair_hyphenation, profile_options.repair_hyphenation),
         figure_crop_fallback=_option_value(args.figure_crop_fallback, profile_options.figure_crop_fallback),
+        image_extraction_page_timeout_seconds=args.image_extraction_page_timeout_seconds,
+        image_extraction_stage_timeout_seconds=args.image_extraction_stage_timeout_seconds,
+        figure_semantics_stage_timeout_seconds=args.figure_semantics_stage_timeout_seconds,
         retrieval_chunk_max_tokens=_option_value(
             args.retrieval_chunk_max_tokens,
             profile_options.retrieval_chunk_max_tokens,
@@ -310,6 +331,9 @@ def _run_batch_conversion(args: argparse.Namespace) -> int:
         dedupe_images=_option_value(args.dedupe_images, profile_options.dedupe_images),
         repair_hyphenation=_option_value(args.repair_hyphenation, profile_options.repair_hyphenation),
         figure_crop_fallback=_option_value(args.figure_crop_fallback, profile_options.figure_crop_fallback),
+        image_extraction_page_timeout_seconds=args.image_extraction_page_timeout_seconds,
+        image_extraction_stage_timeout_seconds=args.image_extraction_stage_timeout_seconds,
+        figure_semantics_stage_timeout_seconds=args.figure_semantics_stage_timeout_seconds,
         retrieval_chunk_max_tokens=_option_value(
             args.retrieval_chunk_max_tokens,
             profile_options.retrieval_chunk_max_tokens,

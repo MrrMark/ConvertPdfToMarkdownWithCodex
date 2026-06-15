@@ -144,6 +144,38 @@ def _add_report_summary_json_schema_extras(schema: dict[str, Any]) -> None:
             "description": "True when figure sidecars were intentionally skipped because image extraction was disabled.",
         },
     )
+    for name, description in {
+        "image_extraction_page_timeout_seconds": "Configured per-page image extraction timeout in seconds.",
+        "image_extraction_stage_timeout_seconds": "Configured image extraction stage timeout in seconds.",
+        "figure_semantics_stage_timeout_seconds": "Configured figure semantics stage timeout in seconds.",
+    }.items():
+        properties.setdefault(name, {"type": ["number", "null"], "description": description})
+    for name, description in {
+        "image_extraction_page_timeout_count": "Number of pages skipped by per-page image extraction timeout.",
+        "image_extraction_stage_timeout_count": "Number of image extraction stage timeout events.",
+        "image_extraction_processed_page_count": "Number of image extraction pages completed.",
+        "image_extraction_skipped_page_count": "Number of image extraction pages skipped.",
+        "image_extraction_last_page": "Last image extraction page observed before completion or timeout.",
+        "image_extraction_last_image_count": "Image count for the last image extraction page observed.",
+        "figure_semantics_stage_timeout_count": "Number of figure semantics stage timeout events.",
+        "figure_semantics_timeout_elapsed_ms": "Elapsed milliseconds when figure semantics timeout was recorded.",
+    }.items():
+        properties.setdefault(name, {"type": ["integer", "null"], "description": description})
+    properties.setdefault(
+        "image_extraction_timed_out_pages",
+        {
+            "type": "array",
+            "items": {"type": "integer"},
+            "description": "Pages skipped by image extraction page timeout.",
+        },
+    )
+    properties.setdefault(
+        "figure_semantics_timeout_stage",
+        {
+            "type": ["string", "null"],
+            "description": "Figure semantics substage skipped when the timeout was recorded.",
+        },
+    )
 
 
 class ReportSummary(BaseModel):

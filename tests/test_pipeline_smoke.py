@@ -90,6 +90,12 @@ def test_pipeline_emits_observer_only_page_progress(tmp_path: Path) -> None:
     assert result.exit_code == EXIT_SUCCESS
     assert [(event.status, event.current, event.total, event.page) for event in events] == [
         ("pages_selected", 0, 3, None),
+        ("image_extraction_page_started", 0, 3, 1),
+        ("image_extraction_page_finished", 1, 3, 1),
+        ("image_extraction_page_started", 1, 3, 2),
+        ("image_extraction_page_finished", 2, 3, 2),
+        ("image_extraction_page_started", 2, 3, 3),
+        ("image_extraction_page_finished", 3, 3, 3),
         ("page_started", 0, 3, 1),
         ("page_finished", 1, 3, 1),
         ("page_started", 1, 3, 2),
@@ -97,4 +103,7 @@ def test_pipeline_emits_observer_only_page_progress(tmp_path: Path) -> None:
         ("page_started", 2, 3, 3),
         ("page_finished", 3, 3, 3),
     ]
-    assert all(event.stage in {"page_selection", "normalization"} for event in events)
+    assert all(event.stage in {"page_selection", "image_extraction", "normalization"} for event in events)
+    image_events = [event for event in events if event.stage == "image_extraction"]
+    assert all(event.image_count == 0 for event in image_events)
+    assert all(event.elapsed_ms is not None for event in image_events)

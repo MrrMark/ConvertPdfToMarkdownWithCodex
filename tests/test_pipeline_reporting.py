@@ -294,6 +294,58 @@ def test_no_image_mode_skips_image_boxes_and_visual_sidecars(
     assert not (output_dir / "figure_structures_rag.jsonl").exists()
 
 
+def test_figure_semantics_stage_timeout_skips_remaining_visual_sidecars(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    ticks = iter([0.0, 0.0, 0.002, 0.003])
+    last_tick = 0.003
+
+    def fake_monotonic() -> float:
+        nonlocal last_tick
+        try:
+            last_tick = next(ticks)
+        except StopIteration:
+            pass
+        return last_tick
+
+    monkeypatch.setattr(pipeline_module.time, "monotonic", fake_monotonic)
+    monkeypatch.setattr(pipeline_module, "extract_images", lambda *args, **kwargs: ImageExtractionResult())
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "figure-semantics-timeout"
+    result = run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=output_dir,
+            image_mode=ImageMode.PLACEHOLDER,
+            rag_figure_text_chunks=True,
+            rag_generated_figure_descriptions=True,
+            figure_structure_extraction=True,
+            figure_semantics_stage_timeout_seconds=0.001,
+        )
+    )
+
+    assert result.exit_code == EXIT_SUCCESS
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+
+    assert report["warnings"][0]["code"] == WarningCode.FIGURE_SEMANTICS_STAGE_TIMEOUT
+    assert report["warnings"][0]["details"]["stage"] == "rag_figure_descriptions"
+    assert report["summary"]["figure_semantics_stage_timeout_count"] == 1
+    assert report["summary"]["figure_semantics_timeout_stage"] == "rag_figure_descriptions"
+    assert report["summary"]["advisory_warning_count"] == 1
+    assert report["summary"]["actionable_warning_count"] == 0
+    assert manifest["options"]["figure_semantics_stage_timeout_seconds"] == 0.001
+    assert (output_dir / "figures_rag.jsonl").exists()
+    assert not (output_dir / "figure_descriptions_rag.jsonl").exists()
+    assert not (output_dir / "figure_structures_rag.jsonl").exists()
+    assert "figure_descriptions_jsonl_filename" not in manifest["options"]
+    assert "figure_structures_jsonl_filename" not in manifest["options"]
+
+
 def test_pipeline_applies_structure_marker_recovery_without_inserting_image_block(
     sample_pdf: Path,
     tmp_path: Path,

@@ -40,6 +40,9 @@ class Config(BaseModel):
     dedupe_images: bool = False
     repair_hyphenation: bool = False
     figure_crop_fallback: bool = False
+    image_extraction_page_timeout_seconds: Optional[float] = None
+    image_extraction_stage_timeout_seconds: Optional[float] = None
+    figure_semantics_stage_timeout_seconds: Optional[float] = None
     retrieval_chunk_max_tokens: int = 512
     retrieval_tokenizer: str = "char"
     rag_contextual_embedding_text: bool = False
@@ -82,6 +85,17 @@ class Config(BaseModel):
     def _validate_page_workers(cls, value: int) -> int:
         if value < 1:
             raise ValueError("page_workers must be >= 1")
+        return value
+
+    @field_validator(
+        "image_extraction_page_timeout_seconds",
+        "image_extraction_stage_timeout_seconds",
+        "figure_semantics_stage_timeout_seconds",
+    )
+    @classmethod
+    def _validate_optional_positive_seconds(cls, value: Optional[float]) -> Optional[float]:
+        if value is not None and value <= 0:
+            raise ValueError("timeout seconds must be > 0")
         return value
 
     @field_validator("retrieval_chunk_max_tokens")
