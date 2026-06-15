@@ -234,6 +234,10 @@
           "title": "Figure Rag Record Count",
           "type": "integer"
         },
+        "figure_sidecars_skipped": {
+          "description": "True when figure sidecars were intentionally skipped because image extraction was disabled.",
+          "type": "boolean"
+        },
         "font_heading_candidate_count": {
           "default": 0,
           "title": "Font Heading Candidate Count",
@@ -253,6 +257,14 @@
           "default": 0,
           "title": "Hyphenation Repair Count",
           "type": "integer"
+        },
+        "image_extraction_skip_reason": {
+          "description": "Stable no-image skip reason, currently image_mode_none.",
+          "type": "string"
+        },
+        "image_extraction_skipped": {
+          "description": "True when image_mode=none intentionally skipped image/figure extraction.",
+          "type": "boolean"
         },
         "list_item_count": {
           "default": 0,

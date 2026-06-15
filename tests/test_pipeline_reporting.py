@@ -12,7 +12,7 @@ from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrMetrics, OcrResult
 from pdf2md.extractors.tables import TableExtractionResult
 from pdf2md.extractors.text import PageLayoutMetadata, TextLayoutResult, TextLine
-from pdf2md.models import ImageMode, TableAsset, TableMode, WarningEntry
+from pdf2md.models import DomainAdapterMode, ImageMode, TableAsset, TableMode, WarningEntry
 from pdf2md.pipeline import EXIT_PARTIAL, EXIT_SUCCESS, run_conversion
 from pdf2md.reporting import determine_conversion_status, is_advisory_warning, warning_affects_exit_code
 
@@ -226,6 +226,72 @@ def test_manifest_uses_canonical_html_mode_for_legacy_alias(sample_pdf: Path, tm
     report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
     assert manifest["options"]["table_mode"] == "html"
     assert report["summary"]["table_mode_requested"] == "html"
+
+
+def test_no_image_mode_skips_image_boxes_and_visual_sidecars(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def fail_get_image_boxes(*args, **kwargs):  # noqa: ANN001
+        raise AssertionError("get_image_boxes must not run in image_mode=none")
+
+    def fail_extract_images(*args, **kwargs):  # noqa: ANN001
+        raise AssertionError("extract_images must not run in image_mode=none")
+
+    def fail_figure_semantics(*args, **kwargs):  # noqa: ANN001
+        raise AssertionError("figure semantics must not run in image_mode=none")
+
+    monkeypatch.setattr(pipeline_module.PdfDocumentContext, "get_image_boxes", fail_get_image_boxes)
+    monkeypatch.setattr(pipeline_module, "extract_images", fail_extract_images)
+    monkeypatch.setattr(pipeline_module, "augment_figure_records_with_region_ocr", fail_figure_semantics)
+    monkeypatch.setattr(pipeline_module, "build_figure_description_records", fail_figure_semantics)
+    monkeypatch.setattr(pipeline_module, "build_figure_structure_records", fail_figure_semantics)
+    monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "no-image"
+    result = run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=output_dir,
+            image_mode=ImageMode.NONE,
+            rag_profile="technical_spec_rag_visual",
+            domain_adapter=DomainAdapterMode.NVME,
+            rag_figure_text_chunks=True,
+            figure_region_ocr=True,
+            rag_generated_figure_descriptions=True,
+            figure_structure_extraction=True,
+        )
+    )
+
+    assert result.exit_code == EXIT_SUCCESS
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+
+    assert manifest["options"]["image_mode"] == "none"
+    assert manifest["options"]["image_extraction_skipped"] is True
+    assert manifest["options"]["image_extraction_skip_reason"] == "image_mode_none"
+    assert manifest["options"]["figure_sidecars_skipped"] is True
+    assert "figures_rag_jsonl_filename" not in manifest["options"]
+    assert "figure_descriptions_jsonl_filename" not in manifest["options"]
+    assert "figure_structures_jsonl_filename" not in manifest["options"]
+    assert manifest["images"] == []
+    assert manifest["excluded_images"] == []
+
+    assert report["status"] == "success"
+    assert report["warnings"][0]["code"] == WarningCode.IMAGE_EXTRACTION_SKIPPED
+    assert report["warnings"][0]["details"]["skip_reason"] == "image_mode_none"
+    assert report["summary"]["image_extraction_skipped"] is True
+    assert report["summary"]["image_extraction_skip_reason"] == "image_mode_none"
+    assert report["summary"]["figure_sidecars_skipped"] is True
+    assert report["summary"]["figure_rag_record_count"] == 0
+    assert report["summary"]["figure_rag_file_count"] == 0
+    assert report["summary"]["advisory_warning_count"] == 1
+    assert report["summary"]["actionable_warning_count"] == 0
+    assert not (output_dir / "figures_rag.jsonl").exists()
+    assert not (output_dir / "figure_descriptions_rag.jsonl").exists()
+    assert not (output_dir / "figure_structures_rag.jsonl").exists()
 
 
 def test_pipeline_applies_structure_marker_recovery_without_inserting_image_block(

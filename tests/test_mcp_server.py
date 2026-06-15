@@ -31,6 +31,7 @@ def test_list_profiles_exposes_agent_selectable_modes() -> None:
     assert visual["figure_structure_extraction"] is True
     assert "nvme" in payload["domain_adapters"]
     assert "placeholder" in payload["image_modes"]
+    assert "none" in payload["image_modes"]
     assert "minimal" in payload["rag_sidecar_scopes"]
 
 
@@ -98,6 +99,55 @@ def test_convert_pdf_builds_assetless_technical_config_and_hides_password(
     assert result["options"]["manual_domain_adapter_keywords_supplied"] is True
     assert "secret" not in json.dumps(result, ensure_ascii=False, sort_keys=True)
     assert result["artifact_uris"]["document.md"].startswith("file://")
+
+
+def test_convert_pdf_accepts_no_image_mode_override(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "spec.pdf"
+    input_pdf.write_bytes(b"%PDF-1.4\n% synthetic placeholder\n")
+    output_dir = tmp_path / "out"
+    captured = {}
+
+    def fake_run_conversion(config):  # noqa: ANN001
+        captured["config"] = config
+        output_dir.mkdir()
+        markdown_path = output_dir / "document.md"
+        manifest_path = output_dir / "manifest.json"
+        report_path = output_dir / "report.json"
+        markdown_path.write_text("# Spec\n", encoding="utf-8")
+        manifest_path.write_text("{}", encoding="utf-8")
+        report_path.write_text("{}", encoding="utf-8")
+        return SimpleNamespace(
+            exit_code=0,
+            markdown_path=markdown_path,
+            manifest_path=manifest_path,
+            report_path=report_path,
+            warnings=[],
+            status=ConversionStatus.SUCCESS,
+            report=None,
+        )
+
+    monkeypatch.setattr(mcp_server, "run_conversion", fake_run_conversion)
+
+    result = mcp_server.convert_pdf(
+        input_pdf=str(input_pdf),
+        output_dir=str(output_dir),
+        rag_profile="technical_spec_rag_visual",
+        domain_adapter="nvme",
+        image_mode="none",
+        roots=[tmp_path],
+    )
+
+    config = captured["config"]
+    assert config.image_mode == "none"
+    assert config.rag_profile == "technical_spec_rag_visual"
+    assert config.rag_figure_text_chunks is True
+    assert config.figure_region_ocr is True
+    assert config.rag_generated_figure_descriptions is True
+    assert config.figure_structure_extraction is True
+    assert result["options"]["image_mode"] == "none"
 
 
 def test_convert_pdf_requires_domain_adapter_for_technical_profile(tmp_path: Path) -> None:

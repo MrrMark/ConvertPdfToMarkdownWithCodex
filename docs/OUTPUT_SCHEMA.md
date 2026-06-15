@@ -88,6 +88,13 @@ Stable nested fields:
 - `tables[].continuation_group`, `continued_from_page`, `continued_to_page`, `continuation_confidence`
 - `tables[].continuation_reasons`, `continuation_rejected_reasons`, `continuation_features`
 
+Image mode policy:
+
+- `options.image_mode` is one of `referenced`, `embedded`, `placeholder`, or `none`.
+- `image_mode=placeholder` keeps figure provenance and may write `figures_rag.jsonl`, but Markdown image links are replaced with placeholder comments.
+- `image_mode=none` is a true no-image mode. It skips image box detection, image extraction, figure crop fallback, figure OCR, generated figure descriptions, figure structures, and figure sidecars.
+- In no-image mode, `options.image_extraction_skipped=true`, `options.image_extraction_skip_reason="image_mode_none"`, and `options.figure_sidecars_skipped=true`.
+
 Supported `options.rag_profile` values:
 
 - `preserve`
@@ -140,6 +147,12 @@ Stable summary fields:
 - `technical_table_record_count`, `technical_table_file_count`
 - `confidential_safe_mode`
 - `font_heading_candidate_count`, `footnote_candidate_count`, `structure_low_confidence_count`
+
+No-image summary fields:
+
+- `image_extraction_skipped`: present and `true` when `image_mode=none` skipped image/figure extraction.
+- `image_extraction_skip_reason`: stable skip reason, currently `image_mode_none`.
+- `figure_sidecars_skipped`: present and `true` when figure sidecars were intentionally not written because image extraction was disabled.
 
 Non-full sidecar scope summary fields:
 
@@ -899,6 +912,7 @@ Policy:
 
 - The sidecar records extracted image assets and excluded image candidates.
 - In `image_mode=placeholder` or `embedded`, `path` may be provenance only and the image file may not exist on disk.
+- In `image_mode=none`, this sidecar is not written; figure captions that appear in the PDF text layer remain ordinary text.
 - `figure_kind` is conservative metadata such as `image`, `diagram`, `state_machine`, `sequence_diagram`, or `register_layout`.
 - Low-confidence OCR/label candidates stay in `diagram_label_diagnostics.rejected_ocr_candidates`; only promoted candidates appear in `detected_labels`.
 - `figure_region_ocr.region_ocr` may record `candidate`, `runtime_unavailable`, or `rejected` status with reasons such as `missing_bbox`, `invalid_bbox`, `empty_result`, `language_data_missing`, or `ocr_failed`. Label-pattern and confidence rejection details stay in `figure_region_ocr.rejected_candidates`.

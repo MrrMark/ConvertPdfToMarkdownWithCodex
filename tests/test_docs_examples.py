@@ -373,6 +373,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
     quality_scorecard = Path("docs/QUALITY_SCORECARD.md").read_text(encoding="utf-8")
     changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+    mcp_nvme_stability_spec = Path("docs/PDF2MD_MCP_NVME_BASE_STABILITY_DEVELOPMENT_SPEC.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "python-version" in workflow
     assert '"3.11"' in workflow
@@ -461,7 +464,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q114. Docling Layout Adapter Comparison Mode" not in next_plan
     assert "Q115. Visual Technical Spec RAG Profile and Metrics" not in next_plan
     assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
+    assert "Q117. MCP NVMe Base Large Conversion Stability" in next_plan
+    assert "현재 남은 작업 없음." not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in next_plan
@@ -511,13 +515,14 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q114. Docling Layout Adapter Comparison Mode" not in development_specs
     assert "Q115. Visual Technical Spec RAG Profile and Metrics" not in development_specs
     assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" not in development_specs
+    assert "Q117. MCP NVMe Base Large Conversion Stability" in development_specs
     assert "figure_descriptions_rag.jsonl" not in development_specs
     assert "figure_structures_rag.jsonl" not in development_specs
     assert "--rag-generated-figure-descriptions" not in development_specs
     assert "generated_text=true" not in development_specs
     assert "placeholder + figure_text chunk" not in development_specs
     assert "다중 OCR backend" not in development_specs
-    assert "현재 active 개발 명세 없음." in development_specs
+    assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in development_specs
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in development_specs
@@ -566,10 +571,19 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q48. Corpus Evidence Signature Analysis Report" not in development_specs
     assert "Q52. Quality Document And Schema History Contract" not in development_specs
     assert "Q53. Minimal Desktop GUI Wrapper" not in development_specs
-    assert "Q115/Q116은 구현, 검증, PR merge까지 완료" in next_plan
-    assert "ssd-verification-agent` repo에서 수행할 sidecar direct ingest/API/MCP/SpecAnalysisAgent" in next_plan
-    assert "docs/VISUAL_TECHNICAL_SPEC_RAG_DEVELOPMENT_SPEC.md" in next_plan
-    assert "docs/SSD_VERIFICATION_AGENT_PDF2MD_VISUAL_RAG_HANDOFF_SPEC.md" in next_plan
+    assert "docs/PDF2MD_MCP_NVME_BASE_STABILITY_DEVELOPMENT_SPEC.md" in next_plan
+    assert "true no-image mode" in next_plan
+    assert "page-window" in next_plan
+    assert "image/figure extraction timeout" in next_plan
+    assert "docs/PDF2MD_MCP_NVME_BASE_STABILITY_DEVELOPMENT_SPEC.md" in development_specs
+    assert "image_mode=none" in development_specs
+    assert "MCP page-window conversion" in development_specs
+    assert "Status: Active Q117 development spec." in mcp_nvme_stability_spec
+    assert "ImageMode.PLACEHOLDER" in mcp_nvme_stability_spec
+    assert "P0-1. True No-Image Mode" in mcp_nvme_stability_spec
+    assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
+    assert "interrupted_report.json" in mcp_nvme_stability_spec
+    assert "page_window_merge_report.json" in mcp_nvme_stability_spec
     assert "완료된 Q34-Q116" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q115. Visual Technical Spec RAG Profile and Metrics" in implemented_specs
