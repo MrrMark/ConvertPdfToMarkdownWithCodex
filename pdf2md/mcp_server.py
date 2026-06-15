@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -20,12 +21,15 @@ from pdf2md.models import (
 )
 from pdf2md.pipeline import ConversionResult, run_conversion
 from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, TECHNICAL_SPEC_RAG_PROFILES, rag_profile_options
+from pdf2md.utils.page_range import parse_page_range
+from pdf2md.utils.pdf import open_pdf_reader
 
 
 SERVER_NAME = "pdf2md"
 MCP_EXTRA = "pdf2md[mcp]"
 MCP_ROOTS_ENV = "PDF2MD_MCP_ROOTS"
 DEFAULT_WARNING_LIMIT = 20
+WINDOW_OUTPUT_ROOT = "windows"
 ARTIFACT_FILENAMES = (
     "document.md",
     "manifest.json",
@@ -93,6 +97,77 @@ def _optional_enum(value: str | None, enum_type: type[Any], default: str) -> Any
     return enum_type(default if value is None else value)
 
 
+def _file_sha256(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _format_page_range(pages: list[int]) -> str:
+    if not pages:
+        raise ValueError("Cannot format an empty page selection")
+    ranges: list[str] = []
+    start = previous = pages[0]
+    for page in pages[1:]:
+        if page == previous + 1:
+            previous = page
+            continue
+        ranges.append(f"{start}-{previous}" if start != previous else str(start))
+        start = previous = page
+    ranges.append(f"{start}-{previous}" if start != previous else str(start))
+    return ",".join(ranges)
+
+
+def _window_id(start_page: int, end_page: int) -> str:
+    return f"pages-{start_page:04d}-{end_page:04d}"
+
+
+def _window_output_subdir(window_id: str) -> str:
+    return f"{WINDOW_OUTPUT_ROOT}/{window_id}"
+
+
+def _selected_pages_for_pdf(input_pdf: Path, *, pages: str | None, password: str | None) -> tuple[int, list[int]]:
+    reader = open_pdf_reader(input_pdf, password)
+    total_pages = len(reader.pages)
+    return total_pages, parse_page_range(pages, total_pages)
+
+
+def _build_page_window_records(
+    *,
+    selected_pages: list[int],
+    source_sha256: str,
+    output_dir: Path,
+    window_size: int,
+) -> list[dict[str, Any]]:
+    if window_size < 1:
+        raise ValueError("window_size must be >= 1")
+
+    windows: list[dict[str, Any]] = []
+    for index, offset in enumerate(range(0, len(selected_pages), window_size), start=1):
+        window_pages = selected_pages[offset : offset + window_size]
+        start_page = window_pages[0]
+        end_page = window_pages[-1]
+        window_id = _window_id(start_page, end_page)
+        output_subdir = _window_output_subdir(window_id)
+        windows.append(
+            {
+                "window_index": index,
+                "window_id": window_id,
+                "page_range": _format_page_range(window_pages),
+                "start_page": start_page,
+                "end_page": end_page,
+                "selected_pages": window_pages,
+                "selected_page_count": len(window_pages),
+                "source_sha256": source_sha256,
+                "output_subdir": output_subdir,
+                "output_dir": str(output_dir / WINDOW_OUTPUT_ROOT / window_id),
+            }
+        )
+    return windows
+
+
 def list_profiles() -> dict[str, Any]:
     """Return supported local RAG profiles and their deterministic option bundles."""
     return {
@@ -107,6 +182,131 @@ def list_profiles() -> dict[str, Any]:
         "rag_table_outputs": [mode.value for mode in RagTableOutputMode],
         "output_profiles": [profile.value for profile in OutputProfile],
         "rag_sidecar_scopes": [scope.value for scope in RagSidecarScope],
+    }
+
+
+def plan_page_windows(
+    *,
+    input_pdf: str,
+    output_dir: str | None = None,
+    pages: str | None = None,
+    password: str | None = None,
+    window_size: int = 100,
+    roots: list[Path] | None = None,
+) -> dict[str, Any]:
+    """Plan deterministic page windows for a large PDF conversion."""
+    allowed_roots = roots or configured_roots()
+    resolved_input = ensure_within_roots(input_pdf, allowed_roots, label="input_pdf")
+    if output_dir is None:
+        resolved_output = default_output_dir_for_input(resolved_input)
+        ensure_within_roots(resolved_output, allowed_roots, label="output_dir")
+    else:
+        resolved_output = ensure_within_roots(output_dir, allowed_roots, label="output_dir")
+    total_pages, selected_pages = _selected_pages_for_pdf(resolved_input, pages=pages, password=password)
+    source_sha256 = _file_sha256(resolved_input)
+    windows = _build_page_window_records(
+        selected_pages=selected_pages,
+        source_sha256=source_sha256,
+        output_dir=resolved_output,
+        window_size=window_size,
+    )
+    return {
+        "schema_version": "1.0",
+        "purpose": "page_window_plan",
+        "input_pdf": str(resolved_input),
+        "output_dir": str(resolved_output),
+        "source_sha256": source_sha256,
+        "total_pages": total_pages,
+        "selected_pages": selected_pages,
+        "selected_page_count": len(selected_pages),
+        "window_size": window_size,
+        "window_count": len(windows),
+        "windows": windows,
+        "password_supplied": password is not None,
+    }
+
+
+def _find_window(plan: dict[str, Any], window_id: str) -> dict[str, Any]:
+    for window in plan["windows"]:
+        if window["window_id"] == window_id:
+            return window
+    raise ValueError(f"window_id not found in page-window plan: {window_id}")
+
+
+def convert_page_window(
+    *,
+    input_pdf: str,
+    output_dir: str | None = None,
+    window_id: str,
+    pages: str | None = None,
+    password: str | None = None,
+    window_size: int = 100,
+    rag_profile: str = "preserve",
+    domain_adapter: str | None = None,
+    manual_domain_adapter_label: str | None = None,
+    manual_domain_adapter_keywords: str | None = None,
+    image_mode: str | None = None,
+    table_mode: str | None = None,
+    rag_table_output: str | None = None,
+    output_profile: str = OutputProfile.FULL.value,
+    rag_sidecar_scope: str | None = None,
+    force_ocr: bool = False,
+    ocr_lang: str = "eng",
+    ocr_backend: str = "tesseract",
+    page_workers: int = 1,
+    assetless_figure_text: bool = False,
+    image_extraction_page_timeout_seconds: float | None = None,
+    image_extraction_stage_timeout_seconds: float | None = None,
+    figure_semantics_stage_timeout_seconds: float | None = None,
+    require_domain_adapter_for_technical_profile: bool = True,
+    skip_existing: bool = False,
+    warning_limit: int = DEFAULT_WARNING_LIMIT,
+    roots: list[Path] | None = None,
+) -> dict[str, Any]:
+    """Convert one planned page window into its stable windows/pages-* output directory."""
+    allowed_roots = roots or configured_roots()
+    plan = plan_page_windows(
+        input_pdf=input_pdf,
+        output_dir=output_dir,
+        pages=pages,
+        password=password,
+        window_size=window_size,
+        roots=allowed_roots,
+    )
+    window = _find_window(plan, window_id)
+    conversion = convert_pdf(
+        input_pdf=input_pdf,
+        output_dir=window["output_dir"],
+        rag_profile=rag_profile,
+        domain_adapter=domain_adapter,
+        manual_domain_adapter_label=manual_domain_adapter_label,
+        manual_domain_adapter_keywords=manual_domain_adapter_keywords,
+        pages=window["page_range"],
+        password=password,
+        image_mode=image_mode,
+        table_mode=table_mode,
+        rag_table_output=rag_table_output,
+        output_profile=output_profile,
+        rag_sidecar_scope=rag_sidecar_scope,
+        force_ocr=force_ocr,
+        ocr_lang=ocr_lang,
+        ocr_backend=ocr_backend,
+        page_workers=page_workers,
+        assetless_figure_text=assetless_figure_text,
+        image_extraction_page_timeout_seconds=image_extraction_page_timeout_seconds,
+        image_extraction_stage_timeout_seconds=image_extraction_stage_timeout_seconds,
+        figure_semantics_stage_timeout_seconds=figure_semantics_stage_timeout_seconds,
+        require_domain_adapter_for_technical_profile=require_domain_adapter_for_technical_profile,
+        skip_existing=skip_existing,
+        warning_limit=warning_limit,
+        roots=allowed_roots,
+    )
+    return {
+        "schema_version": "1.0",
+        "purpose": "page_window_conversion",
+        "source_sha256": plan["source_sha256"],
+        "window": window,
+        "conversion": conversion,
     }
 
 
@@ -512,6 +712,86 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
     def pdf2md_list_profiles() -> dict[str, Any]:
         """List supported pdf2md RAG profiles, adapters, and output modes."""
         return list_profiles()
+
+    @mcp.tool()
+    def pdf2md_plan_page_windows(
+        input_pdf: str,
+        output_dir: str | None = None,
+        pages: str | None = None,
+        password: str | None = None,
+        window_size: int = 100,
+    ) -> dict[str, Any]:
+        """Plan deterministic page windows for a large PDF conversion."""
+        return plan_page_windows(
+            input_pdf=input_pdf,
+            output_dir=output_dir,
+            pages=pages,
+            password=password,
+            window_size=window_size,
+            roots=roots,
+        )
+
+    @mcp.tool()
+    def pdf2md_convert_page_window(
+        input_pdf: str,
+        output_dir: str | None = None,
+        window_id: str = "",
+        pages: str | None = None,
+        password: str | None = None,
+        window_size: int = 100,
+        rag_profile: str = "preserve",
+        domain_adapter: str | None = None,
+        manual_domain_adapter_label: str | None = None,
+        manual_domain_adapter_keywords: str | None = None,
+        image_mode: str | None = None,
+        table_mode: str | None = None,
+        rag_table_output: str | None = None,
+        output_profile: str = OutputProfile.FULL.value,
+        rag_sidecar_scope: str | None = None,
+        force_ocr: bool = False,
+        ocr_lang: str = "eng",
+        ocr_backend: str = "tesseract",
+        page_workers: int = 1,
+        assetless_figure_text: bool = False,
+        image_extraction_page_timeout_seconds: float | None = None,
+        image_extraction_stage_timeout_seconds: float | None = None,
+        figure_semantics_stage_timeout_seconds: float | None = None,
+        require_domain_adapter_for_technical_profile: bool = True,
+        skip_existing: bool = False,
+        warning_limit: int = DEFAULT_WARNING_LIMIT,
+    ) -> dict[str, Any]:
+        """Convert one planned page window into its stable windows/pages-* output directory."""
+        if not window_id:
+            raise ValueError("window_id is required")
+        return convert_page_window(
+            input_pdf=input_pdf,
+            output_dir=output_dir,
+            window_id=window_id,
+            pages=pages,
+            password=password,
+            window_size=window_size,
+            rag_profile=rag_profile,
+            domain_adapter=domain_adapter,
+            manual_domain_adapter_label=manual_domain_adapter_label,
+            manual_domain_adapter_keywords=manual_domain_adapter_keywords,
+            image_mode=image_mode,
+            table_mode=table_mode,
+            rag_table_output=rag_table_output,
+            output_profile=output_profile,
+            rag_sidecar_scope=rag_sidecar_scope,
+            force_ocr=force_ocr,
+            ocr_lang=ocr_lang,
+            ocr_backend=ocr_backend,
+            page_workers=page_workers,
+            assetless_figure_text=assetless_figure_text,
+            image_extraction_page_timeout_seconds=image_extraction_page_timeout_seconds,
+            image_extraction_stage_timeout_seconds=image_extraction_stage_timeout_seconds,
+            figure_semantics_stage_timeout_seconds=figure_semantics_stage_timeout_seconds,
+            require_domain_adapter_for_technical_profile=require_domain_adapter_for_technical_profile,
+            skip_existing=skip_existing,
+            warning_limit=warning_limit,
+            roots=roots,
+        )
 
     @mcp.tool()
     def pdf2md_convert_pdf(
