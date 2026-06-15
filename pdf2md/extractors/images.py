@@ -1387,6 +1387,9 @@ def extract_images(
     page_text_lines: dict[int, list[dict]] | None = None,
 ) -> ImageExtractionResult:
     result = ImageExtractionResult()
+    if image_mode == ImageMode.NONE:
+        return result
+
     images_root = output_dir / assets_dirname / "images"
     images_root.mkdir(parents=True, exist_ok=True)
 

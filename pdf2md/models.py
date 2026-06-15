@@ -11,6 +11,7 @@ class ImageMode(str, Enum):
     REFERENCED = "referenced"
     EMBEDDED = "embedded"
     PLACEHOLDER = "placeholder"
+    NONE = "none"
 
 
 class TableMode(str, Enum):
@@ -120,8 +121,33 @@ class PageResult(BaseModel):
     header_footer_suppressed_count: int = 0
 
 
+def _add_report_summary_json_schema_extras(schema: dict[str, Any]) -> None:
+    properties = schema.setdefault("properties", {})
+    properties.setdefault(
+        "image_extraction_skipped",
+        {
+            "type": "boolean",
+            "description": "True when image_mode=none intentionally skipped image/figure extraction.",
+        },
+    )
+    properties.setdefault(
+        "image_extraction_skip_reason",
+        {
+            "type": "string",
+            "description": "Stable no-image skip reason, currently image_mode_none.",
+        },
+    )
+    properties.setdefault(
+        "figure_sidecars_skipped",
+        {
+            "type": "boolean",
+            "description": "True when figure sidecars were intentionally skipped because image extraction was disabled.",
+        },
+    )
+
+
 class ReportSummary(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", json_schema_extra=_add_report_summary_json_schema_extras)
 
     processed_pages: int = 0
     warning_count: int = 0

@@ -10,7 +10,7 @@ from typing import Callable, Literal, Optional
 from pdf2md.config import Config
 from pdf2md.constants import WarningCode
 from pdf2md.extractors.header_footer import remove_repeated_header_footer
-from pdf2md.extractors.images import extract_images
+from pdf2md.extractors.images import ImageExtractionResult, extract_images
 from pdf2md.extractors.ocr import (
     OCR_LOW_CONFIDENCE_MEAN_THRESHOLD,
     OCR_LOW_CONFIDENCE_TOKEN_RATIO_THRESHOLD,
@@ -165,6 +165,7 @@ def _expected_full_rag_sidecars(
     *,
     rag_table_output: RagTableOutputMode,
     domain_adapter: DomainAdapterMode,
+    include_figure_provenance: bool,
     include_figure_descriptions: bool,
     include_figure_structures: bool,
 ) -> set[str]:
@@ -173,12 +174,13 @@ def _expected_full_rag_sidecars(
         config.semantic_units_jsonl_filename,
         config.requirements_jsonl_filename,
         config.cross_refs_jsonl_filename,
-        config.figures_rag_jsonl_filename,
         config.requirement_traceability_jsonl_filename,
         config.technical_tables_jsonl_filename,
         config.retrieval_chunks_jsonl_filename,
     }
     outputs.update(_requested_rag_table_sidecars(config, rag_table_output))
+    if include_figure_provenance:
+        outputs.add(config.figures_rag_jsonl_filename)
     if domain_adapter is not DomainAdapterMode.NONE:
         outputs.add(config.domain_units_jsonl_filename)
     if include_figure_descriptions:
@@ -213,6 +215,7 @@ def _written_rag_sidecars_for_scope(
     scope: RagSidecarScope,
     rag_table_output: RagTableOutputMode,
     domain_adapter: DomainAdapterMode,
+    include_figure_provenance: bool,
     include_figure_text_chunks: bool,
     include_figure_descriptions: bool,
     include_figure_structures: bool,
@@ -222,6 +225,7 @@ def _written_rag_sidecars_for_scope(
             config,
             rag_table_output=rag_table_output,
             domain_adapter=domain_adapter,
+            include_figure_provenance=include_figure_provenance,
             include_figure_descriptions=include_figure_descriptions,
             include_figure_structures=include_figure_structures,
         )
@@ -242,6 +246,7 @@ def _omitted_rag_sidecars(
     scope: RagSidecarScope,
     rag_table_output: RagTableOutputMode,
     domain_adapter: DomainAdapterMode,
+    include_figure_provenance: bool,
     include_figure_text_chunks: bool,
     include_figure_descriptions: bool,
     include_figure_structures: bool,
@@ -250,6 +255,7 @@ def _omitted_rag_sidecars(
         config,
         rag_table_output=rag_table_output,
         domain_adapter=domain_adapter,
+        include_figure_provenance=include_figure_provenance,
         include_figure_descriptions=include_figure_descriptions,
         include_figure_structures=include_figure_structures,
     )
@@ -258,6 +264,7 @@ def _omitted_rag_sidecars(
         scope=scope,
         rag_table_output=rag_table_output,
         domain_adapter=domain_adapter,
+        include_figure_provenance=include_figure_provenance,
         include_figure_text_chunks=include_figure_text_chunks,
         include_figure_descriptions=include_figure_descriptions,
         include_figure_structures=include_figure_structures,
@@ -326,7 +333,7 @@ def _apply_structure_recoveries(
 def _annotate_ocr_warning_context(
     warnings: list[WarningEntry],
     page_results: dict[int, PageResult],
-    page_image_boxes: dict[int, list[object]],
+    page_image_boxes: dict[int, list[object]] | None,
 ) -> None:
     for warning in warnings:
         if warning.code != WarningCode.OCR_EMPTY_RESULT or warning.page is None:
@@ -335,7 +342,8 @@ def _annotate_ocr_warning_context(
         if page_result is not None:
             warning.details.setdefault("text_layer_char_count", page_result.text_layer_char_count)
             warning.details.setdefault("existing_text_char_count", page_result.text_layer_char_count)
-        warning.details.setdefault("page_image_count", len(page_image_boxes.get(warning.page, [])))
+        if page_image_boxes is not None:
+            warning.details.setdefault("page_image_count", len(page_image_boxes.get(warning.page, [])))
 
 
 def _technical_profile_domain_adapter_missing(config: Config, domain_adapter: DomainAdapterMode) -> bool:
@@ -353,6 +361,22 @@ def _technical_profile_domain_adapter_warning(config: Config, domain_adapter: Do
             "rag_profile": config.rag_profile,
             "domain_adapter": domain_adapter.value,
             "recommended_domain_adapters": ["nvme", "pcie", "ocp", "tcg", "spdm", "customer-requirements", "manual"],
+        },
+    )
+
+
+def _no_image_visual_sidecar_warning(config: Config) -> WarningEntry:
+    return WarningEntry(
+        code=WarningCode.IMAGE_EXTRACTION_SKIPPED,
+        message="image_mode=none skipped image extraction and visual figure sidecars.",
+        details={
+            "image_mode": ImageMode.NONE.value,
+            "skip_reason": "image_mode_none",
+            "rag_profile": config.rag_profile,
+            "rag_figure_text_chunks_requested": config.rag_figure_text_chunks,
+            "figure_region_ocr_requested": config.figure_region_ocr,
+            "rag_generated_figure_descriptions_requested": config.rag_generated_figure_descriptions,
+            "figure_structure_extraction_requested": config.figure_structure_extraction,
         },
     )
 
@@ -422,22 +446,39 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     )
     output_profile = _output_profile(config)
     rag_sidecar_scope = _effective_rag_sidecar_scope(config, output_profile)
+    image_extraction_disabled = image_mode is ImageMode.NONE
+    requested_figure_sidecar_features = (
+        config.rag_figure_text_chunks
+        or config.figure_region_ocr
+        or config.rag_generated_figure_descriptions
+        or config.figure_structure_extraction
+    )
+    effective_rag_figure_text_chunks = config.rag_figure_text_chunks and not image_extraction_disabled
+    effective_figure_region_ocr = config.figure_region_ocr and not image_extraction_disabled
+    effective_rag_generated_figure_descriptions = (
+        config.rag_generated_figure_descriptions and not image_extraction_disabled
+    )
+    effective_figure_structure_extraction = config.figure_structure_extraction and not image_extraction_disabled
     include_figure_visual_semantics = (
-        config.figure_region_ocr or config.rag_generated_figure_descriptions or config.figure_structure_extraction
+        effective_figure_region_ocr
+        or effective_rag_generated_figure_descriptions
+        or effective_figure_structure_extraction
     )
     rag_sidecar_omitted_outputs = _omitted_rag_sidecars(
         config,
         scope=rag_sidecar_scope,
         rag_table_output=rag_table_output,
         domain_adapter=domain_adapter,
-        include_figure_text_chunks=config.rag_figure_text_chunks,
-        include_figure_descriptions=config.rag_generated_figure_descriptions,
-        include_figure_structures=config.figure_structure_extraction,
+        include_figure_provenance=not image_extraction_disabled,
+        include_figure_text_chunks=effective_rag_figure_text_chunks,
+        include_figure_descriptions=effective_rag_generated_figure_descriptions,
+        include_figure_structures=effective_figure_structure_extraction,
     )
     write_minimal_rag_sidecars = rag_sidecar_scope in {RagSidecarScope.FULL, RagSidecarScope.MINIMAL}
     write_full_rag_sidecars = rag_sidecar_scope is RagSidecarScope.FULL
-    write_figure_rag_sidecar = write_full_rag_sidecars or (
-        write_minimal_rag_sidecars and (config.rag_figure_text_chunks or include_figure_visual_semantics)
+    write_figure_rag_sidecar = not image_extraction_disabled and (
+        write_full_rag_sidecars
+        or (write_minimal_rag_sidecars and (effective_rag_figure_text_chunks or include_figure_visual_semantics))
     )
     stage_durations_ms: dict[str, int] = {}
 
@@ -451,6 +492,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     warnings: list[WarningEntry] = []
     if _technical_profile_domain_adapter_missing(config, domain_adapter):
         warnings.append(_technical_profile_domain_adapter_warning(config, domain_adapter))
+    if image_extraction_disabled and requested_figure_sidecar_features:
+        warnings.append(_no_image_visual_sidecar_warning(config))
     page_results_map: dict[int, PageResult] = {}
     failed_pages: list[int] = []
     heading_count = 0
@@ -783,22 +826,27 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     finish_stage("table_extraction", table_started)
     table_result.rag_tables = normalize_rag_table_payload(table_result.rag_tables)
     image_started = stage_start()
-    logger.info("Extracting images mode=%s", image_mode)
-    page_image_boxes = {page: pdf_context.get_image_boxes(page) for page in selected_pages}
-    image_result = extract_images(
-        reader=reader,
-        pdf_path=config.input_pdf,
-        selected_pages=selected_pages,
-        password=config.password,
-        output_dir=config.output_dir,
-        image_mode=image_mode,
-        assets_dirname=config.assets_dirname,
-        dedupe_images=config.dedupe_images,
-        figure_crop_fallback=config.figure_crop_fallback,
-        pdf=shared_plumber_pdf,
-        page_image_boxes=page_image_boxes,
-        page_text_lines=raw_lines_by_page,
-    )
+    page_image_boxes: dict[int, list[dict]] | None = None
+    if image_extraction_disabled:
+        logger.info("Skipping image extraction mode=%s", image_mode)
+        image_result = ImageExtractionResult()
+    else:
+        logger.info("Extracting images mode=%s", image_mode)
+        page_image_boxes = {page: pdf_context.get_image_boxes(page) for page in selected_pages}
+        image_result = extract_images(
+            reader=reader,
+            pdf_path=config.input_pdf,
+            selected_pages=selected_pages,
+            password=config.password,
+            output_dir=config.output_dir,
+            image_mode=image_mode,
+            assets_dirname=config.assets_dirname,
+            dedupe_images=config.dedupe_images,
+            figure_crop_fallback=config.figure_crop_fallback,
+            pdf=shared_plumber_pdf,
+            page_image_boxes=page_image_boxes,
+            page_text_lines=raw_lines_by_page,
+        )
     finish_stage("image_extraction", image_started)
     engine_usage["tables"] = len(table_result.assets) > 0
     engine_usage["images"] = len(image_result.assets) > 0
@@ -958,7 +1006,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             excluded_images=image_result.excluded_assets,
             text_block_records=text_block_result.records,
         )
-        if config.figure_region_ocr:
+        if effective_figure_region_ocr:
             figure_records, figure_region_ocr_metrics = augment_figure_records_with_region_ocr(
                 figure_records,
                 pdf_path=config.input_pdf,
@@ -968,7 +1016,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         figure_rag_record_count, figure_rag_file_count = write_figure_rag_output(config, figure_records)
         finish_stage("rag_figures", figure_rag_started)
 
-    if write_minimal_rag_sidecars and config.rag_generated_figure_descriptions:
+    if write_minimal_rag_sidecars and effective_rag_generated_figure_descriptions:
         figure_description_started = stage_start()
         figure_description_records, figure_description_metrics = build_figure_description_records(
             figure_records,
@@ -987,7 +1035,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         )
         finish_stage("rag_figure_descriptions", figure_description_started)
 
-    if write_minimal_rag_sidecars and config.figure_structure_extraction:
+    if write_minimal_rag_sidecars and effective_figure_structure_extraction:
         figure_structure_started = stage_start()
         figure_structure_records, figure_structure_metrics = build_figure_structure_records(figure_records)
         figure_structure_record_count = figure_structure_metrics["figure_structure_record_count"]
@@ -1089,7 +1137,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             max_tokens=config.retrieval_chunk_max_tokens,
             token_counter=retrieval_token_counter,
             contextual_embedding_text=config.rag_contextual_embedding_text,
-            include_figure_text_chunks=config.rag_figure_text_chunks,
+            include_figure_text_chunks=effective_rag_figure_text_chunks,
             merge_sibling_text_blocks=config.rag_merge_sibling_text_chunks,
             relationship_metadata=config.rag_chunk_relationship_metadata,
         )
@@ -1195,6 +1243,14 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         "pages": config.pages,
         "version": config.version,
     }
+    if image_extraction_disabled:
+        manifest_options.update(
+            {
+                "image_extraction_skipped": True,
+                "image_extraction_skip_reason": "image_mode_none",
+                "figure_sidecars_skipped": True,
+            }
+        )
     if domain_adapter is DomainAdapterMode.MANUAL:
         if config.manual_domain_adapter_label:
             manifest_options["manual_domain_adapter_label"] = config.manual_domain_adapter_label
@@ -1209,14 +1265,14 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 "retrieval_chunks_jsonl_filename": config.retrieval_chunks_jsonl_filename,
             }
         )
-    if config.rag_figure_text_chunks:
+    if effective_rag_figure_text_chunks:
         manifest_options["rag_figure_text_chunks"] = True
-    if config.figure_region_ocr:
+    if effective_figure_region_ocr:
         manifest_options["figure_region_ocr"] = True
-    if config.rag_generated_figure_descriptions:
+    if effective_rag_generated_figure_descriptions:
         manifest_options["rag_generated_figure_descriptions"] = True
         manifest_options["figure_description_backend"] = config.figure_description_backend
-    if config.figure_structure_extraction:
+    if effective_figure_structure_extraction:
         manifest_options["figure_structure_extraction"] = True
     if write_figure_rag_sidecar:
         manifest_options.update(
@@ -1225,14 +1281,14 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
             }
         )
-    if write_minimal_rag_sidecars and config.rag_generated_figure_descriptions:
+    if write_minimal_rag_sidecars and effective_rag_generated_figure_descriptions:
         manifest_options.update(
             {
                 "figure_descriptions_output": "jsonl",
                 "figure_descriptions_jsonl_filename": config.figure_descriptions_jsonl_filename,
             }
         )
-    if write_minimal_rag_sidecars and config.figure_structure_extraction:
+    if write_minimal_rag_sidecars and effective_figure_structure_extraction:
         manifest_options.update(
             {
                 "figure_structures_output": "jsonl",
@@ -1323,6 +1379,14 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     pages_per_second = round(len(selected_pages) / elapsed_seconds, 4) if elapsed_seconds > 0 else None
     finish_stage("reporting", reporting_started)
     report_summary_extras: dict[str, object] = {}
+    if image_extraction_disabled:
+        report_summary_extras.update(
+            {
+                "image_extraction_skipped": True,
+                "image_extraction_skip_reason": "image_mode_none",
+                "figure_sidecars_skipped": True,
+            }
+        )
     if output_profile is not OutputProfile.FULL or rag_sidecar_scope is not RagSidecarScope.FULL:
         report_summary_extras.update(
             {
@@ -1332,13 +1396,13 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 "rag_sidecar_omitted_reason": SIDECAR_OMITTED_REASON if rag_sidecar_omitted_outputs else None,
             }
         )
-    if config.rag_figure_text_chunks:
+    if effective_rag_figure_text_chunks:
         report_summary_extras["rag_figure_text_chunks"] = True
         report_summary_extras["figure_text_chunk_record_count"] = figure_text_chunk_record_count
-    if config.figure_region_ocr:
+    if effective_figure_region_ocr:
         report_summary_extras["figure_region_ocr"] = True
         report_summary_extras.update(figure_region_ocr_metrics)
-    if config.rag_generated_figure_descriptions:
+    if effective_rag_generated_figure_descriptions:
         report_summary_extras["rag_generated_figure_descriptions"] = True
         report_summary_extras["figure_description_backend"] = config.figure_description_backend
         report_summary_extras["figure_description_record_count"] = figure_description_record_count
@@ -1348,7 +1412,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             figure_description_skipped_no_evidence_count
         )
         report_summary_extras["figure_description_chunk_record_count"] = figure_description_chunk_record_count
-    if config.figure_structure_extraction:
+    if effective_figure_structure_extraction:
         report_summary_extras["figure_structure_extraction"] = True
         report_summary_extras["figure_structure_record_count"] = figure_structure_record_count
         report_summary_extras["figure_structure_file_count"] = figure_structure_file_count

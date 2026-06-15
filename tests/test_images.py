@@ -100,6 +100,24 @@ def test_extract_images_does_not_write_files_for_embedded_or_placeholder(
         assert result.assets[0].caption_source == "nearby_caption"
 
 
+def test_extract_images_none_mode_returns_empty_result_without_loading_context(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "none"
+    result = extract_images(
+        reader=_fake_reader(_FakeImage(b"image-bytes")),
+        pdf_path=sample_pdf,
+        selected_pages=[1],
+        password=None,
+        output_dir=output_dir,
+        image_mode=ImageMode.NONE,
+    )
+
+    assert result.assets == []
+    assert result.excluded_assets == []
+    assert result.blocks_by_page == {}
+    assert result.structure_recoveries == []
+    assert not (output_dir / "assets" / "images").exists()
+
+
 def test_extract_images_writes_referenced_file(monkeypatch, sample_pdf: Path, tmp_path: Path) -> None:
     fake_page = _FakePdfPlumberPage(
         images=[{"top": 100.0, "bottom": 180.0, "x0": 50.0, "x1": 170.0, "width": 120, "height": 80}],
