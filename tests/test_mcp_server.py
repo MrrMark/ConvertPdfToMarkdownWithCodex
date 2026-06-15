@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import tomllib
@@ -10,6 +11,7 @@ import pytest
 
 from pdf2md import mcp_server
 from pdf2md.models import ConversionStatus
+from tests.fixtures.pdf_builder import PageSpec, PositionedText, write_pdf
 
 
 def test_pyproject_declares_mcp_extra_and_entry_point() -> None:
@@ -157,6 +159,121 @@ def test_convert_pdf_accepts_no_image_mode_override(
     assert result["options"]["image_extraction_page_timeout_seconds"] == 10
     assert result["options"]["image_extraction_stage_timeout_seconds"] == 20
     assert result["options"]["figure_semantics_stage_timeout_seconds"] == 30
+
+
+def test_plan_page_windows_returns_deterministic_contract(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "spec.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(texts=[PositionedText(f"Page {page}", 72, 760)])
+            for page in range(1, 6)
+        ],
+    )
+    output_dir = tmp_path / "out"
+
+    result = mcp_server.plan_page_windows(
+        input_pdf=str(input_pdf),
+        output_dir=str(output_dir),
+        pages="1-3,5",
+        window_size=2,
+        roots=[tmp_path],
+    )
+
+    source_sha256 = hashlib.sha256(input_pdf.read_bytes()).hexdigest()
+    assert result["purpose"] == "page_window_plan"
+    assert result["source_sha256"] == source_sha256
+    assert result["total_pages"] == 5
+    assert result["selected_pages"] == [1, 2, 3, 5]
+    assert result["window_count"] == 2
+    assert result["windows"] == [
+        {
+            "window_index": 1,
+            "window_id": "pages-0001-0002",
+            "page_range": "1-2",
+            "start_page": 1,
+            "end_page": 2,
+            "selected_pages": [1, 2],
+            "selected_page_count": 2,
+            "source_sha256": source_sha256,
+            "output_subdir": "windows/pages-0001-0002",
+            "output_dir": str(output_dir / "windows" / "pages-0001-0002"),
+        },
+        {
+            "window_index": 2,
+            "window_id": "pages-0003-0005",
+            "page_range": "3,5",
+            "start_page": 3,
+            "end_page": 5,
+            "selected_pages": [3, 5],
+            "selected_page_count": 2,
+            "source_sha256": source_sha256,
+            "output_subdir": "windows/pages-0003-0005",
+            "output_dir": str(output_dir / "windows" / "pages-0003-0005"),
+        },
+    ]
+    assert "Page 1" not in json.dumps(result, ensure_ascii=False, sort_keys=True)
+
+
+def test_convert_page_window_uses_planned_page_range_and_output_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "spec.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(texts=[PositionedText(f"Page {page}", 72, 760)])
+            for page in range(1, 6)
+        ],
+    )
+    output_root = tmp_path / "out"
+    captured = {}
+
+    def fake_run_conversion(config):  # noqa: ANN001
+        captured["config"] = config
+        config.output_dir.mkdir(parents=True)
+        markdown_path = config.output_dir / "document.md"
+        manifest_path = config.output_dir / "manifest.json"
+        report_path = config.output_dir / "report.json"
+        markdown_path.write_text("# Window\n", encoding="utf-8")
+        manifest_path.write_text("{}", encoding="utf-8")
+        report_path.write_text("{}", encoding="utf-8")
+        return SimpleNamespace(
+            exit_code=0,
+            markdown_path=markdown_path,
+            manifest_path=manifest_path,
+            report_path=report_path,
+            warnings=[],
+            status=ConversionStatus.SUCCESS,
+            report=None,
+        )
+
+    monkeypatch.setattr(mcp_server, "run_conversion", fake_run_conversion)
+
+    result = mcp_server.convert_page_window(
+        input_pdf=str(input_pdf),
+        output_dir=str(output_root),
+        pages="1-3,5",
+        window_size=2,
+        window_id="pages-0003-0005",
+        rag_profile="technical_spec_rag",
+        domain_adapter="nvme",
+        image_mode="none",
+        roots=[tmp_path],
+    )
+
+    config = captured["config"]
+    assert config.output_dir == output_root / "windows" / "pages-0003-0005"
+    assert config.pages == "3,5"
+    assert config.image_mode == "none"
+    assert config.rag_profile == "technical_spec_rag"
+    assert config.domain_adapter == "nvme"
+    assert result["purpose"] == "page_window_conversion"
+    assert result["window"]["page_range"] == "3,5"
+    assert result["window"]["selected_pages"] == [3, 5]
+    assert result["conversion"]["output_dir"] == str(output_root / "windows" / "pages-0003-0005")
+    assert result["conversion"]["artifact_uris"]["document.md"].startswith("file://")
 
 
 def test_convert_pdf_requires_domain_adapter_for_technical_profile(tmp_path: Path) -> None:
