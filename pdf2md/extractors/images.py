@@ -4,11 +4,12 @@ import base64
 import hashlib
 import logging
 import re
+import time
 from collections import Counter
 from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pdfplumber
 from pypdf import PdfReader
@@ -58,6 +59,57 @@ class ImageExtractionResult:
     blocks_by_page: dict[int, list[ImageBlock]] = field(default_factory=dict)
     structure_recoveries: list[dict] = field(default_factory=list)
     debug_candidates_by_page: dict[int, list[dict]] = field(default_factory=dict)
+    progress_events: list[dict[str, Any]] = field(default_factory=list)
+    processed_pages: list[int] = field(default_factory=list)
+    skipped_pages: list[int] = field(default_factory=list)
+    timed_out_pages: list[int] = field(default_factory=list)
+    page_image_counts: dict[int, int] = field(default_factory=dict)
+    stage_timed_out: bool = False
+    last_page: int | None = None
+    last_image_count: int = 0
+
+
+@dataclass(frozen=True)
+class ImageExtractionProgressEvent:
+    status: str
+    current: int
+    total: int
+    page: int | None = None
+    image_count: int | None = None
+    elapsed_ms: int | None = None
+    timeout_reason: str | None = None
+
+
+ImageExtractionProgressCallback = Callable[[ImageExtractionProgressEvent], None]
+TimeProvider = Callable[[], float]
+
+
+def _elapsed_ms(started_at: float, now: float) -> int:
+    return max(int((now - started_at) * 1000), 0)
+
+
+def _timeout_expired(started_at: float, timeout_seconds: float | None, *, now: float) -> bool:
+    return timeout_seconds is not None and (now - started_at) >= timeout_seconds
+
+
+def _emit_image_progress(
+    result: ImageExtractionResult,
+    progress: ImageExtractionProgressCallback | None,
+    event: ImageExtractionProgressEvent,
+) -> None:
+    result.progress_events.append(
+        {
+            "status": event.status,
+            "current": event.current,
+            "total": event.total,
+            "page": event.page,
+            "image_count": event.image_count,
+            "elapsed_ms": event.elapsed_ms,
+            "timeout_reason": event.timeout_reason,
+        }
+    )
+    if progress is not None:
+        progress(event)
 
 
 @dataclass(frozen=True)
@@ -944,45 +996,55 @@ def _collect_image_candidates(
 ) -> list[dict]:
     hashed_candidates: list[dict] = []
     for page_number in selected_pages:
-        page = reader.pages[page_number - 1]
-        logger.debug("Extracting images for page=%s", page_number)
+        hashed_candidates.extend(_collect_image_candidates_for_page(reader, page_number, result))
+    return hashed_candidates
+
+
+def _collect_image_candidates_for_page(
+    reader: PdfReader,
+    page_number: int,
+    result: ImageExtractionResult,
+) -> list[dict]:
+    hashed_candidates: list[dict] = []
+    page = reader.pages[page_number - 1]
+    logger.debug("Extracting images for page=%s", page_number)
+    try:
+        raw_images = list(page.images)
+    except Exception as exc:  # noqa: BLE001
+        result.warnings.append(
+            WarningEntry(
+                code=WarningCode.IMAGE_EXTRACTION_FAILED,
+                message=f"Failed to read image objects: {exc}",
+                page=page_number,
+            )
+        )
+        return hashed_candidates
+    for index, image in enumerate(raw_images, start=1):
         try:
-            raw_images = list(page.images)
+            image_bytes = image.data
+            sha256 = hashlib.sha256(image_bytes).hexdigest()
         except Exception as exc:  # noqa: BLE001
             result.warnings.append(
                 WarningEntry(
                     code=WarningCode.IMAGE_EXTRACTION_FAILED,
-                    message=f"Failed to read image objects: {exc}",
+                    message=f"Failed to decode image bytes: {exc}",
                     page=page_number,
+                    details={"image_index": index},
                 )
             )
             continue
-        for index, image in enumerate(raw_images, start=1):
-            try:
-                image_bytes = image.data
-                sha256 = hashlib.sha256(image_bytes).hexdigest()
-            except Exception as exc:  # noqa: BLE001
-                result.warnings.append(
-                    WarningEntry(
-                        code=WarningCode.IMAGE_EXTRACTION_FAILED,
-                        message=f"Failed to decode image bytes: {exc}",
-                        page=page_number,
-                        details={"image_index": index},
-                    )
-                )
-                continue
-            width, height = _image_dimensions(image)
-            hashed_candidates.append(
-                {
-                    "page": page_number,
-                    "index": index,
-                    "image": image,
-                    "bytes": image_bytes,
-                    "sha256": sha256,
-                    "width": width,
-                    "height": height,
-                }
-            )
+        width, height = _image_dimensions(image)
+        hashed_candidates.append(
+            {
+                "page": page_number,
+                "index": index,
+                "image": image,
+                "bytes": image_bytes,
+                "sha256": sha256,
+                "width": width,
+                "height": height,
+            }
+        )
     return hashed_candidates
 
 
@@ -1385,6 +1447,10 @@ def extract_images(
     pdf: Any = None,
     page_image_boxes: dict[int, list[dict]] | None = None,
     page_text_lines: dict[int, list[dict]] | None = None,
+    image_extraction_page_timeout_seconds: float | None = None,
+    image_extraction_stage_timeout_seconds: float | None = None,
+    progress: ImageExtractionProgressCallback | None = None,
+    time_provider: TimeProvider = time.monotonic,
 ) -> ImageExtractionResult:
     result = ImageExtractionResult()
     if image_mode == ImageMode.NONE:
@@ -1396,144 +1462,351 @@ def extract_images(
     if page_image_boxes is None or page_text_lines is None:
         page_image_boxes, page_text_lines = _load_page_image_context(pdf_path, selected_pages, password, result, pdf=pdf)
     hashed_candidates = _collect_image_candidates(reader, selected_pages, result)
+    candidates_by_page: dict[int, list[dict]] = {}
+    for candidate in hashed_candidates:
+        candidates_by_page.setdefault(int(candidate["page"]), []).append(candidate)
     hash_counter = Counter(item["sha256"] for item in hashed_candidates)
     pending_structure_markers: dict[int, list[PendingStructureMarker]] = {}
     canonical_paths_by_hash: dict[str, str] = {}
     structure_ocr_cache: dict[tuple[str, str, int], StructureOcrObservation] = {}
 
-    for candidate in hashed_candidates:
-        page_number = int(candidate["page"])
-        index = int(candidate["index"])
-        image = candidate["image"]
-        image_bytes = candidate["bytes"]
-        sha256 = candidate["sha256"]
-        width = candidate["width"]
-        height = candidate["height"]
+    timeout_enabled = (
+        image_extraction_page_timeout_seconds is not None
+        or image_extraction_stage_timeout_seconds is not None
+    )
+    stage_started_at = time_provider()
+    stage_timeout_recorded = False
+    total_pages = len(selected_pages)
 
-        extension = _guess_extension(getattr(image, "name", ""))
-        filename = f"page-{page_number:04d}-figure-{index:03d}.{extension}"
-        rel_path = f"{assets_dirname}/images/{filename}"
-        disk_path = images_root / filename
-
-        bbox_payload, top, bottom, width, height = _resolve_image_position(
-            page_number=page_number,
-            index=index,
-            width=width,
-            height=height,
-            page_image_boxes=page_image_boxes,
-        )
-        caption_nearby = _is_caption_nearby(page_text_lines.get(page_number, []), top, bottom)
-        caption_text = _extract_caption_text(page_text_lines.get(page_number, []), top, bottom) if caption_nearby else None
-        debug_payload = {
-            "page": page_number,
-            "image_index": index,
-            "sha256": sha256,
-            "width": width,
-            "height": height,
-            "bbox": bbox_payload,
-            "caption_text": caption_text,
-            "excluded": False,
-            "exclude_reason": None,
-            "dedupe_of": None,
-            "path": rel_path,
-        }
-        if _handle_structure_marker_candidate(
-            page_number=page_number,
-            index=index,
-            top=top,
-            bbox_payload=bbox_payload,
-            width=width,
-            height=height,
-            sha256=sha256,
-            image_bytes=image_bytes,
-            page_text_lines=page_text_lines,
-            pending_structure_markers=pending_structure_markers,
-        ):
-            debug_payload["excluded"] = True
-            debug_payload["exclude_reason"] = "STRUCTURE_MARKER_CANDIDATE"
-            result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
-            continue
-        is_decorative, reason = _is_decorative(
-            width=width,
-            height=height,
-            hash_count=hash_counter.get(sha256, 1),
-            caption_nearby=caption_nearby,
-        )
-        if is_decorative:
-            debug_payload["excluded"] = True
-            debug_payload["exclude_reason"] = reason or ImageExcludeReason.DECORATIVE
-            result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
-            result.excluded_assets.append(
-                ExcludedImageAsset(
-                    page=page_number,
-                    index=index,
-                    reason=reason or ImageExcludeReason.DECORATIVE,
-                    bbox=bbox_payload,
-                    width=width,
-                    height=height,
-                    sha256=sha256,
-                )
+    def record_stage_timeout(page_number: int | None, image_count: int) -> None:
+        nonlocal stage_timeout_recorded
+        if stage_timeout_recorded:
+            return
+        stage_timeout_recorded = True
+        result.stage_timed_out = True
+        now = time_provider()
+        elapsed_ms = _elapsed_ms(stage_started_at, now)
+        result.warnings.append(
+            WarningEntry(
+                code=WarningCode.IMAGE_EXTRACTION_STAGE_TIMEOUT,
+                message="Image extraction stage timeout; skipped remaining image pages.",
+                page=page_number,
+                details={
+                    "timeout_seconds": image_extraction_stage_timeout_seconds,
+                    "elapsed_ms": elapsed_ms,
+                    "timeout_reason": "stage_timeout",
+                    "image_count": image_count,
+                    "processed_page_count": len(result.processed_pages),
+                    "skipped_page_count": len(result.skipped_pages),
+                    "last_page": result.last_page,
+                },
             )
-            continue
+        )
+        _emit_image_progress(
+            result,
+            progress,
+            ImageExtractionProgressEvent(
+                status="image_extraction_stage_timeout",
+                current=len(result.processed_pages) + len(result.skipped_pages),
+                total=total_pages,
+                page=page_number,
+                image_count=image_count,
+                elapsed_ms=elapsed_ms,
+                timeout_reason="stage_timeout",
+            ),
+        )
 
-        try:
-            dedupe_of: str | None = None
-            if dedupe_images and image_mode == ImageMode.REFERENCED and sha256 in canonical_paths_by_hash:
-                dedupe_of = canonical_paths_by_hash[sha256]
-                rel_path = dedupe_of
-                disk_path = output_dir / rel_path
-                debug_payload["dedupe_of"] = dedupe_of
-                debug_payload["path"] = rel_path
-            elif dedupe_images and image_mode == ImageMode.REFERENCED:
-                canonical_paths_by_hash[sha256] = rel_path
+    def record_page_timeout(
+        *,
+        current: int,
+        page_number: int,
+        page_started_at: float,
+        image_count: int,
+        processed_image_count: int,
+    ) -> None:
+        now = time_provider()
+        elapsed_ms = _elapsed_ms(page_started_at, now)
+        if page_number not in result.timed_out_pages:
+            result.timed_out_pages.append(page_number)
+        if page_number not in result.skipped_pages:
+            result.skipped_pages.append(page_number)
+        result.warnings.append(
+            WarningEntry(
+                code=WarningCode.IMAGE_EXTRACTION_PAGE_TIMEOUT,
+                message="Image extraction page timeout; skipped remaining image work for the page.",
+                page=page_number,
+                details={
+                    "timeout_seconds": image_extraction_page_timeout_seconds,
+                    "elapsed_ms": elapsed_ms,
+                    "timeout_reason": "page_timeout",
+                    "image_count": image_count,
+                    "processed_image_count": processed_image_count,
+                },
+            )
+        )
+        _emit_image_progress(
+            result,
+            progress,
+            ImageExtractionProgressEvent(
+                status="image_extraction_page_skipped",
+                current=current,
+                total=total_pages,
+                page=page_number,
+                image_count=image_count,
+                elapsed_ms=elapsed_ms,
+                timeout_reason="page_timeout",
+            ),
+        )
 
-            _append_figure_asset(
-                result=result,
-                image_mode=image_mode,
-                image_bytes=image_bytes,
+    for current, page_number in enumerate(selected_pages, start=1):
+        page_candidates = candidates_by_page.get(page_number, [])
+        image_count = max(len(page_image_boxes.get(page_number, [])), len(page_candidates))
+        result.page_image_counts[page_number] = image_count
+        result.last_page = page_number
+        result.last_image_count = image_count
+        now = time_provider()
+        if _timeout_expired(stage_started_at, image_extraction_stage_timeout_seconds, now=now):
+            record_stage_timeout(page_number, image_count)
+            if page_number not in result.skipped_pages:
+                result.skipped_pages.append(page_number)
+                _emit_image_progress(
+                    result,
+                    progress,
+                    ImageExtractionProgressEvent(
+                        status="image_extraction_page_skipped",
+                        current=current,
+                        total=total_pages,
+                        page=page_number,
+                        image_count=image_count,
+                        elapsed_ms=0,
+                        timeout_reason="stage_timeout",
+                    ),
+                )
+            break
+
+        page_started_at = now
+        page_timed_out = False
+        processed_image_count = 0
+        _emit_image_progress(
+            result,
+            progress,
+            ImageExtractionProgressEvent(
+                status="image_extraction_page_started",
+                current=current - 1,
+                total=total_pages,
+                page=page_number,
+                image_count=image_count,
+                elapsed_ms=0,
+            ),
+        )
+
+        for candidate in page_candidates:
+            now = time_provider()
+            if _timeout_expired(stage_started_at, image_extraction_stage_timeout_seconds, now=now):
+                record_stage_timeout(page_number, image_count)
+                if page_number not in result.skipped_pages:
+                    result.skipped_pages.append(page_number)
+                    _emit_image_progress(
+                        result,
+                        progress,
+                        ImageExtractionProgressEvent(
+                            status="image_extraction_page_skipped",
+                            current=current,
+                            total=total_pages,
+                            page=page_number,
+                            image_count=image_count,
+                            elapsed_ms=_elapsed_ms(page_started_at, now),
+                            timeout_reason="stage_timeout",
+                        ),
+                    )
+                break
+            if _timeout_expired(page_started_at, image_extraction_page_timeout_seconds, now=now):
+                record_page_timeout(
+                    current=current,
+                    page_number=page_number,
+                    page_started_at=page_started_at,
+                    image_count=image_count,
+                    processed_image_count=processed_image_count,
+                )
+                page_timed_out = True
+                break
+
+            index = int(candidate["index"])
+            image = candidate["image"]
+            image_bytes = candidate["bytes"]
+            sha256 = candidate["sha256"]
+            width = candidate["width"]
+            height = candidate["height"]
+
+            extension = _guess_extension(getattr(image, "name", ""))
+            filename = f"page-{page_number:04d}-figure-{index:03d}.{extension}"
+            rel_path = f"{assets_dirname}/images/{filename}"
+            disk_path = images_root / filename
+
+            bbox_payload, top, bottom, width, height = _resolve_image_position(
                 page_number=page_number,
                 index=index,
-                extension=extension,
-                rel_path=rel_path,
-                disk_path=disk_path,
+                width=width,
+                height=height,
+                page_image_boxes=page_image_boxes,
+            )
+            caption_nearby = _is_caption_nearby(page_text_lines.get(page_number, []), top, bottom)
+            caption_text = (
+                _extract_caption_text(page_text_lines.get(page_number, []), top, bottom) if caption_nearby else None
+            )
+            debug_payload = {
+                "page": page_number,
+                "image_index": index,
+                "sha256": sha256,
+                "width": width,
+                "height": height,
+                "bbox": bbox_payload,
+                "caption_text": caption_text,
+                "excluded": False,
+                "exclude_reason": None,
+                "dedupe_of": None,
+                "path": rel_path,
+            }
+            if _handle_structure_marker_candidate(
+                page_number=page_number,
+                index=index,
                 top=top,
                 bbox_payload=bbox_payload,
                 width=width,
                 height=height,
                 sha256=sha256,
-                caption_text=caption_text,
-                dedupe_of=dedupe_of,
+                image_bytes=image_bytes,
+                page_text_lines=page_text_lines,
+                pending_structure_markers=pending_structure_markers,
+            ):
+                debug_payload["excluded"] = True
+                debug_payload["exclude_reason"] = "STRUCTURE_MARKER_CANDIDATE"
+                result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
+                processed_image_count += 1
+                continue
+            is_decorative, reason = _is_decorative(
+                width=width,
+                height=height,
+                hash_count=hash_counter.get(sha256, 1),
+                caption_nearby=caption_nearby,
             )
-            result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
-        except Exception as exc:  # noqa: BLE001
-            result.warnings.append(
-                WarningEntry(
-                    code=WarningCode.IMAGE_EXTRACTION_FAILED,
-                    message=f"Failed to process image object: {exc}",
-                    page=page_number,
-                    details={"image_index": index},
+            if is_decorative:
+                debug_payload["excluded"] = True
+                debug_payload["exclude_reason"] = reason or ImageExcludeReason.DECORATIVE
+                result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
+                result.excluded_assets.append(
+                    ExcludedImageAsset(
+                        page=page_number,
+                        index=index,
+                        reason=reason or ImageExcludeReason.DECORATIVE,
+                        bbox=bbox_payload,
+                        width=width,
+                        height=height,
+                        sha256=sha256,
+                    )
                 )
-            )
+                processed_image_count += 1
+                continue
 
-    all_pending_markers = [
-        marker
-        for page_number in sorted(pending_structure_markers)
-        for marker in pending_structure_markers[page_number]
-    ]
-    for marker, recovery in _resolve_structure_markers(all_pending_markers, ocr_cache=structure_ocr_cache):
-        _append_structure_marker_result(result, marker, recovery)
+            try:
+                dedupe_of: str | None = None
+                if dedupe_images and image_mode == ImageMode.REFERENCED and sha256 in canonical_paths_by_hash:
+                    dedupe_of = canonical_paths_by_hash[sha256]
+                    rel_path = dedupe_of
+                    disk_path = output_dir / rel_path
+                    debug_payload["dedupe_of"] = dedupe_of
+                    debug_payload["path"] = rel_path
+                elif dedupe_images and image_mode == ImageMode.REFERENCED:
+                    canonical_paths_by_hash[sha256] = rel_path
+
+                _append_figure_asset(
+                    result=result,
+                    image_mode=image_mode,
+                    image_bytes=image_bytes,
+                    page_number=page_number,
+                    index=index,
+                    extension=extension,
+                    rel_path=rel_path,
+                    disk_path=disk_path,
+                    top=top,
+                    bbox_payload=bbox_payload,
+                    width=width,
+                    height=height,
+                    sha256=sha256,
+                    caption_text=caption_text,
+                    dedupe_of=dedupe_of,
+                )
+                result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
+            except Exception as exc:  # noqa: BLE001
+                result.warnings.append(
+                    WarningEntry(
+                        code=WarningCode.IMAGE_EXTRACTION_FAILED,
+                        message=f"Failed to process image object: {exc}",
+                        page=page_number,
+                        details={"image_index": index},
+                    )
+                )
+            processed_image_count += 1
+
+        if result.stage_timed_out:
+            break
+        if page_timed_out:
+            continue
+        if timeout_enabled:
+            now = time_provider()
+            if _timeout_expired(page_started_at, image_extraction_page_timeout_seconds, now=now):
+                record_page_timeout(
+                    current=current,
+                    page_number=page_number,
+                    page_started_at=page_started_at,
+                    image_count=image_count,
+                    processed_image_count=processed_image_count,
+                )
+                continue
+            for marker, recovery in _resolve_structure_markers(
+                pending_structure_markers.pop(page_number, []),
+                ocr_cache=structure_ocr_cache,
+            ):
+                _append_structure_marker_result(result, marker, recovery)
+
+        result.processed_pages.append(page_number)
+        _emit_image_progress(
+            result,
+            progress,
+            ImageExtractionProgressEvent(
+                status="image_extraction_page_finished",
+                current=current,
+                total=total_pages,
+                page=page_number,
+                image_count=image_count,
+                elapsed_ms=_elapsed_ms(page_started_at, time_provider()),
+            ),
+        )
+
+    if not timeout_enabled and not result.stage_timed_out:
+        all_pending_markers = [
+            marker
+            for page_number in sorted(pending_structure_markers)
+            for marker in pending_structure_markers[page_number]
+        ]
+        for marker, recovery in _resolve_structure_markers(all_pending_markers, ocr_cache=structure_ocr_cache):
+            _append_structure_marker_result(result, marker, recovery)
 
     if figure_crop_fallback:
-        _append_figure_crop_fallbacks(
-            result=result,
-            reader=reader,
-            pdf_path=pdf_path,
-            password=password,
-            selected_pages=selected_pages,
-            output_dir=output_dir,
-            image_mode=image_mode,
-            assets_dirname=assets_dirname,
-            page_text_lines=page_text_lines,
-        )
+        now = time_provider()
+        if _timeout_expired(stage_started_at, image_extraction_stage_timeout_seconds, now=now):
+            record_stage_timeout(result.last_page, result.last_image_count)
+        elif not result.stage_timed_out:
+            _append_figure_crop_fallbacks(
+                result=result,
+                reader=reader,
+                pdf_path=pdf_path,
+                password=password,
+                selected_pages=[page for page in selected_pages if page not in set(result.skipped_pages)],
+                output_dir=output_dir,
+                image_mode=image_mode,
+                assets_dirname=assets_dirname,
+                page_text_lines=page_text_lines,
+            )
 
     return result

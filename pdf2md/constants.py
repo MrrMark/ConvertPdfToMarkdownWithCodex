@@ -16,6 +16,9 @@ class WarningCode:
     IMAGE_EXTRACTION_FAILED = "IMAGE_EXTRACTION_FAILED"
     IMAGE_CROP_REJECTED = "IMAGE_CROP_REJECTED"
     IMAGE_EXTRACTION_SKIPPED = "IMAGE_EXTRACTION_SKIPPED"
+    IMAGE_EXTRACTION_PAGE_TIMEOUT = "image_extraction_page_timeout"
+    IMAGE_EXTRACTION_STAGE_TIMEOUT = "image_extraction_stage_timeout"
+    FIGURE_SEMANTICS_STAGE_TIMEOUT = "figure_semantics_stage_timeout"
     TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING = "TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING"
     TABLE_GFM_UNSAFE_FALLBACK_HTML = "TABLE_GFM_UNSAFE_FALLBACK_HTML"
     TABLE_COMPLEXITY_HTML_FALLBACK = "TABLE_COMPLEXITY_HTML_FALLBACK"
@@ -64,6 +67,24 @@ WARNING_CODE_REGISTRY: dict[str, WarningCodeSpec] = {
     WarningCode.IMAGE_CROP_REJECTED: WarningCodeSpec(WarningCode.IMAGE_CROP_REJECTED, WarningDomain.IMAGE),
     WarningCode.IMAGE_EXTRACTION_SKIPPED: WarningCodeSpec(
         WarningCode.IMAGE_EXTRACTION_SKIPPED,
+        WarningDomain.IMAGE,
+        default_severity=WarningSeverity.ADVISORY,
+        affects_exit_code=False,
+    ),
+    WarningCode.IMAGE_EXTRACTION_PAGE_TIMEOUT: WarningCodeSpec(
+        WarningCode.IMAGE_EXTRACTION_PAGE_TIMEOUT,
+        WarningDomain.IMAGE,
+        default_severity=WarningSeverity.ADVISORY,
+        affects_exit_code=False,
+    ),
+    WarningCode.IMAGE_EXTRACTION_STAGE_TIMEOUT: WarningCodeSpec(
+        WarningCode.IMAGE_EXTRACTION_STAGE_TIMEOUT,
+        WarningDomain.IMAGE,
+        default_severity=WarningSeverity.ADVISORY,
+        affects_exit_code=False,
+    ),
+    WarningCode.FIGURE_SEMANTICS_STAGE_TIMEOUT: WarningCodeSpec(
+        WarningCode.FIGURE_SEMANTICS_STAGE_TIMEOUT,
         WarningDomain.IMAGE,
         default_severity=WarningSeverity.ADVISORY,
         affects_exit_code=False,

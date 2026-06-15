@@ -4,13 +4,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import logging
+import time
 from pathlib import Path
 from typing import Callable, Literal, Optional
 
 from pdf2md.config import Config
 from pdf2md.constants import WarningCode
 from pdf2md.extractors.header_footer import remove_repeated_header_footer
-from pdf2md.extractors.images import ImageExtractionResult, extract_images
+from pdf2md.extractors.images import ImageExtractionProgressEvent, ImageExtractionResult, extract_images
 from pdf2md.extractors.ocr import (
     OCR_LOW_CONFIDENCE_MEAN_THRESHOLD,
     OCR_LOW_CONFIDENCE_TOKEN_RATIO_THRESHOLD,
@@ -115,8 +116,19 @@ class ConversionProgressEvent:
     current: int
     total: int
     page: int | None
-    status: Literal["pages_selected", "page_started", "page_finished"]
+    status: Literal[
+        "pages_selected",
+        "page_started",
+        "page_finished",
+        "image_extraction_page_started",
+        "image_extraction_page_finished",
+        "image_extraction_page_skipped",
+        "image_extraction_stage_timeout",
+    ]
     stage: str
+    image_count: int | None = None
+    elapsed_ms: int | None = None
+    timeout_reason: str | None = None
 
 
 ConversionProgressCallback = Callable[[ConversionProgressEvent], None]
@@ -125,6 +137,30 @@ ConversionProgressCallback = Callable[[ConversionProgressEvent], None]
 def _emit_progress(progress: ConversionProgressCallback | None, event: ConversionProgressEvent) -> None:
     if progress is not None:
         progress(event)
+
+
+def _forward_image_progress(
+    progress: ConversionProgressCallback | None,
+) -> Callable[[ImageExtractionProgressEvent], None] | None:
+    if progress is None:
+        return None
+
+    def handle_image_progress(event: ImageExtractionProgressEvent) -> None:
+        _emit_progress(
+            progress,
+            ConversionProgressEvent(
+                current=event.current,
+                total=event.total,
+                page=event.page,
+                status=event.status,  # type: ignore[arg-type]
+                stage="image_extraction",
+                image_count=event.image_count,
+                elapsed_ms=event.elapsed_ms,
+                timeout_reason=event.timeout_reason,
+            ),
+        )
+
+    return handle_image_progress
 
 
 def _file_sha256(path: Path) -> str:
@@ -494,6 +530,49 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         warnings.append(_technical_profile_domain_adapter_warning(config, domain_adapter))
     if image_extraction_disabled and requested_figure_sidecar_features:
         warnings.append(_no_image_visual_sidecar_warning(config))
+    figure_semantics_started_at: float | None = None
+    figure_semantics_timed_out = False
+    figure_semantics_timeout_stage: str | None = None
+    figure_semantics_timeout_elapsed_ms: int | None = None
+
+    def ensure_figure_semantics_clock() -> None:
+        nonlocal figure_semantics_started_at
+        if figure_semantics_started_at is None:
+            figure_semantics_started_at = time.monotonic()
+
+    def figure_semantics_elapsed_ms() -> int:
+        if figure_semantics_started_at is None:
+            return 0
+        return max(int((time.monotonic() - figure_semantics_started_at) * 1000), 0)
+
+    def figure_semantics_timeout_expired(stage_name: str) -> bool:
+        nonlocal figure_semantics_timed_out, figure_semantics_timeout_stage, figure_semantics_timeout_elapsed_ms
+        timeout_seconds = config.figure_semantics_stage_timeout_seconds
+        if timeout_seconds is None:
+            return False
+        ensure_figure_semantics_clock()
+        started_at = figure_semantics_started_at if figure_semantics_started_at is not None else time.monotonic()
+        elapsed_seconds = time.monotonic() - started_at
+        if elapsed_seconds < timeout_seconds:
+            return False
+        if not figure_semantics_timed_out:
+            figure_semantics_timed_out = True
+            figure_semantics_timeout_stage = stage_name
+            figure_semantics_timeout_elapsed_ms = figure_semantics_elapsed_ms()
+            warnings.append(
+                WarningEntry(
+                    code=WarningCode.FIGURE_SEMANTICS_STAGE_TIMEOUT,
+                    message="Figure semantics stage timeout; skipped remaining figure semantic sidecars.",
+                    details={
+                        "stage": stage_name,
+                        "timeout_seconds": timeout_seconds,
+                        "elapsed_ms": figure_semantics_timeout_elapsed_ms,
+                        "timeout_reason": "stage_timeout",
+                    },
+                )
+            )
+        return True
+
     page_results_map: dict[int, PageResult] = {}
     failed_pages: list[int] = []
     heading_count = 0
@@ -830,6 +909,20 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     if image_extraction_disabled:
         logger.info("Skipping image extraction mode=%s", image_mode)
         image_result = ImageExtractionResult()
+        for index, page in enumerate(selected_pages, start=1):
+            _emit_progress(
+                progress,
+                ConversionProgressEvent(
+                    current=index,
+                    total=len(selected_pages),
+                    page=page,
+                    status="image_extraction_page_skipped",
+                    stage="image_extraction",
+                    image_count=0,
+                    elapsed_ms=0,
+                    timeout_reason="image_mode_none",
+                ),
+            )
     else:
         logger.info("Extracting images mode=%s", image_mode)
         page_image_boxes = {page: pdf_context.get_image_boxes(page) for page in selected_pages}
@@ -846,6 +939,9 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             pdf=shared_plumber_pdf,
             page_image_boxes=page_image_boxes,
             page_text_lines=raw_lines_by_page,
+            image_extraction_page_timeout_seconds=config.image_extraction_page_timeout_seconds,
+            image_extraction_stage_timeout_seconds=config.image_extraction_stage_timeout_seconds,
+            progress=_forward_image_progress(progress),
         )
     finish_stage("image_extraction", image_started)
     engine_usage["tables"] = len(table_result.assets) > 0
@@ -999,14 +1095,15 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             text_block_result.records,
         )
 
-    if write_figure_rag_sidecar:
+    if write_figure_rag_sidecar and not figure_semantics_timeout_expired("rag_figures"):
+        ensure_figure_semantics_clock()
         figure_rag_started = stage_start()
         figure_records = build_figure_records(
             images=image_result.assets,
             excluded_images=image_result.excluded_assets,
             text_block_records=text_block_result.records,
         )
-        if effective_figure_region_ocr:
+        if effective_figure_region_ocr and not figure_semantics_timeout_expired("figure_region_ocr"):
             figure_records, figure_region_ocr_metrics = augment_figure_records_with_region_ocr(
                 figure_records,
                 pdf_path=config.input_pdf,
@@ -1016,7 +1113,11 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         figure_rag_record_count, figure_rag_file_count = write_figure_rag_output(config, figure_records)
         finish_stage("rag_figures", figure_rag_started)
 
-    if write_minimal_rag_sidecars and effective_rag_generated_figure_descriptions:
+    if (
+        write_minimal_rag_sidecars
+        and effective_rag_generated_figure_descriptions
+        and not figure_semantics_timeout_expired("rag_figure_descriptions")
+    ):
         figure_description_started = stage_start()
         figure_description_records, figure_description_metrics = build_figure_description_records(
             figure_records,
@@ -1035,7 +1136,11 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         )
         finish_stage("rag_figure_descriptions", figure_description_started)
 
-    if write_minimal_rag_sidecars and effective_figure_structure_extraction:
+    if (
+        write_minimal_rag_sidecars
+        and effective_figure_structure_extraction
+        and not figure_semantics_timeout_expired("rag_figure_structures")
+    ):
         figure_structure_started = stage_start()
         figure_structure_records, figure_structure_metrics = build_figure_structure_records(figure_records)
         figure_structure_record_count = figure_structure_metrics["figure_structure_record_count"]
@@ -1251,6 +1356,12 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 "figure_sidecars_skipped": True,
             }
         )
+    if config.image_extraction_page_timeout_seconds is not None:
+        manifest_options["image_extraction_page_timeout_seconds"] = config.image_extraction_page_timeout_seconds
+    if config.image_extraction_stage_timeout_seconds is not None:
+        manifest_options["image_extraction_stage_timeout_seconds"] = config.image_extraction_stage_timeout_seconds
+    if config.figure_semantics_stage_timeout_seconds is not None:
+        manifest_options["figure_semantics_stage_timeout_seconds"] = config.figure_semantics_stage_timeout_seconds
     if domain_adapter is DomainAdapterMode.MANUAL:
         if config.manual_domain_adapter_label:
             manifest_options["manual_domain_adapter_label"] = config.manual_domain_adapter_label
@@ -1281,14 +1392,14 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
             }
         )
-    if write_minimal_rag_sidecars and effective_rag_generated_figure_descriptions:
+    if figure_description_file_count > 0:
         manifest_options.update(
             {
                 "figure_descriptions_output": "jsonl",
                 "figure_descriptions_jsonl_filename": config.figure_descriptions_jsonl_filename,
             }
         )
-    if write_minimal_rag_sidecars and effective_figure_structure_extraction:
+    if figure_structure_file_count > 0:
         manifest_options.update(
             {
                 "figure_structures_output": "jsonl",
@@ -1385,6 +1496,34 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 "image_extraction_skipped": True,
                 "image_extraction_skip_reason": "image_mode_none",
                 "figure_sidecars_skipped": True,
+            }
+        )
+    if (
+        config.image_extraction_page_timeout_seconds is not None
+        or config.image_extraction_stage_timeout_seconds is not None
+        or image_result.timed_out_pages
+        or image_result.stage_timed_out
+    ):
+        report_summary_extras.update(
+            {
+                "image_extraction_page_timeout_seconds": config.image_extraction_page_timeout_seconds,
+                "image_extraction_stage_timeout_seconds": config.image_extraction_stage_timeout_seconds,
+                "image_extraction_page_timeout_count": len(image_result.timed_out_pages),
+                "image_extraction_stage_timeout_count": 1 if image_result.stage_timed_out else 0,
+                "image_extraction_processed_page_count": len(image_result.processed_pages),
+                "image_extraction_skipped_page_count": len(image_result.skipped_pages),
+                "image_extraction_timed_out_pages": image_result.timed_out_pages,
+                "image_extraction_last_page": image_result.last_page,
+                "image_extraction_last_image_count": image_result.last_image_count,
+            }
+        )
+    if config.figure_semantics_stage_timeout_seconds is not None or figure_semantics_timed_out:
+        report_summary_extras.update(
+            {
+                "figure_semantics_stage_timeout_seconds": config.figure_semantics_stage_timeout_seconds,
+                "figure_semantics_stage_timeout_count": 1 if figure_semantics_timed_out else 0,
+                "figure_semantics_timeout_stage": figure_semantics_timeout_stage,
+                "figure_semantics_timeout_elapsed_ms": figure_semantics_timeout_elapsed_ms,
             }
         )
     if output_profile is not OutputProfile.FULL or rag_sidecar_scope is not RagSidecarScope.FULL:

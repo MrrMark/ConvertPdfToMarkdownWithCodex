@@ -78,6 +78,7 @@ Stable nested fields:
 - `options.retrieval_chunk_max_tokens`, `options.retrieval_tokenizer`, `options.rag_contextual_embedding_text`, `options.rag_merge_sibling_text_chunks`, `options.rag_chunk_relationship_metadata`, `options.rag_figure_text_chunks` when enabled
 - `options.figure_region_ocr`, `options.rag_generated_figure_descriptions`, `options.figure_description_backend`, `options.figure_structure_extraction` when enabled
 - `options.output_profile`, `options.rag_sidecar_scope`, `options.rag_sidecar_omitted_outputs`, `options.rag_sidecar_omitted_reason` when a non-full output scope was selected
+- `options.image_extraction_page_timeout_seconds`, `options.image_extraction_stage_timeout_seconds`, `options.figure_semantics_stage_timeout_seconds` when configured
 - `options.confidential_safe_mode`, `options.local_only_processing`, `options.external_llm_calls`, `options.external_embedding_calls`, `options.path_redaction`
 - `options.page_workers`, `options.page_worker_effective_count`, `options.page_parallel_enabled`
 - `images[].page`, `index`, `path`, `source`, `bbox`, `sha256`
@@ -154,6 +155,14 @@ No-image summary fields:
 - `image_extraction_skip_reason`: stable skip reason, currently `image_mode_none`.
 - `figure_sidecars_skipped`: present and `true` when figure sidecars were intentionally not written because image extraction was disabled.
 
+Image/figure timeout summary fields:
+
+- `image_extraction_page_timeout_seconds`, `image_extraction_stage_timeout_seconds`, `figure_semantics_stage_timeout_seconds`: configured timeout values when present.
+- `image_extraction_page_timeout_count`, `image_extraction_stage_timeout_count`: timeout warning counters.
+- `image_extraction_processed_page_count`, `image_extraction_skipped_page_count`, `image_extraction_timed_out_pages`: page-level image extraction progress summary.
+- `image_extraction_last_page`, `image_extraction_last_image_count`: last observed page and image count for timeout triage.
+- `figure_semantics_stage_timeout_count`, `figure_semantics_timeout_stage`, `figure_semantics_timeout_elapsed_ms`: figure OCR/description/structure timeout summary.
+
 Non-full sidecar scope summary fields:
 
 - `output_profile`: `full` or `fast`, present when a non-full output scope is selected.
@@ -195,6 +204,7 @@ Warning taxonomy policy:
 - `actionable_warning_count` and `advisory_warning_count` are derived from that taxonomy plus limited context-sensitive rules, such as blank-page `OCR_EMPTY_RESULT`.
 - Advisory warnings, including expected complex table HTML fallback, do not by themselves set `partial_success` or exit code `2`.
 - Actionable OCR/table/image warnings and failed-page signals may set `partial_success` and exit code `2`.
+- Image/figure timeout warning codes are advisory by default: `image_extraction_page_timeout`, `image_extraction_stage_timeout`, and `figure_semantics_stage_timeout`.
 
 ## debug/table-quality-review-pack.json
 

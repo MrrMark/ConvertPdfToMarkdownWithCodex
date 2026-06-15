@@ -137,6 +137,9 @@ def test_convert_pdf_accepts_no_image_mode_override(
         rag_profile="technical_spec_rag_visual",
         domain_adapter="nvme",
         image_mode="none",
+        image_extraction_page_timeout_seconds=10,
+        image_extraction_stage_timeout_seconds=20,
+        figure_semantics_stage_timeout_seconds=30,
         roots=[tmp_path],
     )
 
@@ -147,7 +150,13 @@ def test_convert_pdf_accepts_no_image_mode_override(
     assert config.figure_region_ocr is True
     assert config.rag_generated_figure_descriptions is True
     assert config.figure_structure_extraction is True
+    assert config.image_extraction_page_timeout_seconds == 10
+    assert config.image_extraction_stage_timeout_seconds == 20
+    assert config.figure_semantics_stage_timeout_seconds == 30
     assert result["options"]["image_mode"] == "none"
+    assert result["options"]["image_extraction_page_timeout_seconds"] == 10
+    assert result["options"]["image_extraction_stage_timeout_seconds"] == 20
+    assert result["options"]["figure_semantics_stage_timeout_seconds"] == 30
 
 
 def test_convert_pdf_requires_domain_adapter_for_technical_profile(tmp_path: Path) -> None:

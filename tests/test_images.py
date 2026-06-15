@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 from PIL import Image, ImageDraw
 
+from pdf2md.constants import WarningCode
 from pdf2md.extractors.images import (
     PendingStructureMarker,
     StructureOcrCandidate,
@@ -141,6 +142,66 @@ def test_extract_images_writes_referenced_file(monkeypatch, sample_pdf: Path, tm
     files = list((output_dir / "assets" / "images").glob("*"))
     assert len(files) == 1
     assert result.assets[0].alt_text == "Image page-0001-figure-001"
+
+
+def test_extract_images_page_timeout_skips_page(sample_pdf: Path, tmp_path: Path) -> None:
+    ticks = iter([0.0, 0.0, 0.002, 0.003])
+    events = []
+
+    result = extract_images(
+        reader=_fake_reader(_FakeImage(b"image-bytes")),
+        pdf_path=sample_pdf,
+        selected_pages=[1],
+        password=None,
+        output_dir=tmp_path / "page-timeout",
+        image_mode=ImageMode.REFERENCED,
+        page_image_boxes={1: [{"top": 100.0, "bottom": 180.0, "x0": 50.0, "x1": 170.0}]},
+        page_text_lines={1: []},
+        image_extraction_page_timeout_seconds=0.001,
+        progress=events.append,
+        time_provider=lambda: next(ticks),
+    )
+
+    assert result.assets == []
+    assert result.timed_out_pages == [1]
+    assert result.skipped_pages == [1]
+    assert result.warnings[0].code == WarningCode.IMAGE_EXTRACTION_PAGE_TIMEOUT
+    assert result.warnings[0].details["timeout_reason"] == "page_timeout"
+    assert [event.status for event in events] == [
+        "image_extraction_page_started",
+        "image_extraction_page_skipped",
+    ]
+    assert events[-1].image_count == 1
+    assert events[-1].timeout_reason == "page_timeout"
+
+
+def test_extract_images_stage_timeout_skips_remaining_pages(sample_pdf: Path, tmp_path: Path) -> None:
+    ticks = iter([0.0, 0.002, 0.003])
+    events = []
+
+    result = extract_images(
+        reader=_fake_reader_pages([[_FakeImage(b"first")], [_FakeImage(b"second")]]),
+        pdf_path=sample_pdf,
+        selected_pages=[1, 2],
+        password=None,
+        output_dir=tmp_path / "stage-timeout",
+        image_mode=ImageMode.REFERENCED,
+        page_image_boxes={1: [{"top": 100.0}], 2: [{"top": 100.0}]},
+        page_text_lines={1: [], 2: []},
+        image_extraction_stage_timeout_seconds=0.001,
+        progress=events.append,
+        time_provider=lambda: next(ticks),
+    )
+
+    assert result.assets == []
+    assert result.stage_timed_out is True
+    assert result.warnings[0].code == WarningCode.IMAGE_EXTRACTION_STAGE_TIMEOUT
+    assert result.warnings[0].details["timeout_reason"] == "stage_timeout"
+    assert [event.status for event in events] == [
+        "image_extraction_stage_timeout",
+        "image_extraction_page_skipped",
+    ]
+    assert events[-1].timeout_reason == "stage_timeout"
 
 
 def test_extract_images_can_create_captioned_page_crop_fallback(monkeypatch, sample_pdf: Path, tmp_path: Path) -> None:

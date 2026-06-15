@@ -65,6 +65,9 @@ class BatchConversionOptions:
     dedupe_images: bool = False
     repair_hyphenation: bool = False
     figure_crop_fallback: bool = False
+    image_extraction_page_timeout_seconds: float | None = None
+    image_extraction_stage_timeout_seconds: float | None = None
+    figure_semantics_stage_timeout_seconds: float | None = None
     retrieval_chunk_max_tokens: int = 512
     retrieval_tokenizer: str = "char"
     rag_contextual_embedding_text: bool = False
@@ -156,6 +159,9 @@ def build_batch_config(pdf_path: Path, output_root: Path, options: BatchConversi
         dedupe_images=options.dedupe_images,
         repair_hyphenation=options.repair_hyphenation,
         figure_crop_fallback=options.figure_crop_fallback,
+        image_extraction_page_timeout_seconds=options.image_extraction_page_timeout_seconds,
+        image_extraction_stage_timeout_seconds=options.image_extraction_stage_timeout_seconds,
+        figure_semantics_stage_timeout_seconds=options.figure_semantics_stage_timeout_seconds,
         retrieval_chunk_max_tokens=options.retrieval_chunk_max_tokens,
         retrieval_tokenizer=options.retrieval_tokenizer,
         rag_contextual_embedding_text=options.rag_contextual_embedding_text,

@@ -372,6 +372,12 @@ def test_cli_accepts_rag_figure_text_chunks_option(sample_pdf: Path, tmp_path: P
         "--figure-description-backend",
         "docling",
         "--figure-structure-extraction",
+        "--image-extraction-page-timeout-seconds",
+        "10",
+        "--image-extraction-stage-timeout-seconds",
+        "20",
+        "--figure-semantics-stage-timeout-seconds",
+        "30",
     ]
 
     completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
@@ -385,6 +391,9 @@ def test_cli_accepts_rag_figure_text_chunks_option(sample_pdf: Path, tmp_path: P
     assert manifest["options"]["rag_generated_figure_descriptions"] is True
     assert manifest["options"]["figure_description_backend"] == "docling"
     assert manifest["options"]["figure_structure_extraction"] is True
+    assert manifest["options"]["image_extraction_page_timeout_seconds"] == 10.0
+    assert manifest["options"]["image_extraction_stage_timeout_seconds"] == 20.0
+    assert manifest["options"]["figure_semantics_stage_timeout_seconds"] == 30.0
     assert (output_dir / "figure_descriptions_rag.jsonl").exists()
     assert (output_dir / "figure_structures_rag.jsonl").exists()
     assert report["summary"]["rag_figure_text_chunks"] is True
@@ -394,6 +403,9 @@ def test_cli_accepts_rag_figure_text_chunks_option(sample_pdf: Path, tmp_path: P
     assert report["summary"]["figure_description_backend"] == "docling"
     assert report["summary"]["figure_description_record_count"] == 0
     assert report["summary"]["figure_structure_record_count"] == 0
+    assert report["summary"]["image_extraction_page_timeout_seconds"] == 10.0
+    assert report["summary"]["image_extraction_stage_timeout_seconds"] == 20.0
+    assert report["summary"]["figure_semantics_stage_timeout_seconds"] == 30.0
 
 
 def test_cli_accepts_domain_adapter_option(sample_pdf: Path, tmp_path: Path) -> None:
