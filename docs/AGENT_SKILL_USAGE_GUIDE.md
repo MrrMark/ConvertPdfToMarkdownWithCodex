@@ -138,6 +138,14 @@ Use the pdf2md-rag-ingest skill. Convert the NVMe Base or NVM Command Set spec P
 Use the pdf2md-rag-ingest skill with the assetless technical RAG workflow. Use placeholder images plus figure text chunks, then validate the output bundle.
 ```
 
+대형 technical spec의 text/table/domain ingest:
+
+```text
+Use the pdf2md-rag-ingest skill. Convert the NVMe Base PDF with technical_spec_rag,
+domain_adapter=nvme, and image_mode=none. If using MCP, prefer page-window conversion and merge.
+Report artifact paths, window status, warning codes, and validator summaries only.
+```
+
 민감정보/고객 문서:
 
 ```text
@@ -182,6 +190,18 @@ python3 agent-pack/skills/pdf2md-rag-ingest/scripts/pdf2md_agent_runner.py conve
   --domain-adapter nvme \
   --output-dir output/spec
 ```
+
+대형 technical spec text-first ingest:
+
+```bash
+python3 -m pdf2md nvme-base.pdf -o output/nvme-base \
+  --rag-profile technical_spec_rag \
+  --domain-adapter nvme \
+  --image-mode none
+```
+
+MCP client에서는 `pdf2md_convert_pdf_windowed` 또는 `pdf2md_plan_page_windows` ->
+`pdf2md_convert_page_window` -> `pdf2md_merge_window_outputs` 순서를 사용한다.
 
 출력 검증:
 

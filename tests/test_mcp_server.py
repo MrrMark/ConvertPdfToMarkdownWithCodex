@@ -612,6 +612,10 @@ def test_mcp_development_spec_documents_stdio_and_http_follow_up() -> None:
     assert "PDF2MD_MCP_ROOTS" in text
     assert 'PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output"' in text
     assert "MCP_SERVER_INSTALL_USAGE_GUIDE.md" in text
+    assert "pdf2md_plan_page_windows" in text
+    assert "pdf2md_convert_pdf_windowed" in text
+    assert "image_mode=none" in text
+    assert "interrupted_report.json" in text
     assert "Streamable HTTP Follow-up Plan" in text
     assert "pdf2md-mcp-http" in text
 
@@ -635,5 +639,13 @@ def test_mcp_install_usage_guide_documents_safe_client_setup() -> None:
     assert "pdf2md_validate_output" in text
     assert "report_summaries" in text
     assert "manual_domain_adapter_keywords" in text
+    assert "pdf2md_plan_page_windows" in text
+    assert "pdf2md_convert_page_window" in text
+    assert "pdf2md_merge_window_outputs" in text
+    assert "pdf2md_convert_pdf_windowed" in text
+    assert "page_window_merge_report.json" in text
+    assert "conversion_state.json" in text
+    assert "interrupted_report.json" in text
+    assert '"image_mode": "none"' in text
     assert "Streamable HTTP server" in text
     assert "docs/MCP_SERVER_INSTALL_USAGE_GUIDE.md" in readme

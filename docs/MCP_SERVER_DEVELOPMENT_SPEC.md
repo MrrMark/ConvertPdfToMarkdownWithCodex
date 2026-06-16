@@ -11,6 +11,8 @@
 - PDF 변환 로직을 재작성하지 않고 기존 `pdf2md` CLI/library 계약을 MCP tool로 노출한다.
 - raw PDF text나 전체 Markdown body를 tool result에 직접 붙이지 않고, 생성 artifact URI와 요약만 반환한다.
 - RAG sidecar, manifest, report, validator를 agent가 안정적으로 찾을 수 있게 한다.
+- NVMe Base 같은 대형 PDF는 page-window 단위로 재시도/merge 가능한 workflow를 제공한다.
+- 중단/치명 예외 상황에서도 `conversion_state.json`, `interrupted_report.json`, best-effort `report.json`을 남길 수 있게 한다.
 - 로컬 파일 접근은 명시된 root 내부로 제한한다.
 
 ## Non-goals
@@ -80,6 +82,99 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 - `output_profiles`
 - `rag_sidecar_scopes`
 
+### `pdf2md_plan_page_windows`
+
+목적:
+
+- 선택된 page range를 deterministic window 목록으로 나눈다.
+- 각 window의 `window_id`, `page_range`, `selected_pages`, `output_subdir`를 사전 계산한다.
+
+주요 입력:
+
+- `input_pdf`
+- `output_dir`
+- `pages`
+- `password`
+- `window_size`
+
+출력:
+
+- `purpose="page_window_plan"`
+- `source_sha256`
+- `window_count`
+- `windows[]`
+
+### `pdf2md_convert_page_window`
+
+목적:
+
+- 계획된 단일 page window를 `windows/pages-0001-0100/` 같은 안정적인 하위 디렉터리로 변환한다.
+
+주요 입력:
+
+- `input_pdf`
+- `output_dir`
+- `window_id`
+- `pages`
+- `window_size`
+- `rag_profile`, `domain_adapter`, `image_mode`, `table_mode`, `rag_table_output`
+- `image_extraction_page_timeout_seconds`
+- `image_extraction_stage_timeout_seconds`
+- `figure_semantics_stage_timeout_seconds`
+
+정책:
+
+- `window_id`는 `pdf2md_plan_page_windows`의 결과와 일치해야 한다.
+- `selected_pages`는 기존 `Config.selected_pages()`와 같은 page range 규칙을 따른다.
+- 응답에는 full Markdown body를 포함하지 않는다.
+
+출력:
+
+- `purpose="page_window_conversion"`
+- `window`
+- `conversion`
+- `artifact_uris`
+- `warnings_preview`
+
+### `pdf2md_merge_window_outputs`
+
+목적:
+
+- window별 public artifact와 sidecar를 최종 output directory로 deterministic하게 merge한다.
+
+주요 입력:
+
+- `output_dir`
+- `input_pdf`
+- `pages`
+- `window_size`
+- `validate_windows`
+- `validate_merged`
+
+정책:
+
+- original page number와 source sha256을 보존한다.
+- `chunk_id`, `requirement_id`, `stable_requirement_seed`, `technical_table_id`, `domain_unit_id` collision은 deterministic하게 rewrite한다.
+- merged sidecar record에는 필요한 경우 `source_window_id`, `source_window_page_range`를 추가한다.
+- merge report에는 raw full text나 full Markdown body를 포함하지 않는다.
+
+출력:
+
+- merged `document.md`, `manifest.json`, `report.json`
+- merged RAG/domain sidecars
+- `page_window_merge_report.json`
+
+### `pdf2md_convert_pdf_windowed`
+
+목적:
+
+- plan, per-window conversion, validation, merge를 한 번에 실행하는 대형 PDF용 convenience tool이다.
+
+정책:
+
+- simple client는 이 tool 하나로 windowed conversion을 실행할 수 있다.
+- 실패한 window가 있으면 merge 전에 structured response로 실패 window와 report URI를 확인할 수 있어야 한다.
+
 ### `pdf2md_convert_pdf`
 
 목적:
@@ -106,12 +201,17 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 - `ocr_backend`
 - `page_workers`
 - `assetless_figure_text`
+- `image_extraction_page_timeout_seconds`
+- `image_extraction_stage_timeout_seconds`
+- `figure_semantics_stage_timeout_seconds`
 - `skip_existing`
 
 정책:
 
 - `technical_spec_rag`는 기본적으로 `domain_adapter`를 요구한다.
 - `assetless_figure_text=true`는 `image_mode=placeholder`와 `rag_figure_text_chunks=true`를 적용한다.
+- `image_mode=none`은 true no-image mode이며 image box detection, image extraction, figure OCR/description/structure sidecar 생성을 skip한다.
+- fatal/interrupt 경로에서는 가능한 경우 `conversion_state.json`, `interrupted_report.json`, interrupted summary가 포함된 `report.json`을 남긴다.
 - 응답에는 `password` 값을 포함하지 않고 `password_supplied` boolean만 포함한다.
 - 응답에는 `manual_domain_adapter_keywords` 값을 포함하지 않고 supplied boolean만 포함한다.
 - 응답에는 full Markdown body를 포함하지 않는다.

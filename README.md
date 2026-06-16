@@ -149,11 +149,16 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" \
 
 - `pdf2md_doctor`
 - `pdf2md_list_profiles`
+- `pdf2md_plan_page_windows`
+- `pdf2md_convert_page_window`
+- `pdf2md_merge_window_outputs`
+- `pdf2md_convert_pdf_windowed`
 - `pdf2md_convert_pdf`
 - `pdf2md_validate_output`
 - `pdf2md_inspect_report`
 
 MCP 응답은 전체 Markdown 본문 대신 artifact URI, report summary, warning preview를 반환합니다.
+대형 technical spec은 page-window tool을 사용하면 `windows/pages-0001-0100/` 같은 안정적인 하위 디렉터리로 나누어 변환한 뒤 deterministic merge를 수행할 수 있습니다.
 
 ## Development
 

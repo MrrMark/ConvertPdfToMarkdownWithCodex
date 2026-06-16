@@ -373,7 +373,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
     quality_scorecard = Path("docs/QUALITY_SCORECARD.md").read_text(encoding="utf-8")
     changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
-    mcp_nvme_stability_spec = Path("docs/PDF2MD_MCP_NVME_BASE_STABILITY_DEVELOPMENT_SPEC.md").read_text(
+    mcp_nvme_stability_spec = Path("docs/archive/PDF2MD_MCP_NVME_BASE_STABILITY_DEVELOPMENT_SPEC.md").read_text(
         encoding="utf-8"
     )
 
@@ -586,6 +586,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "완료된 Q34-Q117" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q117. MCP NVMe Base Large Conversion Stability" in implemented_specs
+    assert "docs/archive/PDF2MD_MCP_NVME_BASE_STABILITY_DEVELOPMENT_SPEC.md" in implemented_specs
     assert "conversion_state.json" in implemented_specs
     assert "interrupted_report.json" in implemented_specs
     assert "pdf2md_convert_pdf_windowed" in implemented_specs
