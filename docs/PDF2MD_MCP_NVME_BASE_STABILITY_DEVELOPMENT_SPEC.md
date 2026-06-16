@@ -1,6 +1,6 @@
 # PDF2MD MCP NVMe Base Stability Development Spec
 
-Status: Active Q117 development spec.
+Status: Implemented Q117 development spec.
 
 ## 1. Purpose
 

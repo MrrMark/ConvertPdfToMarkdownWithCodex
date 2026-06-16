@@ -61,6 +61,8 @@ class Config(BaseModel):
     markdown_filename: str = "document.md"
     manifest_filename: str = "manifest.json"
     report_filename: str = "report.json"
+    conversion_state_filename: str = "conversion_state.json"
+    interrupted_report_filename: str = "interrupted_report.json"
     rag_tables_markdown_filename: str = "rag_tables.md"
     rag_tables_jsonl_filename: str = "tables_rag.jsonl"
     rag_text_blocks_jsonl_filename: str = "text_blocks_rag.jsonl"

@@ -16,6 +16,8 @@
 
 - `docs/schema/manifest.schema.json`
 - `docs/schema/report.schema.json`
+- `docs/schema/conversion_state.schema.json`
+- `docs/schema/interrupted_conversion_report.schema.json`
 - `docs/schema/batch_report.schema.json`
 - `docs/schema/corpus_manifest.schema.json`
 - `docs/schema/corpus_diff_report.schema.json`
@@ -205,6 +207,81 @@ Warning taxonomy policy:
 - Advisory warnings, including expected complex table HTML fallback, do not by themselves set `partial_success` or exit code `2`.
 - Actionable OCR/table/image warnings and failed-page signals may set `partial_success` and exit code `2`.
 - Image/figure timeout warning codes are advisory by default: `image_extraction_page_timeout`, `image_extraction_stage_timeout`, and `figure_semantics_stage_timeout`.
+
+Interrupted/fatal summary fields:
+
+- `interrupted`: present and `true` when `report.json` was written by the best-effort interrupted/fatal path.
+- `interrupted_stage`: current conversion stage when the interrupted/fatal report was written.
+- `interrupted_page`: current page when available.
+- `last_completed_page`: highest completed page observed before interruption.
+- `artifacts_written`: relative output artifacts observed at report time.
+- `resume_hint`: human-readable guidance for re-running or resuming with page-window workflow.
+
+## conversion_state.json
+
+Maintained during conversion for local resume/triage workflows.
+
+Required:
+
+- `schema_version`
+- `purpose="conversion_state"`
+- `input_file`
+- `output_dir`
+- `started_at`
+- `updated_at`
+- `elapsed_ms`
+- `status`
+- `current_stage`
+- `current_page`
+- `selected_pages`
+- `completed_pages`
+- `failed_pages`
+- `skipped_pages`
+- `artifacts_written`
+- `stage_durations_ms`
+- `last_warning_code`
+
+Policy:
+
+- `artifacts_written` uses paths relative to the conversion output directory.
+- In confidential-safe mode, `input_file` and `output_dir` are redacted.
+- The state file is operational metadata and must not include raw PDF text, full Markdown body, or image bytes.
+
+## interrupted_report.json
+
+Written on `KeyboardInterrupt` or fatal exceptions after conversion output setup has started.
+
+Required:
+
+- `schema_version`
+- `purpose="interrupted_conversion"`
+- `input_file`
+- `output_dir`
+- `started_at`
+- `interrupted_at`
+- `elapsed_ms`
+- `status`
+- `interrupted=true`
+- `interrupted_stage`
+- `interrupted_page`
+- `last_completed_page`
+- `selected_pages`
+- `completed_pages`
+- `failed_pages`
+- `skipped_pages`
+- `artifacts_written`
+- `stage_durations_ms`
+- `last_warning_code`
+- `exception_type`
+- `message`
+- `resume_hint`
+- `warnings`
+
+Policy:
+
+- Partial artifacts are left in place.
+- A best-effort `report.json` is also written when safe, with the interrupted summary fields above.
+- The interrupted report is operational metadata and must not include raw full document text or image bytes.
 
 ## page_window_merge_report.json
 

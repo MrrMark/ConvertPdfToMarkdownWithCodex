@@ -176,6 +176,31 @@ def _add_report_summary_json_schema_extras(schema: dict[str, Any]) -> None:
             "description": "Figure semantics substage skipped when the timeout was recorded.",
         },
     )
+    for name, description in {
+        "interrupted_stage": "Current conversion stage when an interrupted/fatal report was written.",
+        "resume_hint": "Human-readable resume guidance for partial artifacts.",
+    }.items():
+        properties.setdefault(name, {"type": ["string", "null"], "description": description})
+    for name, description in {
+        "interrupted_page": "Current page when an interrupted/fatal report was written.",
+        "last_completed_page": "Highest completed page observed before interruption.",
+    }.items():
+        properties.setdefault(name, {"type": ["integer", "null"], "description": description})
+    properties.setdefault(
+        "interrupted",
+        {
+            "type": "boolean",
+            "description": "True when report.json was written by the best-effort interrupted/fatal path.",
+        },
+    )
+    properties.setdefault(
+        "artifacts_written",
+        {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Relative output artifacts observed when the interrupted/fatal report was written.",
+        },
+    )
 
 
 class ReportSummary(BaseModel):
@@ -398,6 +423,52 @@ class Report(BaseModel):
     warnings: list[WarningEntry] = Field(default_factory=list)
     page_results: list[PageResult] = Field(default_factory=list)
     summary: ReportSummary = Field(default_factory=ReportSummary)
+
+
+class ConversionState(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "conversion_state"
+    input_file: str
+    output_dir: str
+    started_at: datetime
+    updated_at: datetime
+    elapsed_ms: int = 0
+    status: str = "running"
+    current_stage: Optional[str] = None
+    current_page: Optional[int] = None
+    selected_pages: list[int] = Field(default_factory=list)
+    completed_pages: list[int] = Field(default_factory=list)
+    failed_pages: list[int] = Field(default_factory=list)
+    skipped_pages: list[int] = Field(default_factory=list)
+    artifacts_written: list[str] = Field(default_factory=list)
+    stage_durations_ms: dict[str, int] = Field(default_factory=dict)
+    last_warning_code: Optional[str] = None
+
+
+class InterruptedConversionReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "interrupted_conversion"
+    input_file: str
+    output_dir: str
+    started_at: datetime
+    interrupted_at: datetime
+    elapsed_ms: int = 0
+    status: str
+    interrupted: bool = True
+    interrupted_stage: Optional[str] = None
+    interrupted_page: Optional[int] = None
+    last_completed_page: Optional[int] = None
+    selected_pages: list[int] = Field(default_factory=list)
+    completed_pages: list[int] = Field(default_factory=list)
+    failed_pages: list[int] = Field(default_factory=list)
+    skipped_pages: list[int] = Field(default_factory=list)
+    artifacts_written: list[str] = Field(default_factory=list)
+    stage_durations_ms: dict[str, int] = Field(default_factory=dict)
+    last_warning_code: Optional[str] = None
+    exception_type: str
+    message: str
+    resume_hint: str
+    warnings: list[WarningEntry] = Field(default_factory=list)
 
 
 class BatchDocumentFiles(BaseModel):

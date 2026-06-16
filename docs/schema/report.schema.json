@@ -168,6 +168,13 @@
           "title": "Advisory Warning Count",
           "type": "integer"
         },
+        "artifacts_written": {
+          "description": "Relative output artifacts observed when the interrupted/fatal report was written.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "code_block_count": {
           "default": 0,
           "title": "Code Block Count",
@@ -357,6 +364,31 @@
           },
           "type": "array"
         },
+        "interrupted": {
+          "description": "True when report.json was written by the best-effort interrupted/fatal path.",
+          "type": "boolean"
+        },
+        "interrupted_page": {
+          "description": "Current page when an interrupted/fatal report was written.",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "interrupted_stage": {
+          "description": "Current conversion stage when an interrupted/fatal report was written.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_completed_page": {
+          "description": "Highest completed page observed before interruption.",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "list_item_count": {
           "default": 0,
           "title": "List Item Count",
@@ -497,6 +529,13 @@
           "default": 0,
           "title": "Requirement Traceability Record Count",
           "type": "integer"
+        },
+        "resume_hint": {
+          "description": "Human-readable resume guidance for partial artifacts.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "retrieval_chunk_average_token_estimate": {
           "default": 0.0,

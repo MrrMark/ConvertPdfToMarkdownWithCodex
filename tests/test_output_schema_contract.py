@@ -55,6 +55,8 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     assert [path.name for path in written] == [
         "manifest.schema.json",
         "report.schema.json",
+        "conversion_state.schema.json",
+        "interrupted_conversion_report.schema.json",
         "batch_report.schema.json",
         "corpus_manifest.schema.json",
         "corpus_diff_report.schema.json",
@@ -76,6 +78,12 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     manifest_schema = json.loads((output_dir / "manifest.schema.json").read_text(encoding="utf-8"))
     corpus_schema = json.loads((output_dir / "corpus_manifest.schema.json").read_text(encoding="utf-8"))
     assert manifest_schema["properties"]["schema_version"]["default"] == "1.0"
+    conversion_state_schema = json.loads((output_dir / "conversion_state.schema.json").read_text(encoding="utf-8"))
+    assert conversion_state_schema["properties"]["purpose"]["default"] == "conversion_state"
+    interrupted_schema = json.loads(
+        (output_dir / "interrupted_conversion_report.schema.json").read_text(encoding="utf-8")
+    )
+    assert interrupted_schema["properties"]["purpose"]["default"] == "interrupted_conversion"
     assert corpus_schema["properties"]["purpose"]["default"] == "rag_corpus_ingest"
     diff_schema = json.loads((output_dir / "corpus_diff_report.schema.json").read_text(encoding="utf-8"))
     assert diff_schema["properties"]["purpose"]["default"] == "rag_corpus_incremental_diff"

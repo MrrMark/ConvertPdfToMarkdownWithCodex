@@ -1,0 +1,128 @@
+{
+  "properties": {
+    "artifacts_written": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Artifacts Written",
+      "type": "array"
+    },
+    "completed_pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Completed Pages",
+      "type": "array"
+    },
+    "current_page": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Page"
+    },
+    "current_stage": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Stage"
+    },
+    "elapsed_ms": {
+      "default": 0,
+      "title": "Elapsed Ms",
+      "type": "integer"
+    },
+    "failed_pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Failed Pages",
+      "type": "array"
+    },
+    "input_file": {
+      "title": "Input File",
+      "type": "string"
+    },
+    "last_warning_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Warning Code"
+    },
+    "output_dir": {
+      "title": "Output Dir",
+      "type": "string"
+    },
+    "purpose": {
+      "default": "conversion_state",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Selected Pages",
+      "type": "array"
+    },
+    "skipped_pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Skipped Pages",
+      "type": "array"
+    },
+    "stage_durations_ms": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Stage Durations Ms",
+      "type": "object"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "status": {
+      "default": "running",
+      "title": "Status",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "input_file",
+    "output_dir",
+    "started_at",
+    "updated_at"
+  ],
+  "title": "ConversionState",
+  "type": "object"
+}
