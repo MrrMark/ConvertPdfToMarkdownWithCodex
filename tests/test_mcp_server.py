@@ -14,6 +14,131 @@ from pdf2md.models import ConversionStatus
 from tests.fixtures.pdf_builder import PageSpec, PositionedText, write_pdf
 
 
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_jsonl(path: Path, records: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "".join(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in records),
+        encoding="utf-8",
+    )
+
+
+def _valid_retrieval_chunk(*, page: int, source_sha256: str) -> dict:
+    text = f"Chunk page {page}"
+    block_id = f"page-{page:04d}-block-0001"
+    bbox = [72.0, 80.0, 180.0, 92.0]
+    return {
+        "chunk_id": "chunk-000001",
+        "schema_version": "1.0",
+        "chunk_index": 1,
+        "chunk_type": "text_block",
+        "text": text,
+        "source_sha256": source_sha256,
+        "source_refs": [{"source_type": "text_block", "source_id": block_id, "page": page, "bbox": bbox}],
+        "page_range": [page, page],
+        "bbox": bbox,
+        "heading_path": [],
+        "semantic_types": ["paragraph"],
+        "normative_strength": None,
+        "retrieval_priority": 50,
+        "char_count": len(text),
+        "token_estimate": 3,
+        "section_path": "",
+        "chunk_group_id": f"text-page-{page:04d}",
+        "source_record_count": 1,
+        "source_dedupe_key": block_id,
+        "chunk_boundary_policy": "source_record",
+        "chunk_boundary_reasons": ["text_block_boundary"],
+    }
+
+
+def _write_window_output(
+    *,
+    output_root: Path,
+    window_id: str,
+    page: int,
+    source_sha256: str,
+    input_pdf: Path,
+) -> None:
+    window_dir = output_root / "windows" / window_id
+    window_dir.mkdir(parents=True)
+    block_id = f"page-{page:04d}-block-0001"
+    bbox = [72.0, 80.0, 180.0, 92.0]
+    (window_dir / "document.md").write_text(f"Window page {page}\n", encoding="utf-8")
+    _write_json(
+        window_dir / "manifest.json",
+        {
+            "schema_version": "1.0",
+            "input_file": str(input_pdf),
+            "total_pages": 2,
+            "selected_pages": [page],
+            "options": {"image_mode": "none"},
+            "images": [],
+            "excluded_images": [],
+            "tables": [],
+            "ocr_pages": [],
+            "warnings": [],
+        },
+    )
+    _write_json(
+        window_dir / "report.json",
+        {
+            "schema_version": "1.0",
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "finished_at": "2026-01-01T00:00:01+00:00",
+            "duration_ms": 1000,
+            "status": "success",
+            "engine_usage": {"pypdf": True, "pdfplumber": True, "ocr": False, "tables": False, "images": False},
+            "failed_pages": [],
+            "warnings": [],
+            "page_results": [{"page": page, "status": "success"}],
+            "summary": {
+                "processed_pages": 1,
+                "warning_count": 0,
+                "failed_page_count": 0,
+                "partial_success": False,
+                "stage_durations_ms": {},
+                "rag_text_block_record_count": 1,
+                "retrieval_chunk_record_count": 1,
+                "domain_unit_record_count": 1,
+            },
+        },
+    )
+    _write_jsonl(
+        window_dir / "text_blocks_rag.jsonl",
+        [
+            {
+                "block_id": block_id,
+                "page": page,
+                "block_index": 1,
+                "text": f"Block page {page}",
+                "bbox": bbox,
+            }
+        ],
+    )
+    _write_jsonl(
+        window_dir / "retrieval_chunks_rag.jsonl",
+        [_valid_retrieval_chunk(page=page, source_sha256=source_sha256)],
+    )
+    _write_jsonl(
+        window_dir / "domain_units_rag.jsonl",
+        [
+            {
+                "domain_unit_id": "domain-unit-000001",
+                "unit_type": "synthetic",
+                "page": page,
+                "text": f"Domain page {page}",
+                "bbox": bbox,
+                "source_refs": [{"source_type": "text_block", "source_id": block_id, "page": page, "bbox": bbox}],
+            }
+        ],
+    )
+
+
 def test_pyproject_declares_mcp_extra_and_entry_point() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
@@ -274,6 +399,122 @@ def test_convert_page_window_uses_planned_page_range_and_output_dir(
     assert result["window"]["selected_pages"] == [3, 5]
     assert result["conversion"]["output_dir"] == str(output_root / "windows" / "pages-0003-0005")
     assert result["conversion"]["artifact_uris"]["document.md"].startswith("file://")
+
+
+def test_merge_window_outputs_rewrites_collisions_and_validates(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "spec.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(texts=[PositionedText(f"Page {page}", 72, 760)])
+            for page in range(1, 3)
+        ],
+    )
+    source_sha256 = hashlib.sha256(input_pdf.read_bytes()).hexdigest()
+    output_root = tmp_path / "out"
+    _write_window_output(
+        output_root=output_root,
+        window_id="pages-0001-0001",
+        page=1,
+        source_sha256=source_sha256,
+        input_pdf=input_pdf,
+    )
+    _write_window_output(
+        output_root=output_root,
+        window_id="pages-0002-0002",
+        page=2,
+        source_sha256=source_sha256,
+        input_pdf=input_pdf,
+    )
+
+    result = mcp_server.merge_window_outputs(
+        input_pdf=str(input_pdf),
+        output_dir=str(output_root),
+        window_size=1,
+        validate_windows=False,
+        validate_merged=True,
+        roots=[tmp_path],
+        project_root=Path.cwd(),
+    )
+
+    assert result["status"] == "success"
+    assert result["source_pdf_sha256"] == source_sha256
+    assert result["merged_record_counts"]["retrieval_chunks_rag.jsonl"] == 2
+    assert result["id_collision_count"] >= 1
+    chunks = [
+        json.loads(line)
+        for line in (output_root / "retrieval_chunks_rag.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [chunk["chunk_id"] for chunk in chunks] == ["chunk-000001", "chunk-000002"]
+    assert [chunk["chunk_index"] for chunk in chunks] == [1, 2]
+    assert {chunk["source_sha256"] for chunk in chunks} == {source_sha256}
+    assert chunks[0]["source_window_id"] == "pages-0001-0001"
+    domain_units = [
+        json.loads(line)
+        for line in (output_root / "domain_units_rag.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [record["domain_unit_id"] for record in domain_units] == [
+        "pages-0001-0001__domain-unit-000001",
+        "pages-0002-0002__domain-unit-000001",
+    ]
+    manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_root / "report.json").read_text(encoding="utf-8"))
+    merge_report = json.loads((output_root / "page_window_merge_report.json").read_text(encoding="utf-8"))
+    assert manifest["selected_pages"] == [1, 2]
+    assert report["summary"]["retrieval_chunk_record_count"] == 2
+    assert report["summary"]["domain_unit_record_count"] == 2
+    assert merge_report["purpose"] == "page_window_merge"
+    assert "Chunk page" not in json.dumps(merge_report, ensure_ascii=False, sort_keys=True)
+
+
+def test_convert_pdf_windowed_orchestrates_windows_and_merge(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "spec.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(texts=[PositionedText(f"Page {page}", 72, 760)])
+            for page in range(1, 4)
+        ],
+    )
+    output_root = tmp_path / "out"
+    converted: list[str] = []
+
+    def fake_convert_page_window(**kwargs):  # noqa: ANN003
+        converted.append(kwargs["window_id"])
+        return {
+            "conversion": {
+                "status": "success",
+                "exit_code": 0,
+                "output_dir": str(output_root / "windows" / kwargs["window_id"]),
+                "warning_count": 0,
+                "report_summary": {"processed_pages": len(kwargs["window_id"])},
+            }
+        }
+
+    def fake_merge_window_outputs(**kwargs):  # noqa: ANN003
+        assert kwargs["output_dir"] == str(output_root)
+        assert kwargs["window_size"] == 2
+        return {"status": "success", "merge_report_uri": "file:///tmp/page_window_merge_report.json"}
+
+    monkeypatch.setattr(mcp_server, "convert_page_window", fake_convert_page_window)
+    monkeypatch.setattr(mcp_server, "merge_window_outputs", fake_merge_window_outputs)
+
+    result = mcp_server.convert_pdf_windowed(
+        input_pdf=str(input_pdf),
+        output_dir=str(output_root),
+        pages="1-3",
+        window_size=2,
+        roots=[tmp_path],
+    )
+
+    assert converted == ["pages-0001-0002", "pages-0003-0003"]
+    assert result["purpose"] == "page_windowed_conversion"
+    assert result["status"] == "success"
+    assert result["window_count"] == 2
+    assert result["merge"]["merge_report_uri"].endswith("page_window_merge_report.json")
 
 
 def test_convert_pdf_requires_domain_adapter_for_technical_profile(tmp_path: Path) -> None:

@@ -206,6 +206,39 @@ Warning taxonomy policy:
 - Actionable OCR/table/image warnings and failed-page signals may set `partial_success` and exit code `2`.
 - Image/figure timeout warning codes are advisory by default: `image_extraction_page_timeout`, `image_extraction_stage_timeout`, and `figure_semantics_stage_timeout`.
 
+## page_window_merge_report.json
+
+Emitted by MCP page-window merge workflows.
+
+Required:
+
+- `schema_version`
+- `purpose="page_window_merge"`
+- `source_pdf_sha256`
+- `output_dir`
+- `window_count`
+- `windows`
+- `merged_record_counts`
+- `id_collision_count`
+- `rewritten_id_count`
+- `validation_summary`
+- `warnings`
+
+Stable nested fields:
+
+- `windows[].window_id`
+- `windows[].source_window_page_range`
+- `windows[].selected_pages`
+- `windows[].output_subdir`
+- `windows[].status`
+- `merged_record_counts` keyed by public sidecar filename
+- `validation_summary.windows[].status`
+- `validation_summary.windows[].passed`
+- `validation_summary.merged.status`
+- `validation_summary.merged.passed`
+
+The merge report is operational metadata only. It must not include raw full Markdown body, raw PDF text, or full sidecar record bodies.
+
 ## debug/table-quality-review-pack.json
 
 Optional local-only artifact written when `--debug` is enabled.
