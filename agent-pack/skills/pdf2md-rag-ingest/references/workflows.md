@@ -13,6 +13,7 @@ Choose conservative defaults. If a request is ambiguous, prefer source preservat
 | Confidential/customer evidence pack | `--rag-profile confidential_rag` |
 | Preserve Markdown while emitting sidecars | `--rag-profile preserve_with_sidecars` |
 | Image upload is not supported by target RAG | `--rag-profile technical_spec_rag_visual --image-mode placeholder` |
+| Text/table/domain ingest for very large technical specs | `--rag-profile technical_spec_rag --domain-adapter <adapter> --image-mode none` |
 | Fast core artifact generation | `--output-profile fast` |
 
 ## Domain Adapters
@@ -76,3 +77,18 @@ Requirement impact review pack:
 python3 scripts/build_requirement_impact_review_pack.py \
   --impact-report ./pdfs_v2/output/requirement_change_impact_report.json
 ```
+
+## Large PDF MCP Workflow
+
+For NVMe Base-sized PDFs in an MCP client, prefer page-window conversion:
+
+1. `pdf2md_plan_page_windows`
+2. `pdf2md_convert_page_window` for isolated retries, or `pdf2md_convert_pdf_windowed` for one-shot orchestration
+3. `pdf2md_merge_window_outputs`
+4. `pdf2md_validate_output`
+
+Use `image_mode="none"` for text-first ingest when figure evidence is not required. Use `image_mode="referenced"` or
+`technical_spec_rag_visual` when figure/image provenance is part of the requested evidence.
+
+If a conversion is interrupted, inspect `conversion_state.json`, `interrupted_report.json`, and the best-effort
+`report.json` before deleting or rerunning any partial artifacts.

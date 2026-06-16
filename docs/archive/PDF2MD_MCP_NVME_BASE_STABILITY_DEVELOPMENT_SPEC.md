@@ -10,18 +10,18 @@ Status: Implemented Q117 development spec.
 이번 작업의 우선 목표는 `SpecAnalysisAgent`가 요구하는 text/table/requirement/domain sidecar ingest 품질을 유지하면서,
 이미지/도식 evidence가 필요 없는 경로에서는 image/figure 처리 비용을 명시적으로 제거하는 것이다.
 
-## 2. Current Findings
+## 2. Initial Findings Before Implementation
 
-현재 코드 기준 확인 사항:
+Q117 착수 전 코드 기준 확인 사항:
 
 - `ImageMode.PLACEHOLDER`는 Markdown image link 대신 placeholder comment를 쓰는 모드다.
 - `placeholder`에서도 pipeline은 `pdf_context.get_image_boxes(page)`와 `extract_images(...)`를 호출한다.
 - `technical_spec_rag_visual`은 figure text, region OCR, deterministic figure description, figure structure sidecar를 켠다.
-- MCP `pdf2md_convert_pdf`는 단일 PDF 변환 tool만 제공하며, page-window orchestration과 merge contract는 없다.
+- MCP `pdf2md_convert_pdf`는 단일 PDF 변환 tool만 제공하며, page-window orchestration과 merge contract는 없었다.
 - report에는 stage duration이 있으나 image extraction 중 page-level progress, timeout fallback, last processed image/page 정보가 부족하다.
 - 변환 중단 시 최종 `report.json`을 항상 남기는 interrupted-state contract는 없다.
 
-판단:
+당시 판단:
 
 - `placeholder` 의미를 바꿔 image extraction을 skip하면 기존 assetless RAG 계약을 깨므로 별도 no-image mode가 필요하다.
 - NVMe Base full conversion은 single-run보다 page-window conversion과 deterministic merge가 운영 안정성에 유리하다.

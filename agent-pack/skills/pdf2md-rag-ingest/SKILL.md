@@ -13,8 +13,10 @@ Use the local `pdf2md` converter as the source of truth. Do not rewrite the conv
 - Preserve extracted text. Do not summarize, paraphrase, correct, or invent PDF text.
 - Preserve tables as tables. Use `auto` by default; complex tables must remain HTML fallback instead of unsafe GFM.
 - Keep images referenced by default. Use placeholder mode only when an RAG target cannot ingest image files.
+- Use `--image-mode none` only when visual evidence is intentionally out of scope, such as text/table/domain ingest for a very large technical spec.
 - Treat OCR as evidence with confidence, not certainty. Low confidence must remain visible in `report.json`.
 - Prefer partial success. Do not discard an output bundle because one page, table, image, or OCR step warned.
+- Preserve partial artifacts. On fatal/interrupted conversions, inspect `conversion_state.json`, `interrupted_report.json`, and `report.json` before rerunning.
 - For confidential/customer PDFs, use `--confidential-safe-mode` or `--rag-profile confidential_rag`.
 
 ## Quick Workflow
@@ -63,6 +65,18 @@ python3 -m pdf2md spec.pdf -o output/spec \
   --domain-adapter nvme \
   --image-mode placeholder
 ```
+
+Text-first large technical spec ingest:
+
+```bash
+python3 -m pdf2md nvme-base.pdf -o output/nvme-base \
+  --rag-profile technical_spec_rag \
+  --domain-adapter nvme \
+  --image-mode none
+```
+
+For MCP clients, use `pdf2md_convert_pdf_windowed` or the explicit
+`pdf2md_plan_page_windows` -> `pdf2md_convert_page_window` -> `pdf2md_merge_window_outputs` sequence for large PDFs.
 
 Batch conversion:
 

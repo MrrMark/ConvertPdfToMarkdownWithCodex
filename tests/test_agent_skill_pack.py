@@ -49,6 +49,9 @@ def test_agent_skill_pack_references_exist_and_stay_linked() -> None:
     for reference in references:
         assert reference in skill_text
         assert (SKILL_ROOT / reference).is_file()
+    assert "--image-mode none" in skill_text
+    assert "pdf2md_convert_pdf_windowed" in skill_text
+    assert "interrupted_report.json" in skill_text
 
 
 def test_agent_skill_pack_includes_client_adapter_templates() -> None:
@@ -75,8 +78,30 @@ def test_agent_skill_usage_guide_documents_common_client_operations() -> None:
     assert "py -3.14 scripts\\install_agent_skill_pack.py" in guide
     assert "symlink" in guide
     assert "--workflow assetless-technical-rag" in guide
+    assert "--image-mode none" in guide
+    assert "pdf2md_convert_pdf_windowed" in guide
     assert "validate --output-dir output/spec --target all" in guide
     assert "Do not summarize or rewrite PDF text" in guide
+
+
+def test_agent_skill_pack_documents_q117_operational_contracts() -> None:
+    artifacts = (SKILL_ROOT / "references/artifacts.md").read_text(encoding="utf-8")
+    workflows = (SKILL_ROOT / "references/workflows.md").read_text(encoding="utf-8")
+    validation = (SKILL_ROOT / "references/validation.md").read_text(encoding="utf-8")
+    cursor_rule = Path("agent-adapters/cursor/pdf2md-rag-ingest.mdc").read_text(encoding="utf-8")
+    continue_rule = Path("agent-adapters/continue/pdf2md-rag-ingest.md").read_text(encoding="utf-8")
+
+    assert "conversion_state.json" in artifacts
+    assert "interrupted_report.json" in artifacts
+    assert "page_window_merge_report.json" in artifacts
+    assert "pdf2md_plan_page_windows" in workflows
+    assert "pdf2md_merge_window_outputs" in workflows
+    assert "--image-mode none" in workflows
+    assert "summary.interrupted=true" in validation
+    assert "--image-mode none" in cursor_rule
+    assert "pdf2md_convert_pdf_windowed" in cursor_rule
+    assert "--image-mode none" in continue_rule
+    assert "pdf2md_convert_pdf_windowed" in continue_rule
 
 
 def test_pdf2md_agent_runner_dry_run_builds_assetless_command() -> None:

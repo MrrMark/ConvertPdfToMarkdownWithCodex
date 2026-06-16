@@ -9,6 +9,8 @@ Use artifact metadata before reading raw Markdown content. Prefer `report.json`,
 | `document.md` | Human-reviewable Markdown source output |
 | `manifest.json` | Stable options, source identity, asset/table/image metadata |
 | `report.json` | Status, page diagnostics, warnings, summary metrics |
+| `conversion_state.json` | Latest stage/page/artifact state for running or recently completed conversion |
+| `interrupted_report.json` | Best-effort interrupted/fatal conversion report when partial artifacts exist |
 | `assets/images/*` | Referenced images when `image-mode=referenced` |
 
 ## RAG Sidecars
@@ -36,6 +38,13 @@ Use artifact metadata before reading raw Markdown content. Prefer `report.json`,
 | `corpus_diff_report.json` | Added/changed/unchanged/removed document diff |
 | `requirement_change_impact_report.json` | Requirement-level added/changed/removed diff |
 
+## Page-window Outputs
+
+| File or directory | Use |
+| --- | --- |
+| `windows/pages-0001-0100/` | Stable per-window output subdirectory |
+| `page_window_merge_report.json` | Deterministic merge metadata, validation summary, and rewritten ID counts |
+
 ## Reporting Guidance
 
 When reporting to users:
@@ -43,5 +52,7 @@ When reporting to users:
 - Include conversion status, exit code, processed pages, warning count, and output directory.
 - Mention warning codes and affected pages when available.
 - Mention whether outputs are full, minimal, or fast sidecar scope.
+- For interrupted/fatal conversions, mention `interrupted_stage`, `interrupted_page`, `last_completed_page`, and whether partial artifacts remain.
+- For page-window conversions, mention `window_count`, failed windows, merge status, and `page_window_merge_report.json`.
 - For NVMe Base and NVM Command Set, summarize `domain_units_rag.jsonl`, `technical_tables_rag.jsonl`, command relationship metadata coverage, and validation status; do not paste raw spec rows.
 - Do not paste raw PDF text, full Markdown, customer filenames, or image bytes unless explicitly requested and safe.

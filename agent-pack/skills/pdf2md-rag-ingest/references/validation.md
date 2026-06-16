@@ -21,6 +21,13 @@ python3 scripts/validate_provenance_integrity.py --output-dir output/spec --fail
 python3 scripts/validate_artifact_integrity.py --output-dir output/spec --fail-on-error
 ```
 
+For public schema drift checks after adding JSON outputs:
+
+```bash
+python3 scripts/export_output_schema.py --check
+python3 -m pytest tests/test_output_schema_contract.py -q
+```
+
 For confidential/customer outputs:
 
 ```bash
@@ -54,6 +61,13 @@ python3 scripts/validate_ssd_rag_contract.py \
   --domain-adapter nvme
 ```
 
+## Interrupted or Windowed Conversion Checks
+
+- If `report.json` has `summary.interrupted=true`, inspect `interrupted_report.json` and `conversion_state.json`.
+- Preserve existing partial artifacts unless the user explicitly asks to remove them.
+- For page-window conversion, inspect `page_window_merge_report.json` and validator summaries before reading full sidecars.
+- Re-run only failed window directories when possible.
+
 ## Troubleshooting
 
 - `python` not found: use `python3`, `.venv311/bin/python`, or `.venv314/bin/python`.
@@ -62,3 +76,4 @@ python3 scripts/validate_ssd_rag_contract.py \
 - Missing sidecars: inspect `manifest.options.rag_sidecar_scope` and `report.summary.rag_sidecar_omitted_outputs`.
 - Table quality warnings: prefer HTML fallback; do not force Markdown unless the user accepts structure loss.
 - Assetless RAG requested: use placeholder images plus `--rag-figure-text-chunks`.
+- Text-first large spec ingest requested: use `--image-mode none` and document that visual sidecars are intentionally skipped.

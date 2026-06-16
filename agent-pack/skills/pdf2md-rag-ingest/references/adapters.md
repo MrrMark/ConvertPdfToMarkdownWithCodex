@@ -93,4 +93,6 @@ Equivalent target:
 .continue/rules/pdf2md-rag-ingest.md
 ```
 
-For tool execution, prefer a future MCP server or explicit terminal commands from this skill.
+For tool execution, prefer the local stdio MCP server when the client supports MCP. Use explicit terminal commands from
+this skill when MCP is unavailable. For large PDFs, MCP clients should prefer the page-window tools documented in
+`docs/MCP_SERVER_INSTALL_USAGE_GUIDE.md`.
