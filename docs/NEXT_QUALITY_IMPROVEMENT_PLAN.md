@@ -23,15 +23,4 @@
 
 ## 남은 작업
 
-### Q117. MCP NVMe Base Large Conversion Stability
-
-`ssd-verification-agent`에서 pdf2md MCP를 사용해 NVMe Base 전체 PDF를 변환할 때 image/figure extraction 병목,
-장시간 실행 상태 불투명성, 중단 시 report 부재, 대형 단일 실행 리스크를 줄인다.
-
-범위:
-
-- `placeholder`와 별개인 true no-image mode를 추가해 image box/figure extraction을 완전히 skip할 수 있게 한다.
-- image/figure extraction timeout, page progress, elapsed metric, timeout fallback, structured warning/report를 추가한다.
-- NVMe Base 같은 700+ page 문서를 page-window 단위로 변환하고 sidecar를 deterministic하게 merge하는 MCP workflow를 추가한다.
-- interrupt/timeout/partial failure 상황에서도 마지막 stage, page, artifact 상태를 JSON report로 남긴다.
-- 자세한 명세는 `docs/PDF2MD_MCP_NVME_BASE_STABILITY_DEVELOPMENT_SPEC.md`를 따른다.
+현재 남은 작업 없음.

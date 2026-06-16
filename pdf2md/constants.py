@@ -19,6 +19,8 @@ class WarningCode:
     IMAGE_EXTRACTION_PAGE_TIMEOUT = "image_extraction_page_timeout"
     IMAGE_EXTRACTION_STAGE_TIMEOUT = "image_extraction_stage_timeout"
     FIGURE_SEMANTICS_STAGE_TIMEOUT = "figure_semantics_stage_timeout"
+    CONVERSION_INTERRUPTED = "CONVERSION_INTERRUPTED"
+    CONVERSION_FATAL_ERROR = "CONVERSION_FATAL_ERROR"
     TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING = "TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING"
     TABLE_GFM_UNSAFE_FALLBACK_HTML = "TABLE_GFM_UNSAFE_FALLBACK_HTML"
     TABLE_COMPLEXITY_HTML_FALLBACK = "TABLE_COMPLEXITY_HTML_FALLBACK"
@@ -33,6 +35,7 @@ class WarningDomain:
     OCR = "ocr"
     IMAGE = "image"
     TABLE = "table"
+    CONVERSION = "conversion"
     TECHNICAL_PROFILE = "technical_profile"
     UNKNOWN = "unknown"
 
@@ -88,6 +91,14 @@ WARNING_CODE_REGISTRY: dict[str, WarningCodeSpec] = {
         WarningDomain.IMAGE,
         default_severity=WarningSeverity.ADVISORY,
         affects_exit_code=False,
+    ),
+    WarningCode.CONVERSION_INTERRUPTED: WarningCodeSpec(
+        WarningCode.CONVERSION_INTERRUPTED,
+        WarningDomain.CONVERSION,
+    ),
+    WarningCode.CONVERSION_FATAL_ERROR: WarningCodeSpec(
+        WarningCode.CONVERSION_FATAL_ERROR,
+        WarningDomain.CONVERSION,
     ),
     WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING: WarningCodeSpec(
         WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING,

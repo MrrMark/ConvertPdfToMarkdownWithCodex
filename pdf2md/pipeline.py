@@ -22,9 +22,11 @@ from pdf2md.extractors.structure_normalizer import BlockRegion, normalize_page_l
 from pdf2md.extractors.tables import PageTableCandidateResult, extract_tables
 from pdf2md.extractors.text import PageLayoutMetadata, TextExtractionError, TextLine, extract_page_text_layout_result
 from pdf2md.models import (
+    ConversionState,
     ConversionStatus,
     DomainAdapterMode,
     ImageMode,
+    InterruptedConversionReport,
     Manifest,
     NormalizedLine,
     OutputProfile,
@@ -132,6 +134,164 @@ class ConversionProgressEvent:
 
 
 ConversionProgressCallback = Callable[[ConversionProgressEvent], None]
+
+
+class ConversionJournal:
+    """Write a deterministic conversion state journal without changing conversion output semantics."""
+
+    def __init__(self, config: Config, *, started_at: datetime) -> None:
+        self.config = config
+        self.started_at = started_at
+        self.current_stage: str | None = "starting"
+        self.current_page: int | None = None
+        self.selected_pages: list[int] = []
+        self.completed_pages: set[int] = set()
+        self.failed_pages: set[int] = set()
+        self.skipped_pages: set[int] = set()
+        self.stage_durations_ms: dict[str, int] = {}
+        self.last_warning_code: str | None = None
+        self.resume_hint = (
+            "Partial artifacts were left in place. Re-run the conversion with the same input/options, "
+            "or resume from the last completed page if using a page-window workflow."
+        )
+
+    @property
+    def state_path(self) -> Path:
+        return self.config.output_dir / self.config.conversion_state_filename
+
+    @property
+    def interrupted_report_path(self) -> Path:
+        return self.config.output_dir / self.config.interrupted_report_filename
+
+    def set_stage(self, stage: str, *, page: int | None = None, warnings: list[WarningEntry] | None = None) -> None:
+        self.current_stage = stage
+        self.current_page = page
+        self.remember_warnings(warnings or [])
+        self.write_state()
+
+    def set_selected_pages(self, selected_pages: list[int]) -> None:
+        self.selected_pages = list(selected_pages)
+        self.write_state()
+
+    def remember_warnings(self, warnings: list[WarningEntry]) -> None:
+        if warnings:
+            self.last_warning_code = warnings[-1].code
+
+    def finish_stage(self, stage: str, stage_durations_ms: dict[str, int]) -> None:
+        self.current_stage = stage
+        self.stage_durations_ms = dict(sorted(stage_durations_ms.items()))
+        self.write_state()
+
+    def handle_progress(self, event: ConversionProgressEvent) -> None:
+        self.current_stage = event.stage
+        self.current_page = event.page
+        if event.status == "page_finished" and event.page is not None:
+            self.completed_pages.add(event.page)
+        if event.status == "image_extraction_page_skipped" and event.page is not None:
+            self.skipped_pages.add(event.page)
+        self.write_state()
+
+    def mark_finished(self, result: ConversionResult) -> None:
+        self.current_stage = "completed"
+        self.current_page = None
+        self.remember_warnings(result.warnings)
+        if result.report is not None:
+            self.failed_pages.update(result.report.failed_pages)
+        self.write_state(status=result.status.value)
+
+    def mark_failure(self, warning: WarningEntry) -> None:
+        self.last_warning_code = warning.code
+        if self.current_page is not None and self.current_page not in self.completed_pages:
+            self.failed_pages.add(self.current_page)
+
+    def last_completed_page(self) -> int | None:
+        if not self.completed_pages:
+            return None
+        return max(self.completed_pages)
+
+    def artifacts_written(self) -> list[str]:
+        if not self.config.output_dir.exists():
+            return []
+        artifacts: list[str] = []
+        for path in self.config.output_dir.rglob("*"):
+            if not path.is_file():
+                continue
+            artifacts.append(path.relative_to(self.config.output_dir).as_posix())
+        return sorted(artifacts)
+
+    def interrupted_summary_extras(self) -> dict[str, object]:
+        return {
+            "interrupted": True,
+            "interrupted_stage": self.current_stage,
+            "interrupted_page": self.current_page,
+            "last_completed_page": self.last_completed_page(),
+            "artifacts_written": self.artifacts_written(),
+            "resume_hint": self.resume_hint,
+        }
+
+    def write_state(self, *, status: str = "running") -> None:
+        now = datetime.now(timezone.utc)
+        payload = ConversionState(
+            input_file=self._public_input_file(),
+            output_dir=self._public_output_dir(),
+            started_at=self.started_at,
+            updated_at=now,
+            elapsed_ms=max(int((now - self.started_at).total_seconds() * 1000), 0),
+            status=status,
+            current_stage=self.current_stage,
+            current_page=self.current_page,
+            selected_pages=self.selected_pages,
+            completed_pages=sorted(self.completed_pages),
+            failed_pages=sorted(self.failed_pages),
+            skipped_pages=sorted(self.skipped_pages),
+            artifacts_written=self.artifacts_written(),
+            stage_durations_ms=dict(sorted(self.stage_durations_ms.items())),
+            last_warning_code=self.last_warning_code,
+        )
+        try:
+            write_json(self.state_path, payload.model_dump(mode="json"))
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to write conversion state journal")
+
+    def write_interrupted_report(
+        self,
+        *,
+        status: str,
+        warning: WarningEntry,
+        exc: BaseException,
+    ) -> InterruptedConversionReport:
+        now = datetime.now(timezone.utc)
+        self.mark_failure(warning)
+        report = InterruptedConversionReport(
+            input_file=self._public_input_file(),
+            output_dir=self._public_output_dir(),
+            started_at=self.started_at,
+            interrupted_at=now,
+            elapsed_ms=max(int((now - self.started_at).total_seconds() * 1000), 0),
+            status=status,
+            interrupted_stage=self.current_stage,
+            interrupted_page=self.current_page,
+            last_completed_page=self.last_completed_page(),
+            selected_pages=self.selected_pages,
+            completed_pages=sorted(self.completed_pages),
+            failed_pages=sorted(self.failed_pages),
+            skipped_pages=sorted(self.skipped_pages),
+            artifacts_written=self.artifacts_written(),
+            stage_durations_ms=dict(sorted(self.stage_durations_ms.items())),
+            last_warning_code=self.last_warning_code,
+            exception_type=type(exc).__name__,
+            message=str(exc),
+            resume_hint=self.resume_hint,
+            warnings=[warning],
+        )
+        write_json(self.interrupted_report_path, report.model_dump(mode="json"))
+        return report
+
+    def _public_input_file(self) -> str:
+        return "redacted.pdf" if self.config.confidential_safe_mode else self.config.input_pdf.name
+
+    def _public_output_dir(self) -> str:
+        return "redacted-output-dir" if self.config.confidential_safe_mode else str(self.config.output_dir)
 
 
 def _emit_progress(progress: ConversionProgressCallback | None, event: ConversionProgressEvent) -> None:
@@ -463,7 +623,12 @@ def _repair_hyphenated_normalized_lines(lines: list[NormalizedLine]) -> tuple[li
     return repaired, repair_count
 
 
-def run_conversion(config: Config, *, progress: ConversionProgressCallback | None = None) -> ConversionResult:
+def _run_conversion_impl(
+    config: Config,
+    *,
+    progress: ConversionProgressCallback | None = None,
+    journal: ConversionJournal | None = None,
+) -> ConversionResult:
     """Run conversion and write markdown, manifest, and report outputs."""
     started_at = datetime.now(timezone.utc)
     logger.info("Starting conversion input=%s output_dir=%s", config.input_pdf, config.output_dir)
@@ -524,8 +689,15 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     def finish_stage(name: str, started: datetime) -> None:
         elapsed_ms = max(int((datetime.now(timezone.utc) - started).total_seconds() * 1000), 0)
         stage_durations_ms[name] = stage_durations_ms.get(name, 0) + elapsed_ms
+        if journal is not None:
+            journal.finish_stage(name, stage_durations_ms)
 
     warnings: list[WarningEntry] = []
+
+    def mark_stage(name: str, *, page: int | None = None) -> None:
+        if journal is not None:
+            journal.set_stage(name, page=page, warnings=warnings)
+
     if _technical_profile_domain_adapter_missing(config, domain_adapter):
         warnings.append(_technical_profile_domain_adapter_warning(config, domain_adapter))
     if image_extraction_disabled and requested_figure_sidecar_features:
@@ -642,10 +814,12 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         "images": False,
     }
 
+    mark_stage("output_setup")
     output_setup_started = stage_start()
     ensure_output_dirs(config.output_dir, config.assets_dirname)
     finish_stage("output_setup", output_setup_started)
 
+    mark_stage("pdf_open")
     pdf_open_started = stage_start()
     try:
         pdf_context = PdfDocumentContext.open(config.input_pdf, config.password)
@@ -681,6 +855,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     total_pages = pdf_context.total_pages
     logger.info("Opened PDF total_pages=%s", total_pages)
 
+    mark_stage("page_selection")
     page_selection_started = stage_start()
     try:
         selected_pages = config.selected_pages(total_pages)
@@ -713,6 +888,8 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             report=report,
         )
     finish_stage("page_selection", page_selection_started)
+    if journal is not None:
+        journal.set_selected_pages(selected_pages)
     _emit_progress(
         progress,
         ConversionProgressEvent(
@@ -735,6 +912,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     table_candidates_by_page: dict[int, PageTableCandidateResult] = {}
     page_worker_table_warnings: list[WarningEntry] = []
     shared_plumber_pdf = None
+    mark_stage("text_extraction")
     text_started = stage_start()
     try:
         logger.info(
@@ -828,6 +1006,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     finally:
         finish_stage("text_extraction", text_started)
 
+    mark_stage("ocr")
     ocr_started = stage_start()
     logger.info("Running OCR target_pages=%s force=%s", selected_pages, config.force_ocr)
     ocr_result = run_ocr(
@@ -880,6 +1059,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     header_footer_suppressed_payload: list[dict] = []
     header_footer_suppressed_by_page: dict[int, int] = {}
     if config.remove_header_footer:
+        mark_stage("header_footer")
         header_footer_started = stage_start()
         logger.info("Removing repeated headers/footers")
         header_footer_result = remove_repeated_header_footer(page_layout_lines, page_heights)
@@ -891,6 +1071,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             header_footer_suppressed_by_page[decision.page] = header_footer_suppressed_by_page.get(decision.page, 0) + 1
         finish_stage("header_footer", header_footer_started)
 
+    mark_stage("table_extraction")
     table_started = stage_start()
     logger.info("Extracting tables")
     table_result = extract_tables(
@@ -904,6 +1085,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     )
     finish_stage("table_extraction", table_started)
     table_result.rag_tables = normalize_rag_table_payload(table_result.rag_tables)
+    mark_stage("image_extraction")
     image_started = stage_start()
     page_image_boxes: dict[int, list[dict]] | None = None
     if image_extraction_disabled:
@@ -981,8 +1163,10 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     normalized_lines_debug_by_page: dict[int, list[dict]] = {}
     total_deduplicated_blocks = 0
     total_suppressed_lines = len(header_footer_suppressed_payload)
+    mark_stage("normalization")
     normalization_started = stage_start()
     for index, page in enumerate(selected_pages, start=1):
+        mark_stage("normalization", page=page)
         logger.debug("Normalizing page=%s", page)
         _emit_progress(
             progress,
@@ -1069,6 +1253,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         entries.sort(key=lambda item: (item[0], item[1]))
         ordered_page_blocks[page] = [(anchor_idx, markdown) for anchor_idx, _, markdown in entries]
 
+    mark_stage("rag_text_blocks")
     rag_text_started = stage_start()
     text_block_result = build_text_blocks(normalized_lines_by_page_for_blocks)
     if write_minimal_rag_sidecars:
@@ -1097,6 +1282,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
 
     if write_figure_rag_sidecar and not figure_semantics_timeout_expired("rag_figures"):
         ensure_figure_semantics_clock()
+        mark_stage("rag_figures")
         figure_rag_started = stage_start()
         figure_records = build_figure_records(
             images=image_result.assets,
@@ -1118,6 +1304,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         and effective_rag_generated_figure_descriptions
         and not figure_semantics_timeout_expired("rag_figure_descriptions")
     ):
+        mark_stage("rag_figure_descriptions")
         figure_description_started = stage_start()
         figure_description_records, figure_description_metrics = build_figure_description_records(
             figure_records,
@@ -1141,6 +1328,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         and effective_figure_structure_extraction
         and not figure_semantics_timeout_expired("rag_figure_structures")
     ):
+        mark_stage("rag_figure_structures")
         figure_structure_started = stage_start()
         figure_structure_records, figure_structure_metrics = build_figure_structure_records(figure_records)
         figure_structure_record_count = figure_structure_metrics["figure_structure_record_count"]
@@ -1155,6 +1343,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         finish_stage("rag_figure_structures", figure_structure_started)
 
     if write_minimal_rag_sidecars:
+        mark_stage("rag_semantics")
         semantic_started = stage_start()
         pdf_outline_targets = extract_pdf_outline_reference_targets(reader, selected_pages=set(selected_pages))
         semantic_result = build_semantic_layer(
@@ -1184,6 +1373,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         normative_requirement_count = semantic_result.normative_requirement_count
         finish_stage("rag_semantics", semantic_started)
 
+        mark_stage("rag_requirement_traceability")
         requirement_traceability_started = stage_start()
         requirement_traceability_records = build_requirement_traceability_records(
             requirements=semantic_result.requirements,
@@ -1200,6 +1390,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
             )
         finish_stage("rag_requirement_traceability", requirement_traceability_started)
 
+        mark_stage("rag_technical_tables")
         technical_tables_started = stage_start()
         technical_table_records = build_technical_table_records(contextual_rag_tables, source_sha256=source_sha256)
         if write_full_rag_sidecars:
@@ -1210,6 +1401,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         finish_stage("rag_technical_tables", technical_tables_started)
 
         if domain_adapter is not DomainAdapterMode.NONE:
+            mark_stage("rag_domain_adapter")
             domain_started = stage_start()
             domain_units = build_domain_units(
                 domain_adapter=domain_adapter,
@@ -1223,6 +1415,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
                 domain_unit_record_count, domain_unit_file_count = write_domain_unit_output(config, domain_units)
             finish_stage("rag_domain_adapter", domain_started)
 
+        mark_stage("rag_retrieval_chunks")
         retrieval_started = stage_start()
         retrieval_token_counter = (
             None if config.retrieval_tokenizer == "char" else make_token_counter(config.retrieval_tokenizer)
@@ -1265,6 +1458,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         )
         finish_stage("rag_retrieval_chunks", retrieval_started)
 
+    mark_stage("markdown_serialization")
     markdown_started = stage_start()
     markdown_result = serialize_markdown_blocks_result(
         page_text_blocks={
@@ -1283,6 +1477,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     write_text(markdown_path, markdown)
     finish_stage("markdown_serialization", markdown_started)
 
+    mark_stage("rag_tables")
     rag_started = stage_start()
     if write_minimal_rag_sidecars:
         rag_table_record_count, rag_table_file_count = write_rag_table_outputs(
@@ -1293,6 +1488,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
     finish_stage("rag_tables", rag_started)
 
     if config.debug:
+        mark_stage("debug_artifacts")
         debug_started = stage_start()
         logger.info("Writing debug artifacts")
         write_debug_artifacts(
@@ -1314,6 +1510,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         )
         finish_stage("debug_artifacts", debug_started)
 
+    mark_stage("manifest")
     manifest_started = stage_start()
     manifest_options = {
         "image_mode": image_mode,
@@ -1485,6 +1682,7 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         failed_pages,
         table_actionable_low_quality_count=table_actionable_low_quality_count,
     )
+    mark_stage("reporting")
     reporting_started = stage_start()
     elapsed_seconds = (finished_at - started_at).total_seconds()
     pages_per_second = round(len(selected_pages) / elapsed_seconds, 4) if elapsed_seconds > 0 else None
@@ -1657,3 +1855,113 @@ def run_conversion(config: Config, *, progress: ConversionProgressCallback | Non
         status=status,
         report=report,
     )
+
+
+def _page_results_for_interrupted_report(journal: ConversionJournal) -> list[PageResult]:
+    page_results: list[PageResult] = []
+    for page in sorted(journal.completed_pages):
+        page_results.append(PageResult(page=page, status=PageStatus.SUCCESS))
+    for page in sorted(journal.failed_pages - journal.completed_pages):
+        page_results.append(PageResult(page=page, status=PageStatus.FAILED))
+    return page_results
+
+
+def _engine_usage_for_interrupted_report(journal: ConversionJournal) -> dict[str, bool]:
+    stages = set(journal.stage_durations_ms)
+    current_stage = journal.current_stage or ""
+    return {
+        "pypdf": "pdf_open" in stages or current_stage not in {"starting", "output_setup"},
+        "pdfplumber": "text_extraction" in stages,
+        "ocr": "ocr" in stages,
+        "tables": "table_extraction" in stages,
+        "images": "image_extraction" in stages,
+    }
+
+
+def _build_interrupted_conversion_result(
+    *,
+    config: Config,
+    journal: ConversionJournal,
+    started_at: datetime,
+    exc: BaseException,
+    interrupted: bool,
+) -> ConversionResult:
+    status_label = "interrupted" if interrupted else "failed"
+    warning_code = WarningCode.CONVERSION_INTERRUPTED if interrupted else WarningCode.CONVERSION_FATAL_ERROR
+    message = "Conversion interrupted before completion." if interrupted else "Conversion failed before completion."
+    if str(exc):
+        message = f"{message} {str(exc)}"
+    warning = WarningEntry(
+        code=warning_code,
+        message=message,
+        page=journal.current_page,
+        details={
+            "exception_type": type(exc).__name__,
+            "stage": journal.current_stage,
+            "interrupted": interrupted,
+        },
+    )
+    logger.exception("Conversion ended before completion stage=%s", journal.current_stage)
+    journal.write_interrupted_report(status=status_label, warning=warning, exc=exc)
+    finished_at = datetime.now(timezone.utc)
+    report = build_report(
+        started_at=started_at,
+        finished_at=finished_at,
+        status=ConversionStatus.FAILED,
+        warnings=[warning],
+        page_results=_page_results_for_interrupted_report(journal),
+        failed_pages=sorted(journal.failed_pages),
+        engine_usage=_engine_usage_for_interrupted_report(journal),
+        stage_durations_ms=journal.stage_durations_ms,
+        summary_extras=journal.interrupted_summary_extras(),
+    )
+    report_path = config.output_dir / config.report_filename
+    write_json(report_path, serialize_report(report))
+    if config.confidential_safe_mode:
+        write_json(config.output_dir / config.sanitized_report_filename, serialize_report(report))
+    journal.write_state(status=status_label)
+
+    markdown_path = config.output_dir / config.markdown_filename
+    manifest_path = config.output_dir / config.manifest_filename
+    return ConversionResult(
+        exit_code=EXIT_FATAL,
+        markdown_path=markdown_path if markdown_path.exists() else None,
+        manifest_path=manifest_path if manifest_path.exists() else None,
+        report_path=report_path,
+        warnings=[warning],
+        status=ConversionStatus.FAILED,
+        report=report,
+    )
+
+
+def run_conversion(config: Config, *, progress: ConversionProgressCallback | None = None) -> ConversionResult:
+    """Run conversion and write markdown, manifest, report, and conversion state outputs."""
+    started_at = datetime.now(timezone.utc)
+    ensure_output_dirs(config.output_dir, config.assets_dirname)
+    journal = ConversionJournal(config, started_at=started_at)
+    journal.write_state()
+
+    def wrapped_progress(event: ConversionProgressEvent) -> None:
+        journal.handle_progress(event)
+        _emit_progress(progress, event)
+
+    try:
+        result = _run_conversion_impl(config, progress=wrapped_progress, journal=journal)
+        journal.mark_finished(result)
+        return result
+    except KeyboardInterrupt as exc:
+        return _build_interrupted_conversion_result(
+            config=config,
+            journal=journal,
+            started_at=started_at,
+            exc=exc,
+            interrupted=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _build_interrupted_conversion_result(
+            config=config,
+            journal=journal,
+            started_at=started_at,
+            exc=exc,
+            interrupted=False,
+        )
