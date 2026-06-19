@@ -23,4 +23,51 @@
 
 ## 남은 작업
 
-현재 남은 작업 없음.
+### P0 / Q119. Table Confidence v2
+
+기술 스펙 표의 confidence, fallback reason, header/body/stub column, continued table linkage를 강화한다.
+복잡 표는 계속 HTML fallback을 우선하며, GFM 승격 기준을 완화하지 않는다.
+
+상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
+
+### P0 / Q120. Native Hybrid Chunking v2
+
+Docling식 document-native/hybrid chunking 개념을 `pdf2md`의 `retrieval_chunks_rag.jsonl` 계약에 맞게 네이티브로 구현한다.
+section hierarchy, table atomicity, repeated header context, chunk relationship metadata를 강화한다.
+
+상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
+
+### P0 / Q121. Layout Sidecar and Reading Order Diagnostics
+
+multi-column, page furniture, caption linkage, bbox normalization을 구조화해 technical spec reading order와 layout provenance를 강화한다.
+raw full text 없이 source_ref와 layout summary 중심으로 sidecar/report metric을 제공한다.
+
+상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
+
+### P1 / Q122. Region OCR Evidence v2
+
+figure/table bbox crop OCR을 원문 대체가 아닌 evidence sidecar로 강화한다.
+accepted/rejected reason, confidence, backend, bbox, source_ref를 분리 기록하고 Markdown 본문 오염을 방지한다.
+
+상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
+
+### P1 / Q123. OCR Backend Registry Expansion
+
+현재 `tesseract` 기본 경로를 유지하면서 `tesseract-cli`, `rapidocr`, `ocrmac` 등 optional OCR backend를 `pdf2md` 네이티브 protocol로 확장한다.
+optional dependency 미설치는 fatal이 아니라 structured warning/report로 처리한다.
+
+상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
+
+### P1 / Q124. Figure Semantics v2
+
+figure kind, observed text, generated description, structure evidence를 명확히 분리해 visual technical spec RAG 품질을 높인다.
+generated content는 기본 비활성, sidecar-only, review flag 포함 원칙을 유지한다.
+
+상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
+
+### P2 / Q125. Domain Adapter Registry Hardening
+
+NVMe/OCP/PCIe/TCG/SPDM/manual domain adapter를 registry/protocol 구조로 정리해 cross-spec 재처리와 고객별 adapter 확장을 안정화한다.
+schema contract와 validator는 core에서 통제한다.
+
+상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
