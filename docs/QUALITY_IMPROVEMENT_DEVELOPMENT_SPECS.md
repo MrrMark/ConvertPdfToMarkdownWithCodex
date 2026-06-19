@@ -23,8 +23,62 @@
 
 ## 현재 Active Development Specs
 
-현재 active 개발 명세 없음.
+### P0-P2 / Q119-Q125. PDF2MD Native Migration Plan
+
+Docling을 runtime backend나 필수 dependency로 채택하지 않고, Docling에서 참고할 만한 설계 아이디어를 `pdf2md` 네이티브 기능으로 재구현한다.
+canonical output은 계속 `pdf2md`의 `document.md`, `manifest.json`, `report.json`, RAG sidecar, provenance/index/SSD-RAG validator 계약으로 유지한다.
+
+상세 개발 명세는 `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`에서 관리한다.
+
+#### Q119. Table Confidence v2
+
+- 우선순위: P0
+- 목표: table confidence, fallback reason, header/body/stub 구조, continued table linkage를 강화한다.
+- 핵심 산출물: table quality metric v2, fallback reason taxonomy 확장, technical table provenance 강화.
+- 검증: table, complex table, continued table, NVMe table slice regression.
+
+#### Q120. Native Hybrid Chunking v2
+
+- 우선순위: P0
+- 목표: section hierarchy, table atomicity, repeated header context, relationship metadata 기반 chunking을 강화한다.
+- 핵심 산출물: `retrieval_chunks_rag.jsonl` metadata 확장 후보와 chunk eval 개선.
+- 검증: RAG chunk/index contract/RAG eval tests.
+
+#### Q121. Layout Sidecar and Reading Order Diagnostics
+
+- 우선순위: P0
+- 목표: multi-column, furniture, caption linkage, bbox normalization을 구조화한다.
+- 핵심 산출물: `page_layout_rag.jsonl` 또는 `layout_rag.jsonl` 후보와 report summary metrics.
+- 검증: text layout, header/footer, caption linkage fixtures.
+
+#### Q122. Region OCR Evidence v2
+
+- 우선순위: P1
+- 목표: figure/table crop OCR을 원문 대체가 아닌 evidence sidecar로 강화한다.
+- 핵심 산출물: OCR evidence sidecar 또는 figure sidecar 확장, accepted/rejected reason taxonomy.
+- 검증: OCR, image, RAG figure tests와 no Markdown text pollution regression.
+
+#### Q123. OCR Backend Registry Expansion
+
+- 우선순위: P1
+- 목표: `tesseract` 기본 경로를 유지하면서 optional OCR backend를 native protocol로 확장한다.
+- 핵심 산출물: `tesseract-cli`, `rapidocr`, `ocrmac` adapter 후보와 structured warning/report fields.
+- 검증: OCR backend probe, optional dependency 미설치 test, scanned/Korean OCR fixture.
+
+#### Q124. Figure Semantics v2
+
+- 우선순위: P1
+- 목표: figure kind, observed text, generated description, structure evidence를 분리 강화한다.
+- 핵심 산출물: figure structures/descriptions schema 확장 후보와 visual eval 보강.
+- 검증: RAG figure/semantic tests, visual RAG eval, figure description eval.
+
+#### Q125. Domain Adapter Registry Hardening
+
+- 우선순위: P2
+- 목표: NVMe/OCP/PCIe/TCG/SPDM/manual adapter를 registry/protocol 구조로 정리한다.
+- 핵심 산출물: adapter protocol, adapter metadata, spec type/revision mapping, cross-spec compatibility checks.
+- 검증: domain adapter, SSD-RAG contract, latest NVMe/OCP benchmark.
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q117 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q118 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

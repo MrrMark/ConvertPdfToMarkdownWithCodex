@@ -10,6 +10,7 @@ from typing import Callable, Literal, Optional
 
 from pdf2md.config import Config
 from pdf2md.constants import WarningCode
+from pdf2md.document_ir import build_pdf2md_document_ir, ir_text_block_records, ir_text_blocks_by_page
 from pdf2md.extractors.header_footer import remove_repeated_header_footer
 from pdf2md.extractors.images import ImageExtractionProgressEvent, ImageExtractionResult, extract_images
 from pdf2md.extractors.ocr import (
@@ -1256,10 +1257,19 @@ def _run_conversion_impl(
     mark_stage("rag_text_blocks")
     rag_text_started = stage_start()
     text_block_result = build_text_blocks(normalized_lines_by_page_for_blocks)
+    document_ir = build_pdf2md_document_ir(
+        source_sha256=source_sha256,
+        selected_pages=selected_pages,
+        text_blocks_by_page=text_block_result.blocks_by_page,
+        page_results=page_results_map,
+        table_assets=table_result.assets,
+        figure_assets=image_result.assets,
+    )
+    text_block_records = ir_text_block_records(document_ir)
     if write_minimal_rag_sidecars:
         rag_text_block_record_count, rag_text_block_file_count = write_rag_text_block_output(
             config,
-            text_block_result.records,
+            text_block_records,
         )
     font_heading_candidate_count = text_block_result.font_heading_candidate_count
     footnote_candidate_count = text_block_result.footnote_candidate_count
@@ -1277,7 +1287,7 @@ def _run_conversion_impl(
     if write_minimal_rag_sidecars or config.debug:
         contextual_rag_tables = annotate_rag_tables_with_heading_context(
             table_result.rag_tables,
-            text_block_result.records,
+            text_block_records,
         )
 
     if write_figure_rag_sidecar and not figure_semantics_timeout_expired("rag_figures"):
@@ -1287,7 +1297,7 @@ def _run_conversion_impl(
         figure_records = build_figure_records(
             images=image_result.assets,
             excluded_images=image_result.excluded_assets,
-            text_block_records=text_block_result.records,
+            text_block_records=text_block_records,
         )
         if effective_figure_region_ocr and not figure_semantics_timeout_expired("figure_region_ocr"):
             figure_records, figure_region_ocr_metrics = augment_figure_records_with_region_ocr(
@@ -1347,7 +1357,7 @@ def _run_conversion_impl(
         semantic_started = stage_start()
         pdf_outline_targets = extract_pdf_outline_reference_targets(reader, selected_pages=set(selected_pages))
         semantic_result = build_semantic_layer(
-            text_block_records=text_block_result.records,
+            text_block_records=text_block_records,
             rag_tables=contextual_rag_tables,
             pdf_outline_targets=pdf_outline_targets,
             source_sha256=source_sha256,
@@ -1421,7 +1431,7 @@ def _run_conversion_impl(
             None if config.retrieval_tokenizer == "char" else make_token_counter(config.retrieval_tokenizer)
         )
         retrieval_chunks = build_retrieval_chunks(
-            text_block_records=text_block_result.records,
+            text_block_records=text_block_records,
             semantic_units=semantic_units,
             requirements=requirements,
             rag_tables=contextual_rag_tables,
@@ -1461,10 +1471,7 @@ def _run_conversion_impl(
     mark_stage("markdown_serialization")
     markdown_started = stage_start()
     markdown_result = serialize_markdown_blocks_result(
-        page_text_blocks={
-            page: [block.to_record() for block in blocks]
-            for page, blocks in text_block_result.blocks_by_page.items()
-        },
+        page_text_blocks=ir_text_blocks_by_page(document_ir),
         keep_page_markers=config.keep_page_markers,
         page_blocks_by_page=ordered_page_blocks,
     )

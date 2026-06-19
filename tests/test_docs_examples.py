@@ -372,6 +372,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     docling_design = Path("docs/DOCLING_INFORMED_EXTENSION_DESIGN.md").read_text(encoding="utf-8")
     output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
     quality_scorecard = Path("docs/QUALITY_SCORECARD.md").read_text(encoding="utf-8")
+    native_migration_spec = Path("docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md").read_text(
+        encoding="utf-8"
+    )
     changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
     mcp_nvme_stability_spec = Path("docs/archive/PDF2MD_MCP_NVME_BASE_STABILITY_DEVELOPMENT_SPEC.md").read_text(
         encoding="utf-8"
@@ -465,7 +468,16 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q115. Visual Technical Spec RAG Profile and Metrics" not in next_plan
     assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" not in next_plan
     assert "Q117. MCP NVMe Base Large Conversion Stability" not in next_plan
-    assert "현재 남은 작업 없음." in next_plan
+    assert "현재 남은 작업 없음." not in next_plan
+    assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
+    assert "Q119. Table Confidence v2" in next_plan
+    assert "Q120. Native Hybrid Chunking v2" in next_plan
+    assert "Q121. Layout Sidecar and Reading Order Diagnostics" in next_plan
+    assert "Q122. Region OCR Evidence v2" in next_plan
+    assert "Q123. OCR Backend Registry Expansion" in next_plan
+    assert "Q124. Figure Semantics v2" in next_plan
+    assert "Q125. Domain Adapter Registry Hardening" in next_plan
+    assert "docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md" in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in next_plan
@@ -522,7 +534,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "generated_text=true" not in development_specs
     assert "placeholder + figure_text chunk" not in development_specs
     assert "다중 OCR backend" not in development_specs
-    assert "현재 active 개발 명세 없음." in development_specs
+    assert "현재 active 개발 명세 없음." not in development_specs
+    assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
+    assert "Q125. Domain Adapter Registry Hardening" in development_specs
+    assert "PDF2MD Native Migration Plan" in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in development_specs
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in development_specs
@@ -583,8 +598,11 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q117" in development_specs
+    assert "완료된 Q34-Q118" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q118. Native Document IR and Serializer Boundary" in implemented_specs
+    assert "pdf2md/document_ir.py" in implemented_specs
+    assert "ir_text_block_records" in implemented_specs
     assert "Q117. MCP NVMe Base Large Conversion Stability" in implemented_specs
     assert "docs/archive/PDF2MD_MCP_NVME_BASE_STABILITY_DEVELOPMENT_SPEC.md" in implemented_specs
     assert "conversion_state.json" in implemented_specs
@@ -618,6 +636,18 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "generated_text=true" in implemented_specs
     assert "Q105. Docling-Informed OCR And Layout Extension Design" in implemented_specs
     assert "Q106. GUI Assetless RAG Preset And Manual Domain Adapter" in implemented_specs
+    assert "PDF2MD Native Migration Development Spec" in native_migration_spec
+    assert "Docling은 필수 dependency로 추가하지 않는다." in native_migration_spec
+    assert "Q118 - Native Document IR and Serializer Boundary" in native_migration_spec
+    assert "Q119 - Table Confidence v2" in native_migration_spec
+    assert "Q120 - Native Hybrid Chunking v2" in native_migration_spec
+    assert "Q121 - Layout Sidecar and Reading Order Diagnostics" in native_migration_spec
+    assert "Q122 - Region OCR Evidence v2" in native_migration_spec
+    assert "Q123 - OCR Backend Registry Expansion" in native_migration_spec
+    assert "Q124 - Figure Semantics v2" in native_migration_spec
+    assert "Q125 - Domain Adapter Registry Hardening" in native_migration_spec
+    assert "Docling runtime dependency 추가" in native_migration_spec
+    assert "generated description을 `document.md` 본문에 삽입" in native_migration_spec
     assert "manual_domain_adapter_keywords" in implemented_specs
     assert "DOCLING_INFORMED_EXTENSION_DESIGN.md" in implemented_specs
     assert "Q113에서 local-only picture description evaluation pack" in docling_design
