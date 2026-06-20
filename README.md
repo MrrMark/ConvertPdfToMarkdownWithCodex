@@ -100,11 +100,12 @@ python scripts/validate_ssd_rag_contract.py \
   --domain-adapter nvme
 ```
 
-최신 NVMe/OCP 기술 스펙 smoke/evidence path는 다음 스크립트로 관리합니다.
+최신 NVMe/OCP/SSD security 기술 스펙 smoke/evidence path는 다음 스크립트로 관리합니다.
 
 ```bash
 python scripts/run_latest_nvme_base_benchmark.py --help
 python scripts/run_latest_ocp_datacenter_nvme_ssd_benchmark.py --help
+python scripts/run_latest_ssd_security_spec_benchmark.py --help
 ```
 
 ## Exit Codes

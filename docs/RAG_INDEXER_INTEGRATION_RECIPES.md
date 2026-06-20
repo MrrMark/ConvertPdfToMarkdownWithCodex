@@ -271,6 +271,30 @@ python scripts/run_latest_ocp_datacenter_nvme_ssd_benchmark.py \
   --fail-on-ocp-eval-error
 ```
 
+SPDM, TCG Storage, PCIe처럼 SSD 인접 security/register 스펙은 `run_latest_ssd_security_spec_benchmark.py`로 같은 summary-only evidence path를 사용한다. 기본 SPDM metadata는 DMTF 공식 SPDM 페이지 기준 `DSP0274` SPDM 1.4.0과 `DSP0286` SPDM to Storage Binding 1.0.0을 대상으로 한다.
+
+```bash
+python scripts/run_latest_ssd_security_spec_benchmark.py \
+  --input-pdf /tmp/DSP0274-SPDM-latest.pdf \
+  --output-dir /tmp/pdf2md-latest-spdm \
+  --spec-document-type spdm \
+  --mode full_precision \
+  --fail-on-error
+```
+
+SPDM to Storage Binding smoke:
+
+```bash
+python scripts/run_latest_ssd_security_spec_benchmark.py \
+  --input-pdf /tmp/DSP0286-SPDM-to-Storage-Binding.pdf \
+  --output-dir /tmp/pdf2md-latest-spdm-storage-binding-smoke \
+  --spec-document-type spdm-storage-binding \
+  --mode fast_smoke \
+  --fail-on-error
+```
+
+TCG/PCIe 계열은 같은 wrapper에서 `--spec-document-type tcg-storage` 또는 `pcie-base`를 사용한다. 해당 경로는 `security_domain_unit_counts`와 SSD-RAG contract summary만 공유하며, 원문 row text나 retrieved text는 report에 포함하지 않는다.
+
 Docling이 실제 설치된 환경에서만 통과해야 하는 release gate는 다음과 같이 실행한다.
 
 ```bash
@@ -290,12 +314,15 @@ python scripts/run_release_gates.py \
 - `latest_nvme_spec_benchmark_scorecard.md`: latest NVMe Base/NVM Command Set 전용 sanitized metric scorecard
 - `latest_ocp_datacenter_nvme_ssd_benchmark_report.json`: latest OCP Datacenter NVMe SSD 전용 source URL, source_sha256, option matrix, summary count, sanitized contract summary, sanitized OCP P2 query-eval summary
 - `latest_ocp_datacenter_nvme_ssd_benchmark_scorecard.md`: latest OCP Datacenter NVMe SSD 전용 sanitized metric scorecard
+- `latest_ssd_security_spec_benchmark_report.json`: latest SPDM/TCG/PCIe SSD security spec 전용 source URL, source_sha256, option matrix, sidecar count, security domain unit counts, sanitized SSD contract summary
+- `latest_ssd_security_spec_benchmark_scorecard.md`: latest SSD security spec 전용 sanitized metric scorecard
 
 운영 정책:
 
 - raw Markdown body, Docling raw document dict, image bytes, 고객 파일 경로는 comparison pack에 넣지 않는다.
 - latest NVMe spec benchmark report에도 raw spec 전문, Markdown body, generated query, retrieved text, table row content, image bytes, local input path를 넣지 않는다.
 - latest OCP Datacenter NVMe SSD benchmark report에도 raw spec 전문, Markdown body, generated query, retrieved text, table row content, image bytes, local input path를 넣지 않는다.
+- latest SSD security spec benchmark report에도 raw spec 전문, Markdown body, retrieved text, table row content, image bytes, local input path를 넣지 않는다.
 - Docling Markdown/dict export는 파일로 저장하지 않고 in-memory virtual artifact hash/size만 기록한다.
 - `--require-docling` 또는 release gate `--gates docling`은 Docling 미설치를 실패로 처리한다.
 - Q105 확장 설계는 `docs/DOCLING_INFORMED_EXTENSION_DESIGN.md`에서 관리하며, 이 comparison pack에서 확인된 metric/finding을 근거로 adapter/opt-in 후보를 정한다.

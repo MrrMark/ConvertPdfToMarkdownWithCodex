@@ -111,6 +111,24 @@ def test_ocp_datacenter_nvme_ssd_contract_is_documented() -> None:
     assert "`ocp_eval`은 query/result 원문을 저장하지 않고 aggregate metric만 저장" in ocp_handoff
 
 
+def test_ssd_security_spec_contract_is_documented() -> None:
+    output_schema = Path("docs/OUTPUT_SCHEMA.md").read_text(encoding="utf-8")
+    rag_recipes = Path("docs/RAG_INDEXER_INTEGRATION_RECIPES.md").read_text(encoding="utf-8")
+    implemented_specs = Path("docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md").read_text(encoding="utf-8")
+
+    assert "latest_ssd_security_spec_benchmark_report.json" in output_schema
+    assert "`spec_document_type`: `spdm`, `spdm-storage-binding`, `tcg-storage`, or `pcie-base`" in output_schema
+    assert "security_domain_unit_counts" in output_schema
+    assert "domain_adapter=spdm`, `tcg`, or `pcie`" in output_schema
+    assert "run_latest_ssd_security_spec_benchmark.py" in rag_recipes
+    assert "--spec-document-type spdm-storage-binding" in rag_recipes
+    assert "DSP0274` SPDM 1.4.0" in rag_recipes
+    assert "DSP0286` SPDM to Storage Binding 1.0.0" in rag_recipes
+    assert "latest_ssd_security_spec_benchmark_scorecard.md" in rag_recipes
+    assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" in implemented_specs
+    assert "`spdm`, `spdm-storage-binding`, `tcg-storage`, `pcie-base`" in implemented_specs
+
+
 def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
     gitignore = Path(".gitignore").read_text(encoding="utf-8")
     tasks = Path("tasks.md").read_text(encoding="utf-8")
@@ -475,6 +493,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q131. Large Spec Preflight Planner" not in next_plan
     assert "Q132. Visual Sidecar Contract Validator" not in next_plan
     assert "Q133. Page-Window Sidecar Merge Memory Guard" not in next_plan
+    assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" not in next_plan
     assert "현재 남은 작업 없음." in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
     assert "Q119. Table Confidence v2" not in next_plan
@@ -546,6 +565,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q131. Large Spec Preflight Planner" not in development_specs
     assert "Q132. Visual Sidecar Contract Validator" not in development_specs
     assert "Q133. Page-Window Sidecar Merge Memory Guard" not in development_specs
+    assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" not in development_specs
     assert "현재 active 개발 명세 없음." in development_specs
     assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
     assert "Q119. Table Confidence v2" not in development_specs
@@ -577,11 +597,14 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q131. Large Spec Preflight Planner" in implemented_specs
     assert "Q132. Visual Sidecar Contract Validator" in implemented_specs
     assert "Q133. Page-Window Sidecar Merge Memory Guard" in implemented_specs
+    assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" in implemented_specs
     assert "figure_ocr_evidence_rag.jsonl" in implemented_specs
     assert "pdf2md_validate_ssd_rag_contract" in implemented_specs
     assert "pdf2md_plan_large_spec_conversion" in implemented_specs
     assert "pdf2md_validate_visual_sidecars" in implemented_specs
     assert "merge_memory_guard" in implemented_specs
+    assert "run_latest_ssd_security_spec_benchmark.py" in implemented_specs
+    assert "latest_ssd_security_spec_benchmark_report.json" in implemented_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
@@ -628,7 +651,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q133" in development_specs
+    assert "완료된 Q34-Q134" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q125. Domain Adapter Registry Hardening" in implemented_specs
     assert "adapter_metadata" in implemented_specs
@@ -743,6 +766,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "once per worker chunk instead of once per page" in changelog
     assert "context-resolvable markers avoid Tesseract calls" in changelog
     assert "Q131-Q133 MCP stability guardrails" in changelog
+    assert "Q134 SSD security spec benchmark path" in changelog
     assert "visual sidecar contract validation" in changelog
     assert "dependency-audit" in implemented_specs
     assert "pdf-outline-" in implemented_specs
@@ -825,6 +849,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "docs/schema/visual_sidecar_contract_report.schema.json" in output_schema
     assert "docs/schema/docling_benchmark_report.schema.json" in output_schema
     assert "docs/schema/docling_artifact_comparison.schema.json" in output_schema
+    assert "latest_ssd_security_spec_benchmark_report.json" in output_schema
+    assert "docs/schema/latest_ssd_security_spec_benchmark_report.schema.json" in output_schema
     assert "ocr_backend_probe_report.json" in output_schema
     assert "docs/schema/ocr_backend_probe_report.schema.json" in output_schema
     assert "figure_description_eval_report.json" in output_schema
@@ -938,6 +964,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q112 region OCR report-only prototype" in quality_scorecard
     assert "Q113 local-only figure description evaluation pack" in quality_scorecard
     assert "Q114 Docling layout adapter comparison mode" in quality_scorecard
+    assert "Q134 SSD security spec benchmark evidence path" in quality_scorecard
+    assert "run_latest_ssd_security_spec_benchmark.py" in quality_scorecard
     assert "latest_nvme_command_set_scorecard.md" in quality_scorecard
     assert "이미지 업로드 불가 RAG 대응" in quality_scorecard
     assert "Docling 미설치 advisory skip" in quality_scorecard
