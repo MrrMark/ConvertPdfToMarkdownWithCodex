@@ -18,6 +18,49 @@ MODERATE_SPEC_PAGE_THRESHOLD = 50
 MAX_RECOMMENDED_PAGE_WORKERS = 4
 DOMAIN_RECOMMENDATION_SAMPLE_TEXT_LIMIT = 12000
 DOMAIN_RECOMMENDATION_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "nvme": (
+        "nvme",
+        "nvm express",
+        "nvm command set",
+        "admin command",
+        "io command",
+        "submission queue",
+        "completion queue",
+        "namespace",
+        "controller",
+        "opcode",
+        "command dword",
+        "cdw",
+        "identify controller",
+        "identify namespace",
+    ),
+    "pcie": (
+        "pcie",
+        "pci express",
+        "pci-sig",
+        "configuration space",
+        "capability id",
+        "extended capability",
+        "link control",
+        "link status",
+        "ltssm",
+        "transaction layer packet",
+        "tlp",
+        "lane margining",
+        "device control",
+    ),
+    "ocp": (
+        "ocp",
+        "open compute project",
+        "datacenter nvme ssd",
+        "data center nvme ssd",
+        "cloud ssd",
+        "nvme cloud ssd",
+        "ssd requirements",
+        "requirement id",
+        "telemetry profile",
+        "latency monitor",
+    ),
     "spdm": (
         "spdm",
         "dsp0274",
@@ -50,6 +93,9 @@ DOMAIN_RECOMMENDATION_KEYWORDS: dict[str, tuple[str, ...]] = {
     ),
 }
 DOMAIN_RECOMMENDATION_ANCHORS: dict[str, tuple[str, ...]] = {
+    "nvme": ("nvme", "nvm express", "nvm command set"),
+    "pcie": ("pcie", "pci express", "pci-sig"),
+    "ocp": ("ocp", "open compute project", "datacenter nvme ssd", "data center nvme ssd"),
     "spdm": ("spdm", "dsp0274", "dsp0286"),
     "tcg": ("tcg", "trusted computing group", "opal"),
     "caliptra": ("caliptra",),
@@ -184,7 +230,7 @@ def recommend_domain_adapter_for_pdf(
     input_pdf: Path,
     options: PreflightOptions | None = None,
 ) -> dict[str, Any]:
-    """Return a raw-content-free domain adapter recommendation for technical/security specs."""
+    """Return a raw-content-free domain adapter recommendation for technical specs."""
     options = options or PreflightOptions(sample_page_count=2)
     resolved_input = input_pdf.resolve()
     sampled_pages: list[int] = []

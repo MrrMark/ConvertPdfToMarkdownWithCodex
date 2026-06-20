@@ -160,6 +160,7 @@ def test_q92_artifact_hygiene_and_maintenance_mapping_are_documented() -> None:
         "Q104에서 Docling 벤치마크 하네스, Q105에서 Docling-informed 확장 설계를 완료했다"
         in tasks
     )
+    assert "M13은 Q140에서 NVMe/PCIe/OCP storage domain recommendation coverage를 완료했다" in tasks
 
 
 def test_windows_guide_matches_cli_policy() -> None:
@@ -500,6 +501,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" not in next_plan
     assert "Q135. Caliptra Security Spec Adapter And Evidence Path" not in next_plan
     assert "Q136-Q139. Domain Recommendation And Performance Profile Follow-up" not in next_plan
+    assert "Q140. Storage Domain Recommendation Coverage" not in next_plan
     assert "현재 남은 작업 없음." in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
     assert "Q119. Table Confidence v2" not in next_plan
@@ -574,6 +576,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" not in development_specs
     assert "Q135. Caliptra Security Spec Adapter And Evidence Path" not in development_specs
     assert "Q136-Q139. Domain Recommendation And Performance Profile Follow-up" not in development_specs
+    assert "Q140. Storage Domain Recommendation Coverage" not in development_specs
     assert "현재 active 개발 명세 없음." in development_specs
     assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
     assert "Q119. Table Confidence v2" not in development_specs
@@ -608,6 +611,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" in implemented_specs
     assert "Q135. Caliptra Security Spec Adapter And Evidence Path" in implemented_specs
     assert "Q136-Q139. Domain Recommendation And Performance Profile Follow-up" in implemented_specs
+    assert "Q140. Storage Domain Recommendation Coverage" in implemented_specs
     assert "figure_ocr_evidence_rag.jsonl" in implemented_specs
     assert "pdf2md_validate_ssd_rag_contract" in implemented_specs
     assert "pdf2md_plan_large_spec_conversion" in implemented_specs
@@ -618,6 +622,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "HIL/Caliptra" in implemented_specs
     assert "domain_adapter_recommendation" in implemented_specs
     assert "performance_profile" in implemented_specs
+    assert "NVMe, PCIe, OCP technical/storage spec" in implemented_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
@@ -664,7 +669,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q139" in development_specs
+    assert "완료된 Q34-Q140" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q125. Domain Adapter Registry Hardening" in implemented_specs
     assert "adapter_metadata" in implemented_specs
@@ -782,6 +787,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q134 SSD security spec benchmark path" in changelog
     assert "Q135 Caliptra security spec support" in changelog
     assert "Q136-Q139 quality/performance follow-ups" in changelog
+    assert "Q140 storage domain recommendation coverage" in changelog
     assert "visual sidecar contract validation" in changelog
     assert "dependency-audit" in implemented_specs
     assert "pdf-outline-" in implemented_specs
@@ -982,6 +988,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q134 SSD security spec benchmark evidence path" in quality_scorecard
     assert "Q135 Caliptra security spec adapter and evidence path" in quality_scorecard
     assert "Q136-Q139 domain recommendation and performance preflight" in quality_scorecard
+    assert "Q140 storage domain recommendation coverage" in quality_scorecard
     assert "domain_adapter=caliptra" in quality_scorecard
     assert "recommended_options.page_workers" in quality_scorecard
     assert "run_latest_ssd_security_spec_benchmark.py" in quality_scorecard
