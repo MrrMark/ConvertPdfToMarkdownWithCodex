@@ -63,6 +63,7 @@ RELATIONSHIP_ID_FIELDS = (
     "previous_chunk_id",
     "next_chunk_id",
     "section_anchor_chunk_id",
+    "parent_section_anchor_chunk_id",
 )
 VISUAL_CHUNK_TYPES = {"figure_text", "figure_description", "figure_structure"}
 FIGURE_SOURCE_TYPES = {"figure", "excluded_figure"}
@@ -747,6 +748,10 @@ def _validate_retrieval_chunk_record(
         "token_estimate",
         "embedding_token_estimate",
         "source_record_count",
+        "chunk_group_index",
+        "chunk_group_count",
+        "section_chunk_index",
+        "section_chunk_count",
     ):
         if field in record and not _is_int(record.get(field)):
             _add_finding(
@@ -784,7 +789,9 @@ def _validate_retrieval_chunk_record(
         "chunk_group_id",
         "source_dedupe_key",
         "chunk_boundary_policy",
+        "parent_section_path",
         "relationship_strategy",
+        "relationship_metadata_version",
     ):
         if field in record and not isinstance(record.get(field), str):
             _add_finding(
@@ -824,7 +831,7 @@ def _validate_retrieval_chunk_record(
         record_id=record_id,
     )
 
-    for field in ("heading_path", "semantic_types", "chunk_boundary_reasons"):
+    for field in ("heading_path", "semantic_types", "chunk_boundary_reasons", "relationship_reasons"):
         value = record.get(field)
         if field in record and (not isinstance(value, list) or not all(isinstance(item, str) for item in value)):
             _add_finding(
@@ -838,6 +845,33 @@ def _validate_retrieval_chunk_record(
                 field=field,
                 message=f"{field} must be a list of strings.",
             )
+    context_metadata = record.get("context_metadata")
+    if "context_metadata" in record and not isinstance(context_metadata, dict):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_object_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="context_metadata",
+            message="context_metadata must be an object when present.",
+        )
+    if isinstance(context_metadata, dict):
+        for field in ("metadata_version", "context_type"):
+            if field in context_metadata and not isinstance(context_metadata.get(field), str):
+                _add_finding(
+                    findings,
+                    severity="error",
+                    code="invalid_context_metadata_field",
+                    target="common",
+                    file=file_name,
+                    line=line,
+                    record_id=record_id,
+                    field=f"context_metadata.{field}",
+                    message=f"context_metadata.{field} must be a string when present.",
+                )
     if record.get("normative_strength") is not None and not isinstance(record.get("normative_strength"), str):
         _add_finding(
             findings,
@@ -963,11 +997,20 @@ def _openai_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "embedding_token_estimate": record.get("embedding_token_estimate"),
         "source_dedupe_key": record.get("source_dedupe_key"),
         "merged_source_chunk_ids": record.get("merged_source_chunk_ids"),
+        "chunk_group_index": record.get("chunk_group_index"),
+        "chunk_group_count": record.get("chunk_group_count"),
+        "section_chunk_index": record.get("section_chunk_index"),
+        "section_chunk_count": record.get("section_chunk_count"),
         "previous_chunk_id": record.get("previous_chunk_id"),
         "next_chunk_id": record.get("next_chunk_id"),
         "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
+        "parent_section_path": record.get("parent_section_path"),
+        "parent_section_anchor_chunk_id": record.get("parent_section_anchor_chunk_id"),
         "related_chunk_ids": record.get("related_chunk_ids"),
+        "relationship_reasons": record.get("relationship_reasons"),
         "relationship_strategy": record.get("relationship_strategy"),
+        "relationship_metadata_version": record.get("relationship_metadata_version"),
+        "context_metadata": record.get("context_metadata"),
         "schema_version": record.get("schema_version"),
         "source_sha256": record.get("source_sha256"),
         "generated_text": record.get("generated_text"),
@@ -982,6 +1025,10 @@ def _azure_metadata(record: dict[str, Any]) -> dict[str, Any]:
         source_refs_json = json.dumps(record.get("source_refs"), ensure_ascii=False, sort_keys=True)
     except (TypeError, ValueError):
         source_refs_json = None
+    try:
+        context_metadata_json = json.dumps(record.get("context_metadata"), ensure_ascii=False, sort_keys=True)
+    except (TypeError, ValueError):
+        context_metadata_json = None
     return {
         "id": record.get("chunk_id"),
         "chunk_type": record.get("chunk_type"),
@@ -994,12 +1041,21 @@ def _azure_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "embedding_token_estimate": record.get("embedding_token_estimate"),
         "source_dedupe_key": record.get("source_dedupe_key"),
         "merged_source_chunk_ids": record.get("merged_source_chunk_ids"),
+        "chunk_group_index": record.get("chunk_group_index"),
+        "chunk_group_count": record.get("chunk_group_count"),
+        "section_chunk_index": record.get("section_chunk_index"),
+        "section_chunk_count": record.get("section_chunk_count"),
         "previous_chunk_id": record.get("previous_chunk_id"),
         "next_chunk_id": record.get("next_chunk_id"),
         "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
+        "parent_section_path": record.get("parent_section_path"),
+        "parent_section_anchor_chunk_id": record.get("parent_section_anchor_chunk_id"),
         "related_chunk_ids": record.get("related_chunk_ids"),
+        "relationship_reasons": record.get("relationship_reasons"),
         "relationship_strategy": record.get("relationship_strategy"),
+        "relationship_metadata_version": record.get("relationship_metadata_version"),
         "source_refs_json": source_refs_json,
+        "context_metadata_json": context_metadata_json,
         "generated_text": record.get("generated_text"),
         "generation_strategy": record.get("generation_strategy"),
         "derived_from_context": record.get("derived_from_context"),
@@ -1022,11 +1078,20 @@ def _document_metadata(record: dict[str, Any]) -> dict[str, Any]:
         "merged_source_chunk_ids": record.get("merged_source_chunk_ids"),
         "schema_version": record.get("schema_version"),
         "source_sha256": record.get("source_sha256"),
+        "chunk_group_index": record.get("chunk_group_index"),
+        "chunk_group_count": record.get("chunk_group_count"),
+        "section_chunk_index": record.get("section_chunk_index"),
+        "section_chunk_count": record.get("section_chunk_count"),
         "previous_chunk_id": record.get("previous_chunk_id"),
         "next_chunk_id": record.get("next_chunk_id"),
         "section_anchor_chunk_id": record.get("section_anchor_chunk_id"),
+        "parent_section_path": record.get("parent_section_path"),
+        "parent_section_anchor_chunk_id": record.get("parent_section_anchor_chunk_id"),
         "related_chunk_ids": record.get("related_chunk_ids"),
+        "relationship_reasons": record.get("relationship_reasons"),
         "relationship_strategy": record.get("relationship_strategy"),
+        "relationship_metadata_version": record.get("relationship_metadata_version"),
+        "context_metadata": record.get("context_metadata"),
         "generated_text": record.get("generated_text"),
         "generation_strategy": record.get("generation_strategy"),
         "derived_from_context": record.get("derived_from_context"),

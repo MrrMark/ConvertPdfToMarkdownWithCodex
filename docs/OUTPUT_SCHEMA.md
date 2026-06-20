@@ -961,14 +961,21 @@ Optional per JSONL record:
 - `embedding_text`: context-prefixed text for index embedding. It may add section, caption, header, table id, unit type, or NVMe command relationship context for table-like chunks.
 - `embedding_token_estimate`: token budget estimate for `embedding_text`.
 - `embedding_text_strategy`: deterministic strategy label such as `table_context_prefix`.
+- `context_metadata`: source-derived section/table/domain metadata for table-like chunks. It keeps repeated header, caption, confidence, and command/domain hints outside `text`.
 - `merged_source_chunk_ids`: original chunk ids represented by a merged sibling text chunk.
 - `merged_source_chunk_count`: number of original text chunks represented by a merged sibling text chunk.
 - `merge_strategy`: deterministic strategy label such as `adjacent_text_block_same_section_token_budget`.
+- `chunk_group_index` / `chunk_group_count`: 1-based position and total count inside the same `chunk_group_id`.
+- `section_chunk_index` / `section_chunk_count`: 1-based position and total count inside the same non-empty `section_path`.
 - `previous_chunk_id`: previous chunk id in the same `chunk_group_id`, when relationship metadata is enabled and a previous chunk exists.
 - `next_chunk_id`: next chunk id in the same `chunk_group_id`, when relationship metadata is enabled and a next chunk exists.
 - `section_anchor_chunk_id`: first chunk id with the same `section_path`, omitted when the current chunk is already the section anchor.
+- `parent_section_path`: parent breadcrumb path for a nested `section_path`, when a parent section anchor exists.
+- `parent_section_anchor_chunk_id`: first chunk id in `parent_section_path`, when relationship metadata is enabled and a parent anchor exists.
 - `related_chunk_ids`: ordered list of available neighbor/section-anchor chunk ids for lightweight citation expansion.
+- `relationship_reasons`: deterministic reasons for related ids, such as `chunk_group_neighbor`, `section_anchor`, or `parent_section_anchor`.
 - `relationship_strategy`: deterministic strategy label such as `chunk_group_prev_next_section_anchor`.
+- `relationship_metadata_version`: optional relationship metadata version, currently `2.0`.
 
 `figure_text` chunk policy:
 
@@ -992,10 +999,11 @@ Policy:
 
 - `text` remains extracted source text or deterministic row text, not a summary or paraphrase.
 - `embedding_text`, when present, is an index helper only. It must not replace `text` for citation or source-of-truth checks.
+- `context_metadata`, when present, is source-derived metadata only. It may be used for filtering, reranking, or prompt context, but the cited source text remains `text` plus `source_refs`.
 - Command Spec technical table chunks use higher `retrieval_priority` for command opcode, CDW, pointer, and command-linked status records. This is a deterministic re-ranking hint, not a change to source text.
 - `rag_merge_sibling_text_chunks`, when enabled, only merges adjacent `text_block` chunks with the same page/section/heading context and only while the combined `token_estimate` stays within `retrieval_chunk_max_tokens`.
 - Merged sibling text chunks use `chunk_boundary_policy="merged_sibling_text_blocks"` and keep every original source id in `source_refs`; requirement, requirement trace, table row, technical table, and domain unit chunks are not merged by this policy.
-- `rag_chunk_relationship_metadata`, when enabled, is added after merge/split optimization so `previous_chunk_id`, `next_chunk_id`, and `section_anchor_chunk_id` point to final chunk ids in the same JSONL file.
+- `rag_chunk_relationship_metadata`, when enabled, is added after merge/split optimization so `previous_chunk_id`, `next_chunk_id`, `section_anchor_chunk_id`, and `parent_section_anchor_chunk_id` point to final chunk ids in the same JSONL file.
 - `source_refs` must be sufficient to trace a chunk back to the originating block, table row, requirement, requirement trace, technical table unit, figure record, or domain unit.
 - `source_sha256` is the lowercase SHA-256 of the input PDF and is copied into each chunk for downstream index identity checks.
 - Chunk boundary fields are deterministic diagnostics for long technical specs; token-budget splitting does not summarize or rewrite source text.

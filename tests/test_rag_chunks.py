@@ -651,12 +651,63 @@ def test_assign_chunk_relationships_adds_group_neighbors_and_section_anchor() ->
     assert related[0]["next_chunk_id"] == "chunk-000002"
     assert "previous_chunk_id" not in related[0]
     assert related[0]["relationship_strategy"] == "chunk_group_prev_next_section_anchor"
+    assert related[0]["relationship_metadata_version"] == "2.0"
+    assert related[0]["chunk_group_index"] == 1
+    assert related[0]["chunk_group_count"] == 2
+    assert related[0]["section_chunk_index"] == 1
+    assert related[0]["section_chunk_count"] == 3
+    assert related[0]["relationship_reasons"] == ["chunk_group_neighbor"]
     assert related[1]["previous_chunk_id"] == "chunk-000001"
     assert related[1]["section_anchor_chunk_id"] == "chunk-000001"
     assert related[1]["related_chunk_ids"] == ["chunk-000001"]
+    assert related[1]["chunk_group_index"] == 2
+    assert related[1]["relationship_reasons"] == ["chunk_group_neighbor", "section_anchor"]
     assert related[2]["section_anchor_chunk_id"] == "chunk-000001"
     assert related[2]["related_chunk_ids"] == ["chunk-000001"]
+    assert related[2]["chunk_group_count"] == 1
+    assert related[2]["section_chunk_index"] == 3
+    assert related[2]["relationship_reasons"] == ["section_anchor"]
     assert "previous_chunk_id" not in chunks[1]
+
+
+def test_assign_chunk_relationships_adds_parent_section_anchor() -> None:
+    chunks = [
+        {
+            "chunk_id": "chunk-000001",
+            "chunk_index": 1,
+            "chunk_type": "text_block",
+            "text": "Root overview.",
+            "chunk_group_id": "text-page-0001",
+            "section_path": "1 Root",
+        },
+        {
+            "chunk_id": "chunk-000002",
+            "chunk_index": 2,
+            "chunk_type": "text_block",
+            "text": "Child overview.",
+            "chunk_group_id": "text-page-0002",
+            "section_path": "1 Root > 1.1 Child",
+        },
+        {
+            "chunk_id": "chunk-000003",
+            "chunk_index": 3,
+            "chunk_type": "requirement",
+            "text": "The device shall preserve state.",
+            "chunk_group_id": "requirement-page-0002",
+            "section_path": "1 Root > 1.1 Child",
+        },
+    ]
+
+    related = assign_chunk_relationships(chunks)
+
+    assert related[1]["parent_section_path"] == "1 Root"
+    assert related[1]["parent_section_anchor_chunk_id"] == "chunk-000001"
+    assert related[1]["related_chunk_ids"] == ["chunk-000001"]
+    assert related[1]["relationship_reasons"] == ["parent_section_anchor"]
+    assert related[2]["section_anchor_chunk_id"] == "chunk-000002"
+    assert related[2]["parent_section_anchor_chunk_id"] == "chunk-000001"
+    assert related[2]["related_chunk_ids"] == ["chunk-000002", "chunk-000001"]
+    assert related[2]["relationship_reasons"] == ["section_anchor", "parent_section_anchor"]
 
 
 def test_build_retrieval_chunks_can_add_relationship_metadata_after_optimization() -> None:
@@ -691,6 +742,9 @@ def test_build_retrieval_chunks_can_add_relationship_metadata_after_optimization
     assert chunks[1]["previous_chunk_id"] == "chunk-000001"
     assert chunks[1]["section_anchor_chunk_id"] == "chunk-000001"
     assert chunks[0]["relationship_strategy"] == "chunk_group_prev_next_section_anchor"
+    assert chunks[0]["relationship_metadata_version"] == "2.0"
+    assert chunks[0]["chunk_group_index"] == 1
+    assert chunks[1]["chunk_group_index"] == 2
 
 
 def test_contextual_embedding_text_keeps_table_row_text_as_source_of_truth() -> None:
@@ -731,3 +785,50 @@ def test_contextual_embedding_text_keeps_table_row_text_as_source_of_truth() -> 
     assert "Caption: Table 1: Status fields" in chunks[0]["embedding_text"]
     assert "Headers: Field | Description" in chunks[0]["embedding_text"]
     assert chunks[0]["embedding_token_estimate"] > chunks[0]["token_estimate"]
+    assert chunks[0]["context_metadata"] == {
+        "metadata_version": "2.0",
+        "context_type": "table_row",
+        "table_id": "page-0001-table-0001",
+        "caption_text": "Table 1: Status fields",
+        "headers": ["Field", "Description"],
+        "heading_path": ["2 Registers"],
+    }
+
+
+def test_table_row_context_metadata_inherits_table_level_caption_and_headers() -> None:
+    rag_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "caption_text": "Table 1: Status fields",
+            "headers": ["Field", "Description"],
+            "table_confidence_v2": 0.92,
+            "table_confidence_v2_bucket": "high",
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "row_text": "Field = Status | Description = Current status",
+                }
+            ],
+        }
+    ]
+
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=rag_tables,
+    )
+
+    assert chunks[0]["text"] == "Field = Status | Description = Current status"
+    assert chunks[0]["context_metadata"] == {
+        "metadata_version": "2.0",
+        "context_type": "table_row",
+        "table_id": "page-0001-table-0001",
+        "caption_text": "Table 1: Status fields",
+        "headers": ["Field", "Description"],
+        "table_confidence_v2": 0.92,
+        "table_confidence_v2_bucket": "high",
+    }

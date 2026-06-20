@@ -23,19 +23,12 @@
 
 ## 현재 Active Development Specs
 
-### P0-P2 / Q120-Q125. PDF2MD Native Migration Plan
+### P0-P2 / Q121-Q125. PDF2MD Native Migration Plan
 
 Docling을 runtime backend나 필수 dependency로 채택하지 않고, Docling에서 참고할 만한 설계 아이디어를 `pdf2md` 네이티브 기능으로 재구현한다.
 canonical output은 계속 `pdf2md`의 `document.md`, `manifest.json`, `report.json`, RAG sidecar, provenance/index/SSD-RAG validator 계약으로 유지한다.
 
 상세 개발 명세는 `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`에서 관리한다.
-
-#### Q120. Native Hybrid Chunking v2
-
-- 우선순위: P0
-- 목표: section hierarchy, table atomicity, repeated header context, relationship metadata 기반 chunking을 강화한다.
-- 핵심 산출물: `retrieval_chunks_rag.jsonl` metadata 확장 후보와 chunk eval 개선.
-- 검증: RAG chunk/index contract/RAG eval tests.
 
 #### Q121. Layout Sidecar and Reading Order Diagnostics
 
@@ -74,4 +67,4 @@ canonical output은 계속 `pdf2md`의 `document.md`, `manifest.json`, `report.j
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q119 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q120 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

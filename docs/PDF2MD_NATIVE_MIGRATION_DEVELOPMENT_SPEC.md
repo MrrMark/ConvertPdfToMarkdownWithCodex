@@ -128,6 +128,8 @@ Status: Implemented in Q119. Active follow-up work continues in Q120-Q125.
 
 ## Q120 - Native Hybrid Chunking v2
 
+Status: Implemented in Q120. Active follow-up work continues in Q121-Q125.
+
 ### 목표
 
 Docling의 document-native/hybrid chunking 개념을 `pdf2md` RAG sidecar에 맞게 네이티브로 재구현한다. table, requirement, figure context가 chunk boundary에서 깨지지 않도록 한다.
@@ -150,16 +152,25 @@ Docling의 document-native/hybrid chunking 개념을 `pdf2md` RAG sidecar에 맞
 
 ### 산출물
 
-- `retrieval_chunks_rag.jsonl` metadata 확장 후보
-- chunk token budget diagnostic 개선
-- RAG eval query set 또는 synthetic regression 보강
+- `retrieval_chunks_rag.jsonl` relationship metadata v2 optional fields
+  - `relationship_metadata_version`
+  - `chunk_group_index`, `chunk_group_count`
+  - `section_chunk_index`, `section_chunk_count`
+  - `parent_section_path`, `parent_section_anchor_chunk_id`
+  - `relationship_reasons`
+- table-like chunk `context_metadata`
+  - repeated header/caption inheritance for table row chunks
+  - table confidence, domain, command, requirement, and relationship hint metadata
+- relationship and table context regression tests
+- `docs/OUTPUT_SCHEMA.md`, active backlog, implemented spec archive 갱신
 
 ### 검증
 
-- `python -m pytest tests/test_rag_chunks.py tests/test_rag_eval.py tests/test_index_contract_validator.py`
-- `scripts/run_rag_eval.py` local eval
-- index contract validator
-- token budget p95, duplicate source ref count 확인
+- `.venv311/bin/python -m pytest tests/test_rag_chunks.py tests/test_rag_eval.py tests/test_index_contract_validator.py -q`
+- `.venv311/bin/python -m pytest tests/test_docs_examples.py -q`
+- `.venv311/bin/python -m pytest tests/test_golden_corpus.py -q`
+- `.venv311/bin/python scripts/run_rag_eval.py --fixture tests/fixtures/rag_eval_queries.json --output-dir output/q120_rag_eval`
+- latest NVMe Base chunk smoke 및 artifact/index/provenance validator
 
 ### 완료 조건
 

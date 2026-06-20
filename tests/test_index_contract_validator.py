@@ -332,8 +332,21 @@ def test_index_contract_target_metadata_preserves_recipe_fields() -> None:
         previous_chunk_id="chunk-000000",
         next_chunk_id="chunk-000002",
         section_anchor_chunk_id="chunk-000001",
+        parent_section_path="1 Requirements",
+        parent_section_anchor_chunk_id="chunk-000000",
         related_chunk_ids=["chunk-000000", "chunk-000002"],
+        relationship_reasons=["chunk_group_neighbor", "parent_section_anchor"],
         relationship_strategy="chunk_group_prev_next_section_anchor",
+        relationship_metadata_version="2.0",
+        chunk_group_index=1,
+        chunk_group_count=2,
+        section_chunk_index=1,
+        section_chunk_count=3,
+        context_metadata={
+            "metadata_version": "2.0",
+            "context_type": "table_row",
+            "headers": ["Field", "Description"],
+        },
     )
 
     openai_metadata = _metadata_for_target(chunk, "openai")
@@ -343,12 +356,18 @@ def test_index_contract_target_metadata_preserves_recipe_fields() -> None:
 
     assert openai_metadata["embedding_token_estimate"] == 12
     assert openai_metadata["merged_source_chunk_ids"] == ["chunk-000010", "chunk-000011"]
+    assert openai_metadata["parent_section_anchor_chunk_id"] == "chunk-000000"
+    assert openai_metadata["relationship_metadata_version"] == "2.0"
+    assert openai_metadata["context_metadata"]["context_type"] == "table_row"
     assert azure_metadata["source_refs_json"].startswith("[")
+    assert azure_metadata["context_metadata_json"].startswith("{")
     assert azure_metadata["previous_chunk_id"] == "chunk-000000"
     assert langchain_metadata["source_text"] == chunk["text"]
     assert langchain_metadata["schema_version"] == "1.0"
+    assert langchain_metadata["relationship_reasons"] == ["chunk_group_neighbor", "parent_section_anchor"]
     assert llamaindex_metadata["source_refs"] == chunk["source_refs"]
     assert llamaindex_metadata["source_sha256"] == SOURCE_SHA256
+    assert llamaindex_metadata["chunk_group_count"] == 2
 
 
 def test_index_contract_reports_required_field_type_and_source_ref_errors(tmp_path: Path) -> None:
@@ -402,8 +421,11 @@ def test_index_contract_validates_optional_chunk_relationship_targets(tmp_path: 
         source_dedupe_key="req-trace-000002",
         previous_chunk_id="chunk-000001",
         section_anchor_chunk_id="chunk-000001",
+        parent_section_path="1 Requirements",
+        parent_section_anchor_chunk_id="chunk-000001",
         related_chunk_ids=["chunk-000001"],
         relationship_strategy="chunk_group_prev_next_section_anchor",
+        relationship_metadata_version="2.0",
     )
     _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [first, second])
 
@@ -419,6 +441,7 @@ def test_index_contract_reports_missing_chunk_relationship_targets(tmp_path: Pat
         [
             _valid_chunk(
                 previous_chunk_id="chunk-missing",
+                parent_section_anchor_chunk_id="chunk-parent-missing",
                 related_chunk_ids=["chunk-missing"],
                 relationship_strategy="chunk_group_prev_next_section_anchor",
             )

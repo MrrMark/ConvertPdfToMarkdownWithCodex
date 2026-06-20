@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any, Callable
 
-from pdf2md.serializers.rag_tables import flatten_rag_table_records, normalize_rag_table_payload
+from pdf2md.serializers.rag_tables import normalize_rag_table_payload
 from pdf2md.serializers.rag_stable_ids import source_dedupe_key, with_stable_source_metadata
 
 
@@ -15,6 +15,8 @@ TEXT_CHUNK_MERGE_POLICY = "merged_sibling_text_blocks"
 TEXT_CHUNK_MERGE_REASON = "sibling_text_merge"
 TEXT_CHUNK_MERGE_STRATEGY = "adjacent_text_block_same_section_token_budget"
 CHUNK_RELATIONSHIP_STRATEGY = "chunk_group_prev_next_section_anchor"
+CHUNK_RELATIONSHIP_METADATA_VERSION = "2.0"
+CHUNK_CONTEXT_METADATA_VERSION = "2.0"
 FIGURE_TEXT_CHUNK_TYPE = "figure_text"
 FIGURE_DESCRIPTION_CHUNK_TYPE = "figure_description"
 FIGURE_STRUCTURE_CHUNK_TYPE = "figure_structure"
@@ -42,6 +44,54 @@ OCP_REQUIREMENT_PRIORITY_BY_FAMILY = {
     "nvme": 96,
     "pcie": 96,
 }
+TABLE_CONTEXT_INHERITED_FIELDS = (
+    "caption_text",
+    "headers",
+    "heading_path",
+    "heading_context_source",
+    "table_confidence_v2",
+    "table_confidence_v2_bucket",
+    "table_confidence_v2_reasons",
+    "continuation_group",
+    "continued_from",
+)
+CHUNK_CONTEXT_METADATA_FIELDS = (
+    "table_id",
+    "caption_text",
+    "headers",
+    "heading_path",
+    "heading_context_source",
+    "table_confidence_v2",
+    "table_confidence_v2_bucket",
+    "table_confidence_v2_reasons",
+    "continuation_group",
+    "continued_from",
+    "unit_type",
+    "domain",
+    "requirement_id",
+    "requirement_prefix",
+    "requirement_family",
+    "ocp_section_context",
+    "ocp_profile",
+    "ssd_requirement_status",
+    "related_command",
+    "related_log_identifier",
+    "related_feature_identifier",
+    "related_statistic_identifier",
+    "related_security_protocol",
+    "related_form_factor",
+    "command_context",
+    "command_scope",
+    "queue_type",
+    "related_command_opcode",
+    "related_command_unit_id",
+    "command_dword",
+    "pointer_type",
+    "status_code_group",
+    "error_class",
+    "retry_hint",
+    "relationship_hints",
+)
 TokenCounter = Callable[[str], int]
 
 
@@ -278,10 +328,23 @@ def _append_related_id(related: list[str], chunk_id: str | None, *, self_id: str
     related.append(chunk_id)
 
 
+def _append_relationship_reason(reasons: list[str], reason: str) -> None:
+    if reason not in reasons:
+        reasons.append(reason)
+
+
+def _parent_section_path(section_path: str) -> str | None:
+    parts = [part.strip() for part in section_path.split(" > ") if part.strip()]
+    if len(parts) <= 1:
+        return None
+    return " > ".join(parts[:-1])
+
+
 def assign_chunk_relationships(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Add deterministic neighboring chunk metadata without changing source text."""
     chunks = [dict(record) for record in records]
     section_anchor_by_path: dict[str, str] = {}
+    section_indices: dict[str, list[int]] = {}
     group_indices: dict[str, list[int]] = {}
 
     for index, chunk in enumerate(chunks):
@@ -290,31 +353,56 @@ def assign_chunk_relationships(records: list[dict[str, Any]]) -> list[dict[str, 
         chunk_group_id = str(chunk.get("chunk_group_id") or "")
         if chunk_id and section_path and section_path not in section_anchor_by_path:
             section_anchor_by_path[section_path] = chunk_id
+        if section_path:
+            section_indices.setdefault(section_path, []).append(index)
         if chunk_group_id:
             group_indices.setdefault(chunk_group_id, []).append(index)
 
     for indices in group_indices.values():
         for position, chunk_index in enumerate(indices):
             chunk = chunks[chunk_index]
+            chunk["chunk_group_index"] = position + 1
+            chunk["chunk_group_count"] = len(indices)
             if position > 0:
                 chunk["previous_chunk_id"] = chunks[indices[position - 1]].get("chunk_id")
             if position + 1 < len(indices):
                 chunk["next_chunk_id"] = chunks[indices[position + 1]].get("chunk_id")
 
+    for indices in section_indices.values():
+        for position, chunk_index in enumerate(indices):
+            chunk = chunks[chunk_index]
+            chunk["section_chunk_index"] = position + 1
+            chunk["section_chunk_count"] = len(indices)
+
     for chunk in chunks:
         chunk_id = str(chunk.get("chunk_id") or "")
-        section_anchor = section_anchor_by_path.get(str(chunk.get("section_path") or ""))
+        section_path = str(chunk.get("section_path") or "")
+        section_anchor = section_anchor_by_path.get(section_path)
+        parent_section = _parent_section_path(section_path)
+        parent_section_anchor = section_anchor_by_path.get(parent_section or "")
         related: list[str] = []
+        relationship_reasons: list[str] = []
         previous_chunk_id = chunk.get("previous_chunk_id")
         next_chunk_id = chunk.get("next_chunk_id")
         _append_related_id(related, str(previous_chunk_id) if previous_chunk_id else None, self_id=chunk_id)
         _append_related_id(related, str(next_chunk_id) if next_chunk_id else None, self_id=chunk_id)
+        if previous_chunk_id or next_chunk_id:
+            _append_relationship_reason(relationship_reasons, "chunk_group_neighbor")
         _append_related_id(related, section_anchor, self_id=chunk_id)
         if section_anchor and section_anchor != chunk_id:
             chunk["section_anchor_chunk_id"] = section_anchor
+            _append_relationship_reason(relationship_reasons, "section_anchor")
+        if parent_section and parent_section_anchor:
+            chunk["parent_section_path"] = parent_section
+            chunk["parent_section_anchor_chunk_id"] = parent_section_anchor
+            _append_related_id(related, parent_section_anchor, self_id=chunk_id)
+            _append_relationship_reason(relationship_reasons, "parent_section_anchor")
         if related:
             chunk["related_chunk_ids"] = related
+        if relationship_reasons:
+            chunk["relationship_reasons"] = relationship_reasons
         chunk["relationship_strategy"] = CHUNK_RELATIONSHIP_STRATEGY
+        chunk["relationship_metadata_version"] = CHUNK_RELATIONSHIP_METADATA_VERSION
     return chunks
 
 
@@ -453,6 +541,7 @@ def _make_chunk(
     generated_text: bool | None = None,
     generation_strategy: str | None = None,
     derived_from_context: bool | None = None,
+    context_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     chunk = {
         "chunk_id": f"chunk-{index:06d}",
@@ -487,6 +576,8 @@ def _make_chunk(
         chunk["generation_strategy"] = generation_strategy
     if derived_from_context is not None:
         chunk["derived_from_context"] = derived_from_context
+    if context_metadata:
+        chunk["context_metadata"] = context_metadata
     return with_stable_source_metadata(chunk, source_sha256=source_sha256)
 
 
@@ -590,6 +681,50 @@ def _contextual_embedding_text(chunk_type: str, text: str, record: dict[str, Any
     if not context_parts:
         return None
     return "\n".join(context_parts + [f"Text: {text}"])
+
+
+def _clean_context_metadata_value(value: Any) -> Any:
+    if value is None or value == "":
+        return None
+    if isinstance(value, list):
+        items = [item for item in value if item not in (None, "")]
+        return items or None
+    if isinstance(value, dict):
+        items = {str(key): item for key, item in value.items() if item not in (None, "")}
+        return items or None
+    return value
+
+
+def _is_blank_context_value(value: Any) -> bool:
+    if value is None or value == "":
+        return True
+    return isinstance(value, (list, dict)) and not value
+
+
+def _chunk_context_metadata(chunk_type: str, record: dict[str, Any]) -> dict[str, Any] | None:
+    if chunk_type not in TABLE_CONTEXT_CHUNK_TYPES:
+        return None
+    metadata: dict[str, Any] = {
+        "metadata_version": CHUNK_CONTEXT_METADATA_VERSION,
+        "context_type": chunk_type,
+    }
+    for field in CHUNK_CONTEXT_METADATA_FIELDS:
+        value = _clean_context_metadata_value(_record_metadata_value(record, field))
+        if value is not None:
+            metadata[field] = value
+    return metadata if len(metadata) > 2 else None
+
+
+def _flatten_rag_table_records_with_context(rag_tables: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for table in normalize_rag_table_payload(rag_tables):
+        for record in table.get("records", []):
+            record_copy = dict(record)
+            for field in TABLE_CONTEXT_INHERITED_FIELDS:
+                if _is_blank_context_value(record_copy.get(field)) and not _is_blank_context_value(table.get(field)):
+                    record_copy[field] = table.get(field)
+            records.append(record_copy)
+    return records
 
 
 def _float_or_none(value: Any) -> float | None:
@@ -926,6 +1061,7 @@ def build_retrieval_chunks(
             if contextual_embedding_text
             else None,
             embedding_text_strategy="domain_unit_context_prefix",
+            context_metadata=_chunk_context_metadata("domain_unit", record),
         )
 
     for record in sorted(technical_table_records or [], key=lambda item: int(item.get("technical_table_unit_index") or 0)):
@@ -956,6 +1092,7 @@ def build_retrieval_chunks(
             if contextual_embedding_text
             else None,
             embedding_text_strategy="technical_table_context_prefix",
+            context_metadata=_chunk_context_metadata("technical_table", record),
         )
 
     if include_figure_text_chunks:
@@ -1031,7 +1168,7 @@ def build_retrieval_chunks(
             derived_from_context=payload["derived_from_context"],
         )
 
-    for record in flatten_rag_table_records(normalize_rag_table_payload(rag_tables)):
+    for record in _flatten_rag_table_records_with_context(rag_tables):
         text = str(record.get("row_text") or "").strip()
         if not text:
             continue
@@ -1058,6 +1195,7 @@ def build_retrieval_chunks(
             chunk_group_id=f"table-{record.get('table_id') or 'unknown'}",
             embedding_text=_contextual_embedding_text("table_row", text, record) if contextual_embedding_text else None,
             embedding_text_strategy="table_context_prefix",
+            context_metadata=_chunk_context_metadata("table_row", record),
         )
 
     if merge_sibling_text_blocks:
