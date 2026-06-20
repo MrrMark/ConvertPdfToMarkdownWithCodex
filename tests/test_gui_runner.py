@@ -22,6 +22,7 @@ from pdf2md.gui_runner import (
     build_single_config,
     check_gui_runtime,
     format_gui_diagnostic_report,
+    format_gui_completion_dialog,
     format_gui_summary,
     gui_diagnostic_report_to_dict,
     gui_options_fingerprint,
@@ -951,3 +952,35 @@ def test_gui_summary_separates_actionable_and_advisory_warning_counts(tmp_path: 
     text = format_gui_summary(summary)
 
     assert "warnings=3 (actionable=1, advisory=2; OCR_EMPTY_RESULT, TABLE_COMPLEXITY_HTML_FALLBACK)" in text
+
+
+def test_gui_completion_dialog_summary_is_bounded_for_large_batches(tmp_path: Path) -> None:
+    documents = [
+        GuiDocumentSummary(
+            input_pdf=tmp_path / f"document-{index:03d}.pdf",
+            output_dir=tmp_path / "out" / f"document-{index:03d}",
+            status="partial_success",
+            exit_code=2,
+            warning_count=index + 1,
+            retry_candidate=index % 2 == 0,
+        )
+        for index in range(25)
+    ]
+    summary = GuiConversionSummary(
+        input_mode="folder",
+        input_path=tmp_path / "pdfs",
+        output_root=tmp_path / "out",
+        documents=documents,
+        exit_code=2,
+        batch_report_path=tmp_path / "out" / "batch_report.json",
+    )
+
+    detailed_text = format_gui_summary(summary)
+    dialog_text = format_gui_completion_dialog(summary)
+
+    assert "document-024.pdf" in detailed_text
+    assert "document-024.pdf" not in dialog_text
+    assert "documents=25" in dialog_text
+    assert "showing 5 of 25" in dialog_text
+    assert "... 20 more" in dialog_text
+    assert len(dialog_text.splitlines()) <= 10

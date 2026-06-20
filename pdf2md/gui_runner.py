@@ -48,6 +48,8 @@ DiagnosticSeverity = Literal["info", "advisory", "warning", "error"]
 MIN_GUI_PYTHON_VERSION = (3, 11)
 GUI_STATUS_SKIPPED = "skipped"
 GUI_STATUS_CANCELLED = "cancelled"
+GUI_COMPLETION_DIALOG_MAX_DOCUMENTS = 5
+GUI_COMPLETION_DIALOG_MAX_PATH_CHARS = 96
 
 
 @dataclass(frozen=True)
@@ -306,6 +308,68 @@ def format_gui_summary(summary: GuiConversionSummary) -> str:
         lines.append(f"- corpus_diff={summary.corpus_diff_report_path}")
     if summary.requirement_change_impact_report_path is not None:
         lines.append(f"- requirement_impact={summary.requirement_change_impact_report_path}")
+    return "\n".join(lines)
+
+
+def _ellipsize_middle(value: Path | str, *, max_chars: int = GUI_COMPLETION_DIALOG_MAX_PATH_CHARS) -> str:
+    text = str(value)
+    if len(text) <= max_chars:
+        return text
+    if max_chars <= 3:
+        return text[:max_chars]
+    prefix_len = max(1, (max_chars - 3) // 2)
+    suffix_len = max_chars - 3 - prefix_len
+    return f"{text[:prefix_len]}...{text[-suffix_len:]}"
+
+
+def format_gui_completion_dialog(
+    summary: GuiConversionSummary,
+    *,
+    max_documents: int = GUI_COMPLETION_DIALOG_MAX_DOCUMENTS,
+) -> str:
+    """Format a bounded completion message for the GUI modal dialog."""
+    pages_per_second = _format_rate(summary.pages_per_second)
+    lines = [
+        (
+            "Finished: "
+            f"documents={summary.document_count}, "
+            f"success={summary.success_count}, "
+            f"partial={summary.partial_success_count}, "
+            f"failed={summary.failed_count}, "
+            f"skipped={summary.skipped_count}, "
+            f"cancelled={summary.cancelled_count}, "
+            f"retry_candidates={len(summary.retry_candidates)}, "
+            f"processed_pages={summary.processed_pages}, "
+            f"pages_per_second={pages_per_second}"
+        ),
+        f"Output: {_ellipsize_middle(summary.output_root)}",
+    ]
+    if summary.batch_report_path is not None:
+        lines.append(f"Batch report: {_ellipsize_middle(summary.batch_report_path)}")
+    if summary.corpus_manifest_path is not None:
+        lines.append(f"Corpus manifest: {_ellipsize_middle(summary.corpus_manifest_path)}")
+
+    noteworthy_documents = [
+        document
+        for document in summary.documents
+        if document.status != ConversionStatus.SUCCESS.value or document.warning_count or document.retry_candidate
+    ]
+    if not noteworthy_documents:
+        lines.append("All documents completed without warnings.")
+        return "\n".join(lines)
+
+    safe_max_documents = max(0, max_documents)
+    shown_documents = noteworthy_documents[:safe_max_documents]
+    lines.append(
+        f"Review needed: showing {len(shown_documents)} of {len(noteworthy_documents)} documents with warnings, failures, or retry candidates."
+    )
+    for document in shown_documents:
+        warning_text = f", warnings={document.warning_count}" if document.warning_count else ""
+        retry_text = ", retry_candidate=true" if document.retry_candidate else ""
+        lines.append(f"- {document.input_pdf.name}: status={document.status}{warning_text}{retry_text}")
+    remaining = len(noteworthy_documents) - len(shown_documents)
+    if remaining > 0:
+        lines.append(f"- ... {remaining} more. Use the Results table, log, or batch report for details.")
     return "\n".join(lines)
 
 
