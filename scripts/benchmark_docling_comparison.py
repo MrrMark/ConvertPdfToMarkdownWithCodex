@@ -51,6 +51,7 @@ SANITIZED_ARTIFACTS = (
     "manifest.json",
     "report.json",
     "retrieval_chunks_rag.jsonl",
+    "page_layout_rag.jsonl",
     "figures_rag.jsonl",
     "tables_rag.jsonl",
     "technical_tables_rag.jsonl",

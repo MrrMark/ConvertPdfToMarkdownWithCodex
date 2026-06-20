@@ -70,6 +70,7 @@ class Config(BaseModel):
     requirements_jsonl_filename: str = "requirements_rag.jsonl"
     cross_refs_jsonl_filename: str = "cross_refs_rag.jsonl"
     retrieval_chunks_jsonl_filename: str = "retrieval_chunks_rag.jsonl"
+    page_layout_jsonl_filename: str = "page_layout_rag.jsonl"
     figures_rag_jsonl_filename: str = "figures_rag.jsonl"
     figure_descriptions_jsonl_filename: str = "figure_descriptions_rag.jsonl"
     figure_structures_jsonl_filename: str = "figure_structures_rag.jsonl"

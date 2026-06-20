@@ -186,6 +186,17 @@ def _add_report_summary_json_schema_extras(schema: dict[str, Any]) -> None:
         "last_completed_page": "Highest completed page observed before interruption.",
     }.items():
         properties.setdefault(name, {"type": ["integer", "null"], "description": description})
+    for name, description in {
+        "page_layout_record_count": "Number of page_layout_rag.jsonl records written for technical spec layout diagnostics.",
+        "page_layout_file_count": "Number of page layout sidecar files written.",
+        "layout_region_ref_count": "Total region_refs emitted in page_layout_rag.jsonl.",
+        "layout_caption_link_count": "Total caption_links emitted in page_layout_rag.jsonl.",
+        "layout_multi_column_page_count": "Number of pages marked as multi-column in page_layout_rag.jsonl.",
+        "layout_header_footer_suppressed_page_count": (
+            "Number of pages with header/footer suppressed-line diagnostics in page_layout_rag.jsonl."
+        ),
+    }.items():
+        properties.setdefault(name, {"type": "integer", "description": description})
     properties.setdefault(
         "interrupted",
         {
@@ -485,6 +496,7 @@ class BatchDocumentFiles(BaseModel):
     requirements_rag: Optional[str] = None
     cross_refs_rag: Optional[str] = None
     retrieval_chunks_rag: Optional[str] = None
+    page_layout_rag: Optional[str] = None
     figures_rag: Optional[str] = None
     figure_descriptions_rag: Optional[str] = None
     figure_structures_rag: Optional[str] = None

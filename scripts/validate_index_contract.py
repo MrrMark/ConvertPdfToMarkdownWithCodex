@@ -30,6 +30,7 @@ SIDE_CAR_FILES = (
     "requirement_traceability_rag.jsonl",
     "technical_tables_rag.jsonl",
     "tables_rag.jsonl",
+    "page_layout_rag.jsonl",
     "figures_rag.jsonl",
     "figure_descriptions_rag.jsonl",
     "figure_structures_rag.jsonl",
@@ -103,6 +104,19 @@ FIGURE_STRUCTURE_REQUIRED_FIELDS = {
     "derived_from_context",
 }
 TEXT_BLOCK_FIELDS = ("block_id", "page", "block_index", "text")
+PAGE_LAYOUT_REQUIRED_FIELDS = {
+    "layout_id",
+    "schema_version",
+    "page",
+    "source_sha256",
+    "reading_order_strategy",
+    "column_count_estimate",
+    "multi_column_detected",
+    "region_ref_count",
+    "region_refs",
+    "caption_link_count",
+    "caption_links",
+}
 TABLE_ROW_REQUIRED_FIELDS = {
     "table_id",
     "table_row_id",
@@ -214,6 +228,7 @@ def _record_id(record: dict[str, Any]) -> str | None:
         "structure_id",
         "domain_unit_id",
         "block_id",
+        "layout_id",
     ):
         value = record.get(field)
         if not _is_missing(value):
@@ -1673,6 +1688,157 @@ def _validate_figure_structure_record(
         )
 
 
+def _validate_layout_object_list(
+    value: Any,
+    *,
+    findings: list[dict[str, Any]],
+    file_name: str,
+    line: int,
+    record_id: str | None,
+    field: str,
+) -> None:
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_object_list_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field=field,
+            message=f"{field} must be a list of objects.",
+        )
+
+
+def _validate_page_layout_record(
+    *,
+    file_name: str,
+    line: int,
+    record: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> None:
+    record_id = _record_id(record)
+    _validate_required_fields(
+        record,
+        required_fields=PAGE_LAYOUT_REQUIRED_FIELDS,
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+    )
+    if record.get("schema_version") != SCHEMA_VERSION:
+        _add_finding(
+            findings,
+            severity="error",
+            code="schema_version_mismatch",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="schema_version",
+            message="schema_version must be 1.0.",
+        )
+    for field in ("layout_id", "source_sha256", "reading_order_strategy"):
+        if field in record:
+            _validate_string_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    if "source_sha256" in record and (
+        not isinstance(record.get("source_sha256"), str)
+        or not HEX_SHA256_RE.fullmatch(str(record.get("source_sha256")))
+    ):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_source_sha256",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="source_sha256",
+            message="source_sha256 must be a lowercase SHA-256 hex string.",
+        )
+    for field in (
+        "page",
+        "column_count_estimate",
+        "text_block_count",
+        "heading_count",
+        "caption_block_count",
+        "table_count",
+        "figure_count",
+        "region_ref_count",
+        "caption_link_count",
+    ):
+        if field in record:
+            _validate_int_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+                positive=field in {"page", "column_count_estimate"},
+            )
+    if "multi_column_detected" in record:
+        _validate_bool_value(
+            record.get("multi_column_detected"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="multi_column_detected",
+        )
+    _validate_bbox(
+        record.get("content_bbox"),
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+        field="content_bbox",
+        required=False,
+    )
+    for field in ("region_refs", "caption_links"):
+        if field in record:
+            _validate_layout_object_list(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    if isinstance(record.get("region_refs"), list) and record.get("region_ref_count") != len(record["region_refs"]):
+        _add_finding(
+            findings,
+            severity="error",
+            code="layout_count_mismatch",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="region_ref_count",
+            message="region_ref_count must match region_refs length.",
+        )
+    if isinstance(record.get("caption_links"), list) and record.get("caption_link_count") != len(record["caption_links"]):
+        _add_finding(
+            findings,
+            severity="error",
+            code="layout_count_mismatch",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="caption_link_count",
+            message="caption_link_count must match caption_links length.",
+        )
+
+
 def _validate_optional_sidecar_record(
     *,
     file_name: str,
@@ -1687,6 +1853,8 @@ def _validate_optional_sidecar_record(
         _validate_technical_table_record(file_name=file_name, line=line, record=record, findings=findings)
     elif file_name == "tables_rag.jsonl":
         _validate_table_row_record(file_name=file_name, line=line, record=record, findings=findings)
+    elif file_name == "page_layout_rag.jsonl":
+        _validate_page_layout_record(file_name=file_name, line=line, record=record, findings=findings)
     elif file_name == "figure_descriptions_rag.jsonl":
         _validate_figure_description_record(file_name=file_name, line=line, record=record, findings=findings)
     elif file_name == "figure_structures_rag.jsonl":

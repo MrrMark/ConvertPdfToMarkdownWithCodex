@@ -454,6 +454,66 @@ def test_index_contract_reports_missing_chunk_relationship_targets(tmp_path: Pat
     assert {finding["code"] for finding in report["findings"]} == {"relationship_target_missing"}
 
 
+def test_index_contract_validates_page_layout_sidecar(tmp_path: Path) -> None:
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
+    _write_jsonl(
+        tmp_path / "page_layout_rag.jsonl",
+        [
+            {
+                "layout_id": "page-0001-layout",
+                "schema_version": "1.0",
+                "page": 1,
+                "source_sha256": SOURCE_SHA256,
+                "reading_order_strategy": "multi_column",
+                "column_count_estimate": 2,
+                "multi_column_detected": True,
+                "region_ref_count": 1,
+                "region_refs": [
+                    {
+                        "region_type": "text_block",
+                        "source_type": "text_block",
+                        "source_id": "page-0001-block-0001",
+                    }
+                ],
+                "caption_link_count": 0,
+                "caption_links": [],
+            }
+        ],
+    )
+
+    report = validate_index_contract(output_dir=tmp_path, target="openai")
+
+    assert report["status"] == "passed"
+    assert report["findings"] == []
+
+
+def test_index_contract_reports_invalid_page_layout_sidecar(tmp_path: Path) -> None:
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
+    _write_jsonl(
+        tmp_path / "page_layout_rag.jsonl",
+        [
+            {
+                "layout_id": "page-0001-layout",
+                "schema_version": "1.0",
+                "page": 1,
+                "source_sha256": SOURCE_SHA256,
+                "reading_order_strategy": "top",
+                "column_count_estimate": 1,
+                "multi_column_detected": False,
+                "region_ref_count": 2,
+                "region_refs": [{"region_type": "text_block"}],
+                "caption_link_count": 0,
+                "caption_links": [],
+            }
+        ],
+    )
+
+    report = validate_index_contract(output_dir=tmp_path, target="openai")
+
+    assert report["status"] == "failed"
+    assert "layout_count_mismatch" in {finding["code"] for finding in report["findings"]}
+
+
 def test_index_contract_confidential_safe_detects_paths_filename_and_hash(tmp_path: Path) -> None:
     _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
     _write_jsonl(

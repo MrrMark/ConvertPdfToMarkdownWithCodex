@@ -21,6 +21,8 @@
     "local_only_processing": true,
     "ocr_backend": "tesseract",
     "ocr_lang": "eng",
+    "page_layout_jsonl_filename": "page_layout_rag.jsonl",
+    "page_layout_output": "jsonl",
     "page_parallel_enabled": false,
     "page_worker_effective_count": 1,
     "page_workers": 1,

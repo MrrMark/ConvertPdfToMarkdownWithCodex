@@ -23,13 +23,6 @@
 
 ## 남은 작업
 
-### P0 / Q121. Layout Sidecar and Reading Order Diagnostics
-
-multi-column, page furniture, caption linkage, bbox normalization을 구조화해 technical spec reading order와 layout provenance를 강화한다.
-raw full text 없이 source_ref와 layout summary 중심으로 sidecar/report metric을 제공한다.
-
-상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
-
 ### P1 / Q122. Region OCR Evidence v2
 
 figure/table bbox crop OCR을 원문 대체가 아닌 evidence sidecar로 강화한다.

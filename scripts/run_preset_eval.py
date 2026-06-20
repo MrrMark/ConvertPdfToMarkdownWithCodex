@@ -47,6 +47,7 @@ ARTIFACT_FILES = (
     "technical_tables_rag.jsonl",
     "figures_rag.jsonl",
     "domain_units_rag.jsonl",
+    "page_layout_rag.jsonl",
     "retrieval_chunks_rag.jsonl",
     "tables_rag.jsonl",
     "rag_tables.md",

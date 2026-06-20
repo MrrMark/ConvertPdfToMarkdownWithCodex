@@ -48,6 +48,7 @@ ARTIFACT_FILENAMES = (
     "requirement_traceability_rag.jsonl",
     "technical_tables_rag.jsonl",
     "retrieval_chunks_rag.jsonl",
+    "page_layout_rag.jsonl",
     "figures_rag.jsonl",
     "figure_descriptions_rag.jsonl",
     "figure_structures_rag.jsonl",
@@ -68,6 +69,7 @@ MERGE_SIDECAR_FILENAMES = (
     "figure_descriptions_rag.jsonl",
     "figure_structures_rag.jsonl",
     "domain_units_rag.jsonl",
+    "page_layout_rag.jsonl",
     "retrieval_chunks_rag.jsonl",
 )
 MERGE_COUNT_FIELDS = {
@@ -82,6 +84,7 @@ MERGE_COUNT_FIELDS = {
     "figure_descriptions_rag.jsonl": "figure_description_record_count",
     "figure_structures_rag.jsonl": "figure_structure_record_count",
     "domain_units_rag.jsonl": "domain_unit_record_count",
+    "page_layout_rag.jsonl": "page_layout_record_count",
     "retrieval_chunks_rag.jsonl": "retrieval_chunk_record_count",
 }
 MERGE_FILE_COUNT_FIELDS = {
@@ -96,6 +99,7 @@ MERGE_FILE_COUNT_FIELDS = {
     "figure_descriptions_rag.jsonl": "figure_description_file_count",
     "figure_structures_rag.jsonl": "figure_structure_file_count",
     "domain_units_rag.jsonl": "domain_unit_file_count",
+    "page_layout_rag.jsonl": "page_layout_file_count",
     "retrieval_chunks_rag.jsonl": "retrieval_chunk_file_count",
 }
 SIDECAR_ID_FIELDS = {
@@ -114,6 +118,7 @@ SIDECAR_ID_FIELDS = {
     "figure_descriptions_rag.jsonl": ("description_id",),
     "figure_structures_rag.jsonl": ("structure_id",),
     "domain_units_rag.jsonl": ("domain_unit_id", "stable_requirement_seed"),
+    "page_layout_rag.jsonl": ("layout_id",),
     "retrieval_chunks_rag.jsonl": ("chunk_id", "stable_requirement_seed"),
 }
 SOURCE_TYPE_ID_FIELDS = {
@@ -131,9 +136,15 @@ SOURCE_TYPE_ID_FIELDS = {
     "figure_descriptions_rag.jsonl": (("figure_description", "description_id"),),
     "figure_structures_rag.jsonl": (("figure_structure", "structure_id"),),
     "domain_units_rag.jsonl": (("domain_unit", "domain_unit_id"),),
+    "page_layout_rag.jsonl": (("page_layout", "layout_id"),),
     "retrieval_chunks_rag.jsonl": (("retrieval_chunk", "chunk_id"),),
 }
-CHUNK_RELATIONSHIP_FIELDS = ("previous_chunk_id", "next_chunk_id", "section_anchor_chunk_id")
+CHUNK_RELATIONSHIP_FIELDS = (
+    "previous_chunk_id",
+    "next_chunk_id",
+    "section_anchor_chunk_id",
+    "parent_section_anchor_chunk_id",
+)
 
 
 @dataclass(frozen=True)

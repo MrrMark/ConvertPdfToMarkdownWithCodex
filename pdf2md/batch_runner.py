@@ -404,6 +404,7 @@ def _document_files(
         "requirements_rag": config.output_dir / config.requirements_jsonl_filename,
         "cross_refs_rag": config.output_dir / config.cross_refs_jsonl_filename,
         "retrieval_chunks_rag": config.output_dir / config.retrieval_chunks_jsonl_filename,
+        "page_layout_rag": config.output_dir / config.page_layout_jsonl_filename,
         "figures_rag": config.output_dir / config.figures_rag_jsonl_filename,
         "figure_descriptions_rag": config.output_dir / config.figure_descriptions_jsonl_filename,
         "figure_structures_rag": config.output_dir / config.figure_structures_jsonl_filename,

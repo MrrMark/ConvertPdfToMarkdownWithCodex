@@ -1,5 +1,5 @@
 {
-  "duration_ms": 66,
+  "duration_ms": 81,
   "engine_usage": {
     "images": false,
     "ocr": false,
@@ -8,7 +8,7 @@
     "tables": true
   },
   "failed_pages": [],
-  "finished_at": "2026-06-14T04:37:36.636657Z",
+  "finished_at": "2026-06-20T08:32:06.462476Z",
   "page_results": [
     {
       "char_count": 200,
@@ -117,7 +117,7 @@
     }
   ],
   "schema_version": "1.0",
-  "started_at": "2026-06-14T04:37:36.569987Z",
+  "started_at": "2026-06-20T08:32:06.380600Z",
   "status": "success",
   "summary": {
     "actionable_warning_count": 0,
@@ -138,6 +138,10 @@
     "footnote_candidate_count": 0,
     "heading_count": 1,
     "hyphenation_repair_count": 0,
+    "layout_caption_link_count": 4,
+    "layout_header_footer_suppressed_page_count": 0,
+    "layout_multi_column_page_count": 0,
+    "layout_region_ref_count": 12,
     "list_item_count": 0,
     "low_confidence_pages": [],
     "normative_requirement_count": 2,
@@ -146,6 +150,8 @@
     "ocr_confidence_by_page": {},
     "page_cache_hits": 5,
     "page_cache_misses": 5,
+    "page_layout_file_count": 1,
+    "page_layout_record_count": 5,
     "page_parallel_enabled": false,
     "page_status_counts": {
       "failed": 0,
@@ -154,7 +160,7 @@
     },
     "page_worker_count": 1,
     "page_worker_effective_count": 1,
-    "pages_per_second": 74.9963,
+    "pages_per_second": 61.068,
     "partial_success": false,
     "pdf_open_count": 2,
     "processed_pages": 5,
@@ -177,16 +183,17 @@
     "semantic_unit_file_count": 1,
     "semantic_unit_record_count": 9,
     "stage_durations_ms": {
-      "image_extraction": 1,
+      "image_extraction": 3,
       "manifest": 0,
       "markdown_serialization": 0,
-      "normalization": 0,
+      "normalization": 3,
       "ocr": 0,
       "output_setup": 0,
       "page_selection": 0,
       "pdf_open": 0,
       "rag_domain_adapter": 1,
       "rag_figures": 0,
+      "rag_page_layout": 0,
       "rag_requirement_traceability": 0,
       "rag_retrieval_chunks": 1,
       "rag_semantics": 0,
@@ -195,7 +202,7 @@
       "rag_text_blocks": 0,
       "reporting": 0,
       "table_extraction": 5,
-      "text_extraction": 52
+      "text_extraction": 49
     },
     "structure_low_confidence_count": 0,
     "structure_marker_recovered_context_count": 0,

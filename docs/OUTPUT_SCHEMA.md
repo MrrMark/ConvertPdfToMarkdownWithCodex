@@ -75,7 +75,7 @@ Stable nested fields:
 - `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_profile` when a non-default RAG profile was selected, `options.rag_text_blocks_output`, `options.semantic_layer_output`, `options.ocr_lang`, `options.ocr_backend`
 - `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
 - `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
-- `options.retrieval_chunks_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.figure_descriptions_jsonl_filename`, `options.figure_structures_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
+- `options.retrieval_chunks_jsonl_filename`, `options.page_layout_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.figure_descriptions_jsonl_filename`, `options.figure_structures_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
 - `options.manual_domain_adapter_label`, `options.manual_domain_adapter_keywords` when `options.domain_adapter="manual"` and those inputs were provided
 - `options.retrieval_chunk_max_tokens`, `options.retrieval_tokenizer`, `options.rag_contextual_embedding_text`, `options.rag_merge_sibling_text_chunks`, `options.rag_chunk_relationship_metadata`, `options.rag_figure_text_chunks` when enabled
 - `options.figure_region_ocr`, `options.rag_generated_figure_descriptions`, `options.figure_description_backend`, `options.figure_structure_extraction` when enabled
@@ -172,6 +172,15 @@ Non-full sidecar scope summary fields:
 - `rag_sidecar_scope`: effective sidecar scope, one of `full`, `minimal`, or `none`.
 - `rag_sidecar_omitted_outputs`: sidecar filenames skipped compared with the default full scope.
 - `rag_sidecar_omitted_reason`: stable reason code, currently `rag_sidecar_scope_omitted`.
+
+Technical layout summary fields:
+
+- `page_layout_record_count`: `page_layout_rag.jsonl` record count when a technical spec RAG profile writes layout diagnostics.
+- `page_layout_file_count`: page layout sidecar file count.
+- `layout_region_ref_count`: total text/table/figure region refs emitted without raw region text.
+- `layout_caption_link_count`: total table/figure caption link refs emitted.
+- `layout_multi_column_page_count`: pages marked as multi-column.
+- `layout_header_footer_suppressed_page_count`: pages with header/footer suppressed-line diagnostics.
 
 Assetless figure text summary fields:
 
@@ -695,6 +704,64 @@ Policy:
 - `block_type` is one of `heading`, `paragraph`, `list`, `code`, `footnote`, `caption`.
 - `text` is extracted source text, not a summary or paraphrase.
 - Ambiguous structure is emitted as `paragraph` with conservative diagnostics in `report.json`.
+
+## page_layout_rag.jsonl
+
+Technical spec profile JSONL output for page-level layout and reading-order diagnostics.
+It is written for `technical_spec_rag` and `technical_spec_rag_visual` full sidecar output.
+
+Required per JSONL record:
+
+- `layout_id`
+- `schema_version`
+- `page`
+- `source_sha256`
+- `reading_order_strategy`
+- `column_count_estimate`
+- `multi_column_detected`
+- `text_block_count`
+- `heading_count`
+- `caption_block_count`
+- `table_count`
+- `figure_count`
+- `header_footer_suppressed_count`
+- `suppressed_line_count`
+- `dedupe_count`
+- `line_merge_count`
+- `content_bbox`
+- `bbox_by_kind`
+- `region_ref_count`
+- `region_refs`
+- `caption_link_count`
+- `caption_links`
+- `source_counts`
+
+`region_refs[]` entries:
+
+- `region_type`: `text_block`, `table`, or `figure`.
+- `source_type`: source sidecar type, such as `text_block`, `table`, `figure`, or `excluded_figure`.
+- `source_id`: stable id in the corresponding sidecar.
+- `order_index`: page-local block/table/figure index.
+- `role`: source role such as `heading`, `paragraph`, `caption`, `table`, or figure kind.
+- `bbox`: source bbox when available.
+- `line_indices`: present for text block refs.
+- `caption_present`, `confidence`, or `caption_confidence` when available for table/figure refs.
+
+`caption_links[]` entries:
+
+- `link_type`: `table_caption` or `figure_caption`.
+- `target_type`: `table` or `figure`.
+- `target_id`: stable target id.
+- `caption_source_type`: `text_block`, `table`, or `figure`.
+- `caption_source_id`: stable caption source id.
+- `confidence`: deterministic table confidence or figure caption confidence when available.
+
+Policy:
+
+- This sidecar must not include raw full page text or raw region text.
+- Source identity is represented by stable ids, bbox, counts, and layout roles.
+- It is a diagnostics/provenance sidecar for reading-order review, citation expansion, and downstream UI drilldown.
+- `document.md`, `text_blocks_rag.jsonl`, and `retrieval_chunks_rag.jsonl` remain the text source of truth.
 
 ## rag_tables.md
 
@@ -1257,7 +1324,7 @@ Policy:
 - `targets` may include `openai`, `azure-ai-search`, `langchain`, and `llamaindex`.
 - `findings[]` are sorted deterministically by severity, file, line, field, and code.
 - `severity` is one of `error`, `warning`, or `info`.
-- The validator checks required field and type coverage for `retrieval_chunks_rag.jsonl`, `tables_rag.jsonl`, `technical_tables_rag.jsonl`, and `requirement_traceability_rag.jsonl` before external indexing.
+- The validator checks required field and type coverage for `retrieval_chunks_rag.jsonl`, `page_layout_rag.jsonl`, `tables_rag.jsonl`, `technical_tables_rag.jsonl`, and `requirement_traceability_rag.jsonl` before external indexing.
 - The validator must not call external services or create embeddings.
 - Confidential-safe findings are advisory for metadata sharing. The validator does not redact source `text`.
 

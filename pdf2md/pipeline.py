@@ -45,6 +45,7 @@ from pdf2md.output_writers import (
     write_figure_description_output,
     write_figure_rag_output,
     write_figure_structure_output,
+    write_page_layout_output,
     write_rag_table_outputs,
     write_rag_text_block_output,
     write_requirement_traceability_output,
@@ -68,6 +69,7 @@ from pdf2md.serializers.rag_figure_semantics import (
     build_figure_structure_records,
 )
 from pdf2md.serializers.rag_figures import build_figure_records
+from pdf2md.serializers.rag_layout import build_page_layout_records
 from pdf2md.serializers.rag_requirements import build_requirement_traceability_records
 from pdf2md.serializers.rag_tables import (
     annotate_rag_tables_with_heading_context,
@@ -366,6 +368,7 @@ def _expected_full_rag_sidecars(
     include_figure_provenance: bool,
     include_figure_descriptions: bool,
     include_figure_structures: bool,
+    include_page_layout: bool,
 ) -> set[str]:
     outputs = {
         config.rag_text_blocks_jsonl_filename,
@@ -376,6 +379,8 @@ def _expected_full_rag_sidecars(
         config.technical_tables_jsonl_filename,
         config.retrieval_chunks_jsonl_filename,
     }
+    if include_page_layout:
+        outputs.add(config.page_layout_jsonl_filename)
     outputs.update(_requested_rag_table_sidecars(config, rag_table_output))
     if include_figure_provenance:
         outputs.add(config.figures_rag_jsonl_filename)
@@ -417,6 +422,7 @@ def _written_rag_sidecars_for_scope(
     include_figure_text_chunks: bool,
     include_figure_descriptions: bool,
     include_figure_structures: bool,
+    include_page_layout: bool,
 ) -> set[str]:
     if scope is RagSidecarScope.FULL:
         return _expected_full_rag_sidecars(
@@ -426,6 +432,7 @@ def _written_rag_sidecars_for_scope(
             include_figure_provenance=include_figure_provenance,
             include_figure_descriptions=include_figure_descriptions,
             include_figure_structures=include_figure_structures,
+            include_page_layout=include_page_layout,
         )
     if scope is RagSidecarScope.MINIMAL:
         return _expected_minimal_rag_sidecars(
@@ -448,6 +455,7 @@ def _omitted_rag_sidecars(
     include_figure_text_chunks: bool,
     include_figure_descriptions: bool,
     include_figure_structures: bool,
+    include_page_layout: bool,
 ) -> list[str]:
     expected_full = _expected_full_rag_sidecars(
         config,
@@ -456,6 +464,7 @@ def _omitted_rag_sidecars(
         include_figure_provenance=include_figure_provenance,
         include_figure_descriptions=include_figure_descriptions,
         include_figure_structures=include_figure_structures,
+        include_page_layout=include_page_layout,
     )
     written = _written_rag_sidecars_for_scope(
         config,
@@ -466,6 +475,7 @@ def _omitted_rag_sidecars(
         include_figure_text_chunks=include_figure_text_chunks,
         include_figure_descriptions=include_figure_descriptions,
         include_figure_structures=include_figure_structures,
+        include_page_layout=include_page_layout,
     )
     return sorted(expected_full - written)
 
@@ -667,6 +677,8 @@ def _run_conversion_impl(
         or effective_rag_generated_figure_descriptions
         or effective_figure_structure_extraction
     )
+    requested_page_layout_sidecar = config.rag_profile in TECHNICAL_SPEC_RAG_PROFILES
+    write_page_layout_sidecar = rag_sidecar_scope is RagSidecarScope.FULL and requested_page_layout_sidecar
     rag_sidecar_omitted_outputs = _omitted_rag_sidecars(
         config,
         scope=rag_sidecar_scope,
@@ -676,6 +688,7 @@ def _run_conversion_impl(
         include_figure_text_chunks=effective_rag_figure_text_chunks,
         include_figure_descriptions=effective_rag_generated_figure_descriptions,
         include_figure_structures=effective_figure_structure_extraction,
+        include_page_layout=requested_page_layout_sidecar,
     )
     write_minimal_rag_sidecars = rag_sidecar_scope in {RagSidecarScope.FULL, RagSidecarScope.MINIMAL}
     write_full_rag_sidecars = rag_sidecar_scope is RagSidecarScope.FULL
@@ -776,6 +789,15 @@ def _run_conversion_impl(
         "retrieval_chunk_average_token_estimate": 0.0,
         "retrieval_chunk_over_target_count": 0,
         "retrieval_chunk_duplicate_source_ref_count": 0,
+    }
+    page_layout_records: list[dict] = []
+    page_layout_record_count = 0
+    page_layout_file_count = 0
+    page_layout_metrics = {
+        "layout_region_ref_count": 0,
+        "layout_caption_link_count": 0,
+        "layout_multi_column_page_count": 0,
+        "layout_header_footer_suppressed_page_count": 0,
     }
     figure_rag_record_count = 0
     figure_rag_file_count = 0
@@ -1426,6 +1448,23 @@ def _run_conversion_impl(
                 domain_unit_record_count, domain_unit_file_count = write_domain_unit_output(config, domain_units)
             finish_stage("rag_domain_adapter", domain_started)
 
+        if write_page_layout_sidecar:
+            mark_stage("rag_page_layout")
+            page_layout_started = stage_start()
+            page_layout_records, page_layout_metrics = build_page_layout_records(
+                selected_pages=selected_pages,
+                page_results=page_results_map,
+                text_block_records=text_block_records,
+                rag_tables=contextual_rag_tables,
+                figure_records=figure_records,
+                source_sha256=source_sha256,
+            )
+            page_layout_record_count, page_layout_file_count = write_page_layout_output(
+                config,
+                page_layout_records,
+            )
+            finish_stage("rag_page_layout", page_layout_started)
+
         mark_stage("rag_retrieval_chunks")
         retrieval_started = stage_start()
         retrieval_token_counter = (
@@ -1624,6 +1663,13 @@ def _run_conversion_impl(
                 "technical_tables_jsonl_filename": config.technical_tables_jsonl_filename,
             }
         )
+    if write_page_layout_sidecar:
+        manifest_options.update(
+            {
+                "page_layout_output": "jsonl",
+                "page_layout_jsonl_filename": config.page_layout_jsonl_filename,
+            }
+        )
     if output_profile is not OutputProfile.FULL or rag_sidecar_scope is not RagSidecarScope.FULL:
         manifest_options.update(
             {
@@ -1769,6 +1815,19 @@ def _run_conversion_impl(
             figure_structure_skipped_no_structure_count
         )
         report_summary_extras["figure_structure_chunk_record_count"] = figure_structure_chunk_record_count
+    if write_page_layout_sidecar:
+        report_summary_extras.update(
+            {
+                "page_layout_record_count": page_layout_record_count,
+                "page_layout_file_count": page_layout_file_count,
+                "layout_region_ref_count": page_layout_metrics["layout_region_ref_count"],
+                "layout_caption_link_count": page_layout_metrics["layout_caption_link_count"],
+                "layout_multi_column_page_count": page_layout_metrics["layout_multi_column_page_count"],
+                "layout_header_footer_suppressed_page_count": page_layout_metrics[
+                    "layout_header_footer_suppressed_page_count"
+                ],
+            }
+        )
     if domain_adapter is DomainAdapterMode.MANUAL:
         if config.manual_domain_adapter_label:
             report_summary_extras["manual_domain_adapter_label"] = config.manual_domain_adapter_label

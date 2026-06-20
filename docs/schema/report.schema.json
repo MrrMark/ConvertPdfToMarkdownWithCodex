@@ -389,6 +389,22 @@
             "null"
           ]
         },
+        "layout_caption_link_count": {
+          "description": "Total caption_links emitted in page_layout_rag.jsonl.",
+          "type": "integer"
+        },
+        "layout_header_footer_suppressed_page_count": {
+          "description": "Number of pages with header/footer suppressed-line diagnostics in page_layout_rag.jsonl.",
+          "type": "integer"
+        },
+        "layout_multi_column_page_count": {
+          "description": "Number of pages marked as multi-column in page_layout_rag.jsonl.",
+          "type": "integer"
+        },
+        "layout_region_ref_count": {
+          "description": "Total region_refs emitted in page_layout_rag.jsonl.",
+          "type": "integer"
+        },
         "list_item_count": {
           "default": 0,
           "title": "List Item Count",
@@ -434,6 +450,14 @@
         "page_cache_misses": {
           "default": 0,
           "title": "Page Cache Misses",
+          "type": "integer"
+        },
+        "page_layout_file_count": {
+          "description": "Number of page layout sidecar files written.",
+          "type": "integer"
+        },
+        "page_layout_record_count": {
+          "description": "Number of page_layout_rag.jsonl records written for technical spec layout diagnostics.",
           "type": "integer"
         },
         "page_parallel_enabled": {
