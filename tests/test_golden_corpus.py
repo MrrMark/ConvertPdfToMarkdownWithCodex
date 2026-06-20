@@ -269,6 +269,13 @@ def test_nvme_base_slice_golden_sidecars_cover_adapter_contract(tmp_path: Path) 
     assert all(record["source_refs"][0]["source_type"] == "table_row" for record in domain_units)
     assert all(record["source_refs"][1]["source_type"] == "technical_table_unit" for record in domain_units)
     assert all(record["stable_source_id"] and record["stable_requirement_seed"] for record in domain_units)
+    assert all(record["adapter_metadata"]["registry_version"] == "1.0" for record in domain_units)
+    assert all(record["adapter_metadata"]["ssd_agent_spec_type"] == "NVMe" for record in domain_units)
+    assert all(
+        record["cross_spec_compatibility"]["compatibility_group"] == "storage-technical-spec"
+        for record in domain_units
+    )
+    assert units_by_type["command"]["adapter_metadata"]["required_normalized_fields"] == ["opcode"]
 
     trace_kinds = {record["candidate_kind"]: record for record in traces}
     assert trace_kinds["normative_requirement"]["is_requirement_candidate"] is True
@@ -306,6 +313,12 @@ def test_ocp_datacenter_nvme_ssd_slice_golden_sidecars_cover_adapter_contract(tm
     assert all(record["source_refs"][0]["source_type"] == "table_row" for record in domain_units)
     assert all(record["source_refs"][1]["source_type"] == "technical_table_unit" for record in domain_units)
     assert all(record["stable_source_id"] and record["stable_requirement_seed"] for record in domain_units)
+    assert all(record["adapter_metadata"]["registry_version"] == "1.0" for record in domain_units)
+    assert all(record["adapter_metadata"]["ssd_agent_spec_type"] == "OCP" for record in domain_units)
+    assert all(
+        record["cross_spec_compatibility"]["compatible_adapters"] == ["nvme", "pcie", "tcg", "spdm"]
+        for record in domain_units
+    )
 
     fields_by_id = {record["normalized_fields"]["requirement_id"]: record["normalized_fields"] for record in domain_units}
     assert fields_by_id["NVMe-IO-6"]["requirement_family"] == "nvme"

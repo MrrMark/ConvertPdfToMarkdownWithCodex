@@ -6,6 +6,12 @@ import re
 from pathlib import Path
 from typing import Any
 
+from pdf2md.serializers.rag_domain_adapters import (
+    DOMAIN_ADAPTER_REGISTRY_VERSION,
+    get_domain_adapter_spec,
+    supported_domain_adapter_specs,
+)
+
 
 SCHEMA_VERSION = "1.0"
 REPORT_FILENAME = "ssd_rag_contract_report.json"
@@ -22,14 +28,7 @@ ALLOWED_FTL_SPEC_TYPES = {
     "PowerLossRecovery",
     "OtherFWFeature",
 }
-DOMAIN_ADAPTER_TO_SPEC_TYPE = {
-    "nvme": "NVMe",
-    "pcie": "PCIe",
-    "ocp": "OCP",
-    "tcg": "TCG",
-    "spdm": "SPDM",
-    "customer-requirements": "CustomerRequirement",
-}
+DOMAIN_ADAPTER_TO_SPEC_TYPE = {spec.name: spec.ssd_agent_spec_type for spec in supported_domain_adapter_specs()}
 REQUIRED_CHUNK_FIELDS = {
     "chunk_id",
     "schema_version",
@@ -295,6 +294,160 @@ def _validate_nvme_technical_tables(technical_tables: list[dict[str, Any]], *, e
             )
 
 
+def _validate_domain_adapter_registry_metadata(
+    domain_units: list[dict[str, Any]],
+    *,
+    adapter: str,
+    ssd_agent_domain: str,
+    ssd_agent_spec_type: str,
+    errors: list[dict[str, Any]],
+    warnings: list[dict[str, Any]],
+) -> None:
+    try:
+        spec = get_domain_adapter_spec(adapter)
+    except ValueError:
+        return
+
+    for index, record in enumerate(domain_units, start=1):
+        path = f"domain_units_rag.jsonl[{index}]"
+        unit_type = str(record.get("unit_type") or "")
+        if unit_type and unit_type not in spec.unit_taxonomy:
+            _add_issue(
+                errors,
+                path=path,
+                code="domain_unit_taxonomy_mismatch",
+                message=f"{adapter} domain unit_type is not registered: {unit_type}.",
+            )
+
+        metadata = record.get("adapter_metadata")
+        if metadata is None:
+            _add_issue(
+                warnings,
+                path=path,
+                code="missing_adapter_metadata",
+                message="Legacy domain unit record is missing adapter_metadata.",
+            )
+            continue
+        if not isinstance(metadata, dict):
+            _add_issue(errors, path=path, code="invalid_adapter_metadata", message="adapter_metadata must be an object.")
+            continue
+
+        expected_values = {
+            "registry_version": DOMAIN_ADAPTER_REGISTRY_VERSION,
+            "adapter": adapter,
+            "ssd_agent_domain": ssd_agent_domain,
+            "ssd_agent_spec_type": ssd_agent_spec_type,
+            "keyword_profile": spec.keyword_profile,
+        }
+        for field, expected in expected_values.items():
+            if metadata.get(field) != expected:
+                _add_issue(
+                    errors,
+                    path=path,
+                    code="adapter_metadata_mismatch",
+                    message=f"adapter_metadata.{field} must be {expected!r}.",
+                )
+
+        if metadata.get("unit_taxonomy") != list(spec.unit_taxonomy):
+            _add_issue(
+                errors,
+                path=path,
+                code="adapter_unit_taxonomy_mismatch",
+                message="adapter_metadata.unit_taxonomy does not match the registry.",
+            )
+        if metadata.get("revision_hints") != list(spec.revision_hints):
+            _add_issue(
+                errors,
+                path=path,
+                code="adapter_revision_hints_mismatch",
+                message="adapter_metadata.revision_hints does not match the registry.",
+            )
+        if metadata.get("evaluator_hooks") != list(spec.evaluator_hooks):
+            _add_issue(
+                errors,
+                path=path,
+                code="adapter_evaluator_hooks_mismatch",
+                message="adapter_metadata.evaluator_hooks does not match the registry.",
+            )
+
+        normalized_fields = record.get("normalized_fields")
+        required_fields = metadata.get("required_normalized_fields")
+        if required_fields is None:
+            _add_issue(
+                errors,
+                path=path,
+                code="missing_adapter_required_normalized_fields",
+                message="adapter_metadata.required_normalized_fields must be present.",
+            )
+        elif not isinstance(required_fields, list):
+            _add_issue(
+                errors,
+                path=path,
+                code="invalid_adapter_required_normalized_fields",
+                message="adapter_metadata.required_normalized_fields must be a list.",
+            )
+        elif required_fields:
+            if not isinstance(normalized_fields, dict):
+                _add_issue(
+                    errors,
+                    path=path,
+                    code="missing_adapter_normalized_fields",
+                    message="required_normalized_fields cannot be checked without normalized_fields.",
+                )
+            elif not any(normalized_fields.get(field) not in {None, ""} for field in required_fields):
+                _add_issue(
+                    errors,
+                    path=path,
+                    code="missing_adapter_required_normalized_field",
+                    message=f"{unit_type} requires one of: {', '.join(str(field) for field in required_fields)}.",
+                )
+
+        compatibility = record.get("cross_spec_compatibility")
+        if not isinstance(compatibility, dict):
+            _add_issue(
+                errors,
+                path=path,
+                code="missing_cross_spec_compatibility",
+                message="cross_spec_compatibility must be present with adapter_metadata.",
+            )
+            continue
+        if compatibility.get("compatibility_group") != spec.compatibility_group:
+            _add_issue(
+                errors,
+                path=path,
+                code="cross_spec_compatibility_group_mismatch",
+                message="cross_spec_compatibility.compatibility_group does not match the registry.",
+            )
+        if compatibility.get("compatible_adapters") != list(spec.compatible_adapters):
+            _add_issue(
+                errors,
+                path=path,
+                code="cross_spec_adapter_mismatch",
+                message="cross_spec_compatibility.compatible_adapters does not match the registry.",
+            )
+        source_id_fields = compatibility.get("source_id_fields")
+        if not isinstance(source_id_fields, list):
+            _add_issue(
+                errors,
+                path=path,
+                code="invalid_cross_spec_source_id_fields",
+                message="cross_spec_compatibility.source_id_fields must be a list.",
+            )
+            continue
+        missing_stable_fields = [
+            field
+            for field in ("source_sha256", "source_dedupe_key", "stable_source_id", "stable_requirement_seed")
+            if field not in source_id_fields or record.get(field) in {None, ""}
+        ]
+        if missing_stable_fields:
+            _add_issue(
+                errors,
+                path=path,
+                code="missing_cross_spec_stable_id_fields",
+                message=f"Missing cross-spec stable source fields: {', '.join(missing_stable_fields)}.",
+            )
+
+
 def validate_ssd_rag_contract(
     *,
     output_dir: Path,
@@ -393,6 +546,14 @@ def validate_ssd_rag_contract(
                 _add_issue(errors, path=path, code="domain_unit_adapter_mismatch", message=f"Expected domain={adapter}.")
             if not record.get("source_refs"):
                 _add_issue(errors, path=path, code="missing_domain_unit_source_refs", message="Missing source_refs.")
+        _validate_domain_adapter_registry_metadata(
+            domain_units,
+            adapter=adapter,
+            ssd_agent_domain=ssd_agent_domain,
+            ssd_agent_spec_type=ssd_agent_spec_type,
+            errors=errors,
+            warnings=warnings,
+        )
         if adapter == "tcg" and domain_units and not any(record.get("unit_type") in TCG_DOMAIN_UNIT_TYPES for record in domain_units):
             _add_issue(
                 errors,
