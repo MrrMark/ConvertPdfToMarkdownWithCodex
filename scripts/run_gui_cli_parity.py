@@ -28,6 +28,7 @@ PARITY_ARTIFACTS = (
     "cross_refs_rag.jsonl",
     "requirement_traceability_rag.jsonl",
     "technical_tables_rag.jsonl",
+    "page_layout_rag.jsonl",
     "retrieval_chunks_rag.jsonl",
     "figures_rag.jsonl",
 )

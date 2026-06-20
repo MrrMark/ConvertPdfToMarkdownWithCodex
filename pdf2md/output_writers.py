@@ -12,6 +12,7 @@ from pdf2md.serializers.rag_figure_semantics import (
     serialize_figure_structures_jsonl,
 )
 from pdf2md.serializers.rag_figures import serialize_figures_jsonl
+from pdf2md.serializers.rag_layout import serialize_page_layout_jsonl
 from pdf2md.serializers.rag_requirements import serialize_requirement_traceability_jsonl
 from pdf2md.serializers.rag_semantics import (
     serialize_cross_refs_jsonl,
@@ -149,6 +150,11 @@ def write_semantic_layer_outputs(
 
 def write_retrieval_chunk_output(config: Config, records: list[dict]) -> tuple[int, int]:
     write_text(config.output_dir / config.retrieval_chunks_jsonl_filename, serialize_retrieval_chunks_jsonl(records))
+    return len(records), 1
+
+
+def write_page_layout_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(config.output_dir / config.page_layout_jsonl_filename, serialize_page_layout_jsonl(records))
     return len(records), 1
 
 

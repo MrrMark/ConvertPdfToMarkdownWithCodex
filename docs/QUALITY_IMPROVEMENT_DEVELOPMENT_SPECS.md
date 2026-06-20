@@ -23,19 +23,12 @@
 
 ## 현재 Active Development Specs
 
-### P0-P2 / Q121-Q125. PDF2MD Native Migration Plan
+### P1-P2 / Q122-Q125. PDF2MD Native Migration Plan
 
 Docling을 runtime backend나 필수 dependency로 채택하지 않고, Docling에서 참고할 만한 설계 아이디어를 `pdf2md` 네이티브 기능으로 재구현한다.
 canonical output은 계속 `pdf2md`의 `document.md`, `manifest.json`, `report.json`, RAG sidecar, provenance/index/SSD-RAG validator 계약으로 유지한다.
 
 상세 개발 명세는 `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`에서 관리한다.
-
-#### Q121. Layout Sidecar and Reading Order Diagnostics
-
-- 우선순위: P0
-- 목표: multi-column, furniture, caption linkage, bbox normalization을 구조화한다.
-- 핵심 산출물: `page_layout_rag.jsonl` 또는 `layout_rag.jsonl` 후보와 report summary metrics.
-- 검증: text layout, header/footer, caption linkage fixtures.
 
 #### Q122. Region OCR Evidence v2
 
@@ -67,4 +60,4 @@ canonical output은 계속 `pdf2md`의 `document.md`, `manifest.json`, `report.j
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q120 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q121 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

@@ -29,6 +29,7 @@ SIDECAR_COUNT_FIELDS = {
     "domain_units_rag.jsonl": "domain_unit_record_count",
     "retrieval_chunks_rag.jsonl": "retrieval_chunk_record_count",
     "tables_rag.jsonl": "rag_table_record_count",
+    "page_layout_rag.jsonl": "page_layout_record_count",
 }
 
 

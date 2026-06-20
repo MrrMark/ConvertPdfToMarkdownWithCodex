@@ -75,6 +75,7 @@ SIDECAR_FILES = (
     "figure_descriptions_rag.jsonl",
     "figure_structures_rag.jsonl",
     "domain_units_rag.jsonl",
+    "page_layout_rag.jsonl",
     "retrieval_chunks_rag.jsonl",
     "tables_rag.jsonl",
     "rag_tables.md",
@@ -513,6 +514,14 @@ def _summary_counts(
             1
             for record in domain_units
             if record.get("domain") == DomainAdapterMode.OCP.value and record.get("unit_type") == "requirement"
+        ),
+        "page_layout_record_count": _int_value(conversion_summary, "page_layout_record_count"),
+        "layout_region_ref_count": _int_value(conversion_summary, "layout_region_ref_count"),
+        "layout_caption_link_count": _int_value(conversion_summary, "layout_caption_link_count"),
+        "layout_multi_column_page_count": _int_value(conversion_summary, "layout_multi_column_page_count"),
+        "layout_header_footer_suppressed_page_count": _int_value(
+            conversion_summary,
+            "layout_header_footer_suppressed_page_count",
         ),
         "figure_rag_record_count": _int_value(conversion_summary, "figure_rag_record_count"),
         "figure_text_chunk_record_count": _int_value(conversion_summary, "figure_text_chunk_record_count"),

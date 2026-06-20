@@ -36,6 +36,7 @@ SIDECAR_SPECS = {
     "domain_units_rag.jsonl": {"source_types": ("domain_unit",), "id_fields": ("domain_unit_id",)},
     "cross_refs_rag.jsonl": {"source_types": ("cross_ref",), "id_fields": ("ref_id",)},
     "retrieval_chunks_rag.jsonl": {"source_types": ("retrieval_chunk",), "id_fields": ("chunk_id",)},
+    "page_layout_rag.jsonl": {"source_types": ("page_layout",), "id_fields": ("layout_id",)},
 }
 SUPPORTED_SOURCE_TYPES = {
     source_type
@@ -54,6 +55,7 @@ REPORT_COUNT_FIELDS = {
     "figure_structures_rag.jsonl": "figure_structure_record_count",
     "domain_units_rag.jsonl": "domain_unit_record_count",
     "retrieval_chunks_rag.jsonl": "retrieval_chunk_record_count",
+    "page_layout_rag.jsonl": "page_layout_record_count",
 }
 RAG_TABLE_COUNT_FIELD = "rag_table_record_count"
 
@@ -92,6 +94,7 @@ def _record_id(record: dict[str, Any]) -> str | None:
         "structure_id",
         "domain_unit_id",
         "ref_id",
+        "layout_id",
     ):
         value = record.get(field)
         if not _is_missing(value):
