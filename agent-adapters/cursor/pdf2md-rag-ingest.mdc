@@ -6,6 +6,9 @@ alwaysApply: false
 # PDF2MD RAG Ingest
 
 Use the canonical Agent Skill at `agent-pack/skills/pdf2md-rag-ingest/SKILL.md`.
+For sidecar details, use `agent-pack/skills/pdf2md-rag-ingest/references/artifacts.md`
+and `references/validation.md`; do not duplicate the full output contract in
+this rule.
 
 Core rules:
 

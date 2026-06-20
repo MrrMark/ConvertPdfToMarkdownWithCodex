@@ -25,8 +25,12 @@ Use artifact metadata before reading raw Markdown content. Prefer `report.json`,
 | `technical_tables_rag.jsonl` | Register/bitfield/opcode/log page/CDW/pointer/status taxonomy typed rows |
 | `tables_rag.jsonl` | Row-oriented table JSONL when requested |
 | `rag_tables.md` | Row-oriented Markdown when requested |
+| `page_layout_rag.jsonl` | Page layout diagnostics, reading-order evidence, region refs, and caption links |
 | `figures_rag.jsonl` | Figure/image provenance, captions, bbox, nearby refs |
-| `domain_units_rag.jsonl` | Domain adapter output when `--domain-adapter` is used |
+| `figure_ocr_evidence_rag.jsonl` | Region OCR evidence for figures, including confidence/status provenance |
+| `figure_descriptions_rag.jsonl` | Generated figure description records when explicitly enabled by profile/options |
+| `figure_structures_rag.jsonl` | Extracted figure/diagram structure records when explicitly enabled by profile/options |
+| `domain_units_rag.jsonl` | Domain adapter output with `adapter_metadata`, `cross_spec_compatibility`, and stable source metadata when `--domain-adapter` is used |
 | `cross_refs_rag.jsonl` | Resolved/unresolved section/table/figure/technical references |
 
 ## Batch Outputs
@@ -54,5 +58,7 @@ When reporting to users:
 - Mention whether outputs are full, minimal, or fast sidecar scope.
 - For interrupted/fatal conversions, mention `interrupted_stage`, `interrupted_page`, `last_completed_page`, and whether partial artifacts remain.
 - For page-window conversions, mention `window_count`, failed windows, merge status, and `page_window_merge_report.json`.
-- For NVMe Base and NVM Command Set, summarize `domain_units_rag.jsonl`, `technical_tables_rag.jsonl`, command relationship metadata coverage, and validation status; do not paste raw spec rows.
+- For visual technical RAG, summarize whether `page_layout_rag.jsonl`, `figure_ocr_evidence_rag.jsonl`, `figure_descriptions_rag.jsonl`, and `figure_structures_rag.jsonl` were generated, intentionally skipped, or omitted.
+- For NVMe Base and NVM Command Set, summarize `domain_units_rag.jsonl`, `technical_tables_rag.jsonl`, command relationship metadata coverage, `adapter_metadata`/`cross_spec_compatibility` coverage, and validation status; do not paste raw spec rows.
+- Preserve `source_sha256`, `source_dedupe_key`, `stable_source_id`, and `stable_requirement_seed` when handing sidecar records to downstream tools.
 - Do not paste raw PDF text, full Markdown, customer filenames, or image bytes unless explicitly requested and safe.

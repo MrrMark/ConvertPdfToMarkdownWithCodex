@@ -160,6 +160,8 @@ def test_list_profiles_exposes_agent_selectable_modes() -> None:
     assert "placeholder" in payload["image_modes"]
     assert "none" in payload["image_modes"]
     assert "minimal" in payload["rag_sidecar_scopes"]
+    assert "tesseract" in payload["ocr_backends"]
+    assert "tesseract-cli" in payload["ocr_backends"]
 
 
 def test_path_guard_rejects_paths_outside_configured_roots(tmp_path: Path) -> None:
@@ -581,6 +583,38 @@ def test_validate_output_uses_project_root_when_cwd_is_elsewhere(
                 sys.modules.pop(module_name, None)
 
 
+def test_validate_ssd_rag_contract_writes_compact_report(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    source_sha256 = "a" * 64
+    _write_jsonl(output_dir / "retrieval_chunks_rag.jsonl", [_valid_retrieval_chunk(page=1, source_sha256=source_sha256)])
+    _write_jsonl(output_dir / "requirements_rag.jsonl", [])
+    _write_jsonl(output_dir / "technical_tables_rag.jsonl", [])
+    _write_jsonl(output_dir / "cross_refs_rag.jsonl", [])
+    _write_jsonl(output_dir / "figures_rag.jsonl", [])
+
+    result = mcp_server.validate_ssd_rag_contract_output(
+        output_dir=str(output_dir),
+        ssd_agent_spec_type="NVMe",
+        source_sha256=source_sha256,
+        require_tables=False,
+        require_domain_units=False,
+        fail_on_warning=True,
+        roots=[tmp_path],
+    )
+
+    assert result["status"] == "failed"
+    assert result["contract_passed"] is True
+    assert result["summary"]["warning_count"] == 1
+    assert result["warnings_preview"][0]["code"] == "domain_adapter_none_for_nvme"
+    assert (output_dir / "ssd_rag_contract_report.json").is_file()
+    assert result["report_uri"].endswith("/ssd_rag_contract_report.json")
+    assert result["artifact_uris"]["ssd_rag_contract_report.json"].endswith("/ssd_rag_contract_report.json")
+    serialized = json.dumps(result, ensure_ascii=False, sort_keys=True)
+    assert "Chunk page 1" not in serialized
+    assert "sample_mapped_chunk" not in serialized
+
+
 def test_inspect_report_returns_summary_without_markdown_body(tmp_path: Path) -> None:
     output_dir = tmp_path / "out"
     output_dir.mkdir()
@@ -614,6 +648,9 @@ def test_mcp_development_spec_documents_stdio_and_http_follow_up() -> None:
     assert "MCP_SERVER_INSTALL_USAGE_GUIDE.md" in text
     assert "pdf2md_plan_page_windows" in text
     assert "pdf2md_convert_pdf_windowed" in text
+    assert "pdf2md_validate_ssd_rag_contract" in text
+    assert "ssd_rag_contract_report.json" in text
+    assert "ocr_backends" in text
     assert "image_mode=none" in text
     assert "interrupted_report.json" in text
     assert "Streamable HTTP Follow-up Plan" in text
@@ -637,6 +674,9 @@ def test_mcp_install_usage_guide_documents_safe_client_setup() -> None:
     assert "PDF2MD_MCP_ROOTS" in text
     assert "mcpServers" in text
     assert "pdf2md_validate_output" in text
+    assert "pdf2md_validate_ssd_rag_contract" in text
+    assert "ssd_rag_contract_report.json" in text
+    assert "OCR backend option" in text
     assert "report_summaries" in text
     assert "manual_domain_adapter_keywords" in text
     assert "pdf2md_plan_page_windows" in text

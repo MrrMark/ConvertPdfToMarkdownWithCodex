@@ -52,14 +52,25 @@ def test_agent_skill_pack_references_exist_and_stay_linked() -> None:
     assert "--image-mode none" in skill_text
     assert "pdf2md_convert_pdf_windowed" in skill_text
     assert "interrupted_report.json" in skill_text
+    assert "figure_ocr_evidence_rag.jsonl" in skill_text
+    assert "adapter_metadata" in skill_text
+    assert "cross_spec_compatibility" in skill_text
 
 
 def test_agent_skill_pack_includes_client_adapter_templates() -> None:
-    assert (Path("agent-adapters/cursor/pdf2md-rag-ingest.mdc")).is_file()
-    assert (Path("agent-adapters/continue/pdf2md-rag-ingest.md")).is_file()
+    cursor_rule = Path("agent-adapters/cursor/pdf2md-rag-ingest.mdc")
+    continue_rule = Path("agent-adapters/continue/pdf2md-rag-ingest.md")
+    assert cursor_rule.is_file()
+    assert continue_rule.is_file()
+    assert "agent-pack/skills/pdf2md-rag-ingest/SKILL.md" in cursor_rule.read_text(encoding="utf-8")
+    assert "references/artifacts.md" in cursor_rule.read_text(encoding="utf-8")
+    assert "agent-pack/skills/pdf2md-rag-ingest/SKILL.md" in continue_rule.read_text(encoding="utf-8")
+    assert "references/artifacts.md" in continue_rule.read_text(encoding="utf-8")
     portability = Path("docs/AGENT_SKILL_PORTABILITY.md").read_text(encoding="utf-8")
     assert "agent-pack/skills/pdf2md-rag-ingest" in portability
     assert "AGENT_SKILL_USAGE_GUIDE.md" in portability
+    assert "--overwrite --dry-run" in portability
+    assert "Keep Cursor/Continue rules thin" in portability
 
 
 def test_agent_skill_usage_guide_documents_common_client_operations() -> None:
@@ -77,10 +88,16 @@ def test_agent_skill_usage_guide_documents_common_client_operations() -> None:
     assert "--overwrite" in guide
     assert "py -3.14 scripts\\install_agent_skill_pack.py" in guide
     assert "symlink" in guide
+    assert "target <- source" in guide
     assert "--workflow assetless-technical-rag" in guide
     assert "--image-mode none" in guide
     assert "pdf2md_convert_pdf_windowed" in guide
     assert "validate --output-dir output/spec --target all" in guide
+    assert "validate_ssd_rag_contract.py" in guide
+    assert "page_layout_rag.jsonl" in guide
+    assert "figure_ocr_evidence_rag.jsonl" in guide
+    assert "adapter_metadata" in guide
+    assert "cross_spec_compatibility" in guide
     assert "Do not summarize or rewrite PDF text" in guide
 
 
@@ -102,6 +119,33 @@ def test_agent_skill_pack_documents_q117_operational_contracts() -> None:
     assert "pdf2md_convert_pdf_windowed" in cursor_rule
     assert "--image-mode none" in continue_rule
     assert "pdf2md_convert_pdf_windowed" in continue_rule
+
+
+def test_agent_skill_pack_documents_latest_sidecar_contracts() -> None:
+    skill_text = SKILL_FILE.read_text(encoding="utf-8")
+    artifacts = (SKILL_ROOT / "references/artifacts.md").read_text(encoding="utf-8")
+    validation = (SKILL_ROOT / "references/validation.md").read_text(encoding="utf-8")
+
+    for sidecar in [
+        "page_layout_rag.jsonl",
+        "figure_ocr_evidence_rag.jsonl",
+        "figure_descriptions_rag.jsonl",
+        "figure_structures_rag.jsonl",
+    ]:
+        assert sidecar in skill_text or sidecar in artifacts
+        assert sidecar in artifacts
+        assert sidecar in validation
+
+    for field in [
+        "adapter_metadata",
+        "cross_spec_compatibility",
+        "source_sha256",
+        "source_dedupe_key",
+        "stable_source_id",
+        "stable_requirement_seed",
+    ]:
+        assert field in skill_text or field in artifacts
+        assert field in artifacts or field in validation
 
 
 def test_pdf2md_agent_runner_dry_run_builds_assetless_command() -> None:
@@ -157,3 +201,7 @@ def test_install_agent_skill_pack_dry_run_lists_all_clients() -> None:
     assert ".roo/skills/pdf2md-rag-ingest" in completed.stdout
     assert ".cursor/rules/pdf2md-rag-ingest.mdc" in completed.stdout
     assert ".continue/rules/pdf2md-rag-ingest.md" in completed.stdout
+    assert "agent-pack/skills/pdf2md-rag-ingest" in completed.stdout
+    assert "agent-adapters/cursor/pdf2md-rag-ingest.mdc" in completed.stdout
+    assert "agent-adapters/continue/pdf2md-rag-ingest.md" in completed.stdout
+    assert "<-" in completed.stdout

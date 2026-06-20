@@ -15,6 +15,7 @@ Use the local `pdf2md` converter as the source of truth. Do not rewrite the conv
 - Keep images referenced by default. Use placeholder mode only when an RAG target cannot ingest image files.
 - Use `--image-mode none` only when visual evidence is intentionally out of scope, such as text/table/domain ingest for a very large technical spec.
 - Treat OCR as evidence with confidence, not certainty. Low confidence must remain visible in `report.json`.
+- Preserve technical RAG sidecar metadata, including `adapter_metadata`, `cross_spec_compatibility`, `source_sha256`, `source_dedupe_key`, `stable_source_id`, and `stable_requirement_seed`.
 - Prefer partial success. Do not discard an output bundle because one page, table, image, or OCR step warned.
 - Preserve partial artifacts. On fatal/interrupted conversions, inspect `conversion_state.json`, `interrupted_report.json`, and `report.json` before rerunning.
 - For confidential/customer PDFs, use `--confidential-safe-mode` or `--rag-profile confidential_rag`.
@@ -47,7 +48,7 @@ python3 -m pdf2md spec.pdf -o output/spec \
   --rag-table-output jsonl
 ```
 
-For NVMe Base or NVM Command Set PDFs, use `--domain-adapter nvme` and report only sidecar counts plus validation status.
+For NVMe Base or NVM Command Set PDFs, use `--domain-adapter nvme` and report only sidecar counts, command relationship metadata coverage, Q125 metadata coverage, and validation status.
 
 Technical spec RAG with figure/diagram sidecars:
 
@@ -56,6 +57,11 @@ python3 -m pdf2md spec.pdf -o output/spec \
   --rag-profile technical_spec_rag_visual \
   --domain-adapter nvme
 ```
+
+Visual technical RAG can emit `page_layout_rag.jsonl`, `figure_ocr_evidence_rag.jsonl`,
+`figure_descriptions_rag.jsonl`, and `figure_structures_rag.jsonl`. Report whether
+those sidecars were generated, intentionally skipped, or omitted; do not paste raw
+figure OCR text, generated descriptions, or structure rows.
 
 Assetless technical RAG:
 

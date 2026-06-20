@@ -3,6 +3,9 @@ name: PDF2MD RAG Ingest
 ---
 
 Use the canonical Agent Skill at `agent-pack/skills/pdf2md-rag-ingest/SKILL.md` when converting PDFs, generating RAG sidecars, validating pdf2md outputs, checking OCR readiness, or inspecting report/manifest warnings.
+For sidecar details, use `agent-pack/skills/pdf2md-rag-ingest/references/artifacts.md`
+and `references/validation.md`; do not duplicate the full output contract in
+this rule.
 
 Rules:
 

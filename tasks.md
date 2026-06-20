@@ -81,6 +81,7 @@ P0 안정화 후 구현:
 - M06은 Q98에서 structure marker OCR lazy 처리, Q99에서 page worker chunked parallelization, Q100에서 OCR page parallelization, Q101에서 adaptive table strategy, Q102에서 fast output profile과 sidecar scope를 완료했다.
 - M07은 Q103에서 이미지 파일 업로드가 불가능한 RAG 환경 대응, Q104에서 Docling 벤치마크 하네스, Q105에서 Docling-informed 확장 설계를 완료했다.
 - M08은 Q118에서 내부 IR 기반 serializer boundary, Q119에서 table confidence v2, Q120에서 native hybrid chunking v2, Q121에서 layout sidecar diagnostics, Q122에서 region OCR evidence v2, Q123에서 OCR backend registry expansion, Q124에서 figure semantics v2, Q125에서 domain adapter registry hardening을 완료했다.
+- M09는 Q127-Q130에서 Agent Skill, client rule, MCP discovery/validation surface를 최신 sidecar 계약에 맞추는 작업을 완료했다.
 
 ### M01. pipeline/report 집계 책임 분리
 
@@ -143,6 +144,13 @@ P0 안정화 후 구현:
 - figure semantics 강화(Q124 완료)
 - domain adapter registry와 cross-spec 재처리 계약 강화(Q125 완료)
 - 상세 구현 이력은 `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`와 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에서 관리
+
+### M09. Agent Skill/MCP 운영 계약 정렬
+
+- 신규 Skill을 만들지 않고 `pdf2md-rag-ingest` canonical Skill을 최신 sidecar 계약에 맞게 유지(Q127 완료)
+- client rule은 canonical Skill을 가리키는 얇은 adapter로 유지하고, 변경 후 재생성/drift 검증 절차를 보강(Q130 완료)
+- MCP `pdf2md_list_profiles` discovery metadata와 SSD-RAG contract validation surface를 최신화(Q128-Q129 완료)
+- `ssd-verification-agent` repo 구현은 별도 후속 범위로 분리
 
 ---
 

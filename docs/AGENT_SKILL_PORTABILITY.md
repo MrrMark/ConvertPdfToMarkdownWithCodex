@@ -34,6 +34,12 @@ python3 scripts/install_agent_skill_pack.py --clients all --scope project --mode
 ```
 
 Use `--mode symlink` when your filesystem and team workflow support symlinks.
+After editing the canonical Skill, run the overwrite dry-run first so the
+source-to-target mapping is visible before replacing generated client files:
+
+```bash
+python3 scripts/install_agent_skill_pack.py --clients all --scope project --mode copy --overwrite --dry-run
+```
 
 ## Target Paths
 
@@ -50,6 +56,8 @@ Use `--mode symlink` when your filesystem and team workflow support symlinks.
 
 - Edit `agent-pack/skills/pdf2md-rag-ingest/` first.
 - Treat files under client-specific paths as generated installs.
+- Use `--overwrite --dry-run` before regenerating client-specific installs, then run the same command without `--dry-run` only when the target list is correct.
+- Keep Cursor/Continue rules thin. They should point back to the canonical Skill and references instead of duplicating the full sidecar contract.
 - Do not copy project source code into the skill. The skill must call `pdf2md` CLI or library APIs.
 - Keep `SKILL.md` concise. Move profile tables, artifact maps, and troubleshooting to `references/`.
 - Validate with `tests/test_agent_skill_pack.py` after changes.

@@ -66,6 +66,9 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 - `ocr_backends`
 - optional `ocr_check`
 
+`ocr_backends`는 설치/실행 가능 여부가 아니라 pdf2md가 알고 있는 backend option 목록이다.
+실제 OCR runtime readiness는 `ocr_check` 또는 probe script 결과로 판단한다.
+
 ### `pdf2md_list_profiles`
 
 목적:
@@ -81,6 +84,7 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 - `rag_table_outputs`
 - `output_profiles`
 - `rag_sidecar_scopes`
+- `ocr_backends`
 
 ### `pdf2md_plan_page_windows`
 
@@ -251,6 +255,38 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 
 - 전체 report payload를 MCP 응답에 직접 싣지 않는다.
 - `report_uris`, `report_summaries`, 제한된 `findings_preview`만 반환한다.
+
+### `pdf2md_validate_ssd_rag_contract`
+
+목적:
+
+- 변환된 technical spec RAG output directory가 SSD verification agent ingest 계약에 맞는지 검증한다.
+- `scripts/validate_ssd_rag_contract.py`와 같은 local-only validator를 MCP surface로 제공한다.
+
+주요 입력:
+
+- `output_dir`
+- `ssd_agent_domain`
+- `ssd_agent_spec_type`
+- `domain_adapter`
+- `document_id`
+- `source_sha256`
+- `require_tables`
+- `require_domain_units`
+- `strict_provenance`
+- `fail_on_error`
+- `fail_on_warning`
+- `finding_limit`
+
+출력 파일:
+
+- `ssd_rag_contract_report.json`
+
+응답 정책:
+
+- 전체 report payload를 MCP 응답에 직접 싣지 않는다.
+- `sample_mapped_chunk`, raw spec text, full Markdown body, table row content, image bytes는 tool result에 포함하지 않는다.
+- `report_uri`, `summary`, `errors_preview`, `warnings_preview`, artifact URI만 반환한다.
 
 ### `pdf2md_inspect_report`
 

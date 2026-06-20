@@ -11,6 +11,12 @@ agent-pack/skills/pdf2md-rag-ingest/
 ```
 
 Do not maintain hand-edited copies for each agent. Install by symlink or copy from the canonical source.
+After changing this Skill or any reference file, run an overwrite dry-run before
+regenerating installed targets:
+
+```bash
+python3 scripts/install_agent_skill_pack.py --clients all --scope project --mode copy --overwrite --dry-run
+```
 
 ## Claude Code
 
@@ -77,7 +83,7 @@ Equivalent target:
 .cursor/rules/pdf2md-rag-ingest.mdc
 ```
 
-Use the rule to point Cursor back to the canonical skill and project CLI commands. If Cursor's rule format changes, update only the adapter template.
+Use the rule to point Cursor back to the canonical skill and project CLI commands. Keep the rule thin; do not duplicate the full sidecar contract outside `agent-pack/skills/pdf2md-rag-ingest/references/`. If Cursor's rule format changes, update only the adapter template.
 
 ## Continue
 
@@ -96,3 +102,5 @@ Equivalent target:
 For tool execution, prefer the local stdio MCP server when the client supports MCP. Use explicit terminal commands from
 this skill when MCP is unavailable. For large PDFs, MCP clients should prefer the page-window tools documented in
 `docs/MCP_SERVER_INSTALL_USAGE_GUIDE.md`.
+Keep the Continue rule thin; do not duplicate the full sidecar contract outside
+the canonical Skill references.

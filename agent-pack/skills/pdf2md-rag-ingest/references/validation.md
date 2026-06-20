@@ -61,6 +61,19 @@ python3 scripts/validate_ssd_rag_contract.py \
   --domain-adapter nvme
 ```
 
+Use this validator for NVMe Base, NVM Command Set, OCP, PCIe, TCG, SPDM, customer
+requirements, and manual domain adapter outputs before sharing a technical RAG
+bundle. Report only status, counts, warning/error codes, and affected sidecar
+names. Keep `adapter_metadata`, `cross_spec_compatibility`, `source_sha256`,
+`source_dedupe_key`, `stable_source_id`, and `stable_requirement_seed` intact for
+downstream reconciliation.
+
+For `technical_spec_rag_visual`, also inspect sidecar counts for
+`page_layout_rag.jsonl`, `figure_ocr_evidence_rag.jsonl`,
+`figure_descriptions_rag.jsonl`, and `figure_structures_rag.jsonl`. If a visual
+sidecar is absent, distinguish intentionally skipped outputs, such as
+`--image-mode none` or minimal/fast sidecar scope, from unexpected omissions.
+
 ## Interrupted or Windowed Conversion Checks
 
 - If `report.json` has `summary.interrupted=true`, inspect `interrupted_report.json` and `conversion_state.json`.

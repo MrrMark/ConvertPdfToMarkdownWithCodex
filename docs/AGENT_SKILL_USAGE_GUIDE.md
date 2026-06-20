@@ -116,6 +116,8 @@ python3 scripts/install_agent_skill_pack.py --clients all --scope project --mode
 python3 scripts/install_agent_skill_pack.py --clients all --scope project --mode copy --overwrite --dry-run
 ```
 
+dry-run 출력은 각 client의 target과 source를 `target <- source` 형태로 보여준다. Cursor/Continue rule은 최신 sidecar 계약을 직접 복사하지 않고 canonical Skill과 `references/` 문서로 유도해야 한다.
+
 ## 7. Agent Usage
 
 Agent에게 PDF 변환을 맡길 때는 원문 보존과 산출물 검증을 명시한다.
@@ -129,7 +131,7 @@ Use the pdf2md-rag-ingest skill. Convert input.pdf to output/input with source-p
 기술 스펙 RAG 요청 예시:
 
 ```text
-Use the pdf2md-rag-ingest skill. Convert the NVMe Base or NVM Command Set spec PDF with technical_spec_rag and the nvme domain adapter, generate RAG sidecars, validate the output bundle, and summarize only counts, artifact paths, and actionable warnings.
+Use the pdf2md-rag-ingest skill. Convert the NVMe Base or NVM Command Set spec PDF with technical_spec_rag and the nvme domain adapter, generate RAG sidecars, validate the output bundle, preserve adapter_metadata and cross_spec_compatibility, and summarize only counts, artifact paths, metadata coverage, and actionable warnings.
 ```
 
 이미지 업로드가 불가능한 RAG 환경:
@@ -180,7 +182,9 @@ python3 agent-pack/skills/pdf2md-rag-ingest/scripts/pdf2md_agent_runner.py conve
   --rag-table-output jsonl
 ```
 
-NVMe Base와 NVM Command Set은 모두 같은 `--domain-adapter nvme` 계약을 사용한다. NVM Command Set 산출물은 CDW layout, command pointer, command scope, status taxonomy metadata를 추가로 포함할 수 있으며, Agent 응답에는 raw spec 전문, full Markdown body, table row content, image bytes, local input path를 붙이지 말고 sidecar count와 validator 결과만 요약한다.
+NVMe Base와 NVM Command Set은 모두 같은 `--domain-adapter nvme` 계약을 사용한다. NVM Command Set 산출물은 CDW layout, command pointer, command scope, status taxonomy metadata를 추가로 포함할 수 있으며, Agent 응답에는 raw spec 전문, full Markdown body, table row content, image bytes, local input path를 붙이지 말고 sidecar count, command relationship metadata coverage, `adapter_metadata`/`cross_spec_compatibility` coverage, validator 결과만 요약한다.
+
+`technical_spec_rag_visual` 산출물은 `page_layout_rag.jsonl`, `figure_ocr_evidence_rag.jsonl`, `figure_descriptions_rag.jsonl`, `figure_structures_rag.jsonl`까지 포함할 수 있다. Agent는 이 파일들의 생성 여부와 record count만 보고하고, figure OCR text, generated description, structure row 원문은 기본 응답에 붙이지 않는다.
 
 이미지 업로드 불가 RAG:
 
@@ -202,6 +206,8 @@ python3 -m pdf2md nvme-base.pdf -o output/nvme-base \
 
 MCP client에서는 `pdf2md_convert_pdf_windowed` 또는 `pdf2md_plan_page_windows` ->
 `pdf2md_convert_page_window` -> `pdf2md_merge_window_outputs` 순서를 사용한다.
+변환 후 일반 artifact 검증은 `pdf2md_validate_output`, SSD technical spec 계약 검증은
+`pdf2md_validate_ssd_rag_contract`를 사용한다.
 
 출력 검증:
 
@@ -235,6 +241,7 @@ python3 agent-pack/skills/pdf2md-rag-ingest/scripts/pdf2md_agent_runner.py valid
 python3 scripts/validate_index_contract.py --output-dir output/spec --target all --fail-on-error
 python3 scripts/validate_provenance_integrity.py --output-dir output/spec --fail-on-error
 python3 scripts/validate_artifact_integrity.py --output-dir output/spec --fail-on-error
+python3 scripts/validate_ssd_rag_contract.py --output-dir output/spec --ssd-agent-domain HIL --ssd-agent-spec-type NVMe --domain-adapter nvme
 ```
 
 ## 10. Troubleshooting
