@@ -260,6 +260,8 @@ class ReportSummary(BaseModel):
     table_low_quality_count: int = 0
     table_actionable_low_quality_count: int = 0
     table_advisory_low_quality_count: int = 0
+    table_confidence_v2_buckets: dict[str, int] = Field(default_factory=dict)
+    table_confidence_v2_average: Optional[float] = None
     ocr_actionable_warning_count: int = 0
     ocr_advisory_warning_count: int = 0
     technical_profile_domain_adapter_missing: bool = False
@@ -349,6 +351,9 @@ class TableAsset(BaseModel):
     anchor_top: Optional[float] = None
     quality_score: Optional[float] = None
     fallback_reasons: list[str] = Field(default_factory=list)
+    table_confidence_v2: Optional[float] = None
+    table_confidence_v2_bucket: Optional[str] = None
+    table_confidence_v2_reasons: list[str] = Field(default_factory=list)
     caption_text: Optional[str] = None
     caption_source: Optional[str] = None
     continuation_group: Optional[str] = None

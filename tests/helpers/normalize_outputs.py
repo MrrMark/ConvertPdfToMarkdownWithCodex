@@ -67,6 +67,8 @@ def normalize_report(payload: dict[str, Any]) -> dict[str, Any]:
         "table_actionable_fallback_count",
         "table_low_quality_count",
         "table_caption_linked_count",
+        "table_confidence_v2_buckets",
+        "table_confidence_v2_average",
         "rag_table_output",
         "rag_table_record_count",
         "rag_table_file_count",

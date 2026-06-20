@@ -17,8 +17,8 @@
     "image_mode": "referenced",
     "keep_page_markers": true,
     "local_only_processing": true,
-    "ocr_lang": "eng",
     "ocr_backend": "tesseract",
+    "ocr_lang": "eng",
     "pages": null,
     "path_redaction": "disabled",
     "rag_table_output": "both",
@@ -78,7 +78,22 @@
       "index": 1,
       "mode": "html",
       "page": 1,
-      "quality_score": 0.9406
+      "quality_score": 0.9406,
+      "table_confidence_v2": 0.6975,
+      "table_confidence_v2_bucket": "medium",
+      "table_confidence_v2_reasons": [
+        "caption_linked",
+        "data_density_high",
+        "fallback:FOOTNOTE_ROW",
+        "fallback:MERGED_CELL_SUSPECTED",
+        "fallback:MULTI_ROW_HEADER",
+        "fallback:STUB_COLUMN",
+        "footnote_rows_detected",
+        "header_confidence_high",
+        "html_fallback",
+        "merged_cell_suspected",
+        "stub_column_detected"
+      ]
     },
     {
       "anchor_line_index": 1,
@@ -112,7 +127,14 @@
       "index": 1,
       "mode": "gfm",
       "page": 2,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.9925,
+      "table_confidence_v2_bucket": "high",
+      "table_confidence_v2_reasons": [
+        "caption_linked",
+        "data_density_high",
+        "header_confidence_high"
+      ]
     },
     {
       "anchor_line_index": 1,
@@ -148,7 +170,17 @@
       "index": 1,
       "mode": "html",
       "page": 3,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.79,
+      "table_confidence_v2_bucket": "medium",
+      "table_confidence_v2_reasons": [
+        "caption_linked",
+        "data_density_high",
+        "fallback:STUB_COLUMN",
+        "header_confidence_high",
+        "html_fallback",
+        "stub_column_detected"
+      ]
     },
     {
       "anchor_line_index": 1,
@@ -182,7 +214,14 @@
       "index": 1,
       "mode": "gfm",
       "page": 4,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.9925,
+      "table_confidence_v2_bucket": "high",
+      "table_confidence_v2_reasons": [
+        "caption_linked",
+        "data_density_high",
+        "header_confidence_high"
+      ]
     },
     {
       "anchor_line_index": 1,
@@ -217,7 +256,14 @@
       "index": 1,
       "mode": "gfm",
       "page": 5,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.9925,
+      "table_confidence_v2_bucket": "high",
+      "table_confidence_v2_reasons": [
+        "caption_linked",
+        "data_density_high",
+        "header_confidence_high"
+      ]
     },
     {
       "anchor_line_index": 1,
@@ -253,7 +299,17 @@
       "index": 1,
       "mode": "html",
       "page": 6,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.79,
+      "table_confidence_v2_bucket": "medium",
+      "table_confidence_v2_reasons": [
+        "caption_linked",
+        "data_density_high",
+        "fallback:STUB_COLUMN",
+        "header_confidence_high",
+        "html_fallback",
+        "stub_column_detected"
+      ]
     },
     {
       "anchor_line_index": 1,
@@ -296,7 +352,17 @@
       "index": 1,
       "mode": "html",
       "page": 7,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.79,
+      "table_confidence_v2_bucket": "medium",
+      "table_confidence_v2_reasons": [
+        "caption_linked",
+        "data_density_high",
+        "fallback:STUB_COLUMN",
+        "header_confidence_high",
+        "html_fallback",
+        "stub_column_detected"
+      ]
     },
     {
       "anchor_line_index": 0,
@@ -334,7 +400,16 @@
       "index": 1,
       "mode": "html",
       "page": 8,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.79,
+      "table_confidence_v2_bucket": "medium",
+      "table_confidence_v2_reasons": [
+        "data_density_high",
+        "fallback:STUB_COLUMN",
+        "header_confidence_high",
+        "html_fallback",
+        "stub_column_detected"
+      ]
     }
   ],
   "total_pages": 8,

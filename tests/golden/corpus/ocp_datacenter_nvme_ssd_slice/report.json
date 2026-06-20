@@ -280,6 +280,11 @@
     "table_actionable_low_quality_count": 0,
     "table_advisory_low_quality_count": 0,
     "table_caption_linked_count": 4,
+    "table_confidence_v2_average": 0.8913,
+    "table_confidence_v2_buckets": {
+      "high": 2,
+      "medium": 2
+    },
     "table_expected_fallback_count": 2,
     "table_expected_fallback_reason_counts": {
       "STUB_COLUMN": 2
@@ -347,6 +352,13 @@
           "default"
         ],
         "stub_column_count": 0,
+        "table_confidence_v2": 0.9925,
+        "table_confidence_v2_bucket": "high",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "header_confidence_high"
+        ],
         "table_index": 1,
         "unresolved": false
       },
@@ -384,6 +396,16 @@
         ],
         "selected_strategy": "default",
         "stub_column_count": 1,
+        "table_confidence_v2": 0.79,
+        "table_confidence_v2_bucket": "medium",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "fallback:STUB_COLUMN",
+          "header_confidence_high",
+          "html_fallback",
+          "stub_column_detected"
+        ],
         "table_index": 1,
         "unresolved": true
       },
@@ -421,6 +443,16 @@
         ],
         "selected_strategy": "default",
         "stub_column_count": 1,
+        "table_confidence_v2": 0.79,
+        "table_confidence_v2_bucket": "medium",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "fallback:STUB_COLUMN",
+          "header_confidence_high",
+          "html_fallback",
+          "stub_column_detected"
+        ],
         "table_index": 1,
         "unresolved": true
       },
@@ -464,6 +496,13 @@
           "default"
         ],
         "stub_column_count": 0,
+        "table_confidence_v2": 0.9925,
+        "table_confidence_v2_bucket": "high",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "header_confidence_high"
+        ],
         "table_index": 1,
         "unresolved": false
       }

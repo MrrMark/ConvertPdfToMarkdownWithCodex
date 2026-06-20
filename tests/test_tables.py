@@ -384,8 +384,13 @@ def test_extract_tables_keeps_html_fallback_and_builds_rag_payload(monkeypatch) 
     assert result.assets[0].caption_text == "Table 1: Register fields"
     assert result.rag_tables[0]["source_mode"] == "html"
     assert result.rag_tables[0]["caption_text"] == "Table 1: Register fields"
+    assert result.assets[0].table_confidence_v2_bucket in {"low", "medium"}
+    assert "caption_linked" in result.assets[0].table_confidence_v2_reasons
+    assert result.rag_tables[0]["table_confidence_v2"] == result.assets[0].table_confidence_v2
+    assert result.rag_tables[0]["table_confidence_v2_bucket"] == result.assets[0].table_confidence_v2_bucket
     assert result.rag_tables[0]["records"][0]["row_text"] == f"Bits = 63:0 | Description = {'A' * 130}"
     assert result.rag_tables[0]["records"][0]["fallback_reasons"] == ["AMBIGUOUS_GRID", "LONG_CELL"]
+    assert result.rag_tables[0]["records"][0]["table_confidence_v2"] == result.assets[0].table_confidence_v2
 
 
 def test_extract_tables_flattens_multi_row_headers_for_rag(monkeypatch) -> None:

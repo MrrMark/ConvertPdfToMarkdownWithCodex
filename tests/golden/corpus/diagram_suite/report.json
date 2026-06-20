@@ -219,6 +219,11 @@
     ],
     "table_actionable_fallback_count": 0,
     "table_caption_linked_count": 0,
+    "table_confidence_v2_average": 0.8823,
+    "table_confidence_v2_buckets": {
+      "high": 2,
+      "medium": 1
+    },
     "table_expected_fallback_count": 1,
     "table_expected_fallback_reason_counts": {
       "AMBIGUOUS_GRID": 1,
@@ -271,6 +276,12 @@
         "reasons": [],
         "selected_strategy": "mixed_lines_text",
         "stub_column_count": 0,
+        "table_confidence_v2": 0.8945,
+        "table_confidence_v2_bucket": "high",
+        "table_confidence_v2_reasons": [
+          "data_density_high",
+          "header_confidence_high"
+        ],
         "table_index": 1,
         "unresolved": false
       },
@@ -310,6 +321,15 @@
         ],
         "selected_strategy": "mixed_lines_text",
         "stub_column_count": 0,
+        "table_confidence_v2": 0.79,
+        "table_confidence_v2_bucket": "medium",
+        "table_confidence_v2_reasons": [
+          "data_density_high",
+          "fallback:AMBIGUOUS_GRID",
+          "fallback:TOO_FEW_COLUMNS",
+          "header_confidence_high",
+          "html_fallback"
+        ],
         "table_index": 1,
         "unresolved": true
       },
@@ -355,6 +375,12 @@
           "default"
         ],
         "stub_column_count": 0,
+        "table_confidence_v2": 0.9625,
+        "table_confidence_v2_bucket": "high",
+        "table_confidence_v2_reasons": [
+          "data_density_high",
+          "header_confidence_high"
+        ],
         "table_index": 1,
         "unresolved": false
       }

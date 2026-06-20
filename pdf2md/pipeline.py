@@ -86,6 +86,7 @@ from pdf2md.table_quality import (
     count_caption_linked_tables,
     count_low_quality_tables,
     count_table_fallback_reasons,
+    summarize_table_confidence_v2,
     low_quality_table_pages,
 )
 from pdf2md.utils.io import ensure_output_dirs, write_json, write_text
@@ -1663,6 +1664,9 @@ def _run_conversion_impl(
         actionable_only=True,
     )
     table_caption_linked_count = count_caption_linked_tables(table_result.table_quality)
+    table_confidence_v2_buckets, table_confidence_v2_average = summarize_table_confidence_v2(
+        table_result.table_quality
+    )
     page_results, page_status_counts = finalize_page_statuses(
         page_results,
         warnings,
@@ -1805,6 +1809,8 @@ def _run_conversion_impl(
         table_low_quality_count=table_low_quality_count,
         table_actionable_low_quality_count=table_actionable_low_quality_count,
         table_advisory_low_quality_count=table_advisory_low_quality_count,
+        table_confidence_v2_buckets=table_confidence_v2_buckets,
+        table_confidence_v2_average=table_confidence_v2_average,
         table_caption_linked_count=table_caption_linked_count,
         page_cache_hits=pdf_context.page_cache_hits,
         page_cache_misses=pdf_context.page_cache_misses,

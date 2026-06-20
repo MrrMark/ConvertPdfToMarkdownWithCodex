@@ -149,6 +149,10 @@
     ],
     "table_actionable_fallback_count": 0,
     "table_caption_linked_count": 1,
+    "table_confidence_v2_average": 0.7242,
+    "table_confidence_v2_buckets": {
+      "medium": 1
+    },
     "table_expected_fallback_count": 1,
     "table_expected_fallback_reason_counts": {
       "MERGED_CELL_SUSPECTED": 1,
@@ -208,6 +212,19 @@
         ],
         "selected_strategy": "default",
         "stub_column_count": 1,
+        "table_confidence_v2": 0.7242,
+        "table_confidence_v2_bucket": "medium",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "fallback:MERGED_CELL_SUSPECTED",
+          "fallback:MULTI_ROW_HEADER",
+          "fallback:STUB_COLUMN",
+          "header_confidence_high",
+          "html_fallback",
+          "merged_cell_suspected",
+          "stub_column_detected"
+        ],
         "table_index": 1,
         "unresolved": true
       }

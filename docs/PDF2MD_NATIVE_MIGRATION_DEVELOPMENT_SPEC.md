@@ -84,6 +84,8 @@ pipeline 내부에서 흩어져 있는 text, table, figure, page layout, source 
 
 ## Q119 - Table Confidence v2
 
+Status: Implemented in Q119. Active follow-up work continues in Q120-Q125.
+
 ### 목표
 
 기술 스펙 표를 더 안전하게 재처리하기 위해 table confidence, fallback reason, header/body/stub 구조, continued table linkage를 강화한다.
@@ -105,17 +107,18 @@ pipeline 내부에서 흩어져 있는 text, table, figure, page layout, source 
 
 ### 산출물
 
-- table quality metric v2
-- fallback reason taxonomy 확장
-- complex/continued/NVMe table regression fixture
-- output schema 변경이 필요한 경우 schema와 docs 갱신
+- `table_confidence_v2`, `table_confidence_v2_bucket`, `table_confidence_v2_reasons`
+- `manifest.json` table asset, `report.summary.table_quality[]`, `tables_rag.jsonl`, `technical_tables_rag.jsonl` confidence propagation
+- `report.summary.table_confidence_v2_buckets`, `report.summary.table_confidence_v2_average`
+- complex/continued/NVMe/OCP golden fixture 갱신
+- `docs/OUTPUT_SCHEMA.md`와 `docs/schema/` 갱신
 
 ### 검증
 
-- `python -m pytest tests/test_tables.py tests/test_rag_tables.py tests/test_rag_technical_tables.py`
-- complex table, continued table, NVMe slice regression
+- `.venv311/bin/python -m pytest tests/test_tables.py tests/test_rag_tables.py tests/test_rag_technical_tables.py tests/test_docs_examples.py tests/test_output_schema_contract.py -q`
+- `.venv311/bin/python -m pytest tests/test_golden_corpus.py -q`
+- latest NVMe Base table slice smoke
 - artifact/index/provenance validator
-- latest NVMe Base table count and warning count comparison
 
 ### 완료 조건
 

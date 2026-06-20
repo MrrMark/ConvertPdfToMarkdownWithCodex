@@ -23,13 +23,6 @@
 
 ## 남은 작업
 
-### P0 / Q119. Table Confidence v2
-
-기술 스펙 표의 confidence, fallback reason, header/body/stub column, continued table linkage를 강화한다.
-복잡 표는 계속 HTML fallback을 우선하며, GFM 승격 기준을 완화하지 않는다.
-
-상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
-
 ### P0 / Q120. Native Hybrid Chunking v2
 
 Docling식 document-native/hybrid chunking 개념을 `pdf2md`의 `retrieval_chunks_rag.jsonl` 계약에 맞게 네이티브로 구현한다.

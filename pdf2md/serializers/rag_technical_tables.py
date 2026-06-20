@@ -685,6 +685,9 @@ def build_technical_table_records(rag_tables: list[dict[str, Any]], *, source_sh
             "namespace_support": namespace_support,
             "scope": _cell(cells, "Scope", "NVM Subsystem"),
             "bbox": row.get("bbox"),
+            "table_confidence_v2": row.get("table_confidence_v2"),
+            "table_confidence_v2_bucket": row.get("table_confidence_v2_bucket"),
+            "table_confidence_v2_reasons": row.get("table_confidence_v2_reasons", []),
             "source_refs": [
                 {
                     "source_type": "table_row",

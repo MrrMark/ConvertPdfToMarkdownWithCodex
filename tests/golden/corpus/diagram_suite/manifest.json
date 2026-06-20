@@ -93,8 +93,8 @@
     "image_mode": "referenced",
     "keep_page_markers": true,
     "local_only_processing": true,
-    "ocr_lang": "eng",
     "ocr_backend": "tesseract",
+    "ocr_lang": "eng",
     "pages": null,
     "path_redaction": "disabled",
     "rag_table_output": "none",
@@ -144,7 +144,13 @@
       "index": 1,
       "mode": "gfm",
       "page": 1,
-      "quality_score": 0.83
+      "quality_score": 0.83,
+      "table_confidence_v2": 0.8945,
+      "table_confidence_v2_bucket": "high",
+      "table_confidence_v2_reasons": [
+        "data_density_high",
+        "header_confidence_high"
+      ]
     },
     {
       "anchor_line_index": 2,
@@ -180,7 +186,16 @@
       "index": 1,
       "mode": "html",
       "page": 2,
-      "quality_score": 0.9
+      "quality_score": 0.9,
+      "table_confidence_v2": 0.79,
+      "table_confidence_v2_bucket": "medium",
+      "table_confidence_v2_reasons": [
+        "data_density_high",
+        "fallback:AMBIGUOUS_GRID",
+        "fallback:TOO_FEW_COLUMNS",
+        "header_confidence_high",
+        "html_fallback"
+      ]
     },
     {
       "anchor_line_index": 2,
@@ -214,7 +229,13 @@
       "index": 1,
       "mode": "gfm",
       "page": 3,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.9625,
+      "table_confidence_v2_bucket": "high",
+      "table_confidence_v2_reasons": [
+        "data_density_high",
+        "header_confidence_high"
+      ]
     }
   ],
   "total_pages": 3,

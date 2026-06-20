@@ -124,6 +124,8 @@
     "table_actionable_low_quality_count": 0,
     "table_advisory_low_quality_count": 0,
     "table_caption_linked_count": 0,
+    "table_confidence_v2_average": null,
+    "table_confidence_v2_buckets": {},
     "table_expected_fallback_count": 0,
     "table_expected_fallback_reason_counts": {},
     "table_fallback_count": 0,

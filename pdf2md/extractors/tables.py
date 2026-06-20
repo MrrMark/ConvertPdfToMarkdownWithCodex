@@ -181,6 +181,9 @@ class RagTablePayload:
     headers: list[str]
     bbox: list[float]
     quality_score: float
+    table_confidence_v2: float
+    table_confidence_v2_bucket: str
+    table_confidence_v2_reasons: list[str]
     fallback_reasons: list[str]
     records: list[dict[str, Any]]
     header_depth: int
@@ -206,6 +209,9 @@ class RagTablePayload:
             "headers": self.headers,
             "bbox": self.bbox,
             "quality_score": self.quality_score,
+            "table_confidence_v2": self.table_confidence_v2,
+            "table_confidence_v2_bucket": self.table_confidence_v2_bucket,
+            "table_confidence_v2_reasons": self.table_confidence_v2_reasons,
             "fallback_reasons": self.fallback_reasons,
             "records": self.records,
             "header_depth": self.header_depth,
@@ -635,6 +641,71 @@ def _pick_mode(
     if simple:
         return TableModeEmission.GFM, None, reasons
     return TableModeEmission.HTML, None, reasons
+
+
+def _confidence_bucket(score: float) -> str:
+    if score >= 0.82:
+        return "high"
+    if score >= 0.64:
+        return "medium"
+    return "low"
+
+
+def _table_confidence_v2(
+    *,
+    candidate: TableExtractionCandidate,
+    source_mode: str,
+    fallback_reasons: list[str],
+    caption_text: str | None,
+) -> dict[str, Any]:
+    """Summarize table extraction confidence from structural signals without relaxing fallback policy."""
+    diagnostics = candidate.diagnostics
+    metrics = candidate.metrics
+    structural_score = (
+        metrics.quality_score * 0.4
+        + diagnostics.header_confidence * 0.25
+        + metrics.data_density * 0.15
+        + metrics.header_fill_ratio * 0.1
+        + (1.0 - metrics.empty_cell_ratio) * 0.1
+    )
+    reasons: list[str] = []
+    score = structural_score
+
+    if caption_text:
+        score += 0.03
+        reasons.append("caption_linked")
+    if source_mode == TableModeEmission.HTML:
+        score -= 0.06
+        reasons.append("html_fallback")
+    if fallback_reasons:
+        score -= min(len(fallback_reasons) * 0.025, 0.12)
+        reasons.extend(f"fallback:{reason}" for reason in fallback_reasons)
+    if diagnostics.stub_column_count:
+        reasons.append("stub_column_detected")
+    if diagnostics.footnote_row_count:
+        score -= 0.02
+        reasons.append("footnote_rows_detected")
+    if diagnostics.merged_cell_suspected:
+        score -= 0.06
+        reasons.append("merged_cell_suspected")
+    if diagnostics.header_confidence < 0.5:
+        score -= 0.08
+        reasons.append("low_header_confidence")
+    elif diagnostics.header_confidence >= 0.75:
+        reasons.append("header_confidence_high")
+    if metrics.data_density < 0.45:
+        reasons.append("low_data_density")
+    elif metrics.data_density >= 0.75:
+        reasons.append("data_density_high")
+    if source_mode == TableModeEmission.HTML:
+        score = min(score, 0.79)
+
+    score = round(max(0.0, min(score, 1.0)), 4)
+    return {
+        "table_confidence_v2": score,
+        "table_confidence_v2_bucket": _confidence_bucket(score),
+        "table_confidence_v2_reasons": sorted(dict.fromkeys(reasons)),
+    }
 
 
 def _fill_blank_headers(rows: list[list[str]]) -> list[list[str]]:
@@ -1227,6 +1298,7 @@ def _build_rag_table_payload(
     candidate: TableExtractionCandidate,
     caption_text: str | None,
     fallback_reasons: list[str],
+    confidence: dict[str, Any],
     caption_distance: float | None = None,
     caption_position: str | None = None,
 ) -> dict[str, Any]:
@@ -1250,6 +1322,9 @@ def _build_rag_table_payload(
             "row_text": row_text,
             "bbox": [float(value) for value in candidate.bbox],
             "quality_score": candidate.metrics.quality_score,
+            "table_confidence_v2": confidence["table_confidence_v2"],
+            "table_confidence_v2_bucket": confidence["table_confidence_v2_bucket"],
+            "table_confidence_v2_reasons": confidence["table_confidence_v2_reasons"],
             "fallback_reasons": fallback_reasons,
             "header_depth": diagnostics.header_depth,
             "header_confidence": diagnostics.header_confidence,
@@ -1272,6 +1347,9 @@ def _build_rag_table_payload(
         headers=headers,
         bbox=[float(value) for value in candidate.bbox],
         quality_score=candidate.metrics.quality_score,
+        table_confidence_v2=confidence["table_confidence_v2"],
+        table_confidence_v2_bucket=confidence["table_confidence_v2_bucket"],
+        table_confidence_v2_reasons=confidence["table_confidence_v2_reasons"],
         fallback_reasons=fallback_reasons,
         records=row_records,
         header_depth=diagnostics.header_depth,
@@ -1615,6 +1693,12 @@ def _materialize_page_table_candidates(
         caption_distance = caption_match.distance if caption_match is not None else None
         caption_position = caption_match.position if caption_match is not None else None
         fallback_reasons = reasons if asset_mode == TableModeEmission.HTML else []
+        table_confidence = _table_confidence_v2(
+            candidate=candidate,
+            source_mode=asset_mode,
+            fallback_reasons=fallback_reasons,
+            caption_text=caption_text,
+        )
 
         page_blocks.append(
             TableBlock(
@@ -1638,6 +1722,9 @@ def _materialize_page_table_candidates(
                 bbox=[x0, top, x1, bottom],
                 quality_score=candidate.metrics.quality_score,
                 fallback_reasons=fallback_reasons,
+                table_confidence_v2=table_confidence["table_confidence_v2"],
+                table_confidence_v2_bucket=table_confidence["table_confidence_v2_bucket"],
+                table_confidence_v2_reasons=table_confidence["table_confidence_v2_reasons"],
                 caption_text=caption_text,
                 caption_source="nearby_table_caption" if caption_text else None,
             )
@@ -1650,6 +1737,7 @@ def _materialize_page_table_candidates(
                 candidate=candidate,
                 caption_text=caption_text,
                 fallback_reasons=fallback_reasons,
+                confidence=table_confidence,
                 caption_distance=caption_distance,
                 caption_position=caption_position,
             )
@@ -1663,6 +1751,9 @@ def _materialize_page_table_candidates(
             "columns_compacted": candidate.metrics.columns_compacted,
             "columns_merged": candidate.metrics.columns_merged,
             "quality_score": candidate.metrics.quality_score,
+            "table_confidence_v2": table_confidence["table_confidence_v2"],
+            "table_confidence_v2_bucket": table_confidence["table_confidence_v2_bucket"],
+            "table_confidence_v2_reasons": table_confidence["table_confidence_v2_reasons"],
             "data_density": candidate.metrics.data_density,
             "header_fill_ratio": candidate.metrics.header_fill_ratio,
             "reasons": candidate.decision.reasons,

@@ -129,6 +129,7 @@ Stable summary fields:
 - `table_total`, `table_html_count`, `table_gfm_count`, `table_fallback_count`
 - `table_fallback_reason_counts`, `table_expected_fallback_count`, `table_expected_fallback_reason_counts`, `table_actionable_fallback_count`
 - `table_low_quality_count`, `table_actionable_low_quality_count`, `table_advisory_low_quality_count`, `table_quality`
+- `table_confidence_v2_buckets`, `table_confidence_v2_average`
 - `ocr_actionable_warning_count`, `ocr_advisory_warning_count`
 - `technical_profile_domain_adapter_missing`
 - `stage_durations_ms`, `pdf_open_count`, `pages_per_second`
@@ -196,6 +197,9 @@ Visual retrieval chunk contract:
 
 `summary.table_quality[]` optional diagnostics:
 
+- `table_confidence_v2`: normalized table confidence score derived from structural quality, header confidence, density, fallback, caption, and merged/stub/footnote signals.
+- `table_confidence_v2_bucket`: `high`, `medium`, or `low` bucket for quick triage.
+- `table_confidence_v2_reasons`: stable reason list explaining the v2 confidence score.
 - `strategy_runs`: table extraction strategies actually executed for the page when adaptive strategy skipping occurred.
 - `adaptive_skipped_strategies`: fallback strategies skipped because the default candidate met conservative quality thresholds.
 - `adaptive_skip_reason`: stable reason code for adaptive skipping, currently `default_candidate_quality_sufficient`.
