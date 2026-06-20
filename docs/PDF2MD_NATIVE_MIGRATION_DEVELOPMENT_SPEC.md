@@ -180,7 +180,7 @@ Docling의 document-native/hybrid chunking 개념을 `pdf2md` RAG sidecar에 맞
 
 ## Q121 - Layout Sidecar and Reading Order Diagnostics
 
-Status: Implemented in Q121. Active follow-up work continues in Q123-Q125.
+Status: Implemented in Q121. Active follow-up work continues in Q125.
 
 ### 목표
 
@@ -228,7 +228,7 @@ multi-column, page furniture, caption linkage, bbox normalization을 구조화�
 
 ## Q122 - Region OCR Evidence v2
 
-Status: Implemented in Q122. Active follow-up work continues in Q123-Q125.
+Status: Implemented in Q122. Active follow-up work continues in Q125.
 
 ### 목표
 
@@ -277,7 +277,7 @@ figure/table bbox crop OCR을 원문 대체가 아닌 evidence sidecar로 강화
 
 ## Q123 - OCR Backend Registry Expansion
 
-Status: Implemented in Q123. Active follow-up work continues in Q124-Q125.
+Status: Implemented in Q123. Active follow-up work continues in Q125.
 
 ### 목표
 
@@ -329,6 +329,8 @@ Status: Implemented in Q123. Active follow-up work continues in Q124-Q125.
 - backend confidence 의미가 report에 구분된다.
 
 ## Q124 - Figure Semantics v2
+
+Status: Implemented in Q124. Active follow-up work continues in Q125.
 
 ### 목표
 

@@ -101,14 +101,29 @@
           "title": "Generated Text Record Count",
           "type": "integer"
         },
+        "invalid_generated_scope_count": {
+          "default": 0,
+          "title": "Invalid Generated Scope Count",
+          "type": "integer"
+        },
         "low_confidence_count": {
           "default": 0,
           "title": "Low Confidence Count",
           "type": "integer"
         },
+        "markdown_inserted_count": {
+          "default": 0,
+          "title": "Markdown Inserted Count",
+          "type": "integer"
+        },
         "missing_retrieval_chunk_count": {
           "default": 0,
           "title": "Missing Retrieval Chunk Count",
+          "type": "integer"
+        },
+        "missing_review_metadata_count": {
+          "default": 0,
+          "title": "Missing Review Metadata Count",
           "type": "integer"
         },
         "missing_source_evidence_count": {

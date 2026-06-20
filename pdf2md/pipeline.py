@@ -830,11 +830,13 @@ def _run_conversion_impl(
     figure_description_file_count = 0
     figure_description_low_confidence_count = 0
     figure_description_skipped_no_evidence_count = 0
+    figure_description_review_required_count = 0
     figure_description_chunk_record_count = 0
     figure_structure_record_count = 0
     figure_structure_file_count = 0
     figure_structure_low_confidence_count = 0
     figure_structure_skipped_no_structure_count = 0
+    figure_structure_review_required_count = 0
     figure_structure_chunk_record_count = 0
     figure_region_ocr_metrics = {
         "figure_region_ocr_attempted_count": 0,
@@ -1391,6 +1393,9 @@ def _run_conversion_impl(
         figure_description_skipped_no_evidence_count = figure_description_metrics[
             "figure_description_skipped_no_evidence_count"
         ]
+        figure_description_review_required_count = figure_description_metrics[
+            "figure_description_review_required_count"
+        ]
         figure_description_record_count, figure_description_file_count = write_figure_description_output(
             config,
             figure_description_records,
@@ -1409,6 +1414,9 @@ def _run_conversion_impl(
         figure_structure_low_confidence_count = figure_structure_metrics["figure_structure_low_confidence_count"]
         figure_structure_skipped_no_structure_count = figure_structure_metrics[
             "figure_structure_skipped_no_structure_count"
+        ]
+        figure_structure_review_required_count = figure_structure_metrics[
+            "figure_structure_review_required_count"
         ]
         figure_structure_record_count, figure_structure_file_count = write_figure_structure_output(
             config,
@@ -1856,6 +1864,7 @@ def _run_conversion_impl(
         report_summary_extras["figure_description_skipped_no_evidence_count"] = (
             figure_description_skipped_no_evidence_count
         )
+        report_summary_extras["figure_description_review_required_count"] = figure_description_review_required_count
         report_summary_extras["figure_description_chunk_record_count"] = figure_description_chunk_record_count
     if effective_figure_structure_extraction:
         report_summary_extras["figure_structure_extraction"] = True
@@ -1865,6 +1874,7 @@ def _run_conversion_impl(
         report_summary_extras["figure_structure_skipped_no_structure_count"] = (
             figure_structure_skipped_no_structure_count
         )
+        report_summary_extras["figure_structure_review_required_count"] = figure_structure_review_required_count
         report_summary_extras["figure_structure_chunk_record_count"] = figure_structure_chunk_record_count
     if write_page_layout_sidecar:
         report_summary_extras.update(

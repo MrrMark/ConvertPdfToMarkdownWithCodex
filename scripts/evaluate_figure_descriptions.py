@@ -65,6 +65,7 @@ def _has_source_evidence(record: dict[str, Any]) -> bool:
         or evidence.get("heading_path_present")
         or _positive_intish(evidence.get("detected_label_count"))
         or _positive_intish(evidence.get("nearby_text_count"))
+        or _positive_intish(evidence.get("ocr_text_count"))
     )
 
 
@@ -108,6 +109,9 @@ def evaluate_figure_descriptions(
     visual_pixels_interpreted_count = 0
     backend_invoked_count = 0
     missing_retrieval_chunk_count = 0
+    missing_review_metadata_count = 0
+    markdown_inserted_count = 0
+    invalid_generated_scope_count = 0
 
     for record in description_records:
         if record.get("_invalid_json"):
@@ -129,6 +133,67 @@ def evaluate_figure_descriptions(
                     severity="error",
                     code="missing_generated_text_flag",
                     message="Figure description record must set generated_text=true.",
+                    record=record,
+                )
+            )
+        if record.get("generated_description") != record.get("text"):
+            missing_review_metadata_count += 1
+            findings.append(
+                _finding(
+                    severity="error",
+                    code="generated_description_mismatch",
+                    message="generated_description must match the sidecar text field.",
+                    record=record,
+                )
+            )
+        observed_text = record.get("observed_text")
+        if not isinstance(observed_text, dict) or observed_text.get("visual_pixels_interpreted") is not False:
+            missing_review_metadata_count += 1
+            findings.append(
+                _finding(
+                    severity="error",
+                    code="invalid_observed_text_metadata",
+                    message="observed_text must separate source evidence and set visual_pixels_interpreted=false.",
+                    record=record,
+                )
+            )
+        if record.get("review_required") is not True or not isinstance(record.get("review_reasons"), list):
+            missing_review_metadata_count += 1
+            findings.append(
+                _finding(
+                    severity="error",
+                    code="missing_review_metadata",
+                    message="Figure description records must include review_required=true and review_reasons[].",
+                    record=record,
+                )
+            )
+        if record.get("hallucination_risk") not in {"low", "medium", "high"}:
+            missing_review_metadata_count += 1
+            findings.append(
+                _finding(
+                    severity="error",
+                    code="invalid_hallucination_risk",
+                    message="Figure description records must classify hallucination_risk as low, medium, or high.",
+                    record=record,
+                )
+            )
+        if record.get("generated_content_scope") != "sidecar_only":
+            invalid_generated_scope_count += 1
+            findings.append(
+                _finding(
+                    severity="error",
+                    code="invalid_generated_content_scope",
+                    message="Figure description records must use generated_content_scope=sidecar_only.",
+                    record=record,
+                )
+            )
+        if record.get("markdown_inserted") is not False:
+            markdown_inserted_count += 1
+            findings.append(
+                _finding(
+                    severity="error",
+                    code="figure_description_markdown_pollution",
+                    message="Generated figure descriptions must not be inserted into Markdown.",
                     record=record,
                 )
             )
@@ -229,6 +294,9 @@ def evaluate_figure_descriptions(
             "visual_pixels_interpreted_count": visual_pixels_interpreted_count,
             "backend_invoked_count": backend_invoked_count,
             "missing_retrieval_chunk_count": missing_retrieval_chunk_count,
+            "missing_review_metadata_count": missing_review_metadata_count,
+            "markdown_inserted_count": markdown_inserted_count,
+            "invalid_generated_scope_count": invalid_generated_scope_count,
             "error_count": error_count,
             "warning_count": warning_count,
             "passed": error_count == 0,

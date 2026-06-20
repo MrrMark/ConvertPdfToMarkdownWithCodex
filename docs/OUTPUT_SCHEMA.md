@@ -194,9 +194,9 @@ Assetless figure text summary fields:
 - `region_ocr_evidence_accepted_count`, `region_ocr_evidence_rejected_count`, `region_ocr_evidence_runtime_unavailable_count`, `region_ocr_evidence_not_attempted_count`: accepted/rejected/runtime taxonomy counters.
 - `rag_generated_figure_descriptions`: present and `true` when `--rag-generated-figure-descriptions` was enabled.
 - `figure_description_backend`: selected backend label, currently emitted for deterministic context-only description records.
-- `figure_description_record_count`, `figure_description_file_count`, `figure_description_low_confidence_count`, `figure_description_skipped_no_evidence_count`, `figure_description_chunk_record_count`: generated figure description sidecar and chunk counters.
+- `figure_description_record_count`, `figure_description_file_count`, `figure_description_low_confidence_count`, `figure_description_skipped_no_evidence_count`, `figure_description_review_required_count`, `figure_description_chunk_record_count`: generated figure description sidecar and chunk counters.
 - `figure_structure_extraction`: present and `true` when `--figure-structure-extraction` was enabled.
-- `figure_structure_record_count`, `figure_structure_file_count`, `figure_structure_low_confidence_count`, `figure_structure_skipped_no_structure_count`, `figure_structure_chunk_record_count`: conservative figure structure sidecar and chunk counters.
+- `figure_structure_record_count`, `figure_structure_file_count`, `figure_structure_low_confidence_count`, `figure_structure_skipped_no_structure_count`, `figure_structure_review_required_count`, `figure_structure_chunk_record_count`: conservative figure structure sidecar and chunk counters.
 - `manual_domain_adapter_label`, `manual_domain_adapter_keywords`: present only when `--domain-adapter manual` was selected and those inputs were provided.
 
 Visual retrieval chunk contract:
@@ -669,6 +669,9 @@ Stable summary fields:
 - `visual_pixels_interpreted_count`
 - `backend_invoked_count`
 - `missing_retrieval_chunk_count`
+- `missing_review_metadata_count`
+- `markdown_inserted_count`
+- `invalid_generated_scope_count`
 - `error_count`
 - `warning_count`
 - `passed`
@@ -1181,6 +1184,7 @@ Optional JSONL output controlled by `--rag-generated-figure-descriptions`.
 
 Required per JSONL record:
 
+- `semantics_schema_version`
 - `description_id`
 - `description_index`
 - `figure_id`
@@ -1189,20 +1193,32 @@ Required per JSONL record:
 - `heading_path`
 - `figure_kind`
 - `text`
+- `observed_text`
+- `generated_description`
 - `generated_text`
+- `generated_content_scope`
+- `markdown_inserted`
 - `generation_strategy`
 - `backend`
 - `backend_status`
 - `source_evidence`
+- `evidence_refs`
 - `source_refs`
+- `review_required`
+- `review_reasons`
+- `hallucination_risk`
 - `classification_confidence`
 - `classification_reasons`
 
 Policy:
 
 - Description text is generated helper text and is always separated from source Markdown.
+- `observed_text` contains only observed caption, heading path, detected labels, nearby text, and OCR text evidence.
+- `generated_description` mirrors `text`; consumers should treat it as generated sidecar helper text.
+- `generated_content_scope="sidecar_only"` and `markdown_inserted=false` are required.
+- `review_required=true`, `review_reasons[]`, and `hallucination_risk` (`low`, `medium`, `high`) are required for generated description review.
 - The current local implementation records `backend_status="not_invoked_context_only"` and `source_evidence.visual_pixels_interpreted=false`.
-- Records are skipped when no caption, heading, detected label, or nearby text evidence exists.
+- Records are skipped when no caption, heading, detected label, nearby text, or OCR text evidence exists.
 
 ## figure_structures_rag.jsonl
 
@@ -1210,6 +1226,7 @@ Optional JSONL output controlled by `--figure-structure-extraction`.
 
 Required per JSONL record:
 
+- `structure_schema_version`
 - `structure_id`
 - `structure_index`
 - `figure_id`
@@ -1222,9 +1239,15 @@ Required per JSONL record:
 - `edges`
 - `signals`
 - `text`
+- `observed_text`
 - `generated_text`
 - `derived_from_context`
+- `evidence_refs`
+- `relationship_hints`
 - `source_refs`
+- `review_required`
+- `review_reasons`
+- `hallucination_risk`
 - `classification_confidence`
 - `classification_reasons`
 
@@ -1232,6 +1255,9 @@ Policy:
 
 - Structure records are conservative, deterministic hints for retrieval, not a replacement for the original PDF image.
 - Nodes and signals are created only from detected labels or other observed context. Edges remain empty unless deterministic evidence is available.
+- `relationship_hints[]` records review-only co-occurrence hints between observed labels; it is not a verified edge list.
+- `observed_text` and `evidence_refs[]` separate observed source evidence from derived structure text.
+- `review_required=true`, `review_reasons[]`, and `hallucination_risk` are required because structure records are context-derived hints.
 - Records are skipped when no diagram/label/structure signal is available.
 
 ## domain_units_rag.jsonl
