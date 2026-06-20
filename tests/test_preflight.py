@@ -81,6 +81,38 @@ def test_large_spec_preflight_recommends_security_domain_adapter_without_raw_tex
     assert plan["recommendation"]["domain_adapter_recommendation"]["recommended_domain_adapter"] == "spdm"
 
 
+def test_large_spec_preflight_recommends_storage_domain_adapters_without_raw_text(tmp_path: Path) -> None:
+    cases = [
+        (
+            "NVMe-Base-Synthetic.pdf",
+            "NVM Express Base Specification Admin Command Submission Queue Completion Queue Command Dword CDW",
+            "nvme",
+        ),
+        (
+            "PCIe-Base-Synthetic.pdf",
+            "PCI Express Base Specification configuration space extended capability link status TLP lane margining",
+            "pcie",
+        ),
+        (
+            "OCP-Datacenter-NVMe-SSD-Synthetic.pdf",
+            "Open Compute Project Datacenter NVMe SSD requirement ID telemetry profile latency monitor",
+            "ocp",
+        ),
+    ]
+    for filename, text, expected_adapter in cases:
+        input_pdf = tmp_path / filename
+        write_pdf(input_pdf, [PageSpec(texts=[PositionedText(text, 72, 760)])])
+
+        recommendation = recommend_domain_adapter_for_pdf(input_pdf, PreflightOptions(sample_page_count=1))
+        plan = plan_large_spec_conversion(input_pdf, PreflightOptions(sample_page_count=1))
+
+        assert recommendation["recommended_domain_adapter"] == expected_adapter
+        assert recommendation["confidence"] == "high"
+        assert recommendation["raw_content_included"] is False
+        assert "sample_text" not in recommendation
+        assert plan["recommendation"]["recommended_options"]["domain_adapter"] == expected_adapter
+
+
 def test_large_spec_preflight_recommends_performance_profile_from_sample_metrics(tmp_path: Path) -> None:
     input_pdf = tmp_path / "table-dense-large-spec.pdf"
     table = TableSpec(
