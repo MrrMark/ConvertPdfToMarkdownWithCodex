@@ -471,7 +471,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
     assert "Q119. Table Confidence v2" not in next_plan
-    assert "Q120. Native Hybrid Chunking v2" in next_plan
+    assert "Q120. Native Hybrid Chunking v2" not in next_plan
     assert "Q121. Layout Sidecar and Reading Order Diagnostics" in next_plan
     assert "Q122. Region OCR Evidence v2" in next_plan
     assert "Q123. OCR Backend Registry Expansion" in next_plan
@@ -537,6 +537,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
     assert "Q119. Table Confidence v2" not in development_specs
+    assert "Q120. Native Hybrid Chunking v2" not in development_specs
     assert "Q125. Domain Adapter Registry Hardening" in development_specs
     assert "PDF2MD Native Migration Plan" in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
@@ -599,8 +600,11 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q119" in development_specs
+    assert "완료된 Q34-Q120" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q120. Native Hybrid Chunking v2" in implemented_specs
+    assert "relationship_metadata_version" in implemented_specs
+    assert "context_metadata" in implemented_specs
     assert "Q119. Table Confidence v2" in implemented_specs
     assert "table_confidence_v2" in implemented_specs
     assert "Q118. Native Document IR and Serializer Boundary" in implemented_specs

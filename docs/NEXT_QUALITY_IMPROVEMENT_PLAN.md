@@ -23,13 +23,6 @@
 
 ## 남은 작업
 
-### P0 / Q120. Native Hybrid Chunking v2
-
-Docling식 document-native/hybrid chunking 개념을 `pdf2md`의 `retrieval_chunks_rag.jsonl` 계약에 맞게 네이티브로 구현한다.
-section hierarchy, table atomicity, repeated header context, chunk relationship metadata를 강화한다.
-
-상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
-
 ### P0 / Q121. Layout Sidecar and Reading Order Diagnostics
 
 multi-column, page furniture, caption linkage, bbox normalization을 구조화해 technical spec reading order와 layout provenance를 강화한다.

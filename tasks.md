@@ -80,7 +80,7 @@ P0 안정화 후 구현:
 - M05는 Q95에서 lightweight CI gate를 보강했고, Q96에서 한글/OCR fixture 회귀 방어를 보강했다.
 - M06은 Q98에서 structure marker OCR lazy 처리, Q99에서 page worker chunked parallelization, Q100에서 OCR page parallelization, Q101에서 adaptive table strategy, Q102에서 fast output profile과 sidecar scope를 완료했다.
 - M07은 Q103에서 이미지 파일 업로드가 불가능한 RAG 환경 대응, Q104에서 Docling 벤치마크 하네스, Q105에서 Docling-informed 확장 설계를 완료했다.
-- M08은 Q118에서 내부 IR 기반 serializer boundary, Q119에서 table confidence v2를 완료했고, Q120-Q125에서 Docling runtime 의존 없이 `pdf2md` 네이티브 layout/chunk/OCR/figure/domain 구조를 강화하는 active 작업으로 관리한다.
+- M08은 Q118에서 내부 IR 기반 serializer boundary, Q119에서 table confidence v2, Q120에서 native hybrid chunking v2를 완료했고, Q121-Q125에서 Docling runtime 의존 없이 `pdf2md` 네이티브 layout/OCR/figure/domain 구조를 강화하는 active 작업으로 관리한다.
 
 ### M01. pipeline/report 집계 책임 분리
 
@@ -138,7 +138,7 @@ P0 안정화 후 구현:
 - Docling을 runtime backend로 붙이지 않고 설계 아이디어만 `pdf2md` 내부 구조로 이식
 - 내부 Document IR과 serializer boundary 강화(Q118 완료)
 - table confidence 강화(Q119 완료)
-- native hybrid chunking 강화(Q120)
+- native hybrid chunking 강화(Q120 완료)
 - layout sidecar, region OCR evidence, OCR backend registry, figure semantics 강화(Q121-Q124)
 - domain adapter registry와 cross-spec 재처리 계약 강화(Q125)
 - 상세 active 명세는 `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`와 `docs/QUALITY_IMPROVEMENT_DEVELOPMENT_SPECS.md`에서 관리
