@@ -97,6 +97,16 @@ def test_cli_technical_spec_profile_without_domain_adapter_emits_advisory(
     assert manifest["options"]["domain_adapter"] == "none"
     assert report["status"] == "success"
     assert report["warnings"][0]["code"] == "TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING"
+    assert report["warnings"][0]["details"]["recommended_domain_adapters"] == [
+        "nvme",
+        "pcie",
+        "ocp",
+        "tcg",
+        "spdm",
+        "caliptra",
+        "customer-requirements",
+        "manual",
+    ]
     assert report["summary"]["technical_profile_domain_adapter_missing"] is True
     assert report["summary"]["actionable_warning_count"] == 0
     assert report["summary"]["advisory_warning_count"] == 1

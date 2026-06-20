@@ -175,7 +175,7 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" \
 - Validate/inspect: `pdf2md_validate_output`, `pdf2md_validate_ssd_rag_contract`, `pdf2md_validate_visual_sidecars`, `pdf2md_inspect_report`
 
 MCP 응답은 전체 Markdown 본문 대신 artifact URI, report summary, warning preview를 반환합니다.
-대형 technical spec은 `pdf2md_plan_large_spec_conversion`으로 보수적 권고를 확인한 뒤 page-window tool을 사용합니다.
+대형 technical spec은 `pdf2md_plan_large_spec_conversion`으로 page-window, domain adapter recommendation, performance profile 권고를 확인한 뒤 page-window tool을 사용합니다.
 window output은 `windows/pages-0001-0100/` 같은 안정적인 하위 디렉터리로 나뉘며, merge report에는 sidecar inventory와 advisory memory guard가 포함됩니다.
 
 ## Development

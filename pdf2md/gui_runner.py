@@ -37,7 +37,8 @@ from pdf2md.models import (
     WarningEntry,
 )
 from pdf2md.pipeline import EXIT_FATAL, EXIT_PARTIAL, ConversionProgressEvent, ConversionResult, run_conversion
-from pdf2md.rag_profiles import DEFAULT_RAG_PURPOSE_PROFILE, normalize_rag_profile
+from pdf2md.preflight import PreflightOptions, recommend_domain_adapter_for_pdf
+from pdf2md.rag_profiles import DEFAULT_RAG_PURPOSE_PROFILE, TECHNICAL_SPEC_RAG_PROFILES, normalize_rag_profile
 
 
 ProgressCallback = Callable[[str], None]
@@ -50,6 +51,7 @@ GUI_STATUS_SKIPPED = "skipped"
 GUI_STATUS_CANCELLED = "cancelled"
 GUI_COMPLETION_DIALOG_MAX_DOCUMENTS = 5
 GUI_COMPLETION_DIALOG_MAX_PATH_CHARS = 96
+GUI_DOMAIN_RECOMMENDATION_MAX_FOLDER_SAMPLES = 5
 
 
 @dataclass(frozen=True)
@@ -903,6 +905,80 @@ def _validate_output_dir(output_dir: Path, diagnostics: list[GuiDiagnostic]) -> 
         )
 
 
+def _technical_profile_missing_domain(options: GuiConversionOptions) -> bool:
+    return (
+        normalize_rag_profile(options.rag_profile) in TECHNICAL_SPEC_RAG_PROFILES
+        and options.domain_adapter == DomainAdapterMode.NONE.value
+    )
+
+
+def _domain_recommendation_for_gui(path: Path, options: GuiConversionOptions) -> dict[str, Any] | None:
+    try:
+        recommendation = recommend_domain_adapter_for_pdf(
+            path,
+            PreflightOptions(
+                pages=options.pages or None,
+                password=options.password or None,
+                sample_page_count=1,
+            ),
+        )
+    except Exception:  # noqa: BLE001 - GUI recommendation must not block conversion.
+        return None
+    if recommendation.get("confidence") not in {"high", "medium"}:
+        return None
+    if not recommendation.get("recommended_domain_adapter"):
+        return None
+    return recommendation
+
+
+def _append_domain_adapter_recommendation_diagnostics(
+    *,
+    request: GuiConversionRequest,
+    pdf_paths: Sequence[Path],
+    diagnostics: list[GuiDiagnostic],
+) -> None:
+    if not _technical_profile_missing_domain(request.options):
+        return
+    recommendations: dict[str, int] = {}
+    sampled = 0
+    for pdf_path in list(pdf_paths)[:GUI_DOMAIN_RECOMMENDATION_MAX_FOLDER_SAMPLES]:
+        recommendation = _domain_recommendation_for_gui(pdf_path, request.options)
+        if recommendation is None:
+            continue
+        adapter = str(recommendation["recommended_domain_adapter"])
+        recommendations[adapter] = recommendations.get(adapter, 0) + 1
+        sampled += 1
+    if not recommendations:
+        return
+    if len(recommendations) == 1:
+        adapter = next(iter(recommendations))
+        diagnostics.append(
+            GuiDiagnostic(
+                code="domain_adapter_recommended",
+                severity="warning",
+                message=(
+                    f"Technical spec RAG appears to match Domain={adapter}; "
+                    "select that domain before conversion for domain_units_rag output."
+                ),
+                path=pdf_paths[0] if len(pdf_paths) == 1 else request.input_path,
+            )
+        )
+        return
+    counts = ", ".join(f"{adapter}={count}" for adapter, count in sorted(recommendations.items()))
+    diagnostics.append(
+        GuiDiagnostic(
+            code="mixed_domain_adapters_recommended",
+            severity="warning",
+            message=(
+                "PDF folder appears to contain multiple technical/security domains "
+                f"within sampled documents ({counts}, sampled={sampled}); convert per domain "
+                "or use file mode to avoid applying one domain adapter to unrelated specs."
+            ),
+            path=request.input_path,
+        )
+    )
+
+
 def validate_gui_request(request: GuiConversionRequest) -> GuiDiagnosticReport:
     """Validate GUI input/output paths before invoking the conversion pipeline."""
     diagnostics: list[GuiDiagnostic] = []
@@ -939,6 +1015,12 @@ def validate_gui_request(request: GuiConversionRequest) -> GuiDiagnosticReport:
             )
         output_dir = request.output_dir if request.output_dir is not None else default_output_dir_for_input(input_path)
         _validate_output_dir(output_dir, diagnostics)
+        if input_path.exists() and input_path.is_file() and input_path.suffix.lower() == ".pdf":
+            _append_domain_adapter_recommendation_diagnostics(
+                request=request,
+                pdf_paths=[input_path],
+                diagnostics=diagnostics,
+            )
         if request.previous_corpus_manifest is not None or request.reuse_unchanged:
             diagnostics.append(
                 GuiDiagnostic(
@@ -1001,6 +1083,14 @@ def validate_gui_request(request: GuiConversionRequest) -> GuiDiagnosticReport:
             )
         if request.previous_corpus_manifest is not None:
             _validate_previous_corpus_manifest(request.previous_corpus_manifest, diagnostics)
+        if input_path.exists() and input_path.is_dir():
+            pdf_paths = iter_pdf_paths(input_path)
+            if pdf_paths:
+                _append_domain_adapter_recommendation_diagnostics(
+                    request=request,
+                    pdf_paths=pdf_paths,
+                    diagnostics=diagnostics,
+                )
     else:
         if request.previous_corpus_manifest is not None or request.reuse_unchanged:
             diagnostics.append(

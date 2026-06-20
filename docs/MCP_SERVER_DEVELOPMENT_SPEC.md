@@ -90,7 +90,8 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 
 목적:
 
-- NVMe Base 같은 대형 technical spec을 변환하기 전에 page-window, profile, image mode, timeout 기본값을 보수적으로 추천한다.
+- NVMe Base 같은 대형 technical spec을 변환하기 전에 page-window, profile, image mode, timeout, page worker 기본값을 보수적으로 추천한다.
+- TCG/SPDM/Caliptra 같은 보안 스펙은 파일명과 샘플 페이지 키워드 count만 사용해 domain adapter 추천을 제공한다.
 - full conversion을 실행하지 않고 PDF page count와 소수 sample page의 text/image/table density만 확인한다.
 
 주요 입력:
@@ -113,6 +114,8 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 - `estimates`
 - `recommendation.preferred_mcp_tool`
 - `recommendation.recommended_options`
+- `recommendation.domain_adapter_recommendation`
+- `recommendation.performance_profile`
 
 정책:
 

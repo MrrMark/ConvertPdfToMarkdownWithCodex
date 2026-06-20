@@ -40,7 +40,7 @@ from pdf2md.models import (
     WarningEntry,
 )
 from pdf2md.pipeline import ConversionResult, run_conversion
-from tests.fixtures.pdf_builder import build_multi_page_text_pdf
+from tests.fixtures.pdf_builder import PageSpec, PositionedText, build_multi_page_text_pdf, write_pdf
 from helpers.normalize_outputs import normalize_manifest, normalize_report
 
 
@@ -501,6 +501,61 @@ def test_gui_request_diagnostics_reject_duplicate_batch_stems(
 
     assert report.has_errors is True
     assert [diagnostic.code for diagnostic in report.errors] == ["duplicate_pdf_stems"]
+
+
+def test_gui_request_recommends_security_domain_for_technical_profile(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "caliptra-root-of-trust.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("Caliptra Root of Trust mailbox service", 72, 760),
+                    PositionedText("DICE and DPE measurements are exposed through mailbox commands.", 72, 740),
+                ]
+            )
+        ],
+    )
+
+    report = validate_gui_request(
+        GuiConversionRequest(
+            input_mode="file",
+            input_path=input_pdf,
+            output_dir=tmp_path / "output",
+            options=GuiConversionOptions(rag_profile="technical_spec_rag", domain_adapter=DomainAdapterMode.NONE.value),
+        )
+    )
+
+    assert report.has_errors is False
+    assert [diagnostic.code for diagnostic in report.warnings] == ["domain_adapter_recommended"]
+    assert "Domain=caliptra" in report.warnings[0].message
+
+
+def test_gui_request_warns_for_mixed_security_domain_folder(tmp_path: Path) -> None:
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    write_pdf(
+        input_dir / "DMTF-SPDM.pdf",
+        [PageSpec(texts=[PositionedText("SPDM DSP0274 GET_MEASUREMENTS message", 72, 760)])],
+    )
+    write_pdf(
+        input_dir / "Caliptra-RoT.pdf",
+        [PageSpec(texts=[PositionedText("Caliptra Root of Trust mailbox command", 72, 760)])],
+    )
+
+    report = validate_gui_request(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=input_dir,
+            output_dir=tmp_path / "batch-output",
+            options=GuiConversionOptions(rag_profile="technical_spec_rag", domain_adapter=DomainAdapterMode.NONE.value),
+        )
+    )
+
+    assert report.has_errors is False
+    assert [diagnostic.code for diagnostic in report.warnings] == ["mixed_domain_adapters_recommended"]
+    assert "spdm=1" in report.warnings[0].message
+    assert "caliptra=1" in report.warnings[0].message
 
 
 def test_gui_request_diagnostics_require_folder_manifest_pair(sample_pdf: Path, tmp_path: Path) -> None:
