@@ -110,6 +110,8 @@ OCP_HEADER_TOKENS = {
 }
 TCG_HEADER_TOKENS = {
     "authority",
+    "authorityname",
+    "authorityuid",
     "bits",
     "bytes",
     "description",
@@ -118,13 +120,20 @@ TCG_HEADER_TOKENS = {
     "keymanagement",
     "lockingrange",
     "method",
+    "methodname",
+    "methoduid",
     "object",
+    "objectname",
+    "objectuid",
     "protocolid",
     "securitydescription",
     "securityfield",
     "securityprovider",
+    "securityprovidername",
     "session",
     "sessionstate",
+    "spname",
+    "spuid",
     "uid",
     "value",
 }
@@ -140,8 +149,13 @@ SPDM_HEADER_TOKENS = {
     "messagecode",
     "measurement",
     "measurementindex",
+    "req",
+    "reqcode",
     "request",
+    "requestmessage",
     "response",
+    "rsp",
+    "rspcode",
     "session",
     "sessionstate",
     "slot",
@@ -168,6 +182,7 @@ CALIPTRA_HEADER_TOKENS = {
     "key",
     "lifecycle",
     "mailbox",
+    "mailboxcmd",
     "measurement",
     "mitigation",
     "recovery",
@@ -746,19 +761,19 @@ def _unit_from_row(
     description = _cell_value(cells, "Description", "Meaning", "Requirement Description", "Security Description")
     requirement_id = _cell_value(cells, "Requirement ID", "Req ID", "ID", "Requirement")
     capability = _cell_value(cells, "Capability", "Register", "Register Name")
-    method = _cell_value(cells, "Method", "Method ID")
-    security_object = _cell_value(cells, "Object", "Object ID")
-    security_provider = _cell_value(cells, "Security Provider", "SP", "Provider")
+    method = _cell_value(cells, "Method", "Method ID", "Method Name")
+    security_object = _cell_value(cells, "Object", "Object ID", "Object Name")
+    security_provider = _cell_value(cells, "Security Provider", "Security Provider Name", "SP", "Provider", "SP Name")
     locking_range = _cell_value(cells, "Locking Range", "Range")
     key_name = _cell_value(cells, "Key", "Key Name", "Key Management")
     session_state = _cell_value(cells, "Session State", "Session", "State")
-    authority = _cell_value(cells, "Authority")
-    uid = _cell_value(cells, "UID", "Protocol ID", "ProtocolID")
+    authority = _cell_value(cells, "Authority", "Authority Name")
+    uid = _cell_value(cells, "UID", "Protocol ID", "ProtocolID", "Authority UID", "Object UID", "SP UID", "Method UID")
     security_field = _cell_value(cells, "Security Field", "Field", "Parameter")
     message = _cell_value(cells, "Message", "Message Name", "Command")
-    message_code = _cell_value(cells, "Message Code", "Code", "Request Code", "Response Code", "Opcode")
-    request = _cell_value(cells, "Request", "Request Message")
-    response = _cell_value(cells, "Response", "Response Message")
+    message_code = _cell_value(cells, "Message Code", "Code", "Request Code", "Response Code", "Req Code", "Rsp Code", "Opcode")
+    request = _cell_value(cells, "Request", "Request Message", "Req")
+    response = _cell_value(cells, "Response", "Response Message", "Rsp")
     measurement = _cell_value(cells, "Measurement", "Measurement Index", "Measurement Block", "Measurement Type")
     certificate = _cell_value(cells, "Certificate", "Certificate Slot", "Slot")
     algorithm = _cell_value(cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm")
@@ -772,13 +787,13 @@ def _unit_from_row(
     caliptra_attack_path = _cell_value(cells, "Attack Path", "Threat", "Attack")
     caliptra_mitigation = _cell_value(cells, "Mitigation", "Countermeasure", "Counter Measure")
     caliptra_interface = _cell_value(cells, "Interface", "API", "Bus", "Port")
-    caliptra_mailbox_command = _cell_value(cells, "Mailbox Command", "Command", "Runtime Command")
+    caliptra_mailbox_command = _cell_value(cells, "Mailbox Command", "Mailbox Cmd", "Command", "Cmd", "Runtime Command")
     caliptra_security_state = _cell_value(cells, "Security State", "State", "Lifecycle State")
     caliptra_measurement = _cell_value(cells, "Measurement", "Measurement Type", "RTM")
     caliptra_attestation = _cell_value(cells, "Attestation", "Quote", "Certificate")
     caliptra_key = _cell_value(cells, "Key", "Key Name", "Secret", "Entropy")
     caliptra_register = _cell_value(cells, "Register", "Register Name")
-    caliptra_field = _cell_value(cells, "Field", "Field Name", "Parameter")
+    caliptra_field = _cell_value(cells, "Field", "Field Name", "Register Field", "Parameter")
     manual_tokens = manual_tokens or set()
 
     if domain_adapter in {DomainAdapterMode.OCP, DomainAdapterMode.CUSTOMER_REQUIREMENTS} and requirement_id:
@@ -1030,14 +1045,14 @@ def _unit_from_technical_record(
             return "requirement", req_id, req_id, description, ["ocp_requirement_id_row"]
 
     if domain_adapter is DomainAdapterMode.TCG:
-        method = _cell_value(raw_cells, "Method", "Method ID")
-        security_object = _cell_value(raw_cells, "Object", "Object ID")
-        security_provider = _cell_value(raw_cells, "Security Provider", "SP", "Provider")
+        method = _cell_value(raw_cells, "Method", "Method ID", "Method Name")
+        security_object = _cell_value(raw_cells, "Object", "Object ID", "Object Name")
+        security_provider = _cell_value(raw_cells, "Security Provider", "Security Provider Name", "SP", "Provider", "SP Name")
         locking_range = _cell_value(raw_cells, "Locking Range", "Range")
         key_name = _cell_value(raw_cells, "Key", "Key Name", "Key Management")
         session_state = _cell_value(raw_cells, "Session State", "Session", "State")
-        authority = _cell_value(raw_cells, "Authority")
-        uid = _cell_value(raw_cells, "UID", "Protocol ID", "ProtocolID")
+        authority = _cell_value(raw_cells, "Authority", "Authority Name")
+        uid = _cell_value(raw_cells, "UID", "Protocol ID", "ProtocolID", "Authority UID", "Object UID", "SP UID", "Method UID")
         security_field = _cell_value(raw_cells, "Security Field", "Field", "Parameter") or field
         if method or unit_type == "security_method":
             return "security_method", method or field, uid or value or None, description, ["tcg_security_method_row"]
@@ -1060,9 +1075,9 @@ def _unit_from_technical_record(
 
     if domain_adapter is DomainAdapterMode.SPDM:
         message = _cell_value(raw_cells, "Message", "Message Name", "Command") or field or command
-        message_code = _cell_value(raw_cells, "Message Code", "Code", "Request Code", "Response Code") or value
-        request = _cell_value(raw_cells, "Request", "Request Message")
-        response = _cell_value(raw_cells, "Response", "Response Message")
+        message_code = _cell_value(raw_cells, "Message Code", "Code", "Request Code", "Response Code", "Req Code", "Rsp Code") or value
+        request = _cell_value(raw_cells, "Request", "Request Message", "Req")
+        response = _cell_value(raw_cells, "Response", "Response Message", "Rsp")
         measurement = _cell_value(raw_cells, "Measurement", "Measurement Index", "Measurement Block", "Measurement Type")
         certificate = _cell_value(raw_cells, "Certificate", "Certificate Slot", "Slot")
         algorithm = _cell_value(raw_cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm")
@@ -1093,13 +1108,13 @@ def _unit_from_technical_record(
         caliptra_attack_path = _cell_value(raw_cells, "Attack Path", "Threat", "Attack")
         caliptra_mitigation = _cell_value(raw_cells, "Mitigation", "Countermeasure", "Counter Measure")
         caliptra_interface = _cell_value(raw_cells, "Interface", "API", "Bus", "Port")
-        caliptra_mailbox_command = _cell_value(raw_cells, "Mailbox Command", "Command", "Runtime Command") or command
+        caliptra_mailbox_command = _cell_value(raw_cells, "Mailbox Command", "Mailbox Cmd", "Command", "Cmd", "Runtime Command") or command
         caliptra_security_state = _cell_value(raw_cells, "Security State", "State", "Lifecycle State")
         caliptra_measurement = _cell_value(raw_cells, "Measurement", "Measurement Type", "RTM")
         caliptra_attestation = _cell_value(raw_cells, "Attestation", "Quote", "Certificate")
         caliptra_key = _cell_value(raw_cells, "Key", "Key Name", "Secret", "Entropy")
         caliptra_register = _cell_value(raw_cells, "Register", "Register Name")
-        caliptra_field = _cell_value(raw_cells, "Field", "Field Name", "Parameter") or field
+        caliptra_field = _cell_value(raw_cells, "Field", "Field Name", "Register Field", "Parameter") or field
         if unit_type == "caliptra_asset" or caliptra_asset:
             name = caliptra_asset or field or caliptra_asset_category
             if name:
@@ -1206,14 +1221,14 @@ def _normalized_domain_fields(
     if domain_adapter is DomainAdapterMode.TCG:
         fields.update(
             {
-                "method": _cell_value(cells, "Method", "Method ID"),
-                "security_object": _cell_value(cells, "Object", "Object ID"),
-                "security_provider": _cell_value(cells, "Security Provider", "SP", "Provider"),
+                "method": _cell_value(cells, "Method", "Method ID", "Method Name"),
+                "security_object": _cell_value(cells, "Object", "Object ID", "Object Name"),
+                "security_provider": _cell_value(cells, "Security Provider", "Security Provider Name", "SP", "Provider", "SP Name"),
                 "locking_range": _cell_value(cells, "Locking Range", "Range"),
                 "key_name": _cell_value(cells, "Key", "Key Name", "Key Management"),
                 "session_state": _cell_value(cells, "Session State", "Session", "State"),
-                "authority": _cell_value(cells, "Authority"),
-                "uid": _cell_value(cells, "UID", "Protocol ID", "ProtocolID"),
+                "authority": _cell_value(cells, "Authority", "Authority Name"),
+                "uid": _cell_value(cells, "UID", "Protocol ID", "ProtocolID", "Authority UID", "Object UID", "SP UID", "Method UID"),
                 "security_field": _cell_value(cells, "Security Field", "Field", "Parameter"),
             }
         )
@@ -1350,9 +1365,9 @@ def _normalized_domain_fields(
         fields.update(
             {
                 "message": _cell_value(cells, "Message", "Message Name", "Command"),
-                "message_code": _cell_value(cells, "Message Code", "Code", "Request Code", "Response Code"),
-                "request": _cell_value(cells, "Request", "Request Message"),
-                "response": _cell_value(cells, "Response", "Response Message"),
+                "message_code": _cell_value(cells, "Message Code", "Code", "Request Code", "Response Code", "Req Code", "Rsp Code"),
+                "request": _cell_value(cells, "Request", "Request Message", "Req"),
+                "response": _cell_value(cells, "Response", "Response Message", "Rsp"),
                 "measurement": _cell_value(cells, "Measurement", "Measurement Index", "Measurement Block", "Measurement Type"),
                 "certificate": _cell_value(cells, "Certificate", "Certificate Slot", "Slot"),
                 "algorithm": _cell_value(cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm"),
@@ -1373,10 +1388,10 @@ def _normalized_domain_fields(
                 "threat": _cell_value(cells, "Threat", "Attack", "Attack Path"),
                 "mitigation": _cell_value(cells, "Mitigation", "Countermeasure", "Counter Measure"),
                 "interface": _cell_value(cells, "Interface", "API", "Bus", "Port"),
-                "command": _cell_value(cells, "Mailbox Command", "Command", "Runtime Command"),
-                "mailbox_command": _cell_value(cells, "Mailbox Command", "Runtime Command"),
+                "command": _cell_value(cells, "Mailbox Command", "Mailbox Cmd", "Command", "Cmd", "Runtime Command"),
+                "mailbox_command": _cell_value(cells, "Mailbox Command", "Mailbox Cmd", "Runtime Command"),
                 "register_name": fields.get("register_name") or _cell_value(cells, "Register", "Register Name"),
-                "field_name": fields.get("field_name") or _cell_value(cells, "Field", "Field Name", "Parameter"),
+                "field_name": fields.get("field_name") or _cell_value(cells, "Field", "Field Name", "Register Field", "Parameter"),
                 "bit_range": fields.get("bit_range") or _cell_value(cells, "Bits", "Bit", "Bit Range"),
                 "security_state": _cell_value(cells, "Security State", "State", "Lifecycle State"),
                 "state": _cell_value(cells, "State", "Lifecycle State"),

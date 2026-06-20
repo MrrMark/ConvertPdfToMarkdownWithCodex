@@ -568,6 +568,10 @@ def _technical_profile_domain_adapter_missing(config: Config, domain_adapter: Do
     return config.rag_profile in TECHNICAL_SPEC_RAG_PROFILES and domain_adapter is DomainAdapterMode.NONE
 
 
+def _recommended_technical_domain_adapters() -> list[str]:
+    return [mode.value for mode in DomainAdapterMode if mode is not DomainAdapterMode.NONE]
+
+
 def _technical_profile_domain_adapter_warning(config: Config, domain_adapter: DomainAdapterMode) -> WarningEntry:
     return WarningEntry(
         code=WarningCode.TECHNICAL_PROFILE_DOMAIN_ADAPTER_MISSING,
@@ -578,7 +582,7 @@ def _technical_profile_domain_adapter_warning(config: Config, domain_adapter: Do
         details={
             "rag_profile": config.rag_profile,
             "domain_adapter": domain_adapter.value,
-            "recommended_domain_adapters": ["nvme", "pcie", "ocp", "tcg", "spdm", "customer-requirements", "manual"],
+            "recommended_domain_adapters": _recommended_technical_domain_adapters(),
         },
     )
 

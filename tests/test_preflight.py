@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 from pdf2md import mcp_server
-from pdf2md.preflight import PreflightOptions, plan_large_spec_conversion
+from pdf2md.preflight import PreflightOptions, plan_large_spec_conversion, recommend_domain_adapter_for_pdf
 from scripts.plan_large_spec_conversion import main as plan_large_spec_main
-from tests.fixtures.pdf_builder import PageSpec, PositionedText, write_pdf
+from tests.fixtures.pdf_builder import PageSpec, PositionedText, TableSpec, write_pdf
 
 
 def test_large_spec_preflight_recommends_windowed_technical_ingest(tmp_path: Path) -> None:
@@ -54,6 +54,60 @@ def test_large_spec_preflight_prefers_visual_sidecars_when_requested(tmp_path: P
     assert options["domain_adapter"] == "nvme"
     assert options["image_mode"] == "referenced"
     assert plan["recommendation"]["preferred_mcp_tool"] == "pdf2md_convert_pdf"
+
+
+def test_large_spec_preflight_recommends_security_domain_adapter_without_raw_text(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "DMTF-SPDM-Synthetic.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("Security Protocol and Data Model (SPDM) Specification", 72, 760),
+                    PositionedText("GET_MEASUREMENTS and CHALLENGE_AUTH message flow", 72, 740),
+                ]
+            )
+        ],
+    )
+
+    recommendation = recommend_domain_adapter_for_pdf(input_pdf, PreflightOptions(sample_page_count=1))
+    plan = plan_large_spec_conversion(input_pdf, PreflightOptions(sample_page_count=1))
+
+    assert recommendation["recommended_domain_adapter"] == "spdm"
+    assert recommendation["confidence"] == "high"
+    assert recommendation["raw_content_included"] is False
+    assert "sample_text" not in recommendation
+    assert plan["recommendation"]["recommended_options"]["domain_adapter"] == "spdm"
+    assert plan["recommendation"]["domain_adapter_recommendation"]["recommended_domain_adapter"] == "spdm"
+
+
+def test_large_spec_preflight_recommends_performance_profile_from_sample_metrics(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "table-dense-large-spec.pdf"
+    table = TableSpec(
+        rows=[["Field", "Bits", "Description"], ["CAP.MQES", "15:0", "Synthetic register field"]],
+        x=72,
+        y=720,
+        column_widths=[120, 80, 220],
+    )
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(
+                texts=[PositionedText(f"Table dense page {page}", 72, 760)],
+                tables=[table],
+            )
+            for page in range(1, 81)
+        ],
+    )
+
+    plan = plan_large_spec_conversion(input_pdf, PreflightOptions(sample_page_count=3))
+    recommendation = plan["recommendation"]
+
+    assert recommendation["performance_profile"]["name"] == "table_dense_parallel"
+    assert recommendation["performance_profile"]["recommended_page_workers"] == 2
+    assert recommendation["recommended_options"]["page_workers"] == 2
+    assert "large_or_table_dense_document" in recommendation["reasons"]["page_workers"]
+    assert recommendation["performance_profile"]["raw_content_included"] is False
 
 
 def test_plan_large_spec_conversion_script_writes_report(tmp_path: Path) -> None:

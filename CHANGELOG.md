@@ -5,6 +5,7 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add Q136-Q139 quality/performance follow-ups: enum-driven technical domain recommendations, GUI security-domain warnings, security adapter header calibration, and preflight performance profile advice.
 - Add Q135 Caliptra security spec support across the domain adapter registry, SSD-RAG contract validation, and latest SSD security benchmark wrapper.
 - Add Q134 SSD security spec benchmark path for SPDM, SPDM-to-Storage, TCG Storage, and PCIe adapter evidence with sanitized contract summaries.
 - Add Q131-Q133 MCP stability guardrails: large technical spec preflight planning, compact visual sidecar contract validation, and page-window merge sidecar inventory/memory guard reporting.

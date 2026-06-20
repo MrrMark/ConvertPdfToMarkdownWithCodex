@@ -1072,6 +1072,126 @@ def test_spdm_domain_adapter_extracts_security_protocol_units_and_chunks() -> No
     assert chunks[0]["source_refs"][-1]["source_id"] == "domain-spdm-000001"
 
 
+def test_security_domain_adapters_accept_common_header_aliases() -> None:
+    tcg_records = build_domain_units(
+        domain_adapter=DomainAdapterMode.TCG,
+        rag_tables=[
+            {
+                "page": 1,
+                "table_index": 1,
+                "headers": ["Authority Name", "Authority UID", "Description"],
+                "records": [
+                    {
+                        "page": 1,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Authority Name", "Authority UID", "Description"],
+                        "cells": {
+                            "Authority Name": "Anybody",
+                            "Authority UID": "0009h",
+                            "Description": "Synthetic TCG authority alias row",
+                        },
+                        "row_text": (
+                            "Authority Name = Anybody | Authority UID = 0009h | "
+                            "Description = Synthetic TCG authority alias row"
+                        ),
+                    }
+                ],
+            }
+        ],
+    )
+    spdm_records = build_domain_units(
+        domain_adapter=DomainAdapterMode.SPDM,
+        rag_tables=[
+            {
+                "page": 1,
+                "table_index": 1,
+                "headers": ["Req", "Rsp", "Req Code", "Description"],
+                "records": [
+                    {
+                        "page": 1,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Req", "Rsp", "Req Code", "Description"],
+                        "cells": {
+                            "Req": "GET_CERTIFICATE",
+                            "Rsp": "CERTIFICATE",
+                            "Req Code": "0x82",
+                            "Description": "Synthetic SPDM request response alias row",
+                        },
+                        "row_text": (
+                            "Req = GET_CERTIFICATE | Rsp = CERTIFICATE | Req Code = 0x82 | "
+                            "Description = Synthetic SPDM request response alias row"
+                        ),
+                    }
+                ],
+            }
+        ],
+    )
+    caliptra_records = build_domain_units(
+        domain_adapter=DomainAdapterMode.CALIPTRA,
+        rag_tables=[
+            {
+                "page": 1,
+                "table_index": 1,
+                "headers": ["Mailbox Cmd", "Interface", "Description"],
+                "records": [
+                    {
+                        "page": 1,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Mailbox Cmd", "Interface", "Description"],
+                        "cells": {
+                            "Mailbox Cmd": "GET_IDEV_CERT",
+                            "Interface": "Mailbox",
+                            "Description": "Synthetic Caliptra mailbox alias row",
+                        },
+                        "row_text": (
+                            "Mailbox Cmd = GET_IDEV_CERT | Interface = Mailbox | "
+                            "Description = Synthetic Caliptra mailbox alias row"
+                        ),
+                    }
+                ],
+            },
+            {
+                "page": 1,
+                "table_index": 2,
+                "headers": ["Register", "Register Field", "Bit Range", "Description"],
+                "records": [
+                    {
+                        "page": 1,
+                        "table_index": 2,
+                        "row_index": 1,
+                        "headers": ["Register", "Register Field", "Bit Range", "Description"],
+                        "cells": {
+                            "Register": "CPTRA_FW_ERROR_FATAL",
+                            "Register Field": "FATAL_CODE",
+                            "Bit Range": "31:0",
+                            "Description": "Synthetic Caliptra register alias row",
+                        },
+                        "row_text": (
+                            "Register = CPTRA_FW_ERROR_FATAL | Register Field = FATAL_CODE | "
+                            "Bit Range = 31:0 | Description = Synthetic Caliptra register alias row"
+                        ),
+                    }
+                ],
+            },
+        ],
+    )
+
+    assert tcg_records[0]["unit_type"] == "security_authority"
+    assert tcg_records[0]["normalized_fields"]["authority"] == "Anybody"
+    assert tcg_records[0]["normalized_fields"]["uid"] == "0009h"
+    assert spdm_records[0]["unit_type"] == "spdm_request_response"
+    assert spdm_records[0]["normalized_fields"]["request"] == "GET_CERTIFICATE"
+    assert spdm_records[0]["normalized_fields"]["response"] == "CERTIFICATE"
+    assert spdm_records[0]["normalized_fields"]["message_code"] == "0x82"
+    by_type = {record["unit_type"]: record for record in caliptra_records}
+    assert by_type["caliptra_mailbox_command"]["normalized_fields"]["mailbox_command"] == "GET_IDEV_CERT"
+    assert by_type["caliptra_register_field"]["normalized_fields"]["field_name"] == "FATAL_CODE"
+    assert by_type["caliptra_register_field"]["normalized_fields"]["bit_range"] == "31:0"
+
+
 def test_domain_adapter_deep_fixtures_cover_storage_pcie_ocp_tcg_and_customer_shapes() -> None:
     nvme_tables = [
         {

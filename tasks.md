@@ -84,6 +84,7 @@ P0 안정화 후 구현:
 - M09는 Q127-Q130에서 Agent Skill, client rule, MCP discovery/validation surface를 최신 sidecar 계약에 맞추는 작업을 완료했다.
 - M10은 Q131-Q133에서 대형 technical spec preflight, visual sidecar contract validator, page-window merge memory guard를 완료했다.
 - M11은 Q134에서 SPDM/TCG/PCIe SSD security spec benchmark evidence path를 완료했고, Q135에서 Caliptra RoT security spec adapter/evidence path를 추가했다.
+- M12는 Q136-Q139에서 domain adapter recommendation UX, security adapter calibration, 대형 spec performance profile recommender를 완료했다.
 
 ### M01. pipeline/report 집계 책임 분리
 
@@ -166,6 +167,13 @@ P0 안정화 후 구현:
 - Caliptra RoT/security spec을 `domain_adapter=caliptra`, `HIL/Caliptra`, latest/smoke benchmark wrapper에 연결(Q135 완료)
 - `technical_spec_rag + domain_adapter=spdm|tcg|pcie|caliptra` 변환과 SSD-RAG contract summary를 raw content 없이 기록
 - `security_domain_unit_counts`로 SPDM message/algorithm, TCG method/object, PCIe register field, Caliptra RoT asset/threat/mailbox/register coverage를 추적
+
+### M12. Quality/Performance Follow-up
+
+- 기술 스펙 profile에서 domain adapter 누락 시 enum 기반 추천 목록을 유지(Q136 완료)
+- GUI file/folder validation에서 TCG/SPDM/Caliptra 보안 도메인 추천 및 mixed-domain folder 경고를 제공(Q137 완료)
+- TCG/SPDM/Caliptra header alias calibration fixture로 domain unit 추출 회귀를 방어(Q138 완료)
+- 대형 spec preflight가 sample metric 기반 `performance_profile`과 `page_workers` 권고를 반환(Q139 완료)
 
 ---
 

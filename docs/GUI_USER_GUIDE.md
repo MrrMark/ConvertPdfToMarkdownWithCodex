@@ -89,6 +89,7 @@ python -m pdf2md.gui --doctor --doctor-format json
 - `Table`: 표 출력 방식이다. 기본값은 `auto`다.
 - `RAG tables`: RAG table sidecar 출력 방식이다.
 - `Domain`: NVMe, PCIe, OCP, TCG, SPDM, Caliptra, customer requirements, manual 같은 도메인 adapter 선택이다.
+- `기술 스펙 RAG` 계열에서 `Domain=none`이면 GUI validation이 파일명/샘플 페이지 키워드 count로 TCG, SPDM, Caliptra 추천 warning을 표시할 수 있다. 폴더 샘플에서 여러 보안 도메인이 섞이면 한 번에 변환하지 말고 도메인별 폴더로 나누는 것을 권장한다.
 - `Manual domain label`: `Domain=manual`일 때 `domain_units_rag.jsonl`의 `adapter_profile`에 기록할 사용자 정의 라벨이다. 예: `Customer A Requirements`
 - `Manual domain keywords`: `Domain=manual`일 때 표 header 인식에 추가할 키워드다. 쉼표, 세미콜론, 줄바꿈으로 구분한다. 예: `Customer Key, Customer Requirement`
 
