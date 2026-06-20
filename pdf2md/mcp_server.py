@@ -57,6 +57,7 @@ ARTIFACT_FILENAMES = (
     "index_contract_report.json",
     "provenance_integrity_report.json",
     "artifact_integrity_report.json",
+    "ssd_rag_contract_report.json",
 )
 MERGE_SIDECAR_FILENAMES = (
     "text_blocks_rag.jsonl",
@@ -295,6 +296,7 @@ def list_profiles() -> dict[str, Any]:
         "rag_table_outputs": [mode.value for mode in RagTableOutputMode],
         "output_profiles": [profile.value for profile in OutputProfile],
         "rag_sidecar_scopes": [scope.value for scope in RagSidecarScope],
+        "ocr_backends": list(SUPPORTED_OCR_BACKENDS),
     }
 
 
@@ -1537,6 +1539,71 @@ def validate_output(
     }
 
 
+def validate_ssd_rag_contract_output(
+    *,
+    output_dir: str,
+    ssd_agent_domain: str = "HIL",
+    ssd_agent_spec_type: str = "NVMe",
+    domain_adapter: str | None = None,
+    document_id: str = "SSD_RAG_DOCUMENT",
+    source_sha256: str | None = None,
+    require_tables: bool = True,
+    require_domain_units: bool = True,
+    strict_provenance: bool = False,
+    fail_on_error: bool = True,
+    fail_on_warning: bool = False,
+    finding_limit: int = DEFAULT_WARNING_LIMIT,
+    roots: list[Path] | None = None,
+    project_root: Path | str | None = None,
+) -> dict[str, Any]:
+    """Run the SSD technical RAG contract validator and return a compact result."""
+    if project_root is not None:
+        _ensure_project_root_on_path(project_root)
+    allowed_roots = _allowed_roots(roots)
+    resolved_output = ensure_within_roots(output_dir, allowed_roots, label="output_dir")
+    from scripts.validate_ssd_rag_contract import REPORT_FILENAME as SSD_RAG_REPORT
+    from scripts.validate_ssd_rag_contract import validate_ssd_rag_contract
+
+    report = validate_ssd_rag_contract(
+        output_dir=resolved_output,
+        ssd_agent_domain=ssd_agent_domain,
+        ssd_agent_spec_type=ssd_agent_spec_type,
+        domain_adapter=domain_adapter,
+        document_id=document_id,
+        source_sha256=source_sha256,
+        require_tables=require_tables,
+        require_domain_units=require_domain_units,
+        strict_provenance=strict_provenance,
+    )
+    report_path = resolved_output / SSD_RAG_REPORT
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    summary = report.get("summary", {})
+    error_count = int(summary.get("error_count", 0))
+    warning_count = int(summary.get("warning_count", 0))
+    contract_passed = bool(report.get("passed"))
+    passed = (contract_passed or not fail_on_error) and (warning_count == 0 or not fail_on_warning)
+    return {
+        "schema_version": "1.0",
+        "status": "passed" if passed else "failed",
+        "passed": passed,
+        "contract_passed": contract_passed,
+        "output_dir": str(resolved_output),
+        "ssd_agent_domain": ssd_agent_domain,
+        "ssd_agent_spec_type": ssd_agent_spec_type,
+        "domain_adapter": report.get("domain_adapter"),
+        "summary": {
+            **summary,
+            "fail_on_error": fail_on_error,
+            "fail_on_warning": fail_on_warning,
+        },
+        "report_uri": report_path.resolve().as_uri(),
+        "errors_preview": report.get("errors", [])[: max(finding_limit, 0)],
+        "warnings_preview": report.get("warnings", [])[: max(finding_limit, 0)],
+        "artifact_uris": _artifact_map(resolved_output),
+    }
+
+
 def inspect_report(
     *,
     output_dir: str,
@@ -1839,6 +1906,39 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
             target=target,
             confidential_safe=confidential_safe,
             metadata_max_bytes=metadata_max_bytes,
+            fail_on_warning=fail_on_warning,
+            finding_limit=finding_limit,
+            roots=roots,
+            project_root=root,
+        )
+
+    @mcp.tool()
+    def pdf2md_validate_ssd_rag_contract(
+        output_dir: str,
+        ssd_agent_domain: str = "HIL",
+        ssd_agent_spec_type: str = "NVMe",
+        domain_adapter: str | None = None,
+        document_id: str = "SSD_RAG_DOCUMENT",
+        source_sha256: str | None = None,
+        require_tables: bool = True,
+        require_domain_units: bool = True,
+        strict_provenance: bool = False,
+        fail_on_error: bool = True,
+        fail_on_warning: bool = False,
+        finding_limit: int = DEFAULT_WARNING_LIMIT,
+    ) -> dict[str, Any]:
+        """Run the local SSD technical RAG contract validator with compact findings."""
+        return validate_ssd_rag_contract_output(
+            output_dir=output_dir,
+            ssd_agent_domain=ssd_agent_domain,
+            ssd_agent_spec_type=ssd_agent_spec_type,
+            domain_adapter=domain_adapter,
+            document_id=document_id,
+            source_sha256=source_sha256,
+            require_tables=require_tables,
+            require_domain_units=require_domain_units,
+            strict_provenance=strict_provenance,
+            fail_on_error=fail_on_error,
             fail_on_warning=fail_on_warning,
             finding_limit=finding_limit,
             roots=roots,

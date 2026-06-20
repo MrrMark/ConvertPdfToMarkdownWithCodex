@@ -20,15 +20,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = args.project_root.resolve()
     clients = expand_clients(args.clients)
-    installed: list[tuple[str, Path]] = []
+    installed: list[tuple[str, Path, Path]] = []
     for client in clients:
         target = target_for_client(client, root, args.scope)
         source = source_for_client(client, root)
         install_path(source, target, mode=args.mode, overwrite=args.overwrite, dry_run=args.dry_run)
-        installed.append((client, target))
-    for client, target in installed:
+        installed.append((client, source, target))
+    for client, source, target in installed:
         prefix = "would install" if args.dry_run else "installed"
-        print(f"{prefix} {client}: {target}")
+        print(f"{prefix} {client}: {target} <- {source}")
     return 0
 
 
