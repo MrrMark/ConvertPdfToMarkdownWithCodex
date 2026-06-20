@@ -22,6 +22,7 @@ from pdf2md.gui_runner import (
     GuiPageProgress,
     check_gui_runtime,
     format_gui_diagnostic_report,
+    format_gui_completion_dialog,
     format_gui_summary,
     gui_diagnostic_report_to_dict,
     run_gui_conversion,
@@ -455,13 +456,16 @@ class Pdf2MdGuiApp:
         self.result_tree.column("markdown", width=170, anchor="w")
         self.result_tree.column("report", width=170, anchor="w")
         self.result_tree.grid(row=0, column=0, sticky="nsew")
+        result_y_scroll = ttk.Scrollbar(results, orient=tk.VERTICAL, command=self.result_tree.yview)
+        self.result_tree.configure(yscrollcommand=result_y_scroll.set)
+        result_y_scroll.grid(row=0, column=1, sticky="ns")
         result_x_scroll = ttk.Scrollbar(results, orient=tk.HORIZONTAL, command=self.result_tree.xview)
         self.result_tree.configure(xscrollcommand=result_x_scroll.set)
-        result_x_scroll.grid(row=1, column=0, sticky="ew")
+        result_x_scroll.grid(row=1, column=0, columnspan=2, sticky="ew")
         self.result_tree.bind("<<TreeviewSelect>>", lambda event: self._update_result_action_buttons())
 
         result_actions = ttk.Frame(results)
-        result_actions.grid(row=2, column=0, sticky="ew", pady=(6, 0))
+        result_actions.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(6, 0))
         for col in range(2):
             result_actions.columnconfigure(col, weight=1)
         self.open_markdown_button = ttk.Button(
@@ -979,7 +983,7 @@ class Pdf2MdGuiApp:
         self.root.after(100, self._poll_queue)
 
     def _summary_text(self, summary: GuiConversionSummary) -> str:
-        return format_gui_summary(summary)
+        return format_gui_completion_dialog(summary)
 
     def _populate_results(self, summary: GuiConversionSummary) -> None:
         self._clear_results()
