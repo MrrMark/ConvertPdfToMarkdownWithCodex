@@ -204,10 +204,12 @@ python3 -m pdf2md nvme-base.pdf -o output/nvme-base \
   --image-mode none
 ```
 
-MCP client에서는 `pdf2md_convert_pdf_windowed` 또는 `pdf2md_plan_page_windows` ->
+MCP client에서는 먼저 `pdf2md_plan_large_spec_conversion`으로 page-window/profile/image mode 권고를 확인한 뒤
+`pdf2md_convert_pdf_windowed` 또는 `pdf2md_plan_page_windows` ->
 `pdf2md_convert_page_window` -> `pdf2md_merge_window_outputs` 순서를 사용한다.
 변환 후 일반 artifact 검증은 `pdf2md_validate_output`, SSD technical spec 계약 검증은
-`pdf2md_validate_ssd_rag_contract`를 사용한다.
+`pdf2md_validate_ssd_rag_contract`를 사용한다. visual sidecar를 생성한 경우
+`pdf2md_validate_visual_sidecars`로 figure/source linkage와 generated content sidecar-only 계약을 추가 검증한다.
 
 출력 검증:
 

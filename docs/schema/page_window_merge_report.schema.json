@@ -1,0 +1,279 @@
+{
+  "$defs": {
+    "PageWindowLargestSidecar": {
+      "properties": {
+        "byte_count": {
+          "default": 0,
+          "title": "Byte Count",
+          "type": "integer"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "record_count": {
+          "default": 0,
+          "title": "Record Count",
+          "type": "integer"
+        }
+      },
+      "title": "PageWindowLargestSidecar",
+      "type": "object"
+    },
+    "PageWindowMergeMemoryGuard": {
+      "properties": {
+        "bytes_threshold_exceeded": {
+          "default": false,
+          "title": "Bytes Threshold Exceeded",
+          "type": "boolean"
+        },
+        "bytes_warning_threshold": {
+          "default": 0,
+          "title": "Bytes Warning Threshold",
+          "type": "integer"
+        },
+        "record_threshold_exceeded": {
+          "default": false,
+          "title": "Record Threshold Exceeded",
+          "type": "boolean"
+        },
+        "record_warning_threshold": {
+          "default": 0,
+          "title": "Record Warning Threshold",
+          "type": "integer"
+        }
+      },
+      "title": "PageWindowMergeMemoryGuard",
+      "type": "object"
+    },
+    "PageWindowMergeWarning": {
+      "additionalProperties": true,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "PageWindowMergeWarning",
+      "type": "object"
+    },
+    "PageWindowSidecarFileInventory": {
+      "properties": {
+        "byte_count": {
+          "default": 0,
+          "title": "Byte Count",
+          "type": "integer"
+        },
+        "record_count": {
+          "default": 0,
+          "title": "Record Count",
+          "type": "integer"
+        }
+      },
+      "title": "PageWindowSidecarFileInventory",
+      "type": "object"
+    },
+    "PageWindowSidecarInventory": {
+      "properties": {
+        "by_file": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PageWindowSidecarFileInventory"
+          },
+          "title": "By File",
+          "type": "object"
+        },
+        "by_window": {
+          "items": {
+            "$ref": "#/$defs/PageWindowSidecarWindowInventory"
+          },
+          "title": "By Window",
+          "type": "array"
+        },
+        "largest_sidecar": {
+          "$ref": "#/$defs/PageWindowLargestSidecar"
+        },
+        "total_byte_count": {
+          "default": 0,
+          "title": "Total Byte Count",
+          "type": "integer"
+        },
+        "total_record_count": {
+          "default": 0,
+          "title": "Total Record Count",
+          "type": "integer"
+        }
+      },
+      "title": "PageWindowSidecarInventory",
+      "type": "object"
+    },
+    "PageWindowSidecarWindowInventory": {
+      "properties": {
+        "byte_count": {
+          "default": 0,
+          "title": "Byte Count",
+          "type": "integer"
+        },
+        "file_record_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "File Record Counts",
+          "type": "object"
+        },
+        "record_count": {
+          "default": 0,
+          "title": "Record Count",
+          "type": "integer"
+        },
+        "window_id": {
+          "title": "Window Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "window_id"
+      ],
+      "title": "PageWindowSidecarWindowInventory",
+      "type": "object"
+    },
+    "PageWindowSummary": {
+      "additionalProperties": true,
+      "properties": {
+        "output_subdir": {
+          "title": "Output Subdir",
+          "type": "string"
+        },
+        "selected_pages": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Selected Pages",
+          "type": "array"
+        },
+        "source_window_page_range": {
+          "title": "Source Window Page Range",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "window_id": {
+          "title": "Window Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "window_id",
+        "source_window_page_range",
+        "output_subdir"
+      ],
+      "title": "PageWindowSummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id_collision_count": {
+      "default": 0,
+      "title": "Id Collision Count",
+      "type": "integer"
+    },
+    "merge_memory_guard": {
+      "$ref": "#/$defs/PageWindowMergeMemoryGuard"
+    },
+    "merged_record_counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Merged Record Counts",
+      "type": "object"
+    },
+    "output_dir": {
+      "title": "Output Dir",
+      "type": "string"
+    },
+    "purpose": {
+      "default": "page_window_merge",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "rewritten_id_count": {
+      "default": 0,
+      "title": "Rewritten Id Count",
+      "type": "integer"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sidecar_inventory": {
+      "$ref": "#/$defs/PageWindowSidecarInventory"
+    },
+    "source_pdf_sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Pdf Sha256"
+    },
+    "validation_summary": {
+      "additionalProperties": true,
+      "title": "Validation Summary",
+      "type": "object"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/PageWindowMergeWarning"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "window_count": {
+      "default": 0,
+      "title": "Window Count",
+      "type": "integer"
+    },
+    "windows": {
+      "items": {
+        "$ref": "#/$defs/PageWindowSummary"
+      },
+      "title": "Windows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "output_dir"
+  ],
+  "title": "PageWindowMergeReport",
+  "type": "object"
+}

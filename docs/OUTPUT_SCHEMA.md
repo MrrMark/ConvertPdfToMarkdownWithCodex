@@ -25,6 +25,8 @@
 - `docs/schema/index_contract_report.schema.json`
 - `docs/schema/provenance_integrity_report.schema.json`
 - `docs/schema/artifact_integrity_report.schema.json`
+- `docs/schema/page_window_merge_report.schema.json`
+- `docs/schema/visual_sidecar_contract_report.schema.json`
 - `docs/schema/docling_benchmark_report.schema.json`
 - `docs/schema/docling_artifact_comparison.schema.json`
 - `docs/schema/latest_nvme_spec_benchmark_report.schema.json`
@@ -314,6 +316,8 @@ Required:
 - `merged_record_counts`
 - `id_collision_count`
 - `rewritten_id_count`
+- `sidecar_inventory`
+- `merge_memory_guard`
 - `validation_summary`
 - `warnings`
 
@@ -325,12 +329,62 @@ Stable nested fields:
 - `windows[].output_subdir`
 - `windows[].status`
 - `merged_record_counts` keyed by public sidecar filename
+- `sidecar_inventory.total_record_count`
+- `sidecar_inventory.total_byte_count`
+- `sidecar_inventory.largest_sidecar`
+- `sidecar_inventory.by_file.<sidecar>.record_count`
+- `sidecar_inventory.by_file.<sidecar>.byte_count`
+- `sidecar_inventory.by_window[].window_id`
+- `sidecar_inventory.by_window[].record_count`
+- `sidecar_inventory.by_window[].byte_count`
+- `merge_memory_guard.record_warning_threshold`
+- `merge_memory_guard.bytes_warning_threshold`
+- `merge_memory_guard.record_threshold_exceeded`
+- `merge_memory_guard.bytes_threshold_exceeded`
 - `validation_summary.windows[].status`
 - `validation_summary.windows[].passed`
 - `validation_summary.merged.status`
 - `validation_summary.merged.passed`
 
 The merge report is operational metadata only. It must not include raw full Markdown body, raw PDF text, or full sidecar record bodies.
+
+## visual_sidecar_contract_report.json
+
+Emitted by `scripts/validate_visual_sidecar_contract.py` and MCP `pdf2md_validate_visual_sidecars`.
+
+Required:
+
+- `schema_version`
+- `purpose="visual_sidecar_contract_validation"`
+- `output_dir`
+- `status`
+- `passed`
+- `summary`
+- `findings`
+
+Stable nested fields:
+
+- `summary.visual_sidecar_file_count`
+- `summary.figure_record_count`
+- `summary.page_layout_record_count`
+- `summary.figure_ocr_evidence_record_count`
+- `summary.figure_description_record_count`
+- `summary.figure_structure_record_count`
+- `summary.error_count`
+- `summary.warning_count`
+- `findings[].severity`
+- `findings[].code`
+- `findings[].file`
+- `findings[].line`
+- `findings[].record_id`
+- `findings[].field`
+- `findings[].message`
+
+Policy:
+
+- OCR evidence must cite the target figure through `source_refs` and must not replace Markdown/source text.
+- Generated figure descriptions must set `generated_text=true`, remain `generated_content_scope="sidecar_only"`, and keep `markdown_inserted=false`.
+- The report is validation metadata only. It must not include raw figure captions, OCR text, generated descriptions, raw PDF text, full Markdown body, or image bytes.
 
 ## debug/table-quality-review-pack.json
 

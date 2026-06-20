@@ -472,6 +472,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q128. MCP Profile Discovery Contract Alignment" not in next_plan
     assert "Q129. MCP SSD-RAG Contract Validator Tool" not in next_plan
     assert "Q130. Agent Rule Regeneration And Drift Guard" not in next_plan
+    assert "Q131. Large Spec Preflight Planner" not in next_plan
+    assert "Q132. Visual Sidecar Contract Validator" not in next_plan
+    assert "Q133. Page-Window Sidecar Merge Memory Guard" not in next_plan
     assert "현재 남은 작업 없음." in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
     assert "Q119. Table Confidence v2" not in next_plan
@@ -540,6 +543,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q128. MCP Profile Discovery Contract Alignment" not in development_specs
     assert "Q129. MCP SSD-RAG Contract Validator Tool" not in development_specs
     assert "Q130. Agent Rule Regeneration And Drift Guard" not in development_specs
+    assert "Q131. Large Spec Preflight Planner" not in development_specs
+    assert "Q132. Visual Sidecar Contract Validator" not in development_specs
+    assert "Q133. Page-Window Sidecar Merge Memory Guard" not in development_specs
     assert "현재 active 개발 명세 없음." in development_specs
     assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
     assert "Q119. Table Confidence v2" not in development_specs
@@ -568,8 +574,14 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q128. MCP Profile Discovery Contract Alignment" in implemented_specs
     assert "Q129. MCP SSD-RAG Contract Validator Tool" in implemented_specs
     assert "Q130. Agent Rule Regeneration And Drift Guard" in implemented_specs
+    assert "Q131. Large Spec Preflight Planner" in implemented_specs
+    assert "Q132. Visual Sidecar Contract Validator" in implemented_specs
+    assert "Q133. Page-Window Sidecar Merge Memory Guard" in implemented_specs
     assert "figure_ocr_evidence_rag.jsonl" in implemented_specs
     assert "pdf2md_validate_ssd_rag_contract" in implemented_specs
+    assert "pdf2md_plan_large_spec_conversion" in implemented_specs
+    assert "pdf2md_validate_visual_sidecars" in implemented_specs
+    assert "merge_memory_guard" in implemented_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
@@ -616,7 +628,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q130" in development_specs
+    assert "완료된 Q34-Q133" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q125. Domain Adapter Registry Hardening" in implemented_specs
     assert "adapter_metadata" in implemented_specs
@@ -730,6 +742,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "bounded OCR page chunk workers" in changelog
     assert "once per worker chunk instead of once per page" in changelog
     assert "context-resolvable markers avoid Tesseract calls" in changelog
+    assert "Q131-Q133 MCP stability guardrails" in changelog
+    assert "visual sidecar contract validation" in changelog
     assert "dependency-audit" in implemented_specs
     assert "pdf-outline-" in implemented_specs
     assert "scripts/run_preset_eval.py" in implemented_specs
@@ -807,12 +821,16 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "gui_options_fingerprint()" in implemented_specs
     assert "schema_version" in output_schema
     assert "docs/schema/manifest.schema.json" in output_schema
+    assert "docs/schema/page_window_merge_report.schema.json" in output_schema
+    assert "docs/schema/visual_sidecar_contract_report.schema.json" in output_schema
     assert "docs/schema/docling_benchmark_report.schema.json" in output_schema
     assert "docs/schema/docling_artifact_comparison.schema.json" in output_schema
     assert "ocr_backend_probe_report.json" in output_schema
     assert "docs/schema/ocr_backend_probe_report.schema.json" in output_schema
     assert "figure_description_eval_report.json" in output_schema
     assert "docs/schema/figure_description_eval_report.schema.json" in output_schema
+    assert "visual_sidecar_contract_report.json" in output_schema
+    assert "merge_memory_guard" in output_schema
     assert 'purpose="local_figure_description_eval"' in output_schema
     assert "options.ocr_backend" in output_schema
     assert "tesseract-cli" in output_schema

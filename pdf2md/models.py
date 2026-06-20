@@ -780,6 +780,105 @@ class ArtifactIntegrityReport(BaseModel):
     findings: list[ArtifactIntegrityFinding] = Field(default_factory=list)
 
 
+class VisualSidecarContractFinding(BaseModel):
+    severity: str
+    code: str
+    file: Optional[str] = None
+    line: Optional[int] = None
+    record_id: Optional[str] = None
+    field: Optional[str] = None
+    message: str
+
+
+class VisualSidecarContractSummary(BaseModel):
+    visual_sidecar_file_count: int = 0
+    figure_record_count: int = 0
+    page_layout_record_count: int = 0
+    figure_ocr_evidence_record_count: int = 0
+    figure_description_record_count: int = 0
+    figure_structure_record_count: int = 0
+    error_count: int = 0
+    warning_count: int = 0
+
+
+class VisualSidecarContractReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "visual_sidecar_contract_validation"
+    output_dir: str
+    status: str
+    passed: bool
+    manifest_options: Optional[dict[str, Any]] = None
+    report_summary: Optional[dict[str, Any]] = None
+    summary: VisualSidecarContractSummary = Field(default_factory=VisualSidecarContractSummary)
+    findings: list[VisualSidecarContractFinding] = Field(default_factory=list)
+
+
+class PageWindowSummary(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    window_id: str
+    source_window_page_range: str
+    selected_pages: list[int] = Field(default_factory=list)
+    output_subdir: str
+    status: Optional[str] = None
+
+
+class PageWindowSidecarFileInventory(BaseModel):
+    record_count: int = 0
+    byte_count: int = 0
+
+
+class PageWindowLargestSidecar(BaseModel):
+    file: Optional[str] = None
+    record_count: int = 0
+    byte_count: int = 0
+
+
+class PageWindowSidecarWindowInventory(BaseModel):
+    window_id: str
+    record_count: int = 0
+    byte_count: int = 0
+    file_record_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class PageWindowSidecarInventory(BaseModel):
+    total_record_count: int = 0
+    total_byte_count: int = 0
+    largest_sidecar: PageWindowLargestSidecar = Field(default_factory=PageWindowLargestSidecar)
+    by_file: dict[str, PageWindowSidecarFileInventory] = Field(default_factory=dict)
+    by_window: list[PageWindowSidecarWindowInventory] = Field(default_factory=list)
+
+
+class PageWindowMergeMemoryGuard(BaseModel):
+    record_warning_threshold: int = 0
+    bytes_warning_threshold: int = 0
+    record_threshold_exceeded: bool = False
+    bytes_threshold_exceeded: bool = False
+
+
+class PageWindowMergeWarning(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    code: str
+    message: str
+
+
+class PageWindowMergeReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "page_window_merge"
+    source_pdf_sha256: Optional[str] = None
+    output_dir: str
+    window_count: int = 0
+    windows: list[PageWindowSummary] = Field(default_factory=list)
+    merged_record_counts: dict[str, int] = Field(default_factory=dict)
+    id_collision_count: int = 0
+    rewritten_id_count: int = 0
+    sidecar_inventory: PageWindowSidecarInventory = Field(default_factory=PageWindowSidecarInventory)
+    merge_memory_guard: PageWindowMergeMemoryGuard = Field(default_factory=PageWindowMergeMemoryGuard)
+    validation_summary: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[PageWindowMergeWarning] = Field(default_factory=list)
+
+
 class DoclingBenchmarkFinding(BaseModel):
     severity: str
     code: str

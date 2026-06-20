@@ -23,9 +23,11 @@ from pdf2md.models import (
     LocalCorpusEvidencePack,
     Manifest,
     OCRBackendProbeReport,
+    PageWindowMergeReport,
     ProvenanceIntegrityReport,
     Report,
     RequirementChangeImpactReport,
+    VisualSidecarContractReport,
 )
 
 
@@ -41,6 +43,8 @@ SCHEMA_FILES: dict[str, type] = {
     "index_contract_report.schema.json": IndexContractReport,
     "provenance_integrity_report.schema.json": ProvenanceIntegrityReport,
     "artifact_integrity_report.schema.json": ArtifactIntegrityReport,
+    "page_window_merge_report.schema.json": PageWindowMergeReport,
+    "visual_sidecar_contract_report.schema.json": VisualSidecarContractReport,
     "docling_benchmark_report.schema.json": DoclingBenchmarkReport,
     "docling_artifact_comparison.schema.json": DoclingArtifactComparisonReport,
     "latest_nvme_spec_benchmark_report.schema.json": LatestNvmeSpecBenchmarkReport,
