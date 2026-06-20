@@ -623,6 +623,13 @@ Stable backend fields:
 - `confidence_normalization`
 - `language_data`
 - `dependencies[]`
+
+Policy:
+
+- Conversion-time `--ocr-backend` supports `tesseract`, `tesseract-cli`, `rapidocr`, and `ocrmac`.
+- `tesseract` remains the default backend.
+- Optional backend dependency or platform absence is reported as structured `OCR_RUNTIME_UNAVAILABLE` warning, not a fatal conversion error.
+- Confidence diagnostics include raw and normalized confidence units so downstream reports can interpret backend-specific values.
 - `hints[]`
 
 Policy:

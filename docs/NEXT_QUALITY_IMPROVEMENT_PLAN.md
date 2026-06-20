@@ -23,13 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q123. OCR Backend Registry Expansion
-
-현재 `tesseract` 기본 경로를 유지하면서 `tesseract-cli`, `rapidocr`, `ocrmac` 등 optional OCR backend를 `pdf2md` 네이티브 protocol로 확장한다.
-optional dependency 미설치는 fatal이 아니라 structured warning/report로 처리한다.
-
-상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
-
 ### P1 / Q124. Figure Semantics v2
 
 figure kind, observed text, generated description, structure evidence를 명확히 분리해 visual technical spec RAG 품질을 높인다.

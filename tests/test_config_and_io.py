@@ -24,8 +24,13 @@ def test_config_validates_retrieval_chunk_options(tmp_path: Path) -> None:
     with pytest.raises(ValidationError):
         Config(input_pdf=input_pdf, output_dir=tmp_path / "out", retrieval_tokenizer="unknown")
 
+    assert Config(input_pdf=input_pdf, output_dir=tmp_path / "out", ocr_backend="rapidocr").ocr_backend == "rapidocr"
+    assert Config(input_pdf=input_pdf, output_dir=tmp_path / "out", ocr_backend="tesseract-cli").ocr_backend == (
+        "tesseract-cli"
+    )
+
     with pytest.raises(ValidationError):
-        Config(input_pdf=input_pdf, output_dir=tmp_path / "out", ocr_backend="rapidocr")
+        Config(input_pdf=input_pdf, output_dir=tmp_path / "out", ocr_backend="unknown-ocr")
 
 
 def test_config_accepts_visual_technical_spec_rag_profile(tmp_path: Path) -> None:

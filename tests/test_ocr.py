@@ -5,6 +5,15 @@ from types import SimpleNamespace
 import pdf2md.extractors.ocr as ocr_module
 import pdf2md.extractors.ocr_backends.tesseract as tesseract_backend_module
 from pdf2md.extractors.ocr import run_ocr
+from pdf2md.extractors.ocr_backends import get_ocr_backend, supported_ocr_backends
+
+
+BACKEND_DIAGNOSTICS = {
+    "ocr_backend_raw_confidence_unit": "0_to_100",
+    "ocr_backend_normalized_confidence_unit": "0_to_1",
+    "ocr_backend_higher_is_better": True,
+    "ocr_backend_supports_languages": True,
+}
 
 
 class _FakePage:
@@ -38,6 +47,13 @@ def _patch_ocr_runtime(monkeypatch, image_to_string, image_to_data) -> None:  # 
     monkeypatch.setattr(ocr_module, "pytesseract", fake_tesseract)
     monkeypatch.setattr(ocr_module, "pdfium", SimpleNamespace(PdfDocument=_FakeDocument))
     monkeypatch.setattr(tesseract_backend_module.shutil, "which", lambda name: "/usr/bin/tesseract")
+
+
+def test_ocr_backend_registry_exposes_optional_native_adapters() -> None:
+    assert supported_ocr_backends() == ("tesseract", "tesseract-cli", "rapidocr", "ocrmac")
+    assert get_ocr_backend("tesseract-cli", pytesseract_module=None).metadata.raw_confidence_unit == "0_to_100"
+    assert get_ocr_backend("rapidocr", pytesseract_module=None).metadata.raw_confidence_unit == "0_to_1"
+    assert get_ocr_backend("ocrmac", pytesseract_module=None).metadata.raw_confidence_unit == "backend_specific"
 
 
 def test_run_ocr_passes_language_to_tesseract(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
@@ -128,10 +144,11 @@ def test_run_ocr_reports_empty_result_with_confidence_metrics(sample_pdf, monkey
         "ocr_confidence_mean": 0.0,
         "ocr_confidence_median": 0.0,
         "low_conf_token_ratio": 1.0,
-        "force_ocr": False,
-        "attempt_reason": "empty_text_layer",
-        "existing_text_char_count": 0,
-    }
+            "force_ocr": False,
+            "attempt_reason": "empty_text_layer",
+            "existing_text_char_count": 0,
+            **BACKEND_DIAGNOSTICS,
+        }
 
 
 def test_run_ocr_reports_missing_language_data_as_runtime_diagnostic(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
@@ -150,10 +167,11 @@ def test_run_ocr_reports_missing_language_data_as_runtime_diagnostic(sample_pdf,
     assert result.used_ocr is False
     assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
     assert result.warnings[0].details == {
-        "ocr_lang": "kor+eng",
-        "ocr_backend": "tesseract",
-        "reason": "language_data_missing",
-    }
+            "ocr_lang": "kor+eng",
+            "ocr_backend": "tesseract",
+            "reason": "language_data_missing",
+            **BACKEND_DIAGNOSTICS,
+        }
 
 
 def test_run_ocr_reports_missing_tesseract_executable_with_attempt_context(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
@@ -172,10 +190,11 @@ def test_run_ocr_reports_missing_tesseract_executable_with_attempt_context(sampl
     assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
     assert result.warnings[0].details == {
         "ocr_lang": "kor+eng",
-        "ocr_backend": "tesseract",
-        "reason": "tesseract_unavailable",
-        "attempted_pages": [1],
-    }
+            "ocr_backend": "tesseract",
+            "reason": "tesseract_unavailable",
+            "attempted_pages": [1],
+            **BACKEND_DIAGNOSTICS,
+        }
 
 
 def test_run_ocr_runtime_unavailable_records_attempt_without_text(sample_pdf, monkeypatch) -> None:  # noqa: ANN001
@@ -190,25 +209,43 @@ def test_run_ocr_runtime_unavailable_records_attempt_without_text(sample_pdf, mo
     assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
     assert result.warnings[0].details == {
         "ocr_lang": "eng",
-        "ocr_backend": "tesseract",
-        "reason": "dependency_unavailable",
-        "attempted_pages": [1],
-    }
+            "ocr_backend": "tesseract",
+            "reason": "dependency_unavailable",
+            "attempted_pages": [1],
+            **BACKEND_DIAGNOSTICS,
+        }
 
 
 def test_run_ocr_reports_unsupported_backend_without_attempting_text(sample_pdf) -> None:  # noqa: ANN001
-    result = run_ocr(sample_pdf, [1], {1: ""}, force_ocr=False, ocr_lang="eng", ocr_backend="rapidocr")
+    result = run_ocr(sample_pdf, [1], {1: ""}, force_ocr=False, ocr_lang="eng", ocr_backend="unknown-ocr")
 
     assert result.used_ocr is False
     assert result.runtime_available is False
     assert result.attempted_pages == [1]
     assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
     assert result.warnings[0].details == {
-        "ocr_lang": "eng",
-        "ocr_backend": "rapidocr",
-        "reason": "unsupported_ocr_backend",
-        "attempted_pages": [1],
-    }
+            "ocr_lang": "eng",
+            "ocr_backend": "unknown-ocr",
+            "reason": "unsupported_ocr_backend",
+            "attempted_pages": [1],
+        }
+
+
+def test_run_ocr_accepts_optional_backend_and_reports_structured_unavailable(
+    sample_pdf,
+    monkeypatch,
+) -> None:  # noqa: ANN001
+    monkeypatch.setattr(ocr_module, "pdfium", None)
+
+    result = run_ocr(sample_pdf, [1], {1: ""}, force_ocr=False, ocr_lang="eng", ocr_backend="ocrmac")
+
+    assert result.used_ocr is False
+    assert result.runtime_available is False
+    assert result.attempted_pages == [1]
+    assert result.warnings[0].code == "OCR_RUNTIME_UNAVAILABLE"
+    assert result.warnings[0].details["ocr_backend"] == "ocrmac"
+    assert result.warnings[0].details["reason"] in {"platform_unsupported", "dependency_unavailable"}
+    assert result.warnings[0].details["ocr_backend_raw_confidence_unit"] == "backend_specific"
 
 
 def test_run_ocr_parallel_pages_merge_in_page_order(sample_pdf, monkeypatch) -> None:  # noqa: ANN001

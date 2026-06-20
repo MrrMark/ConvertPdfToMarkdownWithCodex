@@ -114,7 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--ocr-backend",
         choices=SUPPORTED_OCR_BACKENDS,
         default="tesseract",
-        help="OCR backend for conversion. Currently only tesseract is implemented.",
+        help="OCR backend for conversion. Defaults to tesseract; optional backends report structured warnings when unavailable.",
     )
     parser.add_argument(
         "--page-workers",

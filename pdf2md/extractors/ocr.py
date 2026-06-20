@@ -137,6 +137,16 @@ def _ocr_attempt_context(
     }
 
 
+def _backend_diagnostic_fields(backend: OCRBackend) -> dict[str, object]:
+    metadata = backend.metadata
+    return {
+        "ocr_backend_raw_confidence_unit": metadata.raw_confidence_unit,
+        "ocr_backend_normalized_confidence_unit": metadata.normalized_confidence_unit,
+        "ocr_backend_higher_is_better": metadata.higher_is_better,
+        "ocr_backend_supports_languages": metadata.supports_languages,
+    }
+
+
 def _confidence_warning_for_page(
     *,
     page_number: int,
@@ -144,6 +154,7 @@ def _confidence_warning_for_page(
     ocr_lang: str,
     ocr_backend: str,
     ocr_context: dict,
+    backend_diagnostics: dict[str, object],
 ) -> WarningEntry | None:
     if (
         metrics.mean < OCR_CRITICAL_CONFIDENCE_MEAN_THRESHOLD
@@ -159,6 +170,7 @@ def _confidence_warning_for_page(
                 "ocr_confidence_mean": metrics.mean,
                 "ocr_confidence_median": metrics.median,
                 "low_conf_token_ratio": metrics.low_conf_token_ratio,
+                **backend_diagnostics,
                 **ocr_context,
             },
         )
@@ -176,6 +188,7 @@ def _confidence_warning_for_page(
                 "ocr_confidence_mean": metrics.mean,
                 "ocr_confidence_median": metrics.median,
                 "low_conf_token_ratio": metrics.low_conf_token_ratio,
+                **backend_diagnostics,
                 **ocr_context,
             },
         )
@@ -218,6 +231,7 @@ def _run_ocr_for_page(
                 ocr_lang=ocr_lang,
                 ocr_backend=backend.metadata.name,
                 ocr_context=ocr_context,
+                backend_diagnostics=_backend_diagnostic_fields(backend),
             )
             if confidence_warning is not None:
                 result.warnings.append(confidence_warning)
@@ -234,6 +248,7 @@ def _run_ocr_for_page(
                         "ocr_confidence_mean": metrics.mean,
                         "ocr_confidence_median": metrics.median,
                         "low_conf_token_ratio": metrics.low_conf_token_ratio,
+                        **_backend_diagnostic_fields(backend),
                         **ocr_context,
                     },
                 )
@@ -249,6 +264,7 @@ def _run_ocr_for_page(
                         "ocr_lang": ocr_lang,
                         "ocr_backend": backend.metadata.name,
                         "reason": "language_data_missing",
+                        **_backend_diagnostic_fields(backend),
                     },
                 )
             )
@@ -262,6 +278,7 @@ def _run_ocr_for_page(
                         "ocr_lang": ocr_lang,
                         "ocr_backend": backend.metadata.name,
                         "reason": "ocr_failed",
+                        **_backend_diagnostic_fields(backend),
                     },
                 )
             )
@@ -292,8 +309,10 @@ def _run_ocr_page_chunk(
                 message=f"Failed to open PDF for OCR: {exc}",
                 details={
                     "ocr_lang": ocr_lang,
+                    "ocr_backend": backend.metadata.name,
                     "reason": "pdf_open_failed",
                     "attempted_pages": list(pages),
+                    **_backend_diagnostic_fields(backend),
                 },
             )
         )
@@ -362,16 +381,33 @@ def run_ocr(
         )
         return result
 
-    if pdfium is None or not backend.is_available():
+    if not backend.is_available():
+        unavailable_reason = backend.configure_runtime() or "dependency_unavailable"
         result.warnings.append(
             WarningEntry(
                 code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
-                message="OCR dependencies are unavailable. Install pytesseract and pypdfium2.",
+                message=f"OCR dependencies are unavailable for backend '{backend.metadata.name}'.",
                 details={
                     "ocr_lang": ocr_lang,
                     "ocr_backend": backend.metadata.name,
-                    "reason": "dependency_unavailable",
+                    "reason": unavailable_reason,
                     "attempted_pages": target_pages,
+                    **_backend_diagnostic_fields(backend),
+                },
+            )
+        )
+        return result
+    if pdfium is None:
+        result.warnings.append(
+            WarningEntry(
+                code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
+                message="PDF rendering runtime is unavailable for OCR.",
+                details={
+                    "ocr_lang": ocr_lang,
+                    "ocr_backend": backend.metadata.name,
+                    "reason": "pdf_renderer_unavailable",
+                    "attempted_pages": target_pages,
+                    **_backend_diagnostic_fields(backend),
                 },
             )
         )
@@ -382,12 +418,13 @@ def run_ocr(
         result.warnings.append(
             WarningEntry(
                 code=WarningCode.OCR_RUNTIME_UNAVAILABLE,
-                message="Tesseract executable is unavailable. Install tesseract or add it to PATH.",
+                message=f"OCR runtime is unavailable for backend '{backend.metadata.name}'.",
                 details={
                     "ocr_lang": ocr_lang,
                     "ocr_backend": backend.metadata.name,
                     "reason": runtime_error_reason,
                     "attempted_pages": target_pages,
+                    **_backend_diagnostic_fields(backend),
                 },
             )
         )

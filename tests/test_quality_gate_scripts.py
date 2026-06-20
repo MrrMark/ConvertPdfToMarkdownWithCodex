@@ -732,15 +732,21 @@ def test_ocr_backend_probe_reports_ready_tesseract_and_optional_backends(monkeyp
     monkeypatch.setattr(probe_ocr_backends, "_discover_tesseract", lambda: "/usr/bin/tesseract")
     monkeypatch.setattr(probe_ocr_backends, "_list_tesseract_languages", lambda executable: (["eng", "kor"], None))
 
-    report = probe_ocr_backends.probe_ocr_backends(ocr_lang="kor+eng", backends="tesseract,rapidocr,docling")
+    report = probe_ocr_backends.probe_ocr_backends(
+        ocr_lang="kor+eng",
+        backends="tesseract,tesseract-cli,rapidocr,ocrmac,docling",
+    )
     by_backend = {record["backend"]: record for record in report["backends"]}
 
-    assert report["summary"]["ready_backends"] == ["tesseract", "docling"]
+    assert report["summary"]["ready_backends"] == ["tesseract", "tesseract-cli", "docling"]
     assert report["summary"]["recommended_backend"] == "tesseract"
     assert by_backend["tesseract"]["ready"] is True
+    assert by_backend["tesseract-cli"]["ready"] is True
+    assert by_backend["tesseract-cli"]["dependencies"][0]["name"] == "tesseract"
     assert by_backend["tesseract"]["language_data"]["missing"] == []
     assert by_backend["tesseract"]["confidence_normalization"]["raw_unit"] == "0_to_100"
     assert by_backend["rapidocr"]["status"] == "unavailable"
+    assert by_backend["ocrmac"]["status"] in {"available", "unavailable"}
     assert by_backend["docling"]["module_available"] is True
     assert report["raw_content_included"] is False
 
