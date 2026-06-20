@@ -623,6 +623,7 @@ Stable backend fields:
 - `confidence_normalization`
 - `language_data`
 - `dependencies[]`
+- `hints[]`
 
 Policy:
 
@@ -630,10 +631,6 @@ Policy:
 - `tesseract` remains the default backend.
 - Optional backend dependency or platform absence is reported as structured `OCR_RUNTIME_UNAVAILABLE` warning, not a fatal conversion error.
 - Confidence diagnostics include raw and normalized confidence units so downstream reports can interpret backend-specific values.
-- `hints[]`
-
-Policy:
-
 - The probe never runs OCR on document content and does not include PDF text, image bytes, or customer paths.
 - Tesseract language data is checked when the backend uses the Tesseract runtime.
 - Non-Tesseract backend language support is recorded as unchecked until a backend adapter normalizes it.

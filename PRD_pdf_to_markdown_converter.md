@@ -641,6 +641,12 @@ pdf2md INPUT_PDF [OPTIONS]
 - appendix 출력 모드
 - figure/table caption confidence model
 
+현재 구현 기준 보충:
+
+- Docling은 canonical runtime backend나 필수 dependency로 채택하지 않는다.
+- Docling 관련 기능은 local-only sanitized comparison/evidence path로 유지한다.
+- Docling에서 참고한 구조는 `pdf2md` native Document IR, layout sidecar, OCR backend registry, figure/domain sidecar로 이식한다.
+
 ---
 
 ## 16. Codex 구현 지시사항

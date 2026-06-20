@@ -32,7 +32,7 @@ CLI와 GUI preset은 같은 local-only profile matrix를 사용한다.
 | --- | --- | --- |
 | `preserve` | 기본 원문 보존 | RAG table sidecar와 chunk 보강 옵션을 보수적으로 끔 |
 | `rag_optimized` | 일반 RAG ingest | RAG table both, page marker, header/footer removal, hyphen repair, contextual embedding text, sibling merge, relationship metadata |
-| `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg|spdm|manual`와 함께 사용 |
+| `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg|spdm|customer-requirements|manual`와 함께 사용 |
 | `technical_spec_rag_visual` | storage/PCIe/security spec visual ingest | `technical_spec_rag`에 figure text chunk, figure region OCR, deterministic figure description, figure structure sidecar 추가 |
 | `confidential_rag` | 공유/evidence pack | confidential-safe mode, JSONL table sidecar, chunk 보강, sanitized report |
 | `preserve_with_sidecars` | Markdown 원문 보존 + sidecar ingest | 본문 변화 가능성이 있는 header/footer/hyphen repair는 끄고 JSONL sidecar와 relationship metadata만 추가 |
@@ -82,6 +82,8 @@ python3 -m pdf2md customer-spec.pdf -o output/customer \
 운영 정책:
 
 - `domain_units_rag.jsonl`의 `domain`은 `manual`로 유지하고, `adapter_profile`에 manual label을 기록한다.
+- `adapter_metadata.ssd_agent_spec_type`은 `CustomerRequirement`로 기록된다.
+- `adapter_metadata.required_normalized_fields`와 `cross_spec_compatibility.source_id_fields`는 downstream mapping 전까지 보존한다.
 - manual keywords는 table header matching을 넓히는 데만 사용한다.
 - domain unit의 `text`, `name`, `value`, `description`은 표 또는 typed technical table sidecar에서 관측된 값만 사용한다.
 - 고객별 downstream mapping은 RAG/indexer 쪽 profile 문서에서 `manual` adapter label을 기준으로 관리한다.
@@ -164,7 +166,7 @@ python scripts/run_preset_eval.py \
 - `preset_artifact_comparison.json`: raw content 없이 artifact 존재/크기/record count와 주요 metric delta
 - `preset_scorecard.md`: 사람이 빠르게 보는 점수표
 
-`technical_spec_rag`는 `--domain-adapter nvme|pcie|ocp|tcg|spdm|manual`를 함께 지정해야 domain unit, technical table, SSD contract gate가 의미 있게 동작한다. 실제 corpus 원문은 커밋하지 않고 위 세 파일처럼 sanitized summary만 공유한다.
+`technical_spec_rag`는 `--domain-adapter nvme|pcie|ocp|tcg|spdm|customer-requirements|manual`를 함께 지정해야 domain unit, technical table, SSD contract gate가 의미 있게 동작한다. 실제 corpus 원문은 커밋하지 않고 위 세 파일처럼 sanitized summary만 공유한다.
 
 release gate에 포함:
 
@@ -300,7 +302,7 @@ python scripts/run_release_gates.py \
 
 ## Multi OCR Backend Probe
 
-OCR backend adapter를 도입하기 전에는 backend별 설치 상태와 confidence 단위를 먼저 local-only probe로 확인한다.
+OCR backend registry를 운영 환경에 적용하기 전에는 backend별 설치 상태와 confidence 단위를 먼저 local-only probe로 확인한다.
 
 ```bash
 python scripts/probe_ocr_backends.py \
@@ -323,7 +325,8 @@ python scripts/run_release_gates.py \
 
 - probe는 OCR을 문서에 적용하지 않고 module, executable, language data, platform support만 기록한다.
 - `ocr_backend_probe_report.json`에는 raw PDF text, image bytes, customer path를 넣지 않는다.
-- Tesseract 계열은 language data를 확인하고, RapidOCR/EasyOCR/OCRmac/Docling은 adapter 구현 전까지 availability와 confidence normalization hint만 기록한다.
+- Tesseract 계열은 language data를 확인하고, RapidOCR/OCRmac은 optional runtime availability와 confidence normalization hint를 함께 기록한다.
+- EasyOCR/Docling은 현재 canonical conversion backend가 아니므로 probe/evidence 용도로만 취급한다.
 
 ## OpenAI Vector Store / Generic Embedding Pipeline
 
@@ -367,8 +370,11 @@ Profile mapping:
 | `ocp` | `HIL` | `OCP` |
 | `tcg` | `HIL` | `TCG` |
 | `spdm` | `HIL` | `SPDM` |
+| `customer-requirements` | `HIL` | `CustomerRequirement` |
+| `manual` | `HIL` | `CustomerRequirement` |
 
 `TCG`와 `SPDM`은 first-class `spec_type`으로 취급한다. `CustomerRequirement + feature_name=TCG/SPDM` fallback은 사용하지 않는다.
+Q125 이후 이 mapping은 `domain_units_rag.jsonl.adapter_metadata`와 `scripts/validate_ssd_rag_contract.py`의 registry 기반 validator로 검증한다.
 
 RagChunk/RagCitation mapping:
 
@@ -390,13 +396,14 @@ python scripts/validate_ssd_rag_contract.py --output-dir output/nvme --ssd-agent
 python scripts/validate_ssd_rag_contract.py --output-dir output/ocp --ssd-agent-domain HIL --ssd-agent-spec-type OCP --domain-adapter ocp
 python scripts/validate_ssd_rag_contract.py --output-dir output/tcg --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
 python scripts/validate_ssd_rag_contract.py --output-dir output/spdm --ssd-agent-domain HIL --ssd-agent-spec-type SPDM --domain-adapter spdm
+python scripts/validate_ssd_rag_contract.py --output-dir output/customer --ssd-agent-domain HIL --ssd-agent-spec-type CustomerRequirement --domain-adapter manual
 python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error
 python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error --evidence-pack
 python scripts/analyze_corpus_evidence_pack.py --evidence-pack local_corpus_evidence_pack.json
 python scripts/compare_corpus_evidence_packs.py --baseline old_evidence_pack.json --current local_corpus_evidence_pack.json --fail-on-new-signature
 ```
 
-운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg|spdm|manual`를 필수로 지정한다. `--domain-adapter nvme` 검증은 NVMe Base와 NVM Command Set 모두에 대해 core NVMe domain unit, Command Set CDW/pointer/status taxonomy normalized fields, command relationship metadata, technical table provenance, stable metadata, `requirement_traceability_rag.jsonl` 존재 여부까지 확인한다. `--domain-adapter ocp` 검증은 OCP requirement domain unit, `requirement_id`/`requirement_prefix`/`requirement_family` normalized fields, source table row metadata, stable metadata, `requirement_traceability_rag.jsonl` 존재 여부를 확인한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
+운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg|spdm|customer-requirements|manual`를 필수로 지정한다. `--domain-adapter nvme` 검증은 NVMe Base와 NVM Command Set 모두에 대해 core NVMe domain unit, Command Set CDW/pointer/status taxonomy normalized fields, command relationship metadata, technical table provenance, stable metadata, `requirement_traceability_rag.jsonl` 존재 여부까지 확인한다. `--domain-adapter ocp` 검증은 OCP requirement domain unit, `requirement_id`/`requirement_prefix`/`requirement_family` normalized fields, source table row metadata, stable metadata, `requirement_traceability_rag.jsonl` 존재 여부를 확인한다. Q125 registry metadata가 있는 record는 `adapter_metadata.registry_version`, `adapter_metadata.unit_taxonomy`, `adapter_metadata.evaluator_hooks`, `cross_spec_compatibility.compatible_adapters`, stable source id fields까지 검사한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
 
 ## Azure AI Search
 
