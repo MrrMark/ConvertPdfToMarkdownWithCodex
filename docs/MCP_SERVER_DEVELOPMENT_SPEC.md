@@ -86,6 +86,40 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 - `rag_sidecar_scopes`
 - `ocr_backends`
 
+### `pdf2md_plan_large_spec_conversion`
+
+목적:
+
+- NVMe Base 같은 대형 technical spec을 변환하기 전에 page-window, profile, image mode, timeout 기본값을 보수적으로 추천한다.
+- full conversion을 실행하지 않고 PDF page count와 소수 sample page의 text/image/table density만 확인한다.
+
+주요 입력:
+
+- `input_pdf`
+- `pages`
+- `password`
+- `sample_page_count`
+- `domain_adapter`
+- `prefer_visual`
+- `prefer_assetless`
+
+출력:
+
+- `purpose="large_spec_preflight_plan"`
+- `source_sha256`
+- `selected_page_count`
+- `sampled_pages`
+- `sample_metrics`
+- `estimates`
+- `recommendation.preferred_mcp_tool`
+- `recommendation.recommended_options`
+
+정책:
+
+- 응답에는 raw PDF text, Markdown body, table cell content, image bytes를 포함하지 않는다.
+- text/table 중심 ingest는 기본적으로 `technical_spec_rag`, 대형 문서는 `image_mode=none`과 page-window workflow를 우선 추천한다.
+- `prefer_visual=true`일 때만 `technical_spec_rag_visual`과 visual sidecar 보존 경로를 추천한다.
+
 ### `pdf2md_plan_page_windows`
 
 목적:
@@ -154,12 +188,15 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 - `window_size`
 - `validate_windows`
 - `validate_merged`
+- `merge_record_warning_threshold`
+- `merge_bytes_warning_threshold`
 
 정책:
 
 - original page number와 source sha256을 보존한다.
 - `chunk_id`, `requirement_id`, `stable_requirement_seed`, `technical_table_id`, `domain_unit_id` collision은 deterministic하게 rewrite한다.
 - merged sidecar record에는 필요한 경우 `source_window_id`, `source_window_page_range`를 추가한다.
+- merge 전에 window별 sidecar record/byte inventory를 계산하고, threshold 초과 시 warning과 `merge_memory_guard`를 기록한다.
 - merge report에는 raw full text나 full Markdown body를 포함하지 않는다.
 
 출력:
@@ -167,6 +204,7 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 - merged `document.md`, `manifest.json`, `report.json`
 - merged RAG/domain sidecars
 - `page_window_merge_report.json`
+- compact `sidecar_inventory`
 
 ### `pdf2md_convert_pdf_windowed`
 
@@ -178,6 +216,7 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 
 - simple client는 이 tool 하나로 windowed conversion을 실행할 수 있다.
 - 실패한 window가 있으면 merge 전에 structured response로 실패 window와 report URI를 확인할 수 있어야 한다.
+- `merge_record_warning_threshold`, `merge_bytes_warning_threshold`를 `pdf2md_merge_window_outputs`까지 전달한다.
 
 ### `pdf2md_convert_pdf`
 
@@ -287,6 +326,30 @@ PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output" pdf2md-mcp --p
 - 전체 report payload를 MCP 응답에 직접 싣지 않는다.
 - `sample_mapped_chunk`, raw spec text, full Markdown body, table row content, image bytes는 tool result에 포함하지 않는다.
 - `report_uri`, `summary`, `errors_preview`, `warnings_preview`, artifact URI만 반환한다.
+
+### `pdf2md_validate_visual_sidecars`
+
+목적:
+
+- 변환된 visual sidecar bundle이 source figure와 안전하게 연결되어 있는지 검증한다.
+- `scripts/validate_visual_sidecar_contract.py`와 같은 local-only validator를 MCP surface로 제공한다.
+
+주요 입력:
+
+- `output_dir`
+- `require_visual_sidecars`
+- `fail_on_warning`
+- `finding_limit`
+
+출력 파일:
+
+- `visual_sidecar_contract_report.json`
+
+응답 정책:
+
+- 전체 report payload를 MCP 응답에 직접 싣지 않는다.
+- figure caption, generated description, OCR text, raw spec text, full Markdown body, image bytes는 tool result에 포함하지 않는다.
+- `report_uri`, `summary`, 제한된 `findings_preview`, artifact URI만 반환한다.
 
 ### `pdf2md_inspect_report`
 

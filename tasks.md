@@ -82,6 +82,7 @@ P0 안정화 후 구현:
 - M07은 Q103에서 이미지 파일 업로드가 불가능한 RAG 환경 대응, Q104에서 Docling 벤치마크 하네스, Q105에서 Docling-informed 확장 설계를 완료했다.
 - M08은 Q118에서 내부 IR 기반 serializer boundary, Q119에서 table confidence v2, Q120에서 native hybrid chunking v2, Q121에서 layout sidecar diagnostics, Q122에서 region OCR evidence v2, Q123에서 OCR backend registry expansion, Q124에서 figure semantics v2, Q125에서 domain adapter registry hardening을 완료했다.
 - M09는 Q127-Q130에서 Agent Skill, client rule, MCP discovery/validation surface를 최신 sidecar 계약에 맞추는 작업을 완료했다.
+- M10은 Q131-Q133에서 대형 technical spec preflight, visual sidecar contract validator, page-window merge memory guard를 완료했다.
 
 ### M01. pipeline/report 집계 책임 분리
 
@@ -151,6 +152,12 @@ P0 안정화 후 구현:
 - client rule은 canonical Skill을 가리키는 얇은 adapter로 유지하고, 변경 후 재생성/drift 검증 절차를 보강(Q130 완료)
 - MCP `pdf2md_list_profiles` discovery metadata와 SSD-RAG contract validation surface를 최신화(Q128-Q129 완료)
 - `ssd-verification-agent` repo 구현은 별도 후속 범위로 분리
+
+### M10. 대형 스펙 MCP 운영 안정성
+
+- full conversion 전에 `pdf2md_plan_large_spec_conversion`으로 window/profile/image mode/timeout 권고를 생성(Q131 완료)
+- `visual_sidecar_contract_report.json`과 MCP `pdf2md_validate_visual_sidecars`로 visual sidecar source linkage와 generated content sidecar-only 계약을 검증(Q132 완료)
+- page-window merge 전에 sidecar record/byte inventory를 집계하고 advisory memory guard warning을 남긴다(Q133 완료)
 
 ---
 

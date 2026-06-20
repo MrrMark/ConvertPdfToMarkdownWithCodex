@@ -64,6 +64,8 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "index_contract_report.schema.json",
         "provenance_integrity_report.schema.json",
         "artifact_integrity_report.schema.json",
+        "page_window_merge_report.schema.json",
+        "visual_sidecar_contract_report.schema.json",
         "docling_benchmark_report.schema.json",
         "docling_artifact_comparison.schema.json",
         "latest_nvme_spec_benchmark_report.schema.json",
@@ -97,6 +99,18 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     assert provenance_schema["properties"]["purpose"]["default"] == "rag_provenance_integrity_validation"
     artifact_schema = json.loads((output_dir / "artifact_integrity_report.schema.json").read_text(encoding="utf-8"))
     assert artifact_schema["properties"]["purpose"]["default"] == "output_artifact_integrity_validation"
+    page_window_schema = json.loads((output_dir / "page_window_merge_report.schema.json").read_text(encoding="utf-8"))
+    assert page_window_schema["properties"]["purpose"]["default"] == "page_window_merge"
+    assert "sidecar_inventory" in page_window_schema["properties"]
+    assert "merge_memory_guard" in page_window_schema["properties"]
+    visual_contract_schema = json.loads(
+        (output_dir / "visual_sidecar_contract_report.schema.json").read_text(encoding="utf-8")
+    )
+    assert visual_contract_schema["properties"]["purpose"]["default"] == "visual_sidecar_contract_validation"
+    assert (
+        "figure_description_record_count"
+        in visual_contract_schema["$defs"]["VisualSidecarContractSummary"]["properties"]
+    )
     docling_benchmark_schema = json.loads(
         (output_dir / "docling_benchmark_report.schema.json").read_text(encoding="utf-8")
     )

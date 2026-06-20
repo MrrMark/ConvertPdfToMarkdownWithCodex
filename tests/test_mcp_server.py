@@ -466,7 +466,61 @@ def test_merge_window_outputs_rewrites_collisions_and_validates(tmp_path: Path) 
     assert report["summary"]["retrieval_chunk_record_count"] == 2
     assert report["summary"]["domain_unit_record_count"] == 2
     assert merge_report["purpose"] == "page_window_merge"
+    assert merge_report["sidecar_inventory"]["total_record_count"] == 6
+    assert merge_report["merge_memory_guard"]["record_threshold_exceeded"] is False
     assert "Chunk page" not in json.dumps(merge_report, ensure_ascii=False, sort_keys=True)
+
+
+def test_merge_window_outputs_warns_on_large_sidecar_inventory(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "spec.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(texts=[PositionedText(f"Page {page}", 72, 760)])
+            for page in range(1, 3)
+        ],
+    )
+    source_sha256 = hashlib.sha256(input_pdf.read_bytes()).hexdigest()
+    output_root = tmp_path / "out"
+    _write_window_output(
+        output_root=output_root,
+        window_id="pages-0001-0001",
+        page=1,
+        source_sha256=source_sha256,
+        input_pdf=input_pdf,
+    )
+    _write_window_output(
+        output_root=output_root,
+        window_id="pages-0002-0002",
+        page=2,
+        source_sha256=source_sha256,
+        input_pdf=input_pdf,
+    )
+
+    result = mcp_server.merge_window_outputs(
+        input_pdf=str(input_pdf),
+        output_dir=str(output_root),
+        window_size=1,
+        validate_windows=False,
+        validate_merged=False,
+        merge_record_warning_threshold=1,
+        merge_bytes_warning_threshold=1,
+        roots=[tmp_path],
+        project_root=Path.cwd(),
+    )
+
+    merge_report = json.loads((output_root / "page_window_merge_report.json").read_text(encoding="utf-8"))
+    warning_codes = {warning["code"] for warning in result["warnings_preview"]}
+
+    assert result["status"] == "warning"
+    assert result["sidecar_inventory"]["total_record_count"] == 6
+    assert result["sidecar_inventory"]["total_byte_count"] > 1
+    assert "page_window_merge_record_guard" in warning_codes
+    assert "page_window_merge_byte_guard" in warning_codes
+    assert merge_report["merge_memory_guard"]["record_threshold_exceeded"] is True
+    assert merge_report["merge_memory_guard"]["bytes_threshold_exceeded"] is True
+    assert merge_report["sidecar_inventory"]["by_file"]["retrieval_chunks_rag.jsonl"]["record_count"] == 2
+    assert "Chunk page" not in json.dumps(result, ensure_ascii=False, sort_keys=True)
 
 
 def test_convert_pdf_windowed_orchestrates_windows_and_merge(
@@ -499,6 +553,8 @@ def test_convert_pdf_windowed_orchestrates_windows_and_merge(
     def fake_merge_window_outputs(**kwargs):  # noqa: ANN003
         assert kwargs["output_dir"] == str(output_root)
         assert kwargs["window_size"] == 2
+        assert kwargs["merge_record_warning_threshold"] == 3
+        assert kwargs["merge_bytes_warning_threshold"] == 4
         return {"status": "success", "merge_report_uri": "file:///tmp/page_window_merge_report.json"}
 
     monkeypatch.setattr(mcp_server, "convert_page_window", fake_convert_page_window)
@@ -509,6 +565,8 @@ def test_convert_pdf_windowed_orchestrates_windows_and_merge(
         output_dir=str(output_root),
         pages="1-3",
         window_size=2,
+        merge_record_warning_threshold=3,
+        merge_bytes_warning_threshold=4,
         roots=[tmp_path],
     )
 
@@ -615,6 +673,48 @@ def test_validate_ssd_rag_contract_writes_compact_report(tmp_path: Path) -> None
     assert "sample_mapped_chunk" not in serialized
 
 
+def test_validate_visual_sidecars_writes_compact_report(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    _write_jsonl(
+        output_dir / "figures_rag.jsonl",
+        [
+            {
+                "figure_id": "figure-0001",
+                "page": 1,
+                "bbox": [10, 20, 30, 40],
+                "caption": "Confidential figure caption",
+            }
+        ],
+    )
+    _write_jsonl(
+        output_dir / "page_layout_rag.jsonl",
+        [
+            {
+                "layout_id": "layout-page-0001",
+                "page": 1,
+                "region_refs": [{"source_type": "figure", "source_id": "figure-0001"}],
+                "region_ref_count": 1,
+            }
+        ],
+    )
+
+    result = mcp_server.validate_visual_sidecars_output(
+        output_dir=str(output_dir),
+        require_visual_sidecars=True,
+        roots=[tmp_path],
+    )
+
+    assert result["status"] == "passed"
+    assert result["summary"]["visual_sidecar_file_count"] == 2
+    assert (output_dir / "visual_sidecar_contract_report.json").is_file()
+    assert result["report_uri"].endswith("/visual_sidecar_contract_report.json")
+    assert result["artifact_uris"]["visual_sidecar_contract_report.json"].endswith(
+        "/visual_sidecar_contract_report.json"
+    )
+    assert "Confidential figure caption" not in json.dumps(result, ensure_ascii=False, sort_keys=True)
+
+
 def test_inspect_report_returns_summary_without_markdown_body(tmp_path: Path) -> None:
     output_dir = tmp_path / "out"
     output_dir.mkdir()
@@ -646,10 +746,14 @@ def test_mcp_development_spec_documents_stdio_and_http_follow_up() -> None:
     assert "PDF2MD_MCP_ROOTS" in text
     assert 'PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output"' in text
     assert "MCP_SERVER_INSTALL_USAGE_GUIDE.md" in text
+    assert "pdf2md_plan_large_spec_conversion" in text
     assert "pdf2md_plan_page_windows" in text
     assert "pdf2md_convert_pdf_windowed" in text
     assert "pdf2md_validate_ssd_rag_contract" in text
+    assert "pdf2md_validate_visual_sidecars" in text
     assert "ssd_rag_contract_report.json" in text
+    assert "visual_sidecar_contract_report.json" in text
+    assert "merge_memory_guard" in text
     assert "ocr_backends" in text
     assert "image_mode=none" in text
     assert "interrupted_report.json" in text
@@ -675,15 +779,19 @@ def test_mcp_install_usage_guide_documents_safe_client_setup() -> None:
     assert "mcpServers" in text
     assert "pdf2md_validate_output" in text
     assert "pdf2md_validate_ssd_rag_contract" in text
+    assert "pdf2md_validate_visual_sidecars" in text
     assert "ssd_rag_contract_report.json" in text
+    assert "visual_sidecar_contract_report.json" in text
     assert "OCR backend option" in text
     assert "report_summaries" in text
     assert "manual_domain_adapter_keywords" in text
     assert "pdf2md_plan_page_windows" in text
+    assert "pdf2md_plan_large_spec_conversion" in text
     assert "pdf2md_convert_page_window" in text
     assert "pdf2md_merge_window_outputs" in text
     assert "pdf2md_convert_pdf_windowed" in text
     assert "page_window_merge_report.json" in text
+    assert "merge_memory_guard" in text
     assert "conversion_state.json" in text
     assert "interrupted_report.json" in text
     assert '"image_mode": "none"' in text

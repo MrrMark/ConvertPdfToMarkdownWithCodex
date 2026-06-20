@@ -22,6 +22,7 @@ from pdf2md.models import (
     TableMode,
 )
 from pdf2md.pipeline import ConversionResult, run_conversion
+from pdf2md.preflight import PreflightOptions, plan_large_spec_conversion as build_large_spec_preflight_plan
 from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, TECHNICAL_SPEC_RAG_PROFILES, rag_profile_options
 from pdf2md.utils.page_range import parse_page_range
 from pdf2md.utils.pdf import open_pdf_reader
@@ -33,6 +34,8 @@ MCP_ROOTS_ENV = "PDF2MD_MCP_ROOTS"
 DEFAULT_WARNING_LIMIT = 20
 WINDOW_OUTPUT_ROOT = "windows"
 PAGE_WINDOW_MERGE_REPORT_FILENAME = "page_window_merge_report.json"
+DEFAULT_MERGE_RECORD_WARNING_THRESHOLD = 250_000
+DEFAULT_MERGE_BYTES_WARNING_THRESHOLD = 256 * 1024 * 1024
 ARTIFACT_FILENAMES = (
     "document.md",
     "manifest.json",
@@ -58,6 +61,7 @@ ARTIFACT_FILENAMES = (
     "provenance_integrity_report.json",
     "artifact_integrity_report.json",
     "ssd_rag_contract_report.json",
+    "visual_sidecar_contract_report.json",
 )
 MERGE_SIDECAR_FILENAMES = (
     "text_blocks_rag.jsonl",
@@ -339,6 +343,33 @@ def plan_page_windows(
         "windows": windows,
         "password_supplied": password is not None,
     }
+
+
+def plan_large_spec_conversion(
+    *,
+    input_pdf: str,
+    pages: str | None = None,
+    password: str | None = None,
+    sample_page_count: int = 5,
+    domain_adapter: str | None = None,
+    prefer_visual: bool = False,
+    prefer_assetless: bool = False,
+    roots: list[Path] | None = None,
+) -> dict[str, Any]:
+    """Plan conservative options for a large technical specification before conversion."""
+    allowed_roots = _allowed_roots(roots)
+    resolved_input = ensure_within_roots(input_pdf, allowed_roots, label="input_pdf")
+    return build_large_spec_preflight_plan(
+        resolved_input,
+        PreflightOptions(
+            pages=pages,
+            password=password,
+            sample_page_count=sample_page_count,
+            domain_adapter=domain_adapter,
+            prefer_visual=prefer_visual,
+            prefer_assetless=prefer_assetless,
+        ),
+    )
 
 
 def _find_window(plan: dict[str, Any], window_id: str) -> dict[str, Any]:
@@ -690,6 +721,89 @@ def _load_window_records(windows: list[dict[str, Any]]) -> dict[str, list[Window
     return records_by_file
 
 
+def _jsonl_record_count(path: Path) -> int:
+    if not path.exists():
+        return 0
+    with path.open("r", encoding="utf-8") as handle:
+        return sum(1 for line in handle if line.strip())
+
+
+def _window_sidecar_inventory(windows: list[dict[str, Any]]) -> dict[str, Any]:
+    by_file: dict[str, dict[str, int]] = {}
+    by_window: list[dict[str, Any]] = []
+    total_record_count = 0
+    total_byte_count = 0
+    for window in windows:
+        window_dir = Path(str(window["output_dir"]))
+        window_record_count = 0
+        window_byte_count = 0
+        file_counts: dict[str, int] = {}
+        for file_name in MERGE_SIDECAR_FILENAMES:
+            path = window_dir / file_name
+            record_count = _jsonl_record_count(path)
+            byte_count = path.stat().st_size if path.exists() else 0
+            file_counts[file_name] = record_count
+            by_file.setdefault(file_name, {"record_count": 0, "byte_count": 0})
+            by_file[file_name]["record_count"] += record_count
+            by_file[file_name]["byte_count"] += byte_count
+            window_record_count += record_count
+            window_byte_count += byte_count
+        total_record_count += window_record_count
+        total_byte_count += window_byte_count
+        by_window.append(
+            {
+                "window_id": window["window_id"],
+                "record_count": window_record_count,
+                "byte_count": window_byte_count,
+                "file_record_counts": file_counts,
+            }
+        )
+    largest_file = max(
+        (
+            {"file": file_name, **counts}
+            for file_name, counts in by_file.items()
+        ),
+        key=lambda item: (item["byte_count"], item["record_count"], item["file"]),
+        default={"file": None, "record_count": 0, "byte_count": 0},
+    )
+    return {
+        "total_record_count": total_record_count,
+        "total_byte_count": total_byte_count,
+        "largest_sidecar": largest_file,
+        "by_file": by_file,
+        "by_window": by_window,
+    }
+
+
+def _append_merge_inventory_warnings(
+    warnings: list[dict[str, Any]],
+    *,
+    inventory: dict[str, Any],
+    record_warning_threshold: int,
+    bytes_warning_threshold: int,
+) -> None:
+    total_records = int(inventory.get("total_record_count") or 0)
+    total_bytes = int(inventory.get("total_byte_count") or 0)
+    if total_records > record_warning_threshold:
+        warnings.append(
+            {
+                "code": "page_window_merge_record_guard",
+                "message": "Page-window sidecar merge record count exceeds the configured advisory threshold.",
+                "total_record_count": total_records,
+                "record_warning_threshold": record_warning_threshold,
+            }
+        )
+    if total_bytes > bytes_warning_threshold:
+        warnings.append(
+            {
+                "code": "page_window_merge_byte_guard",
+                "message": "Page-window sidecar merge byte size exceeds the configured advisory threshold.",
+                "total_byte_count": total_bytes,
+                "bytes_warning_threshold": bytes_warning_threshold,
+            }
+        )
+
+
 def _merge_sidecars(
     *,
     output_dir: Path,
@@ -959,6 +1073,8 @@ def merge_window_outputs(
     window_size: int = 100,
     validate_windows: bool = True,
     validate_merged: bool = True,
+    merge_record_warning_threshold: int = DEFAULT_MERGE_RECORD_WARNING_THRESHOLD,
+    merge_bytes_warning_threshold: int = DEFAULT_MERGE_BYTES_WARNING_THRESHOLD,
     roots: list[Path] | None = None,
     project_root: Path | str | None = None,
 ) -> dict[str, Any]:
@@ -992,6 +1108,13 @@ def merge_window_outputs(
             raise FileNotFoundError(f"Window output is missing manifest.json or report.json: {window_dir}")
 
     warnings: list[dict[str, Any]] = []
+    sidecar_inventory = _window_sidecar_inventory(windows)
+    _append_merge_inventory_warnings(
+        warnings,
+        inventory=sidecar_inventory,
+        record_warning_threshold=merge_record_warning_threshold,
+        bytes_warning_threshold=merge_bytes_warning_threshold,
+    )
     window_validations = [
         _validate_output_if_requested(
             output_dir=Path(str(window["output_dir"])),
@@ -1044,6 +1167,13 @@ def merge_window_outputs(
         "merged_record_counts": merged_counts,
         "id_collision_count": id_collision_count,
         "rewritten_id_count": rewritten_id_count,
+        "sidecar_inventory": sidecar_inventory,
+        "merge_memory_guard": {
+            "record_warning_threshold": merge_record_warning_threshold,
+            "bytes_warning_threshold": merge_bytes_warning_threshold,
+            "record_threshold_exceeded": sidecar_inventory["total_record_count"] > merge_record_warning_threshold,
+            "bytes_threshold_exceeded": sidecar_inventory["total_byte_count"] > merge_bytes_warning_threshold,
+        },
         "validation_summary": validation_summary,
         "warnings": warnings,
     }
@@ -1067,6 +1197,11 @@ def merge_window_outputs(
         "merged_record_counts": merged_counts,
         "id_collision_count": id_collision_count,
         "rewritten_id_count": rewritten_id_count,
+        "sidecar_inventory": {
+            "total_record_count": sidecar_inventory["total_record_count"],
+            "total_byte_count": sidecar_inventory["total_byte_count"],
+            "largest_sidecar": sidecar_inventory["largest_sidecar"],
+        },
         "validation_summary": validation_summary,
         "warning_count": len(warnings),
         "warnings_preview": warnings[:DEFAULT_WARNING_LIMIT],
@@ -1101,6 +1236,8 @@ def convert_pdf_windowed(
     skip_existing: bool = False,
     validate_windows: bool = True,
     validate_merged: bool = True,
+    merge_record_warning_threshold: int = DEFAULT_MERGE_RECORD_WARNING_THRESHOLD,
+    merge_bytes_warning_threshold: int = DEFAULT_MERGE_BYTES_WARNING_THRESHOLD,
     warning_limit: int = DEFAULT_WARNING_LIMIT,
     roots: list[Path] | None = None,
     project_root: Path | str | None = None,
@@ -1184,6 +1321,8 @@ def convert_pdf_windowed(
         window_size=window_size,
         validate_windows=validate_windows,
         validate_merged=validate_merged,
+        merge_record_warning_threshold=merge_record_warning_threshold,
+        merge_bytes_warning_threshold=merge_bytes_warning_threshold,
         roots=allowed_roots,
         project_root=project_root,
     )
@@ -1604,6 +1743,49 @@ def validate_ssd_rag_contract_output(
     }
 
 
+def validate_visual_sidecars_output(
+    *,
+    output_dir: str,
+    require_visual_sidecars: bool = False,
+    fail_on_warning: bool = False,
+    finding_limit: int = DEFAULT_WARNING_LIMIT,
+    roots: list[Path] | None = None,
+    project_root: Path | str | None = None,
+) -> dict[str, Any]:
+    """Run the visual sidecar bundle validator and return compact findings."""
+    if project_root is not None:
+        _ensure_project_root_on_path(project_root)
+    allowed_roots = _allowed_roots(roots)
+    resolved_output = ensure_within_roots(output_dir, allowed_roots, label="output_dir")
+    from scripts.validate_visual_sidecar_contract import REPORT_FILENAME as VISUAL_REPORT
+    from scripts.validate_visual_sidecar_contract import validate_visual_sidecar_contract
+
+    report = validate_visual_sidecar_contract(
+        resolved_output,
+        require_visual_sidecars=require_visual_sidecars,
+    )
+    report_path = resolved_output / VISUAL_REPORT
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary = report.get("summary", {})
+    error_count = int(summary.get("error_count", 0))
+    warning_count = int(summary.get("warning_count", 0))
+    passed = error_count == 0 and (warning_count == 0 or not fail_on_warning)
+    return {
+        "schema_version": "1.0",
+        "status": "passed" if passed else "failed",
+        "passed": passed,
+        "output_dir": str(resolved_output),
+        "summary": {
+            **summary,
+            "require_visual_sidecars": require_visual_sidecars,
+            "fail_on_warning": fail_on_warning,
+        },
+        "report_uri": report_path.resolve().as_uri(),
+        "findings_preview": report.get("findings", [])[: max(finding_limit, 0)],
+        "artifact_uris": _artifact_map(resolved_output),
+    }
+
+
 def inspect_report(
     *,
     output_dir: str,
@@ -1668,6 +1850,28 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
     def pdf2md_list_profiles() -> dict[str, Any]:
         """List supported pdf2md RAG profiles, adapters, and output modes."""
         return list_profiles()
+
+    @mcp.tool()
+    def pdf2md_plan_large_spec_conversion(
+        input_pdf: str,
+        pages: str | None = None,
+        password: str | None = None,
+        sample_page_count: int = 5,
+        domain_adapter: str | None = None,
+        prefer_visual: bool = False,
+        prefer_assetless: bool = False,
+    ) -> dict[str, Any]:
+        """Plan conservative large technical-spec conversion options before running conversion."""
+        return plan_large_spec_conversion(
+            input_pdf=input_pdf,
+            pages=pages,
+            password=password,
+            sample_page_count=sample_page_count,
+            domain_adapter=domain_adapter,
+            prefer_visual=prefer_visual,
+            prefer_assetless=prefer_assetless,
+            roots=roots,
+        )
 
     @mcp.tool()
     def pdf2md_plan_page_windows(
@@ -1758,6 +1962,8 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
         window_size: int = 100,
         validate_windows: bool = True,
         validate_merged: bool = True,
+        merge_record_warning_threshold: int = DEFAULT_MERGE_RECORD_WARNING_THRESHOLD,
+        merge_bytes_warning_threshold: int = DEFAULT_MERGE_BYTES_WARNING_THRESHOLD,
     ) -> dict[str, Any]:
         """Merge deterministic page-window outputs into one public output directory."""
         return merge_window_outputs(
@@ -1768,6 +1974,8 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
             window_size=window_size,
             validate_windows=validate_windows,
             validate_merged=validate_merged,
+            merge_record_warning_threshold=merge_record_warning_threshold,
+            merge_bytes_warning_threshold=merge_bytes_warning_threshold,
             roots=roots,
             project_root=root,
         )
@@ -1800,6 +2008,8 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
         skip_existing: bool = False,
         validate_windows: bool = True,
         validate_merged: bool = True,
+        merge_record_warning_threshold: int = DEFAULT_MERGE_RECORD_WARNING_THRESHOLD,
+        merge_bytes_warning_threshold: int = DEFAULT_MERGE_BYTES_WARNING_THRESHOLD,
         warning_limit: int = DEFAULT_WARNING_LIMIT,
     ) -> dict[str, Any]:
         """Plan, convert, validate, and merge deterministic page windows for one PDF."""
@@ -1830,6 +2040,8 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
             skip_existing=skip_existing,
             validate_windows=validate_windows,
             validate_merged=validate_merged,
+            merge_record_warning_threshold=merge_record_warning_threshold,
+            merge_bytes_warning_threshold=merge_bytes_warning_threshold,
             warning_limit=warning_limit,
             roots=roots,
             project_root=root,
@@ -1939,6 +2151,23 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
             require_domain_units=require_domain_units,
             strict_provenance=strict_provenance,
             fail_on_error=fail_on_error,
+            fail_on_warning=fail_on_warning,
+            finding_limit=finding_limit,
+            roots=roots,
+            project_root=root,
+        )
+
+    @mcp.tool()
+    def pdf2md_validate_visual_sidecars(
+        output_dir: str,
+        require_visual_sidecars: bool = False,
+        fail_on_warning: bool = False,
+        finding_limit: int = DEFAULT_WARNING_LIMIT,
+    ) -> dict[str, Any]:
+        """Run the local visual sidecar bundle validator with compact findings."""
+        return validate_visual_sidecars_output(
+            output_dir=output_dir,
+            require_visual_sidecars=require_visual_sidecars,
             fail_on_warning=fail_on_warning,
             finding_limit=finding_limit,
             roots=roots,
