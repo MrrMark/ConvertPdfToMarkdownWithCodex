@@ -277,6 +277,8 @@ figure/table bbox crop OCR을 원문 대체가 아닌 evidence sidecar로 강화
 
 ## Q123 - OCR Backend Registry Expansion
 
+Status: Implemented in Q123. Active follow-up work continues in Q124-Q125.
+
 ### 목표
 
 현재 `tesseract` 중심 OCR backend contract를 유지하면서 optional backend를 `pdf2md` 네이티브 protocol로 확장한다.
@@ -299,12 +301,24 @@ figure/table bbox crop OCR을 원문 대체가 아닌 evidence sidecar로 강화
 ### 산출물
 
 - OCR backend registry 확장
+  - conversion backend: `tesseract`, `tesseract-cli`, `rapidocr`, `ocrmac`
+  - default backend: `tesseract`
 - backend별 structured warning/report fields
-- scanned PDF/Korean OCR fixture 보강
+  - `ocr_backend_raw_confidence_unit`
+  - `ocr_backend_normalized_confidence_unit`
+  - `ocr_backend_higher_is_better`
+  - `ocr_backend_supports_languages`
+- optional backend adapter modules
+  - `pdf2md/extractors/ocr_backends/tesseract_cli.py`
+  - `pdf2md/extractors/ocr_backends/rapidocr.py`
+  - `pdf2md/extractors/ocr_backends/ocrmac.py`
+- CLI/MCP/config supported backend choices 갱신
+- wheel contract에 OCR backend adapter files 포함
 
 ### 검증
 
-- `python -m pytest tests/test_ocr.py tests/test_config_and_io.py tests/test_quality_gate_scripts.py`
+- `.venv311/bin/python -m pytest tests/test_ocr.py tests/test_config_and_io.py tests/test_quality_gate_scripts.py -q`
+- `.venv311/bin/python -m pytest tests/test_cli.py tests/test_mcp_server.py tests/test_docs_examples.py -q`
 - `scripts/probe_ocr_backends.py`
 - optional dependency 미설치 환경 test
 

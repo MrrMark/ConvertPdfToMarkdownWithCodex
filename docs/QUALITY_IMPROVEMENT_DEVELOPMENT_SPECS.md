@@ -23,19 +23,12 @@
 
 ## 현재 Active Development Specs
 
-### P1-P2 / Q123-Q125. PDF2MD Native Migration Plan
+### P1-P2 / Q124-Q125. PDF2MD Native Migration Plan
 
 Docling을 runtime backend나 필수 dependency로 채택하지 않고, Docling에서 참고할 만한 설계 아이디어를 `pdf2md` 네이티브 기능으로 재구현한다.
 canonical output은 계속 `pdf2md`의 `document.md`, `manifest.json`, `report.json`, RAG sidecar, provenance/index/SSD-RAG validator 계약으로 유지한다.
 
 상세 개발 명세는 `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`에서 관리한다.
-
-#### Q123. OCR Backend Registry Expansion
-
-- 우선순위: P1
-- 목표: `tesseract` 기본 경로를 유지하면서 optional OCR backend를 native protocol로 확장한다.
-- 핵심 산출물: `tesseract-cli`, `rapidocr`, `ocrmac` adapter 후보와 structured warning/report fields.
-- 검증: OCR backend probe, optional dependency 미설치 test, scanned/Korean OCR fixture.
 
 #### Q124. Figure Semantics v2
 
@@ -53,4 +46,4 @@ canonical output은 계속 `pdf2md`의 `document.md`, `manifest.json`, `report.j
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q122 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q123 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

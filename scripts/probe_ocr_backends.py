@@ -53,10 +53,9 @@ BACKEND_SPECS: tuple[BackendSpec, ...] = (
     BackendSpec(
         name="tesseract-cli",
         executable="tesseract",
-        requires_pypdfium2=False,
         checks_tesseract_languages=True,
         raw_confidence_unit="0_to_100",
-        notes="System Tesseract executable probe without Python pytesseract import.",
+        notes="System Tesseract executable conversion path without Python pytesseract import.",
     ),
     BackendSpec(
         name="rapidocr",

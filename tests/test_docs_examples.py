@@ -474,7 +474,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q120. Native Hybrid Chunking v2" not in next_plan
     assert "Q121. Layout Sidecar and Reading Order Diagnostics" not in next_plan
     assert "Q122. Region OCR Evidence v2" not in next_plan
-    assert "Q123. OCR Backend Registry Expansion" in next_plan
+    assert "Q123. OCR Backend Registry Expansion" not in next_plan
     assert "Q124. Figure Semantics v2" in next_plan
     assert "Q125. Domain Adapter Registry Hardening" in next_plan
     assert "docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md" in next_plan
@@ -540,6 +540,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q120. Native Hybrid Chunking v2" not in development_specs
     assert "Q121. Layout Sidecar and Reading Order Diagnostics" not in development_specs
     assert "Q122. Region OCR Evidence v2" not in development_specs
+    assert "Q123. OCR Backend Registry Expansion" not in development_specs
     assert "Q125. Domain Adapter Registry Hardening" in development_specs
     assert "PDF2MD Native Migration Plan" in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
@@ -602,7 +603,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q122" in development_specs
+    assert "완료된 Q34-Q123" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q122. Region OCR Evidence v2" in implemented_specs
     assert "figure_ocr_evidence_rag.jsonl" in implemented_specs
@@ -637,6 +638,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "region_ocr.report_only=true" in implemented_specs
     assert "Q111. OCR Backend Adapter Contract" in implemented_specs
     assert "pdf2md/extractors/ocr_backends/" in implemented_specs
+    assert "Q123. OCR Backend Registry Expansion" in implemented_specs
+    assert "pdf2md/extractors/ocr_backends/tesseract_cli.py" in implemented_specs
+    assert "ocr_backend_raw_confidence_unit" in implemented_specs
     assert "Q110. Multi OCR Backend Runtime Probe" in implemented_specs
     assert "probe_ocr_backends.py" in implemented_specs
     assert "Q109. Docling-Installed Benchmark Gate" in implemented_specs
@@ -789,6 +793,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "docs/schema/figure_description_eval_report.schema.json" in output_schema
     assert 'purpose="local_figure_description_eval"' in output_schema
     assert "options.ocr_backend" in output_schema
+    assert "tesseract-cli" in output_schema
+    assert "OCR_RUNTIME_UNAVAILABLE" in output_schema
     assert "figure_region_ocr_accepted_region_count" in output_schema
     assert "region_ocr.text_replaced=false" in output_schema
     assert "docling_benchmark_report.json" in output_schema
