@@ -5,6 +5,10 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add Q118-Q125 native migration hardening: internal document IR, table confidence v2, native hybrid chunking v2, layout sidecar diagnostics, region OCR evidence v2, OCR backend registry expansion, figure semantics v2, and domain adapter registry metadata.
+- Add `domain_units_rag.jsonl` adapter registry metadata and cross-spec compatibility fields for NVMe/PCIe/OCP/TCG/SPDM/customer/manual adapter outputs.
+- Extend conversion-time OCR backend selection to `tesseract`, `tesseract-cli`, `rapidocr`, and `ocrmac` while keeping optional backend failures structured and non-fatal.
+- Add latest NVMe Base/NVM Command Set and OCP Datacenter NVMe SSD benchmark smoke/eval paths for SSD-RAG contract validation.
 - Add a local stdio MCP server entry point with pdf2md conversion, profile discovery, output validation, report inspection, and Streamable HTTP follow-up specification.
 - Add a portable AI agent skill/rule pack for pdf2md RAG ingest workflows across Agent Skills-compatible clients and rule-based coding assistants.
 - Fix wheel packaging so nested OCR backend adapters are included and covered by the wheel contract inspector.

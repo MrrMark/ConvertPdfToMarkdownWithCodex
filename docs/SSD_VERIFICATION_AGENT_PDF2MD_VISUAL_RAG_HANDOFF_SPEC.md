@@ -166,6 +166,7 @@ Expected steps:
 Add supported sidecars:
 
 - `figures_rag.jsonl`
+- `figure_ocr_evidence_rag.jsonl`
 - `figure_descriptions_rag.jsonl`
 - `figure_structures_rag.jsonl`
 
@@ -188,6 +189,10 @@ Preserve these metadata keys when present:
 - `figure_kind`
 - `diagram_candidate`
 - `detected_labels`
+- `adapter_metadata`
+- `cross_spec_compatibility`
+- `stable_source_id`
+- `stable_requirement_seed`
 - `generated_text`
 - `generation_strategy`
 - `figure_region_ocr`
@@ -196,7 +201,6 @@ Preserve these metadata keys when present:
 - `bbox`
 - `heading_path`
 - `source_sha256`
-- `stable_source_id`
 - `source_dedupe_key`
 
 Do not store:

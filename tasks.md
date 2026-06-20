@@ -594,17 +594,21 @@ P2 기능으로 이미지 설명 생성 옵션을 추가한다.
 
 P2 기능으로 대체 추출 백엔드를 실험적으로 추가한다.
 
+현 결정: Q104-Q125 검토와 구현 결과, Docling은 필수 runtime backend나 canonical Markdown/JSON source로 채택하지 않는다.
+Docling 관련 기능은 sanitized comparison/evidence path로 유지하고, layout/table/chunk/OCR/figure/domain 개선은 `pdf2md` 네이티브 IR과 sidecar 계약으로 구현한다.
+
 ### 세부 작업
 
 - adapter 인터페이스 정의
 - `pdfplumber` 기본 백엔드는 유지
-- 실험용 backend switch 옵션 추가
+- 실험용 backend switch 옵션 추가 시 comparison-only 또는 명시 opt-in으로 제한
 - 결과 품질 및 성능 비교용 benchmark 추가
 
 ### 완료 조건
 
 - 기본 backend 동작을 깨지 않는다.
 - 실험 backend 는 opt-in 이어야 한다.
+- Docling raw document/Markdown은 canonical output으로 저장하지 않는다.
 
 ---
 
