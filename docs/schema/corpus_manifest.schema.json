@@ -38,6 +38,18 @@
           "default": null,
           "title": "Figure Descriptions Rag"
         },
+        "figure_ocr_evidence_rag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figure Ocr Evidence Rag"
+        },
         "figure_structures_rag": {
           "anyOf": [
             {

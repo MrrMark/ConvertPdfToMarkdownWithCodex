@@ -72,6 +72,7 @@ class Config(BaseModel):
     retrieval_chunks_jsonl_filename: str = "retrieval_chunks_rag.jsonl"
     page_layout_jsonl_filename: str = "page_layout_rag.jsonl"
     figures_rag_jsonl_filename: str = "figures_rag.jsonl"
+    figure_ocr_evidence_jsonl_filename: str = "figure_ocr_evidence_rag.jsonl"
     figure_descriptions_jsonl_filename: str = "figure_descriptions_rag.jsonl"
     figure_structures_jsonl_filename: str = "figure_structures_rag.jsonl"
     domain_units_jsonl_filename: str = "domain_units_rag.jsonl"

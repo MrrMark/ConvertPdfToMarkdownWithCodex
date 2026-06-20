@@ -31,6 +31,7 @@ PARITY_ARTIFACTS = (
     "page_layout_rag.jsonl",
     "retrieval_chunks_rag.jsonl",
     "figures_rag.jsonl",
+    "figure_ocr_evidence_rag.jsonl",
 )
 DYNAMIC_JSON_KEYS = {
     "started_at",

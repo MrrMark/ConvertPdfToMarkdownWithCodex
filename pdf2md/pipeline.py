@@ -43,6 +43,7 @@ from pdf2md.output_writers import (
     write_debug_artifacts,
     write_domain_unit_output,
     write_figure_description_output,
+    write_figure_ocr_evidence_output,
     write_figure_rag_output,
     write_figure_structure_output,
     write_page_layout_output,
@@ -70,6 +71,7 @@ from pdf2md.serializers.rag_figure_semantics import (
 )
 from pdf2md.serializers.rag_figures import build_figure_records
 from pdf2md.serializers.rag_layout import build_page_layout_records
+from pdf2md.serializers.rag_ocr_evidence import build_region_ocr_evidence_records
 from pdf2md.serializers.rag_requirements import build_requirement_traceability_records
 from pdf2md.serializers.rag_tables import (
     annotate_rag_tables_with_heading_context,
@@ -366,6 +368,7 @@ def _expected_full_rag_sidecars(
     rag_table_output: RagTableOutputMode,
     domain_adapter: DomainAdapterMode,
     include_figure_provenance: bool,
+    include_figure_ocr_evidence: bool,
     include_figure_descriptions: bool,
     include_figure_structures: bool,
     include_page_layout: bool,
@@ -384,6 +387,8 @@ def _expected_full_rag_sidecars(
     outputs.update(_requested_rag_table_sidecars(config, rag_table_output))
     if include_figure_provenance:
         outputs.add(config.figures_rag_jsonl_filename)
+    if include_figure_ocr_evidence:
+        outputs.add(config.figure_ocr_evidence_jsonl_filename)
     if domain_adapter is not DomainAdapterMode.NONE:
         outputs.add(config.domain_units_jsonl_filename)
     if include_figure_descriptions:
@@ -420,6 +425,7 @@ def _written_rag_sidecars_for_scope(
     domain_adapter: DomainAdapterMode,
     include_figure_provenance: bool,
     include_figure_text_chunks: bool,
+    include_figure_ocr_evidence: bool,
     include_figure_descriptions: bool,
     include_figure_structures: bool,
     include_page_layout: bool,
@@ -430,6 +436,7 @@ def _written_rag_sidecars_for_scope(
             rag_table_output=rag_table_output,
             domain_adapter=domain_adapter,
             include_figure_provenance=include_figure_provenance,
+            include_figure_ocr_evidence=include_figure_ocr_evidence,
             include_figure_descriptions=include_figure_descriptions,
             include_figure_structures=include_figure_structures,
             include_page_layout=include_page_layout,
@@ -453,6 +460,7 @@ def _omitted_rag_sidecars(
     domain_adapter: DomainAdapterMode,
     include_figure_provenance: bool,
     include_figure_text_chunks: bool,
+    include_figure_ocr_evidence: bool,
     include_figure_descriptions: bool,
     include_figure_structures: bool,
     include_page_layout: bool,
@@ -462,6 +470,7 @@ def _omitted_rag_sidecars(
         rag_table_output=rag_table_output,
         domain_adapter=domain_adapter,
         include_figure_provenance=include_figure_provenance,
+        include_figure_ocr_evidence=include_figure_ocr_evidence,
         include_figure_descriptions=include_figure_descriptions,
         include_figure_structures=include_figure_structures,
         include_page_layout=include_page_layout,
@@ -473,6 +482,7 @@ def _omitted_rag_sidecars(
         domain_adapter=domain_adapter,
         include_figure_provenance=include_figure_provenance,
         include_figure_text_chunks=include_figure_text_chunks,
+        include_figure_ocr_evidence=include_figure_ocr_evidence,
         include_figure_descriptions=include_figure_descriptions,
         include_figure_structures=include_figure_structures,
         include_page_layout=include_page_layout,
@@ -686,6 +696,7 @@ def _run_conversion_impl(
         domain_adapter=domain_adapter,
         include_figure_provenance=not image_extraction_disabled,
         include_figure_text_chunks=effective_rag_figure_text_chunks,
+        include_figure_ocr_evidence=effective_figure_region_ocr,
         include_figure_descriptions=effective_rag_generated_figure_descriptions,
         include_figure_structures=effective_figure_structure_extraction,
         include_page_layout=requested_page_layout_sidecar,
@@ -696,6 +707,7 @@ def _run_conversion_impl(
         write_full_rag_sidecars
         or (write_minimal_rag_sidecars and (effective_rag_figure_text_chunks or include_figure_visual_semantics))
     )
+    write_figure_ocr_evidence_sidecar = write_full_rag_sidecars and effective_figure_region_ocr
     stage_durations_ms: dict[str, int] = {}
 
     def stage_start() -> datetime:
@@ -801,6 +813,18 @@ def _run_conversion_impl(
     }
     figure_rag_record_count = 0
     figure_rag_file_count = 0
+    figure_ocr_evidence_records: list[dict] = []
+    figure_ocr_evidence_record_count = 0
+    figure_ocr_evidence_file_count = 0
+    region_ocr_evidence_metrics = {
+        "figure_ocr_evidence_record_count": 0,
+        "region_ocr_evidence_figure_record_count": 0,
+        "region_ocr_evidence_table_record_count": 0,
+        "region_ocr_evidence_accepted_count": 0,
+        "region_ocr_evidence_rejected_count": 0,
+        "region_ocr_evidence_runtime_unavailable_count": 0,
+        "region_ocr_evidence_not_attempted_count": 0,
+    }
     figure_text_chunk_record_count = 0
     figure_description_record_count = 0
     figure_description_file_count = 0
@@ -1332,6 +1356,23 @@ def _run_conversion_impl(
         figure_rag_record_count, figure_rag_file_count = write_figure_rag_output(config, figure_records)
         finish_stage("rag_figures", figure_rag_started)
 
+    if write_figure_ocr_evidence_sidecar and not figure_semantics_timeout_expired("rag_ocr_evidence"):
+        mark_stage("rag_ocr_evidence")
+        figure_ocr_evidence_started = stage_start()
+        figure_ocr_evidence_records, region_ocr_evidence_metrics = build_region_ocr_evidence_records(
+            figure_records=figure_records,
+            rag_tables=contextual_rag_tables if rag_table_output.writes_jsonl() else [],
+            source_sha256=source_sha256,
+            pdf_path=config.input_pdf,
+            ocr_lang=config.ocr_lang,
+            ocr_backend=config.ocr_backend,
+        )
+        figure_ocr_evidence_record_count, figure_ocr_evidence_file_count = write_figure_ocr_evidence_output(
+            config,
+            figure_ocr_evidence_records,
+        )
+        finish_stage("rag_ocr_evidence", figure_ocr_evidence_started)
+
     if (
         write_minimal_rag_sidecars
         and effective_rag_generated_figure_descriptions
@@ -1636,6 +1677,13 @@ def _run_conversion_impl(
                 "figures_rag_jsonl_filename": config.figures_rag_jsonl_filename,
             }
         )
+    if write_figure_ocr_evidence_sidecar:
+        manifest_options.update(
+            {
+                "figure_ocr_evidence_output": "jsonl",
+                "figure_ocr_evidence_jsonl_filename": config.figure_ocr_evidence_jsonl_filename,
+            }
+        )
     if figure_description_file_count > 0:
         manifest_options.update(
             {
@@ -1796,6 +1844,9 @@ def _run_conversion_impl(
     if effective_figure_region_ocr:
         report_summary_extras["figure_region_ocr"] = True
         report_summary_extras.update(figure_region_ocr_metrics)
+        if write_figure_ocr_evidence_sidecar:
+            report_summary_extras["figure_ocr_evidence_file_count"] = figure_ocr_evidence_file_count
+            report_summary_extras.update(region_ocr_evidence_metrics)
     if effective_rag_generated_figure_descriptions:
         report_summary_extras["rag_generated_figure_descriptions"] = True
         report_summary_extras["figure_description_backend"] = config.figure_description_backend

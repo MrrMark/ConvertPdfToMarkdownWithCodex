@@ -32,6 +32,7 @@ SIDE_CAR_FILES = (
     "tables_rag.jsonl",
     "page_layout_rag.jsonl",
     "figures_rag.jsonl",
+    "figure_ocr_evidence_rag.jsonl",
     "figure_descriptions_rag.jsonl",
     "figure_structures_rag.jsonl",
     "domain_units_rag.jsonl",
@@ -81,6 +82,7 @@ SOURCE_REF_SIDECARS = {
     "requirement_traceability_rag.jsonl": "trace_id",
     "technical_tables_rag.jsonl": "technical_table_unit_id",
     "figures_rag.jsonl": "figure_id",
+    "figure_ocr_evidence_rag.jsonl": "evidence_id",
     "figure_descriptions_rag.jsonl": "description_id",
     "figure_structures_rag.jsonl": "structure_id",
     "domain_units_rag.jsonl": "domain_unit_id",
@@ -117,6 +119,27 @@ PAGE_LAYOUT_REQUIRED_FIELDS = {
     "caption_link_count",
     "caption_links",
 }
+OCR_EVIDENCE_REQUIRED_FIELDS = {
+    "evidence_id",
+    "schema_version",
+    "reason_taxonomy_version",
+    "evidence_type",
+    "target_type",
+    "target_id",
+    "page",
+    "bbox",
+    "source_sha256",
+    "ocr_backend",
+    "ocr_lang",
+    "status",
+    "accepted",
+    "report_only",
+    "text_replaced",
+    "markdown_inserted",
+    "source_refs",
+}
+OCR_EVIDENCE_ALLOWED_STATUSES = {"accepted", "rejected", "runtime_unavailable", "not_attempted"}
+OCR_EVIDENCE_ALLOWED_TARGETS = {"figure", "table"}
 TABLE_ROW_REQUIRED_FIELDS = {
     "table_id",
     "table_row_id",
@@ -229,6 +252,7 @@ def _record_id(record: dict[str, Any]) -> str | None:
         "domain_unit_id",
         "block_id",
         "layout_id",
+        "evidence_id",
     ):
         value = record.get(field)
         if not _is_missing(value):
@@ -1839,6 +1863,204 @@ def _validate_page_layout_record(
         )
 
 
+def _validate_ocr_evidence_record(
+    *,
+    file_name: str,
+    line: int,
+    record: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> None:
+    record_id = _record_id(record)
+    _validate_required_fields(
+        record,
+        required_fields=OCR_EVIDENCE_REQUIRED_FIELDS,
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+    )
+    if record.get("schema_version") != SCHEMA_VERSION:
+        _add_finding(
+            findings,
+            severity="error",
+            code="schema_version_mismatch",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="schema_version",
+            message="schema_version must be 1.0.",
+        )
+    for field in (
+        "evidence_id",
+        "reason_taxonomy_version",
+        "evidence_type",
+        "target_type",
+        "target_id",
+        "source_sha256",
+        "ocr_backend",
+        "ocr_lang",
+        "status",
+    ):
+        if field in record:
+            _validate_string_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    if record.get("evidence_type") != "region_ocr":
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_ocr_evidence_type",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="evidence_type",
+            message="OCR evidence records must use evidence_type=region_ocr.",
+        )
+    if record.get("target_type") not in OCR_EVIDENCE_ALLOWED_TARGETS:
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_ocr_evidence_target",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="target_type",
+            message="target_type must be figure or table.",
+        )
+    status = str(record.get("status") or "")
+    if status not in OCR_EVIDENCE_ALLOWED_STATUSES:
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_ocr_evidence_status",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="status",
+            message="status must be accepted, rejected, runtime_unavailable, or not_attempted.",
+        )
+    _validate_int_value(
+        record.get("page"),
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+        field="page",
+        positive=True,
+    )
+    _validate_bbox(
+        record.get("bbox"),
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+        field="bbox",
+        required=False,
+    )
+    if "source_sha256" in record and (
+        not isinstance(record.get("source_sha256"), str)
+        or not HEX_SHA256_RE.fullmatch(str(record.get("source_sha256")))
+    ):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_source_sha256",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="source_sha256",
+            message="source_sha256 must be a lowercase SHA-256 hex string.",
+        )
+    for field in ("accepted", "report_only", "text_replaced", "markdown_inserted"):
+        if field in record:
+            _validate_bool_value(
+                record.get(field),
+                findings=findings,
+                file_name=file_name,
+                line=line,
+                record_id=record_id,
+                field=field,
+            )
+    if record.get("report_only") is not True or record.get("text_replaced") is not False:
+        _add_finding(
+            findings,
+            severity="error",
+            code="ocr_evidence_not_report_only",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="report_only",
+            message="OCR evidence must be report_only=true and text_replaced=false.",
+        )
+    if record.get("markdown_inserted") is not False:
+        _add_finding(
+            findings,
+            severity="error",
+            code="ocr_evidence_markdown_pollution",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="markdown_inserted",
+            message="OCR evidence must not be inserted into Markdown.",
+        )
+    if status == "accepted":
+        if record.get("accepted") is not True or not str(record.get("ocr_text") or "").strip():
+            _add_finding(
+                findings,
+                severity="error",
+                code="accepted_ocr_evidence_missing_text",
+                target="common",
+                file=file_name,
+                line=line,
+                record_id=record_id,
+                field="ocr_text",
+                message="Accepted OCR evidence must include ocr_text and accepted=true.",
+            )
+        if _is_missing(record.get("accepted_reason")):
+            _add_finding(
+                findings,
+                severity="error",
+                code="accepted_ocr_evidence_missing_reason",
+                target="common",
+                file=file_name,
+                line=line,
+                record_id=record_id,
+                field="accepted_reason",
+                message="Accepted OCR evidence must include accepted_reason.",
+            )
+    elif _is_missing(record.get("rejected_reason")):
+        _add_finding(
+            findings,
+            severity="error",
+            code="ocr_evidence_missing_rejected_reason",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="rejected_reason",
+            message="Non-accepted OCR evidence must include rejected_reason.",
+        )
+    _validate_source_refs(
+        record.get("source_refs"),
+        findings=findings,
+        file_name=file_name,
+        line=line,
+        record_id=record_id,
+    )
+
+
 def _validate_optional_sidecar_record(
     *,
     file_name: str,
@@ -1855,6 +2077,8 @@ def _validate_optional_sidecar_record(
         _validate_table_row_record(file_name=file_name, line=line, record=record, findings=findings)
     elif file_name == "page_layout_rag.jsonl":
         _validate_page_layout_record(file_name=file_name, line=line, record=record, findings=findings)
+    elif file_name == "figure_ocr_evidence_rag.jsonl":
+        _validate_ocr_evidence_record(file_name=file_name, line=line, record=record, findings=findings)
     elif file_name == "figure_descriptions_rag.jsonl":
         _validate_figure_description_record(file_name=file_name, line=line, record=record, findings=findings)
     elif file_name == "figure_structures_rag.jsonl":

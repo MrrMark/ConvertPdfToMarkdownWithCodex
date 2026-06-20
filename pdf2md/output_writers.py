@@ -13,6 +13,7 @@ from pdf2md.serializers.rag_figure_semantics import (
 )
 from pdf2md.serializers.rag_figures import serialize_figures_jsonl
 from pdf2md.serializers.rag_layout import serialize_page_layout_jsonl
+from pdf2md.serializers.rag_ocr_evidence import serialize_region_ocr_evidence_jsonl
 from pdf2md.serializers.rag_requirements import serialize_requirement_traceability_jsonl
 from pdf2md.serializers.rag_semantics import (
     serialize_cross_refs_jsonl,
@@ -160,6 +161,14 @@ def write_page_layout_output(config: Config, records: list[dict]) -> tuple[int, 
 
 def write_figure_rag_output(config: Config, records: list[dict]) -> tuple[int, int]:
     write_text(config.output_dir / config.figures_rag_jsonl_filename, serialize_figures_jsonl(records))
+    return len(records), 1
+
+
+def write_figure_ocr_evidence_output(config: Config, records: list[dict]) -> tuple[int, int]:
+    write_text(
+        config.output_dir / config.figure_ocr_evidence_jsonl_filename,
+        serialize_region_ocr_evidence_jsonl(records),
+    )
     return len(records), 1
 
 

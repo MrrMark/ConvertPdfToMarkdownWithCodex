@@ -514,6 +514,88 @@ def test_index_contract_reports_invalid_page_layout_sidecar(tmp_path: Path) -> N
     assert "layout_count_mismatch" in {finding["code"] for finding in report["findings"]}
 
 
+def test_index_contract_validates_ocr_evidence_sidecar(tmp_path: Path) -> None:
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
+    _write_jsonl(
+        tmp_path / "figure_ocr_evidence_rag.jsonl",
+        [
+            {
+                "evidence_id": "ocr-evidence-000001",
+                "schema_version": "1.0",
+                "reason_taxonomy_version": "1.0",
+                "evidence_type": "region_ocr",
+                "target_type": "figure",
+                "target_id": "page-0001-figure-0001",
+                "page": 1,
+                "bbox": [10.0, 20.0, 120.0, 160.0],
+                "source_sha256": SOURCE_SHA256,
+                "ocr_backend": "tesseract",
+                "ocr_lang": "eng",
+                "status": "accepted",
+                "accepted": True,
+                "accepted_reason": "confidence_above_threshold",
+                "rejected_reason": None,
+                "confidence_threshold": 0.65,
+                "confidence": 0.9,
+                "ocr_text": "NVME1",
+                "candidate": {"text": "NVME1", "confidence": 0.9},
+                "rejected": None,
+                "report_only": True,
+                "text_replaced": False,
+                "markdown_inserted": False,
+                "source_refs": [
+                    {
+                        "source_type": "figure",
+                        "source_id": "page-0001-figure-0001",
+                        "page": 1,
+                    }
+                ],
+            }
+        ],
+    )
+
+    report = validate_index_contract(output_dir=tmp_path, target="openai")
+
+    assert report["status"] == "passed"
+    assert report["findings"] == []
+
+
+def test_index_contract_reports_invalid_ocr_evidence_sidecar(tmp_path: Path) -> None:
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
+    _write_jsonl(
+        tmp_path / "figure_ocr_evidence_rag.jsonl",
+        [
+            {
+                "evidence_id": "ocr-evidence-000001",
+                "schema_version": "1.0",
+                "reason_taxonomy_version": "1.0",
+                "evidence_type": "region_ocr",
+                "target_type": "figure",
+                "target_id": "page-0001-figure-0001",
+                "page": 1,
+                "bbox": [10.0, 20.0, 120.0, 160.0],
+                "source_sha256": SOURCE_SHA256,
+                "ocr_backend": "tesseract",
+                "ocr_lang": "eng",
+                "status": "accepted",
+                "accepted": True,
+                "report_only": False,
+                "text_replaced": True,
+                "markdown_inserted": True,
+                "source_refs": [],
+            }
+        ],
+    )
+
+    report = validate_index_contract(output_dir=tmp_path, target="openai")
+
+    codes = {finding["code"] for finding in report["findings"]}
+    assert report["status"] == "failed"
+    assert "accepted_ocr_evidence_missing_text" in codes
+    assert "ocr_evidence_not_report_only" in codes
+    assert "ocr_evidence_markdown_pollution" in codes
+
+
 def test_index_contract_confidential_safe_detects_paths_filename_and_hash(tmp_path: Path) -> None:
     _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [_valid_chunk()])
     _write_jsonl(

@@ -231,6 +231,14 @@
           "title": "Failed Page Count",
           "type": "integer"
         },
+        "figure_ocr_evidence_file_count": {
+          "description": "Number of OCR evidence sidecar files written.",
+          "type": "integer"
+        },
+        "figure_ocr_evidence_record_count": {
+          "description": "Number of figure_ocr_evidence_rag.jsonl OCR evidence records.",
+          "type": "integer"
+        },
         "figure_rag_file_count": {
           "default": 0,
           "title": "Figure Rag File Count",
@@ -532,6 +540,30 @@
         "rag_text_block_record_count": {
           "default": 0,
           "title": "Rag Text Block Record Count",
+          "type": "integer"
+        },
+        "region_ocr_evidence_accepted_count": {
+          "description": "Number of OCR evidence records accepted by confidence threshold.",
+          "type": "integer"
+        },
+        "region_ocr_evidence_figure_record_count": {
+          "description": "Number of OCR evidence records targeting figures.",
+          "type": "integer"
+        },
+        "region_ocr_evidence_not_attempted_count": {
+          "description": "Number of OCR evidence records that were not attempted.",
+          "type": "integer"
+        },
+        "region_ocr_evidence_rejected_count": {
+          "description": "Number of OCR evidence records rejected by taxonomy reason.",
+          "type": "integer"
+        },
+        "region_ocr_evidence_runtime_unavailable_count": {
+          "description": "Number of OCR evidence records skipped because local OCR/runtime was unavailable.",
+          "type": "integer"
+        },
+        "region_ocr_evidence_table_record_count": {
+          "description": "Number of OCR evidence records targeting table bbox candidates.",
           "type": "integer"
         },
         "requirement_file_count": {
