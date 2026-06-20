@@ -135,6 +135,10 @@
     ],
     "table_actionable_fallback_count": 0,
     "table_caption_linked_count": 1,
+    "table_confidence_v2_average": 0.9925,
+    "table_confidence_v2_buckets": {
+      "high": 1
+    },
     "table_expected_fallback_count": 0,
     "table_expected_fallback_reason_counts": {},
     "table_fallback_count": 0,
@@ -177,6 +181,13 @@
           "default"
         ],
         "stub_column_count": 0,
+        "table_confidence_v2": 0.9925,
+        "table_confidence_v2_bucket": "high",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "header_confidence_high"
+        ],
         "table_index": 1,
         "unresolved": false
       }

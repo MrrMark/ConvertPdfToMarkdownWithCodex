@@ -17,8 +17,8 @@
     "image_mode": "referenced",
     "keep_page_markers": true,
     "local_only_processing": true,
-    "ocr_lang": "eng",
     "ocr_backend": "tesseract",
+    "ocr_lang": "eng",
     "pages": null,
     "path_redaction": "disabled",
     "rag_table_output": "both",
@@ -69,7 +69,16 @@
       "index": 1,
       "mode": "html",
       "page": 1,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.79,
+      "table_confidence_v2_bucket": "medium",
+      "table_confidence_v2_reasons": [
+        "data_density_high",
+        "fallback:STUB_COLUMN",
+        "header_confidence_high",
+        "html_fallback",
+        "stub_column_detected"
+      ]
     },
     {
       "anchor_line_index": 0,
@@ -104,7 +113,16 @@
       "index": 1,
       "mode": "html",
       "page": 2,
-      "quality_score": 1.0
+      "quality_score": 1.0,
+      "table_confidence_v2": 0.79,
+      "table_confidence_v2_bucket": "medium",
+      "table_confidence_v2_reasons": [
+        "data_density_high",
+        "fallback:STUB_COLUMN",
+        "header_confidence_high",
+        "html_fallback",
+        "stub_column_detected"
+      ]
     }
   ],
   "total_pages": 2,

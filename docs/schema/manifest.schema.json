@@ -508,6 +508,37 @@
           ],
           "default": null,
           "title": "Quality Score"
+        },
+        "table_confidence_v2": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Confidence V2"
+        },
+        "table_confidence_v2_bucket": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Confidence V2 Bucket"
+        },
+        "table_confidence_v2_reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Table Confidence V2 Reasons",
+          "type": "array"
         }
       },
       "required": [

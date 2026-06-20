@@ -422,6 +422,11 @@
     ],
     "table_actionable_fallback_count": 0,
     "table_caption_linked_count": 7,
+    "table_confidence_v2_average": 0.8544,
+    "table_confidence_v2_buckets": {
+      "high": 3,
+      "medium": 5
+    },
     "table_expected_fallback_count": 5,
     "table_expected_fallback_reason_counts": {
       "FOOTNOTE_ROW": 1,
@@ -525,6 +530,21 @@
         ],
         "selected_strategy": "default",
         "stub_column_count": 1,
+        "table_confidence_v2": 0.6975,
+        "table_confidence_v2_bucket": "medium",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "fallback:FOOTNOTE_ROW",
+          "fallback:MERGED_CELL_SUSPECTED",
+          "fallback:MULTI_ROW_HEADER",
+          "fallback:STUB_COLUMN",
+          "footnote_rows_detected",
+          "header_confidence_high",
+          "html_fallback",
+          "merged_cell_suspected",
+          "stub_column_detected"
+        ],
         "table_index": 1,
         "unresolved": true
       },
@@ -570,6 +590,13 @@
           "default"
         ],
         "stub_column_count": 0,
+        "table_confidence_v2": 0.9925,
+        "table_confidence_v2_bucket": "high",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "header_confidence_high"
+        ],
         "table_index": 1,
         "unresolved": false
       },
@@ -609,6 +636,16 @@
         ],
         "selected_strategy": "default",
         "stub_column_count": 1,
+        "table_confidence_v2": 0.79,
+        "table_confidence_v2_bucket": "medium",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "fallback:STUB_COLUMN",
+          "header_confidence_high",
+          "html_fallback",
+          "stub_column_detected"
+        ],
         "table_index": 1,
         "unresolved": true
       },
@@ -654,6 +691,13 @@
           "default"
         ],
         "stub_column_count": 0,
+        "table_confidence_v2": 0.9925,
+        "table_confidence_v2_bucket": "high",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "header_confidence_high"
+        ],
         "table_index": 1,
         "unresolved": false
       },
@@ -700,6 +744,13 @@
           "default"
         ],
         "stub_column_count": 0,
+        "table_confidence_v2": 0.9925,
+        "table_confidence_v2_bucket": "high",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "header_confidence_high"
+        ],
         "table_index": 1,
         "unresolved": false
       },
@@ -739,6 +790,16 @@
         ],
         "selected_strategy": "default",
         "stub_column_count": 1,
+        "table_confidence_v2": 0.79,
+        "table_confidence_v2_bucket": "medium",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "fallback:STUB_COLUMN",
+          "header_confidence_high",
+          "html_fallback",
+          "stub_column_detected"
+        ],
         "table_index": 1,
         "unresolved": true
       },
@@ -789,6 +850,16 @@
         ],
         "selected_strategy": "default",
         "stub_column_count": 1,
+        "table_confidence_v2": 0.79,
+        "table_confidence_v2_bucket": "medium",
+        "table_confidence_v2_reasons": [
+          "caption_linked",
+          "data_density_high",
+          "fallback:STUB_COLUMN",
+          "header_confidence_high",
+          "html_fallback",
+          "stub_column_detected"
+        ],
         "table_index": 1,
         "unresolved": true
       },
@@ -833,6 +904,15 @@
         ],
         "selected_strategy": "default",
         "stub_column_count": 1,
+        "table_confidence_v2": 0.79,
+        "table_confidence_v2_bucket": "medium",
+        "table_confidence_v2_reasons": [
+          "data_density_high",
+          "fallback:STUB_COLUMN",
+          "header_confidence_high",
+          "html_fallback",
+          "stub_column_detected"
+        ],
         "table_index": 1,
         "unresolved": true
       }

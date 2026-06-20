@@ -24,6 +24,9 @@ def test_technical_tables_extract_bitfield_and_opcode_units() -> None:
                     "headers": ["Command", "Opcode", "Description"],
                     "cells": {"Command": "Identify", "Opcode": "06h", "Description": "Identify command"},
                     "row_text": "Command = Identify | Opcode = 06h | Description = Identify command",
+                    "table_confidence_v2": 0.91,
+                    "table_confidence_v2_bucket": "high",
+                    "table_confidence_v2_reasons": ["header_confidence_high"],
                 }
             ],
         },
@@ -55,6 +58,9 @@ def test_technical_tables_extract_bitfield_and_opcode_units() -> None:
     assert [record["unit_type"] for record in records] == ["command_opcode", "bitfield"]
     assert records[0]["technical_table_unit_id"] == "tech-table-000001"
     assert records[0]["opcode"] == "06h"
+    assert records[0]["table_confidence_v2"] == 0.91
+    assert records[0]["table_confidence_v2_bucket"] == "high"
+    assert records[0]["table_confidence_v2_reasons"] == ["header_confidence_high"]
     assert records[1]["bit_range"] == "7:4"
     assert records[1]["reset_default"] == "0h"
     assert records[1]["access"] == "RO"

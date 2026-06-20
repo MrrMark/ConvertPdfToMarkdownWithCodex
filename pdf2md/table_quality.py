@@ -31,6 +31,21 @@ def count_low_quality_tables(table_quality: list[dict]) -> int:
     return len(low_quality_table_pages(table_quality, unique=False))
 
 
+def summarize_table_confidence_v2(table_quality: list[dict]) -> tuple[dict[str, int], float | None]:
+    buckets = {"high": 0, "medium": 0, "low": 0}
+    scores: list[float] = []
+    for item in table_quality:
+        bucket = str(item.get("table_confidence_v2_bucket") or "").lower()
+        if bucket in buckets:
+            buckets[bucket] += 1
+        try:
+            scores.append(float(item["table_confidence_v2"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    average = round(sum(scores) / len(scores), 4) if scores else None
+    return {key: value for key, value in buckets.items() if value}, average
+
+
 def _table_quality_score(item: dict) -> float | None:
     try:
         return float(item.get("quality_score", 1.0))
@@ -246,6 +261,9 @@ def build_table_quality_review_pack(
                 "bbox": bbox,
                 "mode": quality_item.get("mode"),
                 "quality_score": quality_item.get("quality_score"),
+                "table_confidence_v2": quality_item.get("table_confidence_v2"),
+                "table_confidence_v2_bucket": quality_item.get("table_confidence_v2_bucket"),
+                "table_confidence_v2_reasons": quality_item.get("table_confidence_v2_reasons", []),
                 "fallback_reasons": quality_item.get("reasons", []),
                 "header_strategy": quality_item.get("rag_header_strategy"),
                 "header_confidence": quality_item.get("header_confidence"),

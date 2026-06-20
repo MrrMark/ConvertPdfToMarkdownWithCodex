@@ -17,8 +17,8 @@
     "image_mode": "referenced",
     "keep_page_markers": true,
     "local_only_processing": true,
-    "ocr_lang": "eng",
     "ocr_backend": "tesseract",
+    "ocr_lang": "eng",
     "pages": null,
     "path_redaction": "disabled",
     "rag_table_output": "both",
@@ -70,7 +70,20 @@
       "index": 1,
       "mode": "html",
       "page": 1,
-      "quality_score": 0.9208
+      "quality_score": 0.9208,
+      "table_confidence_v2": 0.7242,
+      "table_confidence_v2_bucket": "medium",
+      "table_confidence_v2_reasons": [
+        "caption_linked",
+        "data_density_high",
+        "fallback:MERGED_CELL_SUSPECTED",
+        "fallback:MULTI_ROW_HEADER",
+        "fallback:STUB_COLUMN",
+        "header_confidence_high",
+        "html_fallback",
+        "merged_cell_suspected",
+        "stub_column_detected"
+      ]
     }
   ],
   "total_pages": 1,

@@ -187,6 +187,8 @@ def build_report(
     table_low_quality_count: int = 0,
     table_actionable_low_quality_count: int = 0,
     table_advisory_low_quality_count: int = 0,
+    table_confidence_v2_buckets: dict[str, int] | None = None,
+    table_confidence_v2_average: float | None = None,
     table_caption_linked_count: int = 0,
     page_cache_hits: int = 0,
     page_cache_misses: int = 0,
@@ -303,6 +305,8 @@ def build_report(
         table_low_quality_count=table_low_quality_count,
         table_actionable_low_quality_count=table_actionable_low_quality_count,
         table_advisory_low_quality_count=table_advisory_low_quality_count,
+        table_confidence_v2_buckets=table_confidence_v2_buckets or {},
+        table_confidence_v2_average=table_confidence_v2_average,
         ocr_actionable_warning_count=count_ocr_actionable_warnings(warnings),
         ocr_advisory_warning_count=count_ocr_advisory_warnings(warnings),
         technical_profile_domain_adapter_missing=any(

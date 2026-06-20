@@ -652,6 +652,25 @@
           "title": "Table Caption Linked Count",
           "type": "integer"
         },
+        "table_confidence_v2_average": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Confidence V2 Average"
+        },
+        "table_confidence_v2_buckets": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Table Confidence V2 Buckets",
+          "type": "object"
+        },
         "table_expected_fallback_count": {
           "default": 0,
           "title": "Table Expected Fallback Count",

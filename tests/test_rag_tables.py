@@ -155,6 +155,8 @@ def test_pipeline_writes_selected_rag_sidecar_outputs(
     assert report["summary"]["table_actionable_low_quality_count"] == 0
     assert report["summary"]["table_advisory_low_quality_count"] == 1
     assert report["summary"]["table_caption_linked_count"] == 1
+    assert report["summary"]["table_confidence_v2_buckets"] == {}
+    assert report["summary"]["table_confidence_v2_average"] is None
     assert report["summary"]["semantic_unit_file_count"] == 1
     assert report["summary"]["requirement_file_count"] == 1
     assert report["summary"]["cross_ref_file_count"] == 1
