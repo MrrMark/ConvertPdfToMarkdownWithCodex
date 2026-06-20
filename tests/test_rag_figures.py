@@ -275,6 +275,26 @@ def test_figure_records_use_nearby_crop_text_for_diagram_labels() -> None:
     assert "outside" not in records[0]["detected_labels"]
 
 
+def test_figure_kind_classifier_covers_visual_technical_categories() -> None:
+    images = [
+        ImageAsset(page=1, index=1, path="assets/images/register.png", caption_text="Figure 1: Controller register map"),
+        ImageAsset(page=1, index=2, path="assets/images/waveform.png", caption_text="Figure 2: Timing waveform"),
+        ImageAsset(page=1, index=3, path="assets/images/block.png", caption_text="Figure 3: PCIe block diagram"),
+        ImageAsset(page=1, index=4, path="assets/images/flow.png", caption_text="Figure 4: Reset flow diagram"),
+        ImageAsset(page=1, index=5, path="assets/images/matrix.png", caption_text="Figure 5: Queue matrix"),
+    ]
+
+    records = build_figure_records(images=images, excluded_images=[], text_block_records=[])
+
+    assert [record["figure_kind"] for record in records] == [
+        "register_map",
+        "waveform",
+        "block_diagram",
+        "flow_diagram",
+        "table_like_image",
+    ]
+
+
 def test_figure_visual_semantics_sidecars_are_context_only_and_chunkable() -> None:
     figure_records = [
         {
@@ -322,11 +342,32 @@ def test_figure_visual_semantics_sidecars_are_context_only_and_chunkable() -> No
     assert descriptions[0]["generated_text"] is True
     assert descriptions[0]["backend_status"] == "not_invoked_context_only"
     assert descriptions[0]["source_evidence"]["visual_pixels_interpreted"] is False
+    assert descriptions[0]["semantics_schema_version"] == "2.0"
+    assert descriptions[0]["generated_description"] == descriptions[0]["text"]
+    assert descriptions[0]["generated_content_scope"] == "sidecar_only"
+    assert descriptions[0]["markdown_inserted"] is False
+    assert descriptions[0]["review_required"] is True
+    assert descriptions[0]["hallucination_risk"] == "low"
+    assert descriptions[0]["observed_text"]["caption_text"] == "Figure 1: PCIe block diagram"
+    assert descriptions[0]["observed_text"]["ocr_texts"] == ["NVME1 READY"]
+    assert descriptions[0]["source_evidence"]["ocr_text_count"] == 1
+    assert {ref["evidence_type"] for ref in descriptions[0]["evidence_refs"]} >= {
+        "caption",
+        "detected_label",
+        "nearby_text",
+        "ocr_text",
+    }
     assert "Generated figure description (context-only)." in descriptions[0]["text"]
     assert description_metrics["figure_description_record_count"] == 1
+    assert description_metrics["figure_description_review_required_count"] == 1
     assert structures[0]["structure_type"] == "block_diagram"
     assert structures[0]["derived_from_context"] is True
+    assert structures[0]["structure_schema_version"] == "2.0"
+    assert structures[0]["review_required"] is True
+    assert structures[0]["observed_text"]["ocr_texts"] == ["NVME1 READY"]
+    assert structures[0]["relationship_hints"][0]["relationship_type"] == "co_occurs_in_figure"
     assert structure_metrics["figure_structure_record_count"] == 1
+    assert structure_metrics["figure_structure_review_required_count"] == 1
     chunk_types = [chunk["chunk_type"] for chunk in chunks]
     assert "figure_description" in chunk_types
     assert "figure_structure" in chunk_types
@@ -631,7 +672,9 @@ def test_pipeline_writes_assetless_figure_text_chunks_with_placeholder_mode(
     assert report["summary"]["figure_structure_chunk_record_count"] == 1
     assert report["summary"]["figure_rag_record_count"] == 1
     assert report["summary"]["figure_description_record_count"] == 1
+    assert report["summary"]["figure_description_review_required_count"] == 1
     assert report["summary"]["figure_structure_record_count"] == 1
+    assert report["summary"]["figure_structure_review_required_count"] == 1
 
     assert validate_index_contract(output_dir=output_dir)["passed"] is True
     assert validate_provenance_integrity(output_dir=output_dir)["passed"] is True

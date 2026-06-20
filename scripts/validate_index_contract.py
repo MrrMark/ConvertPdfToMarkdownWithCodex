@@ -92,18 +92,33 @@ FIGURE_DESCRIPTION_REQUIRED_FIELDS = {
     "figure_id",
     "page",
     "text",
+    "observed_text",
+    "generated_description",
     "source_refs",
     "generated_text",
+    "generated_content_scope",
+    "markdown_inserted",
     "generation_strategy",
+    "evidence_refs",
+    "review_required",
+    "review_reasons",
+    "hallucination_risk",
 }
 FIGURE_STRUCTURE_REQUIRED_FIELDS = {
     "structure_id",
     "figure_id",
     "page",
     "text",
+    "structure_schema_version",
+    "observed_text",
+    "evidence_refs",
+    "relationship_hints",
     "source_refs",
     "generated_text",
     "derived_from_context",
+    "review_required",
+    "review_reasons",
+    "hallucination_risk",
 }
 TEXT_BLOCK_FIELDS = ("block_id", "page", "block_index", "text")
 PAGE_LAYOUT_REQUIRED_FIELDS = {
@@ -621,6 +636,116 @@ def _validate_bool_value(
             record_id=record_id,
             field=field,
             message=f"{field} must be a boolean.",
+        )
+
+
+def _validate_object_value(
+    value: Any,
+    *,
+    findings: list[dict[str, Any]],
+    file_name: str,
+    line: int,
+    record_id: str | None,
+    field: str,
+    required: bool = True,
+) -> None:
+    if value is None and not required:
+        return
+    if not isinstance(value, dict):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_object_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field=field,
+            message=f"{field} must be an object.",
+        )
+
+
+def _validate_list_value(
+    value: Any,
+    *,
+    findings: list[dict[str, Any]],
+    file_name: str,
+    line: int,
+    record_id: str | None,
+    field: str,
+    required: bool = True,
+) -> None:
+    if value is None and not required:
+        return
+    if not isinstance(value, list):
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_list_field",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field=field,
+            message=f"{field} must be a list.",
+        )
+
+
+def _validate_figure_semantics_review_fields(
+    *,
+    file_name: str,
+    line: int,
+    record: dict[str, Any],
+    record_id: str | None,
+    findings: list[dict[str, Any]],
+) -> None:
+    if "observed_text" in record:
+        _validate_object_value(
+            record.get("observed_text"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="observed_text",
+        )
+    if "evidence_refs" in record:
+        _validate_list_value(
+            record.get("evidence_refs"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="evidence_refs",
+        )
+    if "review_required" in record:
+        _validate_bool_value(
+            record.get("review_required"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="review_required",
+        )
+    if "review_reasons" in record:
+        _validate_string_list_value(
+            record.get("review_reasons"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="review_reasons",
+        )
+    if "hallucination_risk" in record and record.get("hallucination_risk") not in {"low", "medium", "high"}:
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_hallucination_risk",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="hallucination_risk",
+            message="hallucination_risk must be low, medium, or high.",
         )
 
 
@@ -1569,7 +1694,15 @@ def _validate_figure_description_record(
         line=line,
         record_id=record_id,
     )
-    for field in ("description_id", "figure_id", "text", "generation_strategy"):
+    for field in (
+        "description_id",
+        "figure_id",
+        "text",
+        "generated_description",
+        "generation_strategy",
+        "generated_content_scope",
+        "hallucination_risk",
+    ):
         if field in record:
             _validate_string_value(
                 record.get(field),
@@ -1579,6 +1712,13 @@ def _validate_figure_description_record(
                 record_id=record_id,
                 field=field,
             )
+    _validate_figure_semantics_review_fields(
+        file_name=file_name,
+        line=line,
+        record=record,
+        record_id=record_id,
+        findings=findings,
+    )
     if "page" in record:
         _validate_int_value(
             record.get("page"),
@@ -1597,6 +1737,15 @@ def _validate_figure_description_record(
             line=line,
             record_id=record_id,
             field="generated_text",
+        )
+    if "markdown_inserted" in record:
+        _validate_bool_value(
+            record.get("markdown_inserted"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="markdown_inserted",
         )
     if record.get("generated_text") is not True:
         _add_finding(
@@ -1624,6 +1773,30 @@ def _validate_figure_description_record(
                 "figure description sidecar records must use "
                 f"{FIGURE_DESCRIPTION_GENERATION_STRATEGY} generation_strategy."
             ),
+        )
+    if record.get("generated_content_scope") != "sidecar_only":
+        _add_finding(
+            findings,
+            severity="error",
+            code="invalid_generated_content_scope",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="generated_content_scope",
+            message="figure description sidecar records must use generated_content_scope=sidecar_only.",
+        )
+    if record.get("markdown_inserted") is not False:
+        _add_finding(
+            findings,
+            severity="error",
+            code="figure_description_markdown_pollution",
+            target="common",
+            file=file_name,
+            line=line,
+            record_id=record_id,
+            field="markdown_inserted",
+            message="generated figure descriptions must not be inserted into Markdown.",
         )
     if "source_refs" in record:
         _validate_source_refs(
@@ -1661,7 +1834,14 @@ def _validate_figure_structure_record(
         line=line,
         record_id=record_id,
     )
-    for field in ("structure_id", "figure_id", "text", "structure_type"):
+    for field in (
+        "structure_id",
+        "figure_id",
+        "text",
+        "structure_type",
+        "structure_schema_version",
+        "hallucination_risk",
+    ):
         if field in record:
             _validate_string_value(
                 record.get(field),
@@ -1672,6 +1852,13 @@ def _validate_figure_structure_record(
                 field=field,
                 required=field != "structure_type",
             )
+    _validate_figure_semantics_review_fields(
+        file_name=file_name,
+        line=line,
+        record=record,
+        record_id=record_id,
+        findings=findings,
+    )
     if "page" in record:
         _validate_int_value(
             record.get("page"),
@@ -1709,6 +1896,15 @@ def _validate_figure_structure_record(
             record_id=record_id,
             field="bbox",
             required=False,
+        )
+    if "relationship_hints" in record:
+        _validate_list_value(
+            record.get("relationship_hints"),
+            findings=findings,
+            file_name=file_name,
+            line=line,
+            record_id=record_id,
+            field="relationship_hints",
         )
 
 

@@ -226,10 +226,26 @@ def test_index_contract_validates_visual_chunk_contract(tmp_path: Path) -> None:
                 "figure_id": "page-0001-figure-0001",
                 "page": 1,
                 "text": "figure_description: State transition diagram.",
+                "semantics_schema_version": "2.0",
+                "observed_text": {
+                    "caption_text": "Figure 1: State transition diagram",
+                    "heading_path": [],
+                    "detected_labels": ["IDLE", "READY"],
+                    "nearby_texts": [],
+                    "ocr_texts": [],
+                    "visual_pixels_interpreted": False,
+                },
+                "generated_description": "figure_description: State transition diagram.",
+                "generated_content_scope": "sidecar_only",
+                "markdown_inserted": False,
                 "bbox": [72.0, 120.0, 420.0, 320.0],
+                "evidence_refs": [{"evidence_type": "caption", "source": "caption_text"}],
                 "source_refs": [figure_ref],
                 "generated_text": True,
                 "generation_strategy": "deterministic_context_summary",
+                "review_required": True,
+                "review_reasons": ["generated_content_sidecar_review", "visual_pixels_not_interpreted"],
+                "hallucination_risk": "low",
             }
         ],
     )
@@ -241,10 +257,30 @@ def test_index_contract_validates_visual_chunk_contract(tmp_path: Path) -> None:
                 "figure_id": "page-0001-figure-0001",
                 "page": 1,
                 "text": "figure_structure: state_machine.",
+                "structure_schema_version": "2.0",
+                "observed_text": {
+                    "caption_text": "Figure 1: State transition diagram",
+                    "heading_path": [],
+                    "detected_labels": ["IDLE", "READY"],
+                    "nearby_texts": [],
+                    "ocr_texts": [],
+                    "visual_pixels_interpreted": False,
+                },
                 "bbox": [72.0, 120.0, 420.0, 320.0],
+                "evidence_refs": [{"evidence_type": "detected_label", "source": "detected_labels", "label": "IDLE"}],
+                "relationship_hints": [
+                    {
+                        "relationship_type": "co_occurs_in_figure",
+                        "source_node_id": "page-0001-figure-0001-node-001",
+                        "target_node_id": "page-0001-figure-0001-node-002",
+                    }
+                ],
                 "source_refs": [figure_ref],
                 "generated_text": False,
                 "derived_from_context": True,
+                "review_required": True,
+                "review_reasons": ["context_derived_structure_review", "visual_pixels_not_interpreted"],
+                "hallucination_risk": "low",
             }
         ],
     )

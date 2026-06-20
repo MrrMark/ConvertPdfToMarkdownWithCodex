@@ -773,16 +773,34 @@ def test_figure_description_eval_passes_context_only_sidecars(tmp_path: Path) ->
             {
                 "description_id": "figure-description-000001",
                 "figure_id": "page-0001-figure-0001",
+                "text": "Generated figure description (context-only).",
+                "observed_text": {
+                    "caption_text": "Figure 1: Link state",
+                    "heading_path": [],
+                    "detected_labels": [],
+                    "nearby_texts": [],
+                    "ocr_texts": [],
+                    "visual_pixels_interpreted": False,
+                },
+                "generated_description": "Generated figure description (context-only).",
                 "generated_text": True,
+                "generated_content_scope": "sidecar_only",
+                "markdown_inserted": False,
+                "generation_strategy": "deterministic_context_summary",
                 "backend_status": "not_invoked_context_only",
+                "review_required": True,
+                "review_reasons": ["generated_content_sidecar_review", "visual_pixels_not_interpreted"],
+                "hallucination_risk": "low",
                 "classification_confidence": 0.82,
                 "source_evidence": {
                     "caption_present": True,
                     "heading_path_present": False,
                     "detected_label_count": 0,
                     "nearby_text_count": 0,
+                    "ocr_text_count": 0,
                     "visual_pixels_interpreted": False,
                 },
+                "evidence_refs": [{"evidence_type": "caption", "source": "caption_text"}],
                 "source_refs": [{"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1}],
             }
         ],
@@ -819,14 +837,23 @@ def test_figure_description_eval_reports_local_only_violations(tmp_path: Path) -
             {
                 "description_id": "figure-description-000001",
                 "figure_id": "page-0001-figure-0001",
+                "text": "Generated figure description (context-only).",
+                "observed_text": {"visual_pixels_interpreted": True},
+                "generated_description": "Generated figure description (context-only).",
                 "generated_text": False,
+                "generated_content_scope": "document_body",
+                "markdown_inserted": True,
                 "backend_status": "vlm_invoked",
+                "review_required": False,
+                "review_reasons": "missing-list",
+                "hallucination_risk": "unknown",
                 "classification_confidence": 0.2,
                 "source_evidence": {
                     "caption_present": False,
                     "heading_path_present": False,
                     "detected_label_count": 0,
                     "nearby_text_count": 0,
+                    "ocr_text_count": 0,
                     "visual_pixels_interpreted": True,
                 },
                 "source_refs": [],
@@ -839,10 +866,15 @@ def test_figure_description_eval_reports_local_only_violations(tmp_path: Path) -
 
     codes = {finding["code"] for finding in report["findings"]}
     assert report["summary"]["passed"] is False
-    assert report["summary"]["error_count"] == 5
+    assert report["summary"]["error_count"] == 10
     assert report["summary"]["warning_count"] == 2
     assert {
         "missing_generated_text_flag",
+        "invalid_observed_text_metadata",
+        "missing_review_metadata",
+        "invalid_hallucination_risk",
+        "invalid_generated_content_scope",
+        "figure_description_markdown_pollution",
         "missing_source_refs",
         "missing_source_evidence",
         "visual_pixels_interpreted",

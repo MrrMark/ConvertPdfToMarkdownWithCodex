@@ -475,7 +475,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q121. Layout Sidecar and Reading Order Diagnostics" not in next_plan
     assert "Q122. Region OCR Evidence v2" not in next_plan
     assert "Q123. OCR Backend Registry Expansion" not in next_plan
-    assert "Q124. Figure Semantics v2" in next_plan
+    assert "Q124. Figure Semantics v2" not in next_plan
     assert "Q125. Domain Adapter Registry Hardening" in next_plan
     assert "docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md" in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
@@ -541,6 +541,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q121. Layout Sidecar and Reading Order Diagnostics" not in development_specs
     assert "Q122. Region OCR Evidence v2" not in development_specs
     assert "Q123. OCR Backend Registry Expansion" not in development_specs
+    assert "Q124. Figure Semantics v2" not in development_specs
     assert "Q125. Domain Adapter Registry Hardening" in development_specs
     assert "PDF2MD Native Migration Plan" in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
@@ -603,8 +604,13 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q123" in development_specs
+    assert "완료된 Q34-Q124" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q124. Figure Semantics v2" in implemented_specs
+    assert "observed_text" in implemented_specs
+    assert "generated_content_scope" in implemented_specs
+    assert "hallucination_risk" in implemented_specs
+    assert "relationship_hints" in implemented_specs
     assert "Q122. Region OCR Evidence v2" in implemented_specs
     assert "figure_ocr_evidence_rag.jsonl" in implemented_specs
     assert "Q121. Layout Sidecar and Reading Order Diagnostics" in implemented_specs

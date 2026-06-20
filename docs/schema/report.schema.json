@@ -231,6 +231,48 @@
           "title": "Failed Page Count",
           "type": "integer"
         },
+        "figure_description_backend": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figure Description Backend"
+        },
+        "figure_description_chunk_record_count": {
+          "default": 0,
+          "title": "Figure Description Chunk Record Count",
+          "type": "integer"
+        },
+        "figure_description_file_count": {
+          "default": 0,
+          "title": "Figure Description File Count",
+          "type": "integer"
+        },
+        "figure_description_low_confidence_count": {
+          "default": 0,
+          "title": "Figure Description Low Confidence Count",
+          "type": "integer"
+        },
+        "figure_description_record_count": {
+          "default": 0,
+          "title": "Figure Description Record Count",
+          "type": "integer"
+        },
+        "figure_description_review_required_count": {
+          "default": 0,
+          "title": "Figure Description Review Required Count",
+          "type": "integer"
+        },
+        "figure_description_skipped_no_evidence_count": {
+          "default": 0,
+          "title": "Figure Description Skipped No Evidence Count",
+          "type": "integer"
+        },
         "figure_ocr_evidence_file_count": {
           "description": "Number of OCR evidence sidecar files written.",
           "type": "integer"
@@ -280,6 +322,46 @@
         "figure_sidecars_skipped": {
           "description": "True when figure sidecars were intentionally skipped because image extraction was disabled.",
           "type": "boolean"
+        },
+        "figure_structure_chunk_record_count": {
+          "default": 0,
+          "title": "Figure Structure Chunk Record Count",
+          "type": "integer"
+        },
+        "figure_structure_extraction": {
+          "default": false,
+          "title": "Figure Structure Extraction",
+          "type": "boolean"
+        },
+        "figure_structure_file_count": {
+          "default": 0,
+          "title": "Figure Structure File Count",
+          "type": "integer"
+        },
+        "figure_structure_low_confidence_count": {
+          "default": 0,
+          "title": "Figure Structure Low Confidence Count",
+          "type": "integer"
+        },
+        "figure_structure_record_count": {
+          "default": 0,
+          "title": "Figure Structure Record Count",
+          "type": "integer"
+        },
+        "figure_structure_review_required_count": {
+          "default": 0,
+          "title": "Figure Structure Review Required Count",
+          "type": "integer"
+        },
+        "figure_structure_skipped_no_structure_count": {
+          "default": 0,
+          "title": "Figure Structure Skipped No Structure Count",
+          "type": "integer"
+        },
+        "figure_text_chunk_record_count": {
+          "default": 0,
+          "title": "Figure Text Chunk Record Count",
+          "type": "integer"
         },
         "font_heading_candidate_count": {
           "default": 0,
@@ -516,6 +598,11 @@
           "default": 0,
           "title": "Processed Pages",
           "type": "integer"
+        },
+        "rag_generated_figure_descriptions": {
+          "default": false,
+          "title": "Rag Generated Figure Descriptions",
+          "type": "boolean"
         },
         "rag_table_file_count": {
           "default": 0,

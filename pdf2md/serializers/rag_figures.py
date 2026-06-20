@@ -266,12 +266,22 @@ def _captionless_diagnostics(
 def _figure_kind(text: str) -> tuple[str, list[str], list[str]]:
     lowered = text.lower()
     labels = _labels_from_text(text)
+    if any(token in lowered for token in ("register map", "memory map", "address map")):
+        return "register_map", labels, ["register_map_text"]
+    if any(token in lowered for token in ("register layout", "bit field", "bitfield", "bits ")):
+        return "register_layout", labels, ["register_layout_text"]
+    if any(token in lowered for token in ("waveform", "signal trace", "timing waveform")):
+        return "waveform", labels, ["waveform_text"]
+    if any(token in lowered for token in ("block diagram", "architecture diagram", "system architecture")):
+        return "block_diagram", labels, ["block_diagram_text"]
+    if any(token in lowered for token in ("flow diagram", "flowchart", "process flow")):
+        return "flow_diagram", labels, ["flow_diagram_text"]
+    if any(token in lowered for token in ("table-like", "table like", "matrix", "grid layout")):
+        return "table_like_image", labels, ["table_like_image_text"]
     if any(token in lowered for token in ("state machine", "state diagram", "state transition")):
         return "state_machine", labels, ["state_machine_text"]
     if any(token in lowered for token in ("sequence diagram", "message sequence", "timing diagram")):
         return "sequence_diagram", labels, ["sequence_or_timing_text"]
-    if any(token in lowered for token in ("register layout", "bit field", "bitfield", "bits ")):
-        return "register_layout", labels, ["register_layout_text"]
     if any(token in lowered for token in ("diagram", "flow", "architecture")):
         return "diagram", labels, ["diagram_text"]
     return "image", labels, ["image_asset"]

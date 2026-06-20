@@ -16,6 +16,7 @@ except Exception:  # noqa: BLE001
 
 FIGURE_REGION_OCR_CONFIDENCE_THRESHOLD = 0.65
 FIGURE_SEMANTIC_LOW_CONFIDENCE_THRESHOLD = 0.65
+FIGURE_SEMANTICS_SCHEMA_VERSION = "2.0"
 FIGURE_LABEL_PATTERN = re.compile(r"\b(?:[A-Z]{2,}[A-Z0-9_-]*-\d+|[A-Z]{2,}[0-9]+|[A-Z][A-Za-z]+)\b")
 REGION_OCR_RENDER_SCALE = 2.0
 REGION_OCR_MIN_CROP_PIXELS = 4
@@ -414,11 +415,13 @@ def _evidence(record: dict[str, Any]) -> dict[str, Any]:
     heading_path = _heading_path(record)
     detected_labels = _string_list(record.get("detected_labels"))
     nearby_texts = _nearby_texts(record)
+    ocr_texts = _ordered_unique([str(candidate.get("text") or "") for candidate in _ocr_candidates(record)])
     return {
         "caption_text": caption_text,
         "heading_path": heading_path,
         "detected_labels": detected_labels,
         "nearby_texts": nearby_texts,
+        "ocr_texts": ocr_texts,
     }
 
 
@@ -430,9 +433,40 @@ def _signal_count(evidence: dict[str, Any]) -> int:
             evidence["heading_path"],
             evidence["detected_labels"],
             evidence["nearby_texts"],
+            evidence["ocr_texts"],
         )
         if value
     )
+
+
+def _observed_text(evidence: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "caption_text": evidence["caption_text"] or None,
+        "heading_path": evidence["heading_path"],
+        "detected_labels": evidence["detected_labels"],
+        "nearby_texts": evidence["nearby_texts"],
+        "ocr_texts": evidence["ocr_texts"],
+        "visual_pixels_interpreted": False,
+    }
+
+
+def _evidence_refs(record: dict[str, Any], evidence: dict[str, Any]) -> list[dict[str, Any]]:
+    refs: list[dict[str, Any]] = []
+    page = _page_of(record)
+    bbox = _bbox(record)
+    if evidence["caption_text"]:
+        refs.append({"evidence_type": "caption", "source": "caption_text", "page": page, "bbox": bbox})
+    for index, heading in enumerate(evidence["heading_path"], start=1):
+        refs.append({"evidence_type": "heading", "source": "heading_path", "index": index, "text": heading})
+    for label in evidence["detected_labels"]:
+        refs.append({"evidence_type": "detected_label", "source": "detected_labels", "label": label})
+    for index, nearby_text in enumerate(evidence["nearby_texts"], start=1):
+        refs.append(
+            {"evidence_type": "nearby_text", "source": "nearby_text_refs", "index": index, "text": nearby_text}
+        )
+    for index, ocr_text in enumerate(evidence["ocr_texts"], start=1):
+        refs.append({"evidence_type": "ocr_text", "source": "ocr_candidates", "index": index, "text": ocr_text})
+    return refs
 
 
 def _semantic_confidence(record: dict[str, Any], evidence: dict[str, Any]) -> float:
@@ -443,6 +477,40 @@ def _semantic_confidence(record: dict[str, Any], evidence: dict[str, Any]) -> fl
     if caption_confidence is not None:
         base = max(base, min(caption_confidence, 0.92))
     return round(min(base, 0.95), 2)
+
+
+def _hallucination_risk(confidence: float, evidence: dict[str, Any]) -> str:
+    signal_count = _signal_count(evidence)
+    if confidence < 0.55 or signal_count <= 1:
+        return "high"
+    if confidence < FIGURE_SEMANTIC_LOW_CONFIDENCE_THRESHOLD or not evidence["caption_text"]:
+        return "medium"
+    return "low"
+
+
+def _review_metadata(
+    *,
+    confidence: float,
+    evidence: dict[str, Any],
+    generated_text: bool,
+    derived_from_context: bool,
+) -> dict[str, Any]:
+    reasons: list[str] = ["visual_pixels_not_interpreted"]
+    if generated_text:
+        reasons.append("generated_content_sidecar_review")
+    if derived_from_context:
+        reasons.append("context_derived_structure_review")
+    if confidence < FIGURE_SEMANTIC_LOW_CONFIDENCE_THRESHOLD:
+        reasons.append("low_classification_confidence")
+    if not evidence["caption_text"]:
+        reasons.append("missing_caption")
+    if _signal_count(evidence) <= 1:
+        reasons.append("single_evidence_signal")
+    return {
+        "review_required": True,
+        "review_reasons": sorted(dict.fromkeys(reasons)),
+        "hallucination_risk": _hallucination_risk(confidence, evidence),
+    }
 
 
 def _description_text(record: dict[str, Any], evidence: dict[str, Any]) -> str:
@@ -457,6 +525,8 @@ def _description_text(record: dict[str, Any], evidence: dict[str, Any]) -> str:
         lines.append("Detected labels: " + " | ".join(evidence["detected_labels"]))
     for nearby_text in evidence["nearby_texts"]:
         lines.append(f"Nearby text: {nearby_text}")
+    for ocr_text in evidence["ocr_texts"]:
+        lines.append(f"Observed OCR text: {ocr_text}")
     return "\n".join(lines)
 
 
@@ -476,8 +546,16 @@ def build_figure_description_records(
         figure_id = str(figure_record.get("figure_id") or f"page-{_page_of(figure_record):04d}-figure-0000")
         description_index = len(records) + 1
         confidence = _semantic_confidence(figure_record, evidence)
+        generated_description = _description_text(figure_record, evidence)
+        review_metadata = _review_metadata(
+            confidence=confidence,
+            evidence=evidence,
+            generated_text=True,
+            derived_from_context=False,
+        )
         records.append(
             {
+                "semantics_schema_version": FIGURE_SEMANTICS_SCHEMA_VERSION,
                 "description_id": f"figure-description-{description_index:06d}",
                 "description_index": description_index,
                 "figure_id": figure_id,
@@ -485,8 +563,12 @@ def build_figure_description_records(
                 "bbox": _bbox(figure_record),
                 "heading_path": evidence["heading_path"],
                 "figure_kind": str(figure_record.get("figure_kind") or "image"),
-                "text": _description_text(figure_record, evidence),
+                "text": generated_description,
+                "observed_text": _observed_text(evidence),
+                "generated_description": generated_description,
                 "generated_text": True,
+                "generated_content_scope": "sidecar_only",
+                "markdown_inserted": False,
                 "generation_strategy": "deterministic_context_summary",
                 "backend": backend,
                 "backend_status": "not_invoked_context_only",
@@ -495,9 +577,12 @@ def build_figure_description_records(
                     "heading_path_present": bool(evidence["heading_path"]),
                     "detected_label_count": len(evidence["detected_labels"]),
                     "nearby_text_count": len(evidence["nearby_texts"]),
+                    "ocr_text_count": len(evidence["ocr_texts"]),
                     "visual_pixels_interpreted": False,
                 },
+                "evidence_refs": _evidence_refs(figure_record, evidence),
                 "source_refs": [_figure_source_ref(figure_record)],
+                **review_metadata,
                 "classification_confidence": confidence,
                 "classification_reasons": sorted(
                     dict.fromkeys(
@@ -518,19 +603,33 @@ def build_figure_description_records(
             if float(record.get("classification_confidence") or 0.0) < FIGURE_SEMANTIC_LOW_CONFIDENCE_THRESHOLD
         ),
         "figure_description_skipped_no_evidence_count": skipped_no_evidence_count,
+        "figure_description_review_required_count": sum(1 for record in records if record.get("review_required")),
     }
 
 
 def _structure_type(record: dict[str, Any], evidence: dict[str, Any]) -> str:
     text = " ".join(
-        [str(record.get("figure_kind") or ""), evidence["caption_text"], *evidence["heading_path"], *evidence["nearby_texts"]]
+        [
+            str(record.get("figure_kind") or ""),
+            evidence["caption_text"],
+            *evidence["heading_path"],
+            *evidence["nearby_texts"],
+        ]
     ).lower()
+    if any(token in text for token in ("register map", "memory map", "address map")):
+        return "register_map"
+    if any(token in text for token in ("register layout", "bit field", "bitfield", "bits ")):
+        return "register_layout"
     if any(token in text for token in ("waveform", "timing diagram", "signal trace", "timing waveform")):
         return "waveform"
     if any(token in text for token in ("circuit", "schematic")):
         return "circuit_diagram"
     if any(token in text for token in ("block diagram", "blockdiagram", "architecture")):
         return "block_diagram"
+    if any(token in text for token in ("flow diagram", "flowchart", "process flow")):
+        return "flow_diagram"
+    if any(token in text for token in ("table-like", "table like", "matrix", "grid layout")):
+        return "table_like_image"
     figure_kind = str(record.get("figure_kind") or "image")
     return "diagram" if figure_kind == "image" and evidence["detected_labels"] else figure_kind
 
@@ -545,7 +644,23 @@ def _structure_text(structure_type: str, record: dict[str, Any], evidence: dict[
         lines.append("nodes_or_labels: " + " | ".join(evidence["detected_labels"]))
     for nearby_text in evidence["nearby_texts"]:
         lines.append(f"nearby_text: {nearby_text}")
+    for ocr_text in evidence["ocr_texts"]:
+        lines.append(f"observed_ocr_text: {ocr_text}")
     return "\n".join(lines)
+
+
+def _relationship_hints(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    hints: list[dict[str, Any]] = []
+    for index in range(len(nodes) - 1):
+        hints.append(
+            {
+                "relationship_type": "co_occurs_in_figure",
+                "source_node_id": nodes[index]["node_id"],
+                "target_node_id": nodes[index + 1]["node_id"],
+                "evidence_type": "detected_label_context",
+            }
+        )
+    return hints
 
 
 def build_figure_structure_records(figure_records: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
@@ -574,8 +689,16 @@ def build_figure_structure_records(figure_records: list[dict[str, Any]]) -> tupl
             for index, node in enumerate(nodes, start=1)
         ] if structure_type == "waveform" else []
         confidence = _semantic_confidence(figure_record, evidence)
+        relationship_hints = _relationship_hints(nodes)
+        review_metadata = _review_metadata(
+            confidence=confidence,
+            evidence=evidence,
+            generated_text=False,
+            derived_from_context=True,
+        )
         records.append(
             {
+                "structure_schema_version": FIGURE_SEMANTICS_SCHEMA_VERSION,
                 "structure_id": f"figure-structure-{structure_index:06d}",
                 "structure_index": structure_index,
                 "figure_id": figure_id,
@@ -588,9 +711,13 @@ def build_figure_structure_records(figure_records: list[dict[str, Any]]) -> tupl
                 "edges": [],
                 "signals": signals,
                 "text": _structure_text(structure_type, figure_record, evidence),
+                "observed_text": _observed_text(evidence),
                 "generated_text": False,
                 "derived_from_context": True,
+                "evidence_refs": _evidence_refs(figure_record, evidence),
+                "relationship_hints": relationship_hints,
                 "source_refs": [_figure_source_ref(figure_record)],
+                **review_metadata,
                 "classification_confidence": confidence,
                 "classification_reasons": sorted(
                     dict.fromkeys(
@@ -610,6 +737,7 @@ def build_figure_structure_records(figure_records: list[dict[str, Any]]) -> tupl
             if float(record.get("classification_confidence") or 0.0) < FIGURE_SEMANTIC_LOW_CONFIDENCE_THRESHOLD
         ),
         "figure_structure_skipped_no_structure_count": skipped_no_structure_count,
+        "figure_structure_review_required_count": sum(1 for record in records if record.get("review_required")),
     }
 
 

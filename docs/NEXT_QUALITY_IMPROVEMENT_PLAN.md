@@ -23,13 +23,6 @@
 
 ## 남은 작업
 
-### P1 / Q124. Figure Semantics v2
-
-figure kind, observed text, generated description, structure evidence를 명확히 분리해 visual technical spec RAG 품질을 높인다.
-generated content는 기본 비활성, sidecar-only, review flag 포함 원칙을 유지한다.
-
-상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
-
 ### P2 / Q125. Domain Adapter Registry Hardening
 
 NVMe/OCP/PCIe/TCG/SPDM/manual domain adapter를 registry/protocol 구조로 정리해 cross-spec 재처리와 고객별 adapter 확장을 안정화한다.
