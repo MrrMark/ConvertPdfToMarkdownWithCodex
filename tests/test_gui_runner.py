@@ -559,6 +559,34 @@ def test_gui_request_recommends_storage_domain_for_technical_profile(tmp_path: P
     assert "Domain=nvme" in report.warnings[0].message
 
 
+def test_gui_request_recommends_customer_requirements_domain_for_technical_profile(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "customer-requirements-specification.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("Customer Requirements Specification", 72, 760),
+                    PositionedText("Supplier shall comply with the acceptance criteria and compliance matrix.", 72, 740),
+                ]
+            )
+        ],
+    )
+
+    report = validate_gui_request(
+        GuiConversionRequest(
+            input_mode="file",
+            input_path=input_pdf,
+            output_dir=tmp_path / "output",
+            options=GuiConversionOptions(rag_profile="technical_spec_rag", domain_adapter=DomainAdapterMode.NONE.value),
+        )
+    )
+
+    assert report.has_errors is False
+    assert [diagnostic.code for diagnostic in report.warnings] == ["domain_adapter_recommended"]
+    assert "Domain=customer-requirements" in report.warnings[0].message
+
+
 def test_gui_request_warns_for_mixed_security_domain_folder(tmp_path: Path) -> None:
     input_dir = tmp_path / "pdfs"
     input_dir.mkdir()
@@ -584,6 +612,40 @@ def test_gui_request_warns_for_mixed_security_domain_folder(tmp_path: Path) -> N
     assert [diagnostic.code for diagnostic in report.warnings] == ["mixed_domain_adapters_recommended"]
     assert "spdm=1" in report.warnings[0].message
     assert "caliptra=1" in report.warnings[0].message
+
+
+def test_gui_request_warns_for_mixed_storage_and_customer_domain_folder(tmp_path: Path) -> None:
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    write_pdf(
+        input_dir / "NVMe-Base.pdf",
+        [PageSpec(texts=[PositionedText("NVM Express Admin Command Submission Queue CDW", 72, 760)])],
+    )
+    write_pdf(
+        input_dir / "Customer-Requirements.pdf",
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("Customer Requirements Specification", 72, 760),
+                    PositionedText("Supplier shall comply with the acceptance criteria and compliance matrix.", 72, 740),
+                ]
+            )
+        ],
+    )
+
+    report = validate_gui_request(
+        GuiConversionRequest(
+            input_mode="folder",
+            input_path=input_dir,
+            output_dir=tmp_path / "batch-output",
+            options=GuiConversionOptions(rag_profile="technical_spec_rag", domain_adapter=DomainAdapterMode.NONE.value),
+        )
+    )
+
+    assert report.has_errors is False
+    assert [diagnostic.code for diagnostic in report.warnings] == ["mixed_domain_adapters_recommended"]
+    assert "nvme=1" in report.warnings[0].message
+    assert "customer-requirements=1" in report.warnings[0].message
 
 
 def test_gui_request_warns_for_mixed_storage_and_security_domain_folder(tmp_path: Path) -> None:

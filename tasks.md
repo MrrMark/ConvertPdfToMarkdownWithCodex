@@ -86,6 +86,7 @@ P0 안정화 후 구현:
 - M11은 Q134에서 SPDM/TCG/PCIe SSD security spec benchmark evidence path를 완료했고, Q135에서 Caliptra RoT security spec adapter/evidence path를 추가했다.
 - M12는 Q136-Q139에서 domain adapter recommendation UX, security adapter calibration, 대형 spec performance profile recommender를 완료했다.
 - M13은 Q140에서 NVMe/PCIe/OCP storage domain recommendation coverage를 완료했다.
+- M14는 Q141-Q142에서 domain recommendation basis/ambiguity guard와 customer requirement coverage를 완료했다.
 
 ### M01. pipeline/report 집계 책임 분리
 
@@ -180,6 +181,13 @@ P0 안정화 후 구현:
 
 - preflight domain adapter recommendation이 NVMe, PCIe, OCP technical/storage spec을 raw content 없이 추천(Q140 완료)
 - GUI file/folder validation에서 storage/security domain recommendation과 mixed-domain folder warning을 동일 경로로 검증(Q140 완료)
+
+### M14. Domain Recommendation Hardening
+
+- recommendation basis metadata로 top/runner-up score, score margin, matched candidate count, ambiguity 여부를 raw content 없이 기록(Q141 완료)
+- low/ambiguous recommendation이 자동 권고 옵션으로 승격되지 않도록 guard fixture를 추가(Q141 완료)
+- `customer-requirements` domain recommendation coverage와 OCP 오분류 방지 fixture를 추가(Q142 완료)
+- GUI customer requirement warning과 storage/customer mixed-domain warning을 검증(Q142 완료)
 
 ---
 

@@ -91,6 +91,21 @@ DOMAIN_RECOMMENDATION_KEYWORDS: dict[str, tuple[str, ...]] = {
         "rtrec",
         "rot service",
     ),
+    "customer-requirements": (
+        "customer-requirements",
+        "customer requirement",
+        "customer requirements",
+        "customer specification",
+        "vendor requirement",
+        "vendor requirements",
+        "product requirement",
+        "supplier shall",
+        "vendor shall",
+        "customer shall",
+        "shall comply",
+        "acceptance criteria",
+        "compliance matrix",
+    ),
 }
 DOMAIN_RECOMMENDATION_ANCHORS: dict[str, tuple[str, ...]] = {
     "nvme": ("nvme", "nvm express", "nvm command set"),
@@ -99,6 +114,7 @@ DOMAIN_RECOMMENDATION_ANCHORS: dict[str, tuple[str, ...]] = {
     "spdm": ("spdm", "dsp0274", "dsp0286"),
     "tcg": ("tcg", "trusted computing group", "opal"),
     "caliptra": ("caliptra",),
+    "customer-requirements": ("customer requirement", "customer requirements", "compliance matrix"),
 }
 
 
@@ -203,6 +219,24 @@ def _domain_recommendation_from_scores(scores: dict[str, int]) -> tuple[str | No
     return top_adapter, "low"
 
 
+def _domain_recommendation_basis(scores: dict[str, int]) -> dict[str, Any]:
+    ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+    top_adapter, top_score = ranked[0] if ranked else (None, 0)
+    runner_up_adapter, runner_up_score = ranked[1] if len(ranked) > 1 else (None, 0)
+    matched_candidate_count = sum(1 for score in scores.values() if score > 0)
+    score_margin = max(0, top_score - runner_up_score)
+    return {
+        "top_adapter": top_adapter if top_score > 0 else None,
+        "top_score": top_score,
+        "runner_up_adapter": runner_up_adapter if runner_up_score > 0 else None,
+        "runner_up_score": runner_up_score,
+        "score_margin": score_margin,
+        "matched_candidate_count": matched_candidate_count,
+        "ambiguous": bool(top_score > 0 and runner_up_score > 0 and score_margin < 2),
+        "raw_content_included": False,
+    }
+
+
 def _domain_adapter_recommendation_payload(
     *,
     resolved_input: Path,
@@ -213,6 +247,7 @@ def _domain_adapter_recommendation_payload(
     scoring_text = f"{resolved_input.name} {sample_text}"
     candidate_scores = _score_domain_adapter_candidates(scoring_text)
     adapter, confidence = _domain_recommendation_from_scores(candidate_scores)
+    recommendation_basis = _domain_recommendation_basis(candidate_scores)
     return {
         "schema_version": "1.0",
         "purpose": "domain_adapter_recommendation",
@@ -222,6 +257,7 @@ def _domain_adapter_recommendation_payload(
         "recommended_domain_adapter": adapter,
         "confidence": confidence,
         "candidate_scores": candidate_scores,
+        "recommendation_basis": recommendation_basis,
         "raw_content_included": False,
     }
 
