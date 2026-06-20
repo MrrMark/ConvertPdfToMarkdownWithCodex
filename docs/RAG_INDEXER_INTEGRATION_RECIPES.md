@@ -32,7 +32,7 @@ CLI와 GUI preset은 같은 local-only profile matrix를 사용한다.
 | --- | --- | --- |
 | `preserve` | 기본 원문 보존 | RAG table sidecar와 chunk 보강 옵션을 보수적으로 끔 |
 | `rag_optimized` | 일반 RAG ingest | RAG table both, page marker, header/footer removal, hyphen repair, contextual embedding text, sibling merge, relationship metadata |
-| `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg|spdm|customer-requirements|manual`와 함께 사용 |
+| `technical_spec_rag` | storage/PCIe/security spec ingest | `rag_optimized`와 같은 chunk 보강을 켜고, 필요 시 `--domain-adapter nvme|pcie|ocp|tcg|spdm|caliptra|customer-requirements|manual`와 함께 사용 |
 | `technical_spec_rag_visual` | storage/PCIe/security spec visual ingest | `technical_spec_rag`에 figure text chunk, figure region OCR, deterministic figure description, figure structure sidecar 추가 |
 | `confidential_rag` | 공유/evidence pack | confidential-safe mode, JSONL table sidecar, chunk 보강, sanitized report |
 | `preserve_with_sidecars` | Markdown 원문 보존 + sidecar ingest | 본문 변화 가능성이 있는 header/footer/hyphen repair는 끄고 JSONL sidecar와 relationship metadata만 추가 |
@@ -69,7 +69,7 @@ python3 -m pdf2md spec.pdf -o output/spec \
 
 ## Manual Domain Adapter
 
-기존 `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`에 맞지 않는 고객 requirement 표는 `manual` adapter로 header 키워드를 보수적으로 추가한다.
+기존 `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `caliptra`, `customer-requirements`에 맞지 않는 고객 requirement 표는 `manual` adapter로 header 키워드를 보수적으로 추가한다.
 
 ```bash
 python3 -m pdf2md customer-spec.pdf -o output/customer \
@@ -166,7 +166,7 @@ python scripts/run_preset_eval.py \
 - `preset_artifact_comparison.json`: raw content 없이 artifact 존재/크기/record count와 주요 metric delta
 - `preset_scorecard.md`: 사람이 빠르게 보는 점수표
 
-`technical_spec_rag`는 `--domain-adapter nvme|pcie|ocp|tcg|spdm|customer-requirements|manual`를 함께 지정해야 domain unit, technical table, SSD contract gate가 의미 있게 동작한다. 실제 corpus 원문은 커밋하지 않고 위 세 파일처럼 sanitized summary만 공유한다.
+`technical_spec_rag`는 `--domain-adapter nvme|pcie|ocp|tcg|spdm|caliptra|customer-requirements|manual`를 함께 지정해야 domain unit, technical table, SSD contract gate가 의미 있게 동작한다. 실제 corpus 원문은 커밋하지 않고 위 세 파일처럼 sanitized summary만 공유한다.
 
 release gate에 포함:
 
@@ -271,7 +271,7 @@ python scripts/run_latest_ocp_datacenter_nvme_ssd_benchmark.py \
   --fail-on-ocp-eval-error
 ```
 
-SPDM, TCG Storage, PCIe처럼 SSD 인접 security/register 스펙은 `run_latest_ssd_security_spec_benchmark.py`로 같은 summary-only evidence path를 사용한다. 기본 SPDM metadata는 DMTF 공식 SPDM 페이지 기준 `DSP0274` SPDM 1.4.0과 `DSP0286` SPDM to Storage Binding 1.0.0을 대상으로 한다.
+SPDM, TCG Storage, PCIe, Caliptra처럼 SSD 인접 security/register/RoT 스펙은 `run_latest_ssd_security_spec_benchmark.py`로 같은 summary-only evidence path를 사용한다. 기본 SPDM metadata는 DMTF 공식 SPDM 페이지 기준 `DSP0274` SPDM 1.4.0과 `DSP0286` SPDM to Storage Binding 1.0.0을 대상으로 한다. Caliptra metadata는 CHIPS Alliance의 evolving spec path인 `https://spec.caliptra.io/`와 Caliptra 2.1 RoT 범위를 기본값으로 사용한다.
 
 ```bash
 python scripts/run_latest_ssd_security_spec_benchmark.py \
@@ -293,7 +293,16 @@ python scripts/run_latest_ssd_security_spec_benchmark.py \
   --fail-on-error
 ```
 
-TCG/PCIe 계열은 같은 wrapper에서 `--spec-document-type tcg-storage` 또는 `pcie-base`를 사용한다. 해당 경로는 `security_domain_unit_counts`와 SSD-RAG contract summary만 공유하며, 원문 row text나 retrieved text는 report에 포함하지 않는다.
+TCG/PCIe/Caliptra 계열은 같은 wrapper에서 `--spec-document-type tcg-storage`, `pcie-base`, 또는 `caliptra`를 사용한다. 해당 경로는 `security_domain_unit_counts`와 SSD-RAG contract summary만 공유하며, 원문 row text나 retrieved text는 report에 포함하지 않는다.
+
+```bash
+python scripts/run_latest_ssd_security_spec_benchmark.py \
+  --input-pdf /tmp/Caliptra-latest.pdf \
+  --output-dir /tmp/pdf2md-latest-caliptra-smoke \
+  --spec-document-type caliptra \
+  --mode fast_smoke \
+  --fail-on-error
+```
 
 Docling이 실제 설치된 환경에서만 통과해야 하는 release gate는 다음과 같이 실행한다.
 
@@ -314,7 +323,7 @@ python scripts/run_release_gates.py \
 - `latest_nvme_spec_benchmark_scorecard.md`: latest NVMe Base/NVM Command Set 전용 sanitized metric scorecard
 - `latest_ocp_datacenter_nvme_ssd_benchmark_report.json`: latest OCP Datacenter NVMe SSD 전용 source URL, source_sha256, option matrix, summary count, sanitized contract summary, sanitized OCP P2 query-eval summary
 - `latest_ocp_datacenter_nvme_ssd_benchmark_scorecard.md`: latest OCP Datacenter NVMe SSD 전용 sanitized metric scorecard
-- `latest_ssd_security_spec_benchmark_report.json`: latest SPDM/TCG/PCIe SSD security spec 전용 source URL, source_sha256, option matrix, sidecar count, security domain unit counts, sanitized SSD contract summary
+- `latest_ssd_security_spec_benchmark_report.json`: latest SPDM/TCG/PCIe/Caliptra SSD security spec 전용 source URL, source_sha256, option matrix, sidecar count, security domain unit counts, sanitized SSD contract summary
 - `latest_ssd_security_spec_benchmark_scorecard.md`: latest SSD security spec 전용 sanitized metric scorecard
 
 운영 정책:
@@ -397,10 +406,11 @@ Profile mapping:
 | `ocp` | `HIL` | `OCP` |
 | `tcg` | `HIL` | `TCG` |
 | `spdm` | `HIL` | `SPDM` |
+| `caliptra` | `HIL` | `Caliptra` |
 | `customer-requirements` | `HIL` | `CustomerRequirement` |
 | `manual` | `HIL` | `CustomerRequirement` |
 
-`TCG`와 `SPDM`은 first-class `spec_type`으로 취급한다. `CustomerRequirement + feature_name=TCG/SPDM` fallback은 사용하지 않는다.
+`TCG`, `SPDM`, `Caliptra`는 first-class `spec_type`으로 취급한다. `CustomerRequirement + feature_name=TCG/SPDM/Caliptra` fallback은 사용하지 않는다.
 Q125 이후 이 mapping은 `domain_units_rag.jsonl.adapter_metadata`와 `scripts/validate_ssd_rag_contract.py`의 registry 기반 validator로 검증한다.
 
 RagChunk/RagCitation mapping:
@@ -423,6 +433,7 @@ python scripts/validate_ssd_rag_contract.py --output-dir output/nvme --ssd-agent
 python scripts/validate_ssd_rag_contract.py --output-dir output/ocp --ssd-agent-domain HIL --ssd-agent-spec-type OCP --domain-adapter ocp
 python scripts/validate_ssd_rag_contract.py --output-dir output/tcg --ssd-agent-domain HIL --ssd-agent-spec-type TCG --domain-adapter tcg
 python scripts/validate_ssd_rag_contract.py --output-dir output/spdm --ssd-agent-domain HIL --ssd-agent-spec-type SPDM --domain-adapter spdm
+python scripts/validate_ssd_rag_contract.py --output-dir output/caliptra --ssd-agent-domain HIL --ssd-agent-spec-type Caliptra --domain-adapter caliptra
 python scripts/validate_ssd_rag_contract.py --output-dir output/customer --ssd-agent-domain HIL --ssd-agent-spec-type CustomerRequirement --domain-adapter manual
 python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error
 python scripts/run_ssd_corpus_profile.py --profile local_ssd_corpus_profile.json --fail-on-error --evidence-pack
@@ -430,7 +441,7 @@ python scripts/analyze_corpus_evidence_pack.py --evidence-pack local_corpus_evid
 python scripts/compare_corpus_evidence_packs.py --baseline old_evidence_pack.json --current local_corpus_evidence_pack.json --fail-on-new-signature
 ```
 
-운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg|spdm|customer-requirements|manual`를 필수로 지정한다. `--domain-adapter nvme` 검증은 NVMe Base와 NVM Command Set 모두에 대해 core NVMe domain unit, Command Set CDW/pointer/status taxonomy normalized fields, command relationship metadata, technical table provenance, stable metadata, `requirement_traceability_rag.jsonl` 존재 여부까지 확인한다. `--domain-adapter ocp` 검증은 OCP requirement domain unit, `requirement_id`/`requirement_prefix`/`requirement_family` normalized fields, source table row metadata, stable metadata, `requirement_traceability_rag.jsonl` 존재 여부를 확인한다. Q125 registry metadata가 있는 record는 `adapter_metadata.registry_version`, `adapter_metadata.unit_taxonomy`, `adapter_metadata.evaluator_hooks`, `cross_spec_compatibility.compatible_adapters`, stable source id fields까지 검사한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
+운영 profile에서는 `--rag-table-output jsonl|both`와 `--domain-adapter nvme|pcie|ocp|tcg|spdm|caliptra|customer-requirements|manual`를 필수로 지정한다. `--domain-adapter nvme` 검증은 NVMe Base와 NVM Command Set 모두에 대해 core NVMe domain unit, Command Set CDW/pointer/status taxonomy normalized fields, command relationship metadata, technical table provenance, stable metadata, `requirement_traceability_rag.jsonl` 존재 여부까지 확인한다. `--domain-adapter ocp` 검증은 OCP requirement domain unit, `requirement_id`/`requirement_prefix`/`requirement_family` normalized fields, source table row metadata, stable metadata, `requirement_traceability_rag.jsonl` 존재 여부를 확인한다. `--domain-adapter caliptra` 검증은 Caliptra RoT service, asset, threat, mailbox command, register field, measurement/attestation/key unit taxonomy와 `HIL/Caliptra` mapping을 확인한다. Q125 registry metadata가 있는 record는 `adapter_metadata.registry_version`, `adapter_metadata.unit_taxonomy`, `adapter_metadata.evaluator_hooks`, `cross_spec_compatibility.compatible_adapters`, stable source id fields까지 검사한다. 원본 PDF와 raw output은 커밋하지 않고, 필요한 경우 `ssd_rag_contract_report.json`, sanitized summary, 또는 raw path/query text를 제거한 `local_corpus_evidence_pack.json`만 공유한다. 공유된 evidence pack은 `corpus_evidence_analysis_report.json`으로 hotspot/follow-up hint를 확인하고, `corpus_evidence_trend_report.json`으로 baseline/current signature trend를 비교한다.
 
 ## Azure AI Search
 
@@ -579,7 +590,7 @@ python scripts/run_release_gates.py \
   --rag-min-relationship-target-coverage 1.0
 ```
 
-실제 NVMe/PCIe/OCP/TCG/SPDM/customer-like corpus는 repo에 커밋하지 말고 로컬 profile과 sanitized eval fixture만 사용한다.
+실제 NVMe/PCIe/OCP/TCG/SPDM/Caliptra/customer-like corpus는 repo에 커밋하지 말고 로컬 profile과 sanitized eval fixture만 사용한다.
 
 Eval fixture의 requirement coverage는 기본적으로 `requirement`, `requirement_trace` source type만 인정한다. Table-field coverage는 기본적으로 `table_row`, `technical_table_unit`, `domain_unit` source type만 인정한다. 다른 source type을 의도적으로 허용해야 할 때만 `expected_requirement_source_types` 또는 `expected_table_field_source_types`를 명시한다. Relationship metadata coverage는 `previous_chunk_id`, `next_chunk_id`, `section_anchor_chunk_id`, `related_chunk_ids`가 같은 `retrieval_chunks_rag.jsonl` 내부 final chunk id로 해소되는지 local-only로 계산한다.
 

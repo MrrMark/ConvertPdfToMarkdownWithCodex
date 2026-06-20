@@ -535,7 +535,7 @@ python -m pip install -e ".[mcp]"
 
 `technical_spec_rag requires a non-none domain_adapter`:
 
-- `domain_adapter`를 `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`, `manual` 중 하나로 지정한다.
+- `domain_adapter`를 `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `caliptra`, `customer-requirements`, `manual` 중 하나로 지정한다.
 
 OCR warning:
 

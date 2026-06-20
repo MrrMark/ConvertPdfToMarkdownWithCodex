@@ -67,6 +67,7 @@ class DomainAdapterMode(str, Enum):
     OCP = "ocp"
     TCG = "tcg"
     SPDM = "spdm"
+    CALIPTRA = "caliptra"
     CUSTOMER_REQUIREMENTS = "customer-requirements"
     MANUAL = "manual"
 

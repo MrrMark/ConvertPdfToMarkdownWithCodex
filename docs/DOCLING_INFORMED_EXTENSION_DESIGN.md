@@ -38,7 +38,7 @@ Current tool baseline after Q125:
 - image는 `referenced`, `embedded`, `placeholder`, `none` mode를 지원하고, Q103-Q124에서 image file 없이 `figure_text`, deterministic `figure_description`, `figure_structure`, region OCR evidence sidecar를 opt-in으로 생성한다.
 - table은 `pdfplumber` strategy 기반이며, Q101 adaptive mode와 HTML fallback 안전 정책을 유지한다.
 - RAG sidecar는 source refs, provenance validators, schema contract로 검증한다.
-- Domain adapter는 Q125 registry가 NVMe/PCIe/OCP/TCG/SPDM/customer/manual metadata, SSD spec type, unit taxonomy, revision hints, evaluator hooks, required normalized fields를 관리한다.
+- Domain adapter는 Q125+ registry가 NVMe/PCIe/OCP/TCG/SPDM/Caliptra/customer/manual metadata, SSD spec type, unit taxonomy, revision hints, evaluator hooks, required normalized fields를 관리한다.
 
 ## Candidate Review
 
@@ -76,7 +76,7 @@ Implemented public options:
 - `--rag-generated-figure-descriptions` default false
 - `--figure-structure-extraction` default false
 - `--layout-comparison-mode off|summary` comparison-only
-- `--domain-adapter none|nvme|pcie|ocp|tcg|spdm|customer-requirements|manual`
+- `--domain-adapter none|nvme|pcie|ocp|tcg|spdm|caliptra|customer-requirements|manual`
 
 Default policy:
 

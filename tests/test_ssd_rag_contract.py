@@ -175,6 +175,89 @@ def test_ssd_rag_contract_accepts_spdm_first_class_spec_type(tmp_path: Path) -> 
     assert report["sample_mapped_chunk"]["metadata"]["semantic_types"] == ["spdm_message"]
 
 
+def test_ssd_rag_contract_accepts_caliptra_first_class_spec_type(tmp_path: Path) -> None:
+    source_sha256 = "d" * 64
+    _write_jsonl(
+        tmp_path / "retrieval_chunks_rag.jsonl",
+        [
+            {
+                "chunk_id": "chunk-000001",
+                "schema_version": "1.0",
+                "chunk_index": 1,
+                "chunk_type": "domain_unit",
+                "text": "Asset = Synthetic device identity seed | Security Property = Confidentiality",
+                "source_sha256": source_sha256,
+                "source_refs": [{"source_type": "domain_unit", "source_id": "domain-caliptra-000001", "page": 1}],
+                "page_range": [1, 1],
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+                "heading_path": ["Caliptra Assets"],
+                "semantic_types": ["caliptra_asset"],
+                "normative_strength": None,
+                "retrieval_priority": 94,
+                "char_count": 75,
+                "token_estimate": 19,
+                "section_path": "Caliptra Assets",
+                "chunk_group_id": "domain-caliptra",
+                "source_record_count": 1,
+                "source_dedupe_key": "domain-caliptra-000001",
+                "chunk_boundary_policy": "source_record",
+                "chunk_boundary_reasons": ["domain_unit_boundary"],
+            }
+        ],
+    )
+    _write_jsonl(tmp_path / "requirements_rag.jsonl", [])
+    _write_jsonl(
+        tmp_path / "technical_tables_rag.jsonl",
+        [
+            {
+                "technical_table_unit_id": "tech-table-000001",
+                "unit_type": "caliptra_asset",
+                "page": 1,
+                "table_id": "page-0001-table-0001",
+                "table_row_id": "page-0001-table-0001-row-0001",
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "tables_rag.jsonl",
+        [
+            {
+                "table_row_id": "page-0001-table-0001-row-0001",
+                "table_id": "page-0001-table-0001",
+                "page": 1,
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            }
+        ],
+    )
+    _write_jsonl(
+        tmp_path / "domain_units_rag.jsonl",
+        [
+            {
+                "domain_unit_id": "domain-caliptra-000001",
+                "domain": "caliptra",
+                "unit_type": "caliptra_asset",
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0001-row-0001"}],
+            }
+        ],
+    )
+    _write_jsonl(tmp_path / "cross_refs_rag.jsonl", [])
+    _write_jsonl(tmp_path / "figures_rag.jsonl", [])
+
+    report = validate_ssd_rag_contract(
+        output_dir=tmp_path,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="Caliptra",
+        domain_adapter="caliptra",
+        document_id="CALIPTRA_DOC",
+        source_sha256=source_sha256,
+    )
+
+    assert report["passed"] is True
+    assert report["sample_mapped_chunk"]["citation"]["document_id"] == "CALIPTRA_DOC"
+    assert report["sample_mapped_chunk"]["metadata"]["semantic_types"] == ["caliptra_asset"]
+
+
 def test_ssd_rag_contract_rejects_adapter_spec_type_mismatch(tmp_path: Path) -> None:
     _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [])
 

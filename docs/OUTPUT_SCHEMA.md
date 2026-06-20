@@ -648,7 +648,7 @@ Required:
 
 - `schema_version`
 - `purpose="latest_ssd_security_spec_benchmark"`
-- `spec_document_type`: `spdm`, `spdm-storage-binding`, `tcg-storage`, or `pcie-base`
+- `spec_document_type`: `spdm`, `spdm-storage-binding`, `tcg-storage`, `pcie-base`, or `caliptra`
 - `latest_spec_set`
 - `expected_spec_title`
 - `source_url`
@@ -687,9 +687,10 @@ Stable summary fields:
 
 Policy:
 
-- This report covers SSD-adjacent security specifications under `technical_spec_rag` with `domain_adapter=spdm`, `tcg`, or `pcie`.
+- This report covers SSD-adjacent security specifications under `technical_spec_rag` with `domain_adapter=spdm`, `tcg`, `pcie`, or `caliptra`.
 - The default SPDM metadata tracks DMTF SPDM 1.4.0 and SPDM to Storage Binding 1.0.0 as the first-class SSD security evidence path.
-- `security_domain_unit_counts` records only unit-type counts such as `spdm_message`, `spdm_algorithm`, `security_method`, or `register_field`; full sidecar rows are not embedded.
+- The default Caliptra metadata tracks the CHIPS Alliance evolving Caliptra 2.1 Root of Trust specification path exposed through `https://spec.caliptra.io/`.
+- `security_domain_unit_counts` records only unit-type counts such as `spdm_message`, `spdm_algorithm`, `security_method`, `register_field`, `caliptra_asset`, or `caliptra_mailbox_command`; full sidecar rows are not embedded.
 - The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, and sanitized SSD contract status only.
 - Raw spec text, raw Markdown body, retrieved chunk text, table row content, image bytes, and local input PDF paths are not embedded.
 
@@ -1397,13 +1398,14 @@ Required per JSONL record:
 Policy:
 
 - Default adapter is `none`, so this file is only written when a domain adapter is explicitly selected.
-- Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`, and `manual`.
+- Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `caliptra`, `customer-requirements`, and `manual`.
 - Q125 adds a built-in domain adapter registry. `adapter_metadata.registry_version` is `1.0` and records the selected adapter, SSD agent domain/spec type, keyword profile, supported unit taxonomy, revision hints, evaluator hooks, and unit-type-specific `required_normalized_fields`.
 - `cross_spec_compatibility` records the compatibility group, compatible adapters, and stable source ID fields (`source_sha256`, `source_dedupe_key`, `stable_source_id`, `stable_requirement_seed`) used for cross-spec merge/reprocessing.
 - NVMe domain units cover both NVMe Base and NVM Command Set specs. They may use `command`, `command_dword_field`, `command_pointer_field`, `log_page`, `feature`, `register_field`, `status_code`, `queue_field`, `namespace_field`, `controller_field`, `support_requirement`, `data_structure_field`, or `enum_value`. Their `normalized_fields` may include `canonical_name`, `opcode`, `command_dword`, `command_scope`, `queue_type`, `pointer_type`, `command_context`, `command_context_source`, `related_command_unit_id`, `related_command_opcode`, `relationship_hints`, `log_identifier`, `feature_identifier`, `register_name`, `offset`, `bit_range`, `field_name`, `status_code_type`, `status_code_value`, `status_code_group`, `error_class`, `retry_hint`, `controller_support`, `namespace_support`, `scope`, `access`, `reset_default`, and `requirement_ref`; empty values are omitted.
 - OCP domain units use `requirement`. Their `normalized_fields` include `requirement_id`, `requirement_prefix`, `requirement_number`, `requirement_family`, `normative_strength`, `ssd_requirement_status`, related NVMe hints such as `related_command`, `related_log_identifier`, `related_feature_identifier`, and source row fields `source_table_id`/`source_table_row_id`; empty values are omitted.
 - TCG domain units may use `security_method`, `security_object`, `security_authority`, `security_field`, `security_provider`, `locking_range`, `key_management`, or `session_state`; TCG is expected to map to SSD `HIL/TCG` without a CustomerRequirement fallback.
 - SPDM domain units may use `spdm_message`, `spdm_request_response`, `spdm_measurement`, `spdm_certificate`, `spdm_algorithm`, `spdm_key_exchange`, or `spdm_session`; SPDM maps to SSD `HIL/SPDM`.
+- Caliptra domain units may use `caliptra_rot_service`, `caliptra_asset`, `caliptra_threat`, `caliptra_interface`, `caliptra_mailbox_command`, `caliptra_register_field`, `caliptra_security_state`, `caliptra_measurement`, `caliptra_attestation`, or `caliptra_crypto_key`; Caliptra maps to SSD `HIL/Caliptra`.
 - Manual domain units keep `domain="manual"`, map to SSD `HIL/CustomerRequirement`, and set `adapter_profile` to `--manual-domain-adapter-label` when provided, otherwise `manual`. `--manual-domain-adapter-keywords` only expands deterministic table header recognition; record `text`, `name`, `value`, and `description` are copied from observed table/technical-table provenance and are not generated.
 - Adapter profiles consume the typed technical table sidecar where possible and keep domain heuristics out of the default conversion path.
 - `stable_source_id` and `stable_requirement_seed` are deterministic metadata seeds. They do not replace the ordinal `domain_unit_id`; downstream systems should prefer them when generating business IDs across repeated conversions.

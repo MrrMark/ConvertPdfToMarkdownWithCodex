@@ -5,11 +5,12 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add Q135 Caliptra security spec support across the domain adapter registry, SSD-RAG contract validation, and latest SSD security benchmark wrapper.
 - Add Q134 SSD security spec benchmark path for SPDM, SPDM-to-Storage, TCG Storage, and PCIe adapter evidence with sanitized contract summaries.
 - Add Q131-Q133 MCP stability guardrails: large technical spec preflight planning, compact visual sidecar contract validation, and page-window merge sidecar inventory/memory guard reporting.
 - Add Q127-Q130 agent/MCP contract alignment: latest sidecar guidance in `pdf2md-rag-ingest`, OCR backend discovery in MCP profiles, compact SSD-RAG contract validation through MCP, and source-mapped agent rule regeneration dry-runs.
 - Add Q118-Q125 native migration hardening: internal document IR, table confidence v2, native hybrid chunking v2, layout sidecar diagnostics, region OCR evidence v2, OCR backend registry expansion, figure semantics v2, and domain adapter registry metadata.
-- Add `domain_units_rag.jsonl` adapter registry metadata and cross-spec compatibility fields for NVMe/PCIe/OCP/TCG/SPDM/customer/manual adapter outputs.
+- Add `domain_units_rag.jsonl` adapter registry metadata and cross-spec compatibility fields for NVMe/PCIe/OCP/TCG/SPDM/Caliptra/customer/manual adapter outputs.
 - Extend conversion-time OCR backend selection to `tesseract`, `tesseract-cli`, `rapidocr`, and `ocrmac` while keeping optional backend failures structured and non-fatal.
 - Add latest NVMe Base/NVM Command Set and OCP Datacenter NVMe SSD benchmark smoke/eval paths for SSD-RAG contract validation.
 - Add a local stdio MCP server entry point with pdf2md conversion, profile discovery, output validation, report inspection, and Streamable HTTP follow-up specification.
