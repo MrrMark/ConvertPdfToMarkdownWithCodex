@@ -5,12 +5,13 @@ from pathlib import Path
 
 import pdf2md.pipeline as pipeline_module
 import pdf2md.serializers.rag_figure_semantics as figure_semantics_module
+import pdf2md.serializers.rag_ocr_evidence as ocr_evidence_module
 from pdf2md.config import Config
 from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrResult
 from pdf2md.extractors.ocr_backends import OCRBackendMetadata, OCRBackendResult
 from pdf2md.extractors.tables import TableExtractionResult
-from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, RagSidecarScope
+from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, RagSidecarScope, RagTableOutputMode
 from pdf2md.serializers.rag_chunks import build_retrieval_chunks
 from pdf2md.serializers.rag_figure_semantics import (
     augment_figure_records_with_region_ocr,
@@ -18,6 +19,7 @@ from pdf2md.serializers.rag_figure_semantics import (
     build_figure_structure_records,
 )
 from pdf2md.serializers.rag_figures import build_figure_records, serialize_figures_jsonl
+from pdf2md.serializers.rag_ocr_evidence import build_region_ocr_evidence_records
 from scripts.validate_artifact_integrity import validate_artifact_integrity
 from scripts.validate_index_contract import validate_index_contract
 from scripts.validate_provenance_integrity import validate_provenance_integrity
@@ -420,6 +422,133 @@ def test_region_ocr_report_only_rejects_invalid_bbox(monkeypatch, tmp_path: Path
     assert metrics["figure_region_ocr_rejected_region_count"] == 1
 
 
+def test_region_ocr_evidence_records_include_figure_and_table_targets(monkeypatch, tmp_path: Path) -> None:  # noqa: ANN001
+    monkeypatch.setattr(ocr_evidence_module, "_region_ocr_runtime", lambda *, ocr_backend: (
+        _FakePdfium,
+        _FakeRegionOCRBackend(text="TABLE1", confidence="92"),
+        None,
+    ))
+    figure_records = [
+        {
+            "figure_id": "page-0001-figure-0001",
+            "figure_index": 1,
+            "page": 1,
+            "bbox": [10.0, 20.0, 120.0, 160.0],
+            "source_refs": [
+                {
+                    "source_type": "figure",
+                    "source_id": "page-0001-figure-0001",
+                    "page": 1,
+                    "bbox": [10.0, 20.0, 120.0, 160.0],
+                }
+            ],
+            "figure_region_ocr": {
+                "region_ocr": {
+                    "status": "candidate",
+                    "backend": "tesseract",
+                    "ocr_lang": "eng",
+                    "attempted": True,
+                    "candidate": {
+                        "text": "NVME1",
+                        "confidence": 0.9,
+                        "source": "region_ocr",
+                        "bbox": [10.0, 20.0, 120.0, 160.0],
+                        "ocr_confidence_mean": 90.0,
+                        "ocr_confidence_median": 90.0,
+                        "low_conf_token_ratio": 0.0,
+                    },
+                    "rejected": None,
+                    "report_only": True,
+                    "text_replaced": False,
+                }
+            },
+        }
+    ]
+    rag_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "table_id": "page-0001-table-0001",
+            "bbox": [130.0, 20.0, 280.0, 160.0],
+            "source_mode": "image_only",
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "source_mode": "image_only",
+                    "headers": [],
+                    "row_index": 1,
+                    "cells": {"label": "diagram-only"},
+                    "row_text": "label=diagram-only",
+                    "bbox": [130.0, 20.0, 280.0, 160.0],
+                    "quality_score": 0.8,
+                    "fallback_reasons": [],
+                    "header_depth": 0,
+                    "header_confidence": 0.0,
+                    "rag_header_strategy": "none",
+                }
+            ],
+        }
+    ]
+
+    records, metrics = build_region_ocr_evidence_records(
+        figure_records=figure_records,
+        rag_tables=rag_tables,
+        source_sha256="a" * 64,
+        pdf_path=tmp_path / "sample.pdf",
+        ocr_backend="tesseract",
+        ocr_lang="eng",
+    )
+
+    assert metrics["figure_ocr_evidence_record_count"] == 2
+    assert metrics["region_ocr_evidence_accepted_count"] == 2
+    assert {record["target_type"] for record in records} == {"figure", "table"}
+    assert [record["evidence_id"] for record in records] == ["ocr-evidence-000001", "ocr-evidence-000002"]
+    assert records[0]["ocr_text"] == "NVME1"
+    assert records[0]["source_refs"][0]["source_type"] == "figure"
+    assert records[1]["ocr_text"] == "TABLE1"
+    assert records[1]["source_refs"][0]["source_type"] == "table"
+    assert records[1]["report_only"] is True
+    assert records[1]["text_replaced"] is False
+    assert records[1]["markdown_inserted"] is False
+
+
+def test_region_ocr_evidence_rejects_low_confidence_candidate() -> None:
+    figure_records = [
+        {
+            "figure_id": "page-0001-figure-0001",
+            "figure_index": 1,
+            "page": 1,
+            "bbox": [10.0, 20.0, 120.0, 160.0],
+            "source_refs": [{"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1}],
+            "figure_region_ocr": {
+                "region_ocr": {
+                    "status": "candidate",
+                    "backend": "tesseract",
+                    "ocr_lang": "eng",
+                    "attempted": True,
+                    "candidate": {"text": "NOISY", "confidence": 0.3, "source": "region_ocr"},
+                    "rejected": None,
+                    "report_only": True,
+                    "text_replaced": False,
+                }
+            },
+        }
+    ]
+
+    records, metrics = build_region_ocr_evidence_records(
+        figure_records=figure_records,
+        rag_tables=[],
+        source_sha256="a" * 64,
+    )
+
+    assert metrics["region_ocr_evidence_rejected_count"] == 1
+    assert records[0]["status"] == "rejected"
+    assert records[0]["rejected_reason"] == "low_confidence"
+    assert records[0]["ocr_text"] is None
+    assert records[0]["candidate"]["text"] == "NOISY"
+
+
 def test_pipeline_writes_assetless_figure_text_chunks_with_placeholder_mode(
     sample_pdf: Path,
     tmp_path: Path,
@@ -503,6 +632,105 @@ def test_pipeline_writes_assetless_figure_text_chunks_with_placeholder_mode(
     assert report["summary"]["figure_rag_record_count"] == 1
     assert report["summary"]["figure_description_record_count"] == 1
     assert report["summary"]["figure_structure_record_count"] == 1
+
+    assert validate_index_contract(output_dir=output_dir)["passed"] is True
+    assert validate_provenance_integrity(output_dir=output_dir)["passed"] is True
+    assert validate_artifact_integrity(output_dir=output_dir)["passed"] is True
+
+
+def test_pipeline_writes_region_ocr_evidence_sidecar_without_markdown_pollution(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(figure_semantics_module, "pdfium", _FakePdfium)
+    monkeypatch.setattr(
+        figure_semantics_module,
+        "get_ocr_backend",
+        lambda name, *, pytesseract_module: _FakeRegionOCRBackend(text="NVME1 READY", confidence="90"),
+    )
+    image = ImageAsset(
+        page=1,
+        index=1,
+        path="assets/images/page-0001-figure-001.png",
+        caption_text="Figure 1: State machine diagram",
+        caption_source="nearby_caption",
+        caption_confidence=0.91,
+        bbox=[72.0, 120.0, 420.0, 320.0],
+        width=348,
+        height=200,
+        sha256="abc",
+        source="page_crop",
+        anchor_line_index=1,
+        anchor_top=120.0,
+    )
+    table_payload = {
+        "page": 1,
+        "table_index": 1,
+        "table_id": "page-0001-table-0001",
+        "bbox": [72.0, 340.0, 420.0, 460.0],
+        "source_mode": "image_only",
+        "headers": [],
+        "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "source_mode": "image_only",
+                    "headers": [],
+                    "row_index": 1,
+                    "cells": {"label": "diagram-only"},
+                    "row_text": "label=diagram-only",
+                    "bbox": [72.0, 340.0, 420.0, 460.0],
+                    "quality_score": 0.8,
+                    "fallback_reasons": [],
+                    "header_depth": 0,
+                    "header_confidence": 0.0,
+                    "rag_header_strategy": "none",
+                }
+            ],
+    }
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_images",
+        lambda *args, **kwargs: ImageExtractionResult(assets=[image]),
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_tables",
+        lambda *args, **kwargs: TableExtractionResult(rag_tables=[table_payload]),
+    )
+    monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+    output_dir = tmp_path / "region-ocr-evidence"
+    result = pipeline_module.run_conversion(
+        Config(
+            input_pdf=sample_pdf,
+            output_dir=output_dir,
+            image_mode=ImageMode.PLACEHOLDER,
+            rag_sidecar_scope=RagSidecarScope.FULL,
+            rag_table_output=RagTableOutputMode.JSONL,
+            figure_region_ocr=True,
+        )
+    )
+
+    assert result.exit_code == 0
+    evidence_path = output_dir / "figure_ocr_evidence_rag.jsonl"
+    assert evidence_path.exists()
+    records = [json.loads(line) for line in evidence_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert {record["target_type"] for record in records} == {"figure", "table"}
+    assert all(record["report_only"] is True for record in records)
+    assert all(record["text_replaced"] is False for record in records)
+    assert all(record["markdown_inserted"] is False for record in records)
+    assert all(record["status"] == "accepted" for record in records)
+    assert all(record["ocr_text"] == "NVME1 READY" for record in records)
+    markdown = (output_dir / "document.md").read_text(encoding="utf-8")
+    assert "NVME1 READY" not in markdown
+
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["figure_ocr_evidence_jsonl_filename"] == "figure_ocr_evidence_rag.jsonl"
+    assert report["summary"]["figure_ocr_evidence_record_count"] == 2
+    assert report["summary"]["region_ocr_evidence_accepted_count"] == 2
 
     assert validate_index_contract(output_dir=output_dir)["passed"] is True
     assert validate_provenance_integrity(output_dir=output_dir)["passed"] is True

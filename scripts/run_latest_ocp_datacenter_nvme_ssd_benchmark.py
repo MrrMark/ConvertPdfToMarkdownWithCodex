@@ -72,6 +72,7 @@ SIDECAR_FILES = (
     "requirement_traceability_rag.jsonl",
     "technical_tables_rag.jsonl",
     "figures_rag.jsonl",
+    "figure_ocr_evidence_rag.jsonl",
     "figure_descriptions_rag.jsonl",
     "figure_structures_rag.jsonl",
     "domain_units_rag.jsonl",
@@ -541,6 +542,15 @@ def _summary_counts(
             conversion_summary,
             "figure_region_ocr_runtime_unavailable_count",
         ),
+        "figure_ocr_evidence_record_count": _int_value(conversion_summary, "figure_ocr_evidence_record_count"),
+        "region_ocr_evidence_accepted_count": _int_value(
+            conversion_summary,
+            "region_ocr_evidence_accepted_count",
+        ),
+        "region_ocr_evidence_rejected_count": _int_value(
+            conversion_summary,
+            "region_ocr_evidence_rejected_count",
+        ),
         "visual_eval_status": visual_eval.get("status", "not_applicable"),
         "visual_eval_passed": visual_eval.get("passed") is True,
         "visual_eval_query_count": _int_value(visual_eval, "query_count"),
@@ -602,6 +612,9 @@ def render_scorecard(report: dict[str, Any]) -> str:
         f"| figure_region_ocr_promoted_label_count | {counts.get('figure_region_ocr_promoted_label_count', 0)} |",
         "| figure_region_ocr_runtime_unavailable_count | "
         f"{counts.get('figure_region_ocr_runtime_unavailable_count', 0)} |",
+        f"| figure_ocr_evidence_record_count | {counts.get('figure_ocr_evidence_record_count', 0)} |",
+        f"| region_ocr_evidence_accepted_count | {counts.get('region_ocr_evidence_accepted_count', 0)} |",
+        f"| region_ocr_evidence_rejected_count | {counts.get('region_ocr_evidence_rejected_count', 0)} |",
         f"| visual_eval_status | {counts.get('visual_eval_status')} |",
         f"| visual_eval_passed | {counts.get('visual_eval_passed')} |",
         f"| visual_eval_query_count | {counts.get('visual_eval_query_count', 0)} |",

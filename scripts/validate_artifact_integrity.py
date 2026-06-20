@@ -24,6 +24,7 @@ SIDECAR_COUNT_FIELDS = {
     "requirement_traceability_rag.jsonl": "requirement_traceability_record_count",
     "technical_tables_rag.jsonl": "technical_table_record_count",
     "figures_rag.jsonl": "figure_rag_record_count",
+    "figure_ocr_evidence_rag.jsonl": "figure_ocr_evidence_record_count",
     "figure_descriptions_rag.jsonl": "figure_description_record_count",
     "figure_structures_rag.jsonl": "figure_structure_record_count",
     "domain_units_rag.jsonl": "domain_unit_record_count",

@@ -75,7 +75,7 @@ Stable nested fields:
 - `options.image_mode`, `options.table_mode`, `options.rag_table_output`, `options.rag_profile` when a non-default RAG profile was selected, `options.rag_text_blocks_output`, `options.semantic_layer_output`, `options.ocr_lang`, `options.ocr_backend`
 - `options.rag_text_blocks_jsonl_filename`, `options.semantic_units_jsonl_filename`, `options.requirements_jsonl_filename`, `options.cross_refs_jsonl_filename`
 - `options.requirement_traceability_jsonl_filename`, `options.technical_tables_jsonl_filename`
-- `options.retrieval_chunks_jsonl_filename`, `options.page_layout_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.figure_descriptions_jsonl_filename`, `options.figure_structures_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
+- `options.retrieval_chunks_jsonl_filename`, `options.page_layout_jsonl_filename`, `options.figures_rag_jsonl_filename`, `options.figure_ocr_evidence_jsonl_filename`, `options.figure_descriptions_jsonl_filename`, `options.figure_structures_jsonl_filename`, `options.domain_adapter`, `options.domain_units_jsonl_filename`
 - `options.manual_domain_adapter_label`, `options.manual_domain_adapter_keywords` when `options.domain_adapter="manual"` and those inputs were provided
 - `options.retrieval_chunk_max_tokens`, `options.retrieval_tokenizer`, `options.rag_contextual_embedding_text`, `options.rag_merge_sibling_text_chunks`, `options.rag_chunk_relationship_metadata`, `options.rag_figure_text_chunks` when enabled
 - `options.figure_region_ocr`, `options.rag_generated_figure_descriptions`, `options.figure_description_backend`, `options.figure_structure_extraction` when enabled
@@ -189,6 +189,9 @@ Assetless figure text summary fields:
 - `figure_region_ocr`: present and `true` when `--figure-region-ocr` was enabled.
 - `figure_region_ocr_attempted_count`, `figure_region_ocr_candidate_count`, `figure_region_ocr_promoted_label_count`, `figure_region_ocr_low_confidence_count`: deterministic OCR evidence promotion counters.
 - `figure_region_ocr_render_attempted_count`, `figure_region_ocr_region_candidate_count`, `figure_region_ocr_accepted_region_count`, `figure_region_ocr_rejected_region_count`, `figure_region_ocr_crop_rejected_count`, `figure_region_ocr_runtime_unavailable_count`: report-only figure bbox crop OCR counters.
+- `figure_ocr_evidence_record_count`, `figure_ocr_evidence_file_count`: `figure_ocr_evidence_rag.jsonl` record and file counters.
+- `region_ocr_evidence_figure_record_count`, `region_ocr_evidence_table_record_count`: OCR evidence records by target type.
+- `region_ocr_evidence_accepted_count`, `region_ocr_evidence_rejected_count`, `region_ocr_evidence_runtime_unavailable_count`, `region_ocr_evidence_not_attempted_count`: accepted/rejected/runtime taxonomy counters.
 - `rag_generated_figure_descriptions`: present and `true` when `--rag-generated-figure-descriptions` was enabled.
 - `figure_description_backend`: selected backend label, currently emitted for deterministic context-only description records.
 - `figure_description_record_count`, `figure_description_file_count`, `figure_description_low_confidence_count`, `figure_description_skipped_no_evidence_count`, `figure_description_chunk_record_count`: generated figure description sidecar and chunk counters.
@@ -1118,6 +1121,53 @@ Policy:
 - Captionless candidates may include `captionless_diagnostics` with evidence counts and rejection reasons. This is diagnostics-only metadata and does not create a generated caption or visual description.
 - No generated visual description is added by default.
 
+## figure_ocr_evidence_rag.jsonl
+
+Optional JSONL output written when `--figure-region-ocr` is enabled with full sidecars.
+It separates OCR evidence from `figure_text`, generated descriptions, and Markdown source text.
+
+Required per JSONL record:
+
+- `evidence_id`
+- `schema_version`
+- `reason_taxonomy_version`
+- `evidence_type`
+- `target_type`
+- `target_id`
+- `page`
+- `bbox`
+- `source_sha256`
+- `ocr_backend`
+- `ocr_lang`
+- `status`
+- `accepted`
+- `accepted_reason`
+- `rejected_reason`
+- `confidence_threshold`
+- `confidence`
+- `ocr_text`
+- `candidate`
+- `rejected`
+- `report_only`
+- `text_replaced`
+- `markdown_inserted`
+- `source_refs`
+
+Status taxonomy:
+
+- `accepted`: local OCR returned text and confidence met the deterministic threshold. `ocr_text` is present.
+- `rejected`: OCR was attempted or produced a candidate but failed a deterministic reason such as `low_confidence`, `empty_result`, `missing_bbox`, `invalid_bbox`, `language_data_missing`, or `ocr_failed`.
+- `runtime_unavailable`: local OCR or PDF rendering runtime was unavailable.
+- `not_attempted`: the figure/table region was not attempted, for example because source diagnostics were missing.
+
+Policy:
+
+- `report_only=true`, `text_replaced=false`, and `markdown_inserted=false` are required.
+- OCR evidence never replaces `document.md`, `text_blocks_rag.jsonl`, table extraction, or retrieval chunk source text.
+- Figure records reuse existing `figure_region_ocr.region_ocr` diagnostics.
+- Table records are emitted only when a row-wise table sidecar record exists, so `source_refs[]` can resolve through `tables_rag.jsonl`.
+- Remote OCR/VLM calls are not used.
+
 ## figure_descriptions_rag.jsonl
 
 Optional JSONL output controlled by `--rag-generated-figure-descriptions`.
@@ -1324,7 +1374,7 @@ Policy:
 - `targets` may include `openai`, `azure-ai-search`, `langchain`, and `llamaindex`.
 - `findings[]` are sorted deterministically by severity, file, line, field, and code.
 - `severity` is one of `error`, `warning`, or `info`.
-- The validator checks required field and type coverage for `retrieval_chunks_rag.jsonl`, `page_layout_rag.jsonl`, `tables_rag.jsonl`, `technical_tables_rag.jsonl`, and `requirement_traceability_rag.jsonl` before external indexing.
+- The validator checks required field and type coverage for `retrieval_chunks_rag.jsonl`, `page_layout_rag.jsonl`, `figure_ocr_evidence_rag.jsonl`, `tables_rag.jsonl`, `technical_tables_rag.jsonl`, and `requirement_traceability_rag.jsonl` before external indexing.
 - The validator must not call external services or create embeddings.
 - Confidential-safe findings are advisory for metadata sharing. The validator does not redact source `text`.
 

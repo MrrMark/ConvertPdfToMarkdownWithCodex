@@ -23,19 +23,12 @@
 
 ## 현재 Active Development Specs
 
-### P1-P2 / Q122-Q125. PDF2MD Native Migration Plan
+### P1-P2 / Q123-Q125. PDF2MD Native Migration Plan
 
 Docling을 runtime backend나 필수 dependency로 채택하지 않고, Docling에서 참고할 만한 설계 아이디어를 `pdf2md` 네이티브 기능으로 재구현한다.
 canonical output은 계속 `pdf2md`의 `document.md`, `manifest.json`, `report.json`, RAG sidecar, provenance/index/SSD-RAG validator 계약으로 유지한다.
 
 상세 개발 명세는 `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`에서 관리한다.
-
-#### Q122. Region OCR Evidence v2
-
-- 우선순위: P1
-- 목표: figure/table crop OCR을 원문 대체가 아닌 evidence sidecar로 강화한다.
-- 핵심 산출물: OCR evidence sidecar 또는 figure sidecar 확장, accepted/rejected reason taxonomy.
-- 검증: OCR, image, RAG figure tests와 no Markdown text pollution regression.
 
 #### Q123. OCR Backend Registry Expansion
 
@@ -60,4 +53,4 @@ canonical output은 계속 `pdf2md`의 `document.md`, `manifest.json`, `report.j
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q121 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q122 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

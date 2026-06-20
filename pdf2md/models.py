@@ -197,6 +197,19 @@ def _add_report_summary_json_schema_extras(schema: dict[str, Any]) -> None:
         ),
     }.items():
         properties.setdefault(name, {"type": "integer", "description": description})
+    for name, description in {
+        "figure_ocr_evidence_record_count": "Number of figure_ocr_evidence_rag.jsonl OCR evidence records.",
+        "figure_ocr_evidence_file_count": "Number of OCR evidence sidecar files written.",
+        "region_ocr_evidence_figure_record_count": "Number of OCR evidence records targeting figures.",
+        "region_ocr_evidence_table_record_count": "Number of OCR evidence records targeting table bbox candidates.",
+        "region_ocr_evidence_accepted_count": "Number of OCR evidence records accepted by confidence threshold.",
+        "region_ocr_evidence_rejected_count": "Number of OCR evidence records rejected by taxonomy reason.",
+        "region_ocr_evidence_runtime_unavailable_count": (
+            "Number of OCR evidence records skipped because local OCR/runtime was unavailable."
+        ),
+        "region_ocr_evidence_not_attempted_count": "Number of OCR evidence records that were not attempted.",
+    }.items():
+        properties.setdefault(name, {"type": "integer", "description": description})
     properties.setdefault(
         "interrupted",
         {
@@ -498,6 +511,7 @@ class BatchDocumentFiles(BaseModel):
     retrieval_chunks_rag: Optional[str] = None
     page_layout_rag: Optional[str] = None
     figures_rag: Optional[str] = None
+    figure_ocr_evidence_rag: Optional[str] = None
     figure_descriptions_rag: Optional[str] = None
     figure_structures_rag: Optional[str] = None
     domain_units_rag: Optional[str] = None

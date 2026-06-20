@@ -211,12 +211,13 @@ def test_synthetic_corpus_matches_golden_outputs(tmp_path: Path) -> None:
             "requirements_rag.jsonl",
             "cross_refs_rag.jsonl",
             "requirement_traceability_rag.jsonl",
-                "technical_tables_rag.jsonl",
-                "domain_units_rag.jsonl",
-                "retrieval_chunks_rag.jsonl",
-                "page_layout_rag.jsonl",
-                "figures_rag.jsonl",
-            ):
+            "technical_tables_rag.jsonl",
+            "domain_units_rag.jsonl",
+            "retrieval_chunks_rag.jsonl",
+            "page_layout_rag.jsonl",
+            "figures_rag.jsonl",
+            "figure_ocr_evidence_rag.jsonl",
+        ):
             golden_sidecar = golden_dir / sidecar_name
             output_sidecar = output_dir / sidecar_name
             if golden_sidecar.exists():
