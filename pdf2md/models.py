@@ -1092,6 +1092,64 @@ class LatestOcpDatacenterNvmeSsdBenchmarkReport(BaseModel):
     visual_eval: dict[str, Any] = Field(default_factory=dict)
 
 
+class LatestSsdSecuritySpecBenchmarkSummary(BaseModel):
+    page_count: int = 0
+    conversion_duration_ms: Optional[int] = None
+    sidecar_file_count: int = 0
+    sidecar_total_bytes: int = 0
+    sidecar_file_sizes: dict[str, int] = Field(default_factory=dict)
+    retrieval_chunk_count: int = 0
+    requirement_count: int = 0
+    traceability_record_count: int = 0
+    technical_table_unit_count: int = 0
+    domain_unit_count: int = 0
+    security_domain_unit_counts: dict[str, int] = Field(default_factory=dict)
+    figure_rag_record_count: int = 0
+    figure_text_chunk_record_count: int = 0
+    figure_description_record_count: int = 0
+    figure_description_chunk_record_count: int = 0
+    figure_structure_record_count: int = 0
+    figure_structure_chunk_record_count: int = 0
+    figure_region_ocr_attempted_count: int = 0
+    figure_region_ocr_promoted_label_count: int = 0
+    figure_region_ocr_runtime_unavailable_count: int = 0
+    figure_ocr_evidence_record_count: int = 0
+    contract_validation_status: str = "not_run"
+    contract_validation_passed: bool = False
+    warning_count: int = 0
+    error_count: int = 0
+    conversion_warning_count: int = 0
+    contract_warning_count: int = 0
+    conversion_error_count: int = 0
+    contract_error_count: int = 0
+
+
+class LatestSsdSecuritySpecBenchmarkReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "latest_ssd_security_spec_benchmark"
+    spec_document_type: str
+    latest_spec_set: str
+    latest_release_date: Optional[str] = None
+    expected_spec_title: str
+    expected_revision: Optional[str] = None
+    source_url: str
+    source_sha256: str
+    mode: str
+    option_matrix: dict[str, Any] = Field(default_factory=dict)
+    conversion_exit_code: int = 0
+    conversion_status: str = "not_run"
+    conversion_output_label: str = "conversion"
+    local_only: bool = True
+    raw_content_included: bool = False
+    image_bytes_included: bool = False
+    local_input_paths_included: bool = False
+    summary_counts: LatestSsdSecuritySpecBenchmarkSummary = Field(
+        default_factory=LatestSsdSecuritySpecBenchmarkSummary
+    )
+    sidecars: dict[str, Any] = Field(default_factory=dict)
+    contract_validation: dict[str, Any] = Field(default_factory=dict)
+
+
 class OCRBackendDependency(BaseModel):
     name: str
     kind: str

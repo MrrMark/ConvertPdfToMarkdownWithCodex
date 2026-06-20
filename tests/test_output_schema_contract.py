@@ -70,6 +70,7 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "docling_artifact_comparison.schema.json",
         "latest_nvme_spec_benchmark_report.schema.json",
         "latest_ocp_datacenter_nvme_ssd_benchmark_report.schema.json",
+        "latest_ssd_security_spec_benchmark_report.schema.json",
         "ocr_backend_probe_report.schema.json",
         "figure_description_eval_report.schema.json",
         "local_corpus_evidence_pack.schema.json",
@@ -144,6 +145,14 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     assert "ocp_eval_expected_source_coverage" in latest_ocp_schema["$defs"][
         "LatestOcpDatacenterNvmeSsdBenchmarkSummary"
     ]["properties"]
+    latest_ssd_security_schema = json.loads(
+        (output_dir / "latest_ssd_security_spec_benchmark_report.schema.json").read_text(encoding="utf-8")
+    )
+    assert latest_ssd_security_schema["properties"]["purpose"]["default"] == "latest_ssd_security_spec_benchmark"
+    assert "security_domain_unit_counts" in latest_ssd_security_schema["$defs"][
+        "LatestSsdSecuritySpecBenchmarkSummary"
+    ]["properties"]
+    assert "contract_validation" in latest_ssd_security_schema["properties"]
     ocr_probe_schema = json.loads((output_dir / "ocr_backend_probe_report.schema.json").read_text(encoding="utf-8"))
     assert ocr_probe_schema["properties"]["purpose"]["default"] == "multi_ocr_backend_probe"
     figure_eval_schema = json.loads(

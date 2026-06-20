@@ -701,6 +701,53 @@ def build_ocp_datacenter_nvme_ssd_slice_pdf(path: Path) -> None:
     )
 
 
+def build_spdm_security_slice_pdf(path: Path) -> None:
+    """Build a sanitized SPDM-shaped slice without official specification text."""
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("1 SPDM Synthetic Security Slice", 72, 800, 14),
+                    PositionedText("Table 1: SPDM message code slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Message", "Message Code", "Description"],
+                            ["GET_MEASUREMENTS", "E0h", "Requester shall retrieve measurement blocks."],
+                            ["GET_CERTIFICATE", "82h", "Requester shall retrieve certificate chain data."],
+                        ],
+                        36,
+                        730,
+                        [145, 110, 277],
+                        font_size=7,
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("2 SPDM Algorithms", 72, 800, 14),
+                    PositionedText("Table 2: SPDM algorithm slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Algorithm", "Value", "Description"],
+                            ["TPM_ALG_SHA_384", "0008h", "Responder shall support negotiated hash algorithms."],
+                            ["ECDSA_ECC_NIST_P384", "0010h", "Responder may advertise asymmetric algorithms."],
+                        ],
+                        36,
+                        730,
+                        [180, 90, 262],
+                        font_size=7,
+                    )
+                ],
+            ),
+        ],
+    )
+
+
 def build_diagram_suite_pdf(path: Path) -> None:
     """Build vector-rendered diagram pages for figure crop fallback provenance."""
     state_machine_graphics = [

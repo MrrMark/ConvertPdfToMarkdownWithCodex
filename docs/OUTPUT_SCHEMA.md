@@ -31,6 +31,7 @@
 - `docs/schema/docling_artifact_comparison.schema.json`
 - `docs/schema/latest_nvme_spec_benchmark_report.schema.json`
 - `docs/schema/latest_ocp_datacenter_nvme_ssd_benchmark_report.schema.json`
+- `docs/schema/latest_ssd_security_spec_benchmark_report.schema.json`
 - `docs/schema/ocr_backend_probe_report.schema.json`
 - `docs/schema/figure_description_eval_report.schema.json`
 - `docs/schema/local_corpus_evidence_pack.schema.json`
@@ -638,6 +639,59 @@ Policy:
 - `visual_eval` is metrics-only: status, pass/fail, query count, `hit_at_k`, `expected_source_coverage`, and `figure_source_ref_coverage`. Query strings and retrieved text are not included.
 - The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, sanitized SSD contract status, and sanitized OCP eval status only.
 - Raw spec text, raw Markdown body, generated query strings, retrieved chunk text, table row content, image bytes, and local input PDF paths are not embedded.
+
+## latest_ssd_security_spec_benchmark_report.json
+
+Optional local-only benchmark summary written by `scripts/run_latest_ssd_security_spec_benchmark.py`.
+
+Required:
+
+- `schema_version`
+- `purpose="latest_ssd_security_spec_benchmark"`
+- `spec_document_type`: `spdm`, `spdm-storage-binding`, `tcg-storage`, or `pcie-base`
+- `latest_spec_set`
+- `expected_spec_title`
+- `source_url`
+- `source_sha256`
+- `mode`: `full_precision` or `fast_smoke`
+- `option_matrix`
+- `summary_counts`
+
+Stable summary fields:
+
+- `page_count`
+- `conversion_duration_ms`
+- `sidecar_file_count`
+- `sidecar_total_bytes`
+- `sidecar_file_sizes`
+- `retrieval_chunk_count`
+- `requirement_count`
+- `traceability_record_count`
+- `technical_table_unit_count`
+- `domain_unit_count`
+- `security_domain_unit_counts`
+- `figure_rag_record_count`
+- `figure_text_chunk_record_count`
+- `figure_description_record_count`
+- `figure_description_chunk_record_count`
+- `figure_structure_record_count`
+- `figure_structure_chunk_record_count`
+- `figure_region_ocr_attempted_count`
+- `figure_region_ocr_promoted_label_count`
+- `figure_region_ocr_runtime_unavailable_count`
+- `figure_ocr_evidence_record_count`
+- `contract_validation_status`
+- `contract_validation_passed`
+- `warning_count`
+- `error_count`
+
+Policy:
+
+- This report covers SSD-adjacent security specifications under `technical_spec_rag` with `domain_adapter=spdm`, `tcg`, or `pcie`.
+- The default SPDM metadata tracks DMTF SPDM 1.4.0 and SPDM to Storage Binding 1.0.0 as the first-class SSD security evidence path.
+- `security_domain_unit_counts` records only unit-type counts such as `spdm_message`, `spdm_algorithm`, `security_method`, or `register_field`; full sidecar rows are not embedded.
+- The report includes source URL, source SHA-256, option matrix, sidecar file sizes, summary counts, and sanitized SSD contract status only.
+- Raw spec text, raw Markdown body, retrieved chunk text, table row content, image bytes, and local input PDF paths are not embedded.
 
 ## ocr_backend_probe_report.json
 

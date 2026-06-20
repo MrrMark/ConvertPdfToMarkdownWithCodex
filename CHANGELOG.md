@@ -5,6 +5,7 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add Q134 SSD security spec benchmark path for SPDM, SPDM-to-Storage, TCG Storage, and PCIe adapter evidence with sanitized contract summaries.
 - Add Q131-Q133 MCP stability guardrails: large technical spec preflight planning, compact visual sidecar contract validation, and page-window merge sidecar inventory/memory guard reporting.
 - Add Q127-Q130 agent/MCP contract alignment: latest sidecar guidance in `pdf2md-rag-ingest`, OCR backend discovery in MCP profiles, compact SSD-RAG contract validation through MCP, and source-mapped agent rule regeneration dry-runs.
 - Add Q118-Q125 native migration hardening: internal document IR, table confidence v2, native hybrid chunking v2, layout sidecar diagnostics, region OCR evidence v2, OCR backend registry expansion, figure semantics v2, and domain adapter registry metadata.

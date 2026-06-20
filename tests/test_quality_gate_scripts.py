@@ -19,11 +19,13 @@ from scripts import run_corpus_eval
 from scripts import run_latest_ocp_datacenter_nvme_ssd_benchmark
 from scripts import run_latest_nvme_base_benchmark
 from scripts import run_latest_nvme_command_set_eval
+from scripts import run_latest_ssd_security_spec_benchmark
 from scripts import run_release_gates
 from fixtures.pdf_builder import (
     build_nvme_base_slice_pdf,
     build_nvme_command_set_slice_pdf,
     build_ocp_datacenter_nvme_ssd_slice_pdf,
+    build_spdm_security_slice_pdf,
 )
 
 
@@ -559,6 +561,60 @@ def test_latest_ocp_datacenter_nvme_ssd_benchmark_writes_sanitized_summary(tmp_p
     assert "log_page_requirement NVMe-IO-6" not in serialized
 
 
+def test_latest_ssd_security_spec_benchmark_writes_sanitized_spdm_summary(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "DMTF-SPDM-Synthetic.pdf"
+    build_spdm_security_slice_pdf(input_pdf)
+    output_dir = tmp_path / "latest-ssd-security-spdm-benchmark"
+
+    report = run_latest_ssd_security_spec_benchmark.run_latest_ssd_security_spec_benchmark(
+        run_latest_ssd_security_spec_benchmark.LatestSsdSecuritySpecBenchmarkConfig(
+            input_pdf=input_pdf,
+            output_dir=output_dir,
+            spec_document_type=run_latest_ssd_security_spec_benchmark.SPDM_DOCUMENT,
+            mode=run_latest_ssd_security_spec_benchmark.FAST_SMOKE_MODE,
+            pages="1-2",
+        )
+    )
+    persisted = json.loads(
+        (output_dir / run_latest_ssd_security_spec_benchmark.REPORT_FILENAME).read_text(encoding="utf-8")
+    )
+    scorecard = (output_dir / run_latest_ssd_security_spec_benchmark.SCORECARD_FILENAME).read_text(encoding="utf-8")
+    counts = report["summary_counts"]
+
+    assert persisted == report
+    assert report["purpose"] == "latest_ssd_security_spec_benchmark"
+    assert report["spec_document_type"] == "spdm"
+    assert report["latest_spec_set"] == "DMTF SPDM 1.4.0"
+    assert report["latest_release_date"] == "2025-05-25"
+    assert report["expected_spec_title"] == "Security Protocol and Data Model (SPDM) Specification"
+    assert report["expected_revision"] == "1.4.0"
+    assert report["source_url"] == "https://www.dmtf.org/standards/spdm"
+    assert len(report["source_sha256"]) == 64
+    assert report["option_matrix"]["pages"] == "1-2"
+    assert report["option_matrix"]["domain_adapter"] == "spdm"
+    assert report["option_matrix"]["contract_validator"]["ssd_agent_spec_type"] == "SPDM"
+    assert "spdm_message" in report["option_matrix"]["security_unit_taxonomy"]
+    assert report["option_matrix"]["image_mode"] == "placeholder"
+    assert counts["page_count"] == 2
+    assert counts["retrieval_chunk_count"] > 0
+    assert counts["technical_table_unit_count"] >= 4
+    assert counts["domain_unit_count"] >= 4
+    assert counts["security_domain_unit_counts"]["spdm_message"] >= 2
+    assert counts["security_domain_unit_counts"]["spdm_algorithm"] >= 2
+    assert counts["contract_validation_status"] == "passed"
+    assert counts["contract_validation_passed"] is True
+    assert report["raw_content_included"] is False
+    assert report["image_bytes_included"] is False
+    assert report["local_input_paths_included"] is False
+    assert "Raw PDF text, raw Markdown body, retrieved text" in scorecard
+    assert "| spdm_message |" in scorecard
+
+    serialized = json.dumps(report, ensure_ascii=False, sort_keys=True)
+    assert str(input_pdf) not in serialized
+    assert "GET_MEASUREMENTS" not in serialized
+    assert "Requester shall retrieve measurement blocks." not in serialized
+
+
 def test_latest_ocp_datacenter_nvme_ssd_benchmark_distinguishes_full_and_smoke_modes() -> None:
     full = run_latest_ocp_datacenter_nvme_ssd_benchmark.build_option_matrix(
         mode=run_latest_ocp_datacenter_nvme_ssd_benchmark.FULL_PRECISION_MODE,
@@ -604,6 +660,42 @@ def test_latest_ocp_datacenter_nvme_ssd_benchmark_distinguishes_full_and_smoke_m
     assert visual["figure_region_ocr"] is True
     assert visual["rag_generated_figure_descriptions"] is True
     assert visual["figure_structure_extraction"] is True
+
+
+def test_latest_ssd_security_spec_benchmark_distinguishes_spec_families() -> None:
+    spdm = run_latest_ssd_security_spec_benchmark.build_option_matrix(
+        mode=run_latest_ssd_security_spec_benchmark.FULL_PRECISION_MODE,
+        pages=None,
+        page_workers=1,
+        spec_document_type=run_latest_ssd_security_spec_benchmark.SPDM_STORAGE_BINDING_DOCUMENT,
+    )
+    tcg = run_latest_ssd_security_spec_benchmark.build_option_matrix(
+        mode=run_latest_ssd_security_spec_benchmark.FAST_SMOKE_MODE,
+        pages=None,
+        page_workers=2,
+        spec_document_type=run_latest_ssd_security_spec_benchmark.TCG_STORAGE_DOCUMENT,
+    )
+    pcie = run_latest_ssd_security_spec_benchmark.build_option_matrix(
+        mode=run_latest_ssd_security_spec_benchmark.FAST_SMOKE_MODE,
+        pages="2",
+        page_workers=1,
+        spec_document_type=run_latest_ssd_security_spec_benchmark.PCIE_BASE_DOCUMENT,
+        visual_mode=True,
+    )
+
+    assert spdm["pages"] is None
+    assert spdm["domain_adapter"] == "spdm"
+    assert spdm["contract_validator"]["ssd_agent_spec_type"] == "SPDM"
+    assert "spdm_certificate" in spdm["security_unit_taxonomy"]
+    assert tcg["pages"] == "1-3"
+    assert tcg["page_workers"] == 2
+    assert tcg["domain_adapter"] == "tcg"
+    assert tcg["contract_validator"]["ssd_agent_spec_type"] == "TCG"
+    assert "security_method" in tcg["security_unit_taxonomy"]
+    assert pcie["pages"] == "2"
+    assert pcie["domain_adapter"] == "pcie"
+    assert pcie["rag_profile"] == "technical_spec_rag_visual"
+    assert pcie["contract_validator"]["ssd_agent_spec_type"] == "PCIe"
 
 
 def test_latest_nvme_base_benchmark_distinguishes_full_and_smoke_modes() -> None:
