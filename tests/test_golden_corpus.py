@@ -316,7 +316,7 @@ def test_ocp_datacenter_nvme_ssd_slice_golden_sidecars_cover_adapter_contract(tm
     assert all(record["adapter_metadata"]["registry_version"] == "1.0" for record in domain_units)
     assert all(record["adapter_metadata"]["ssd_agent_spec_type"] == "OCP" for record in domain_units)
     assert all(
-        record["cross_spec_compatibility"]["compatible_adapters"] == ["nvme", "pcie", "tcg", "spdm"]
+        record["cross_spec_compatibility"]["compatible_adapters"] == ["nvme", "pcie", "tcg", "spdm", "caliptra"]
         for record in domain_units
     )
 

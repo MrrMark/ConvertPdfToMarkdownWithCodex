@@ -28,6 +28,11 @@ def test_domain_adapter_registry_exposes_ssd_agent_contract_metadata() -> None:
         "requirement_prefix",
         "requirement_family",
     )
+    assert specs["caliptra"].ssd_agent_spec_type == "Caliptra"
+    assert {"caliptra_asset", "caliptra_mailbox_command", "caliptra_register_field"} <= set(
+        specs["caliptra"].unit_taxonomy
+    )
+    assert "latest_ssd_security_spec_benchmark" in specs["caliptra"].evaluator_hooks
     assert specs["manual"].ssd_agent_spec_type == "CustomerRequirement"
     assert get_domain_adapter_spec(DomainAdapterMode.MANUAL).keyword_profile == "manual-domain-adapter-keywords"
 
@@ -562,6 +567,80 @@ def test_domain_adapter_profiles_extract_pcie_ocp_tcg_and_customer_units() -> No
     assert ocp[0]["unit_type"] == "requirement"
     assert tcg[0]["unit_type"] == "security_method"
     assert customer[0]["classification_reasons"] == ["customer_requirement_id_row"]
+
+
+def test_caliptra_domain_adapter_extracts_rot_assets_and_mailbox_units() -> None:
+    caliptra_tables = normalize_rag_table_payload(
+        [
+            {
+                "page": 1,
+                "table_index": 1,
+                "headers": ["Asset Category", "Asset", "Security Property", "Attack Profile", "Mitigation"],
+                "records": [
+                    {
+                        "page": 1,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Asset Category", "Asset", "Security Property", "Attack Profile", "Mitigation"],
+                        "cells": {
+                            "Asset Category": "Die unique asset",
+                            "Asset": "Synthetic device identity seed",
+                            "Security Property": "Confidentiality",
+                            "Attack Profile": "Logical attack",
+                            "Mitigation": "Keep derived values inside the key vault.",
+                        },
+                        "row_text": (
+                            "Asset Category = Die unique asset | Asset = Synthetic device identity seed | "
+                            "Security Property = Confidentiality | Attack Profile = Logical attack | "
+                            "Mitigation = Keep derived values inside the key vault."
+                        ),
+                    }
+                ],
+            },
+            {
+                "page": 2,
+                "table_index": 1,
+                "headers": ["Mailbox Command", "Interface", "Register", "Field", "Bits", "Description"],
+                "records": [
+                    {
+                        "page": 2,
+                        "table_index": 1,
+                        "row_index": 1,
+                        "headers": ["Mailbox Command", "Interface", "Register", "Field", "Bits", "Description"],
+                        "cells": {
+                            "Mailbox Command": "GET_SYNTHETIC_MEASUREMENT",
+                            "Interface": "Mailbox",
+                            "Register": "CPTRA_STATUS",
+                            "Field": "READY",
+                            "Bits": "0",
+                            "Description": "Synthetic command reports measured boot status.",
+                        },
+                        "row_text": (
+                            "Mailbox Command = GET_SYNTHETIC_MEASUREMENT | Interface = Mailbox | "
+                            "Register = CPTRA_STATUS | Field = READY | Bits = 0 | "
+                            "Description = Synthetic command reports measured boot status."
+                        ),
+                    }
+                ],
+            },
+        ]
+    )
+
+    records = build_domain_units(
+        domain_adapter=DomainAdapterMode.CALIPTRA,
+        rag_tables=caliptra_tables,
+        source_sha256="e" * 64,
+    )
+
+    by_type = {record["unit_type"]: record for record in records}
+
+    assert {"caliptra_asset", "caliptra_mailbox_command"} <= set(by_type)
+    assert by_type["caliptra_asset"]["domain"] == "caliptra"
+    assert by_type["caliptra_asset"]["normalized_fields"]["asset"] == "Synthetic device identity seed"
+    assert by_type["caliptra_asset"]["adapter_metadata"]["ssd_agent_spec_type"] == "Caliptra"
+    assert by_type["caliptra_asset"]["cross_spec_compatibility"]["compatibility_group"] == "security-technical-spec"
+    assert by_type["caliptra_mailbox_command"]["normalized_fields"]["command"] == "GET_SYNTHETIC_MEASUREMENT"
+    assert by_type["caliptra_mailbox_command"]["normalized_fields"]["register_name"] == "CPTRA_STATUS"
 
 
 def test_ocp_domain_adapter_populates_requirement_taxonomy_and_related_hints() -> None:

@@ -41,11 +41,13 @@ SPDM_DOCUMENT = "spdm"
 SPDM_STORAGE_BINDING_DOCUMENT = "spdm-storage-binding"
 TCG_STORAGE_DOCUMENT = "tcg-storage"
 PCIE_BASE_DOCUMENT = "pcie-base"
+CALIPTRA_DOCUMENT = "caliptra"
 SPEC_DOCUMENT_TYPES = (
     SPDM_DOCUMENT,
     SPDM_STORAGE_BINDING_DOCUMENT,
     TCG_STORAGE_DOCUMENT,
     PCIE_BASE_DOCUMENT,
+    CALIPTRA_DOCUMENT,
 )
 
 SPEC_DOCUMENT_METADATA: dict[str, dict[str, str | None]] = {
@@ -80,6 +82,14 @@ SPEC_DOCUMENT_METADATA: dict[str, dict[str, str | None]] = {
         "expected_revision": None,
         "source_url": "https://pcisig.com",
         "domain_adapter": DomainAdapterMode.PCIE.value,
+    },
+    CALIPTRA_DOCUMENT: {
+        "latest_spec_set": "Caliptra 2.1",
+        "latest_release_date": None,
+        "expected_spec_title": "Caliptra: A Datacenter System on a Chip (SoC) Root of Trust (RoT)",
+        "expected_revision": "2.1",
+        "source_url": "https://spec.caliptra.io/",
+        "domain_adapter": DomainAdapterMode.CALIPTRA.value,
     },
 }
 

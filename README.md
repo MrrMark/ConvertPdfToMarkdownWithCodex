@@ -10,7 +10,7 @@ PDF 문서를 **원문 보존 중심 Markdown**으로 변환하는 CLI/라이브
 - **이미지는 참조가 기본**: 이미지 파일은 `assets/`에 저장하고 Markdown은 상대경로로 참조합니다.
 - **부분 실패를 기록**: 페이지/표/이미지/OCR 경고는 `report.json`에 남기고 가능한 처리는 계속합니다.
 - **기술 스펙 RAG 지원**: retrieval chunks, table/domain/figure/layout sidecar와 provenance validator를 제공합니다.
-- **Domain adapter registry**: NVMe/PCIe/OCP/TCG/SPDM/customer/manual adapter metadata를 안정적으로 기록합니다.
+- **Domain adapter registry**: NVMe/PCIe/OCP/TCG/SPDM/Caliptra/customer/manual adapter metadata를 안정적으로 기록합니다.
 - **AI Agent 연동 지원**: Claude Code, Cline, Roo Code, Cursor, Continue용 Skill/Rule 패키지와
   local stdio MCP 서버를 제공합니다.
 

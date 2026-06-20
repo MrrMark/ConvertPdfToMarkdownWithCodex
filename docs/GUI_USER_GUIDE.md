@@ -58,7 +58,7 @@ python -m pdf2md.gui --doctor --doctor-format json
 
 - `기본 모드(원본 유지)`: 원문 보존을 우선하는 보수적 기본값이다.
 - `RAG 등록용(최적화)`: Markdown 원문을 임의로 바꾸지 않고 RAG table sidecar, page marker, header/footer 보정, hyphenation 보정, table context `embedding_text`, sibling chunk merge, relationship metadata 같은 RAG 친화 옵션을 켠다.
-- `기술 스펙 RAG`: storage/PCIe/security spec ingest를 위해 RAG sidecar와 chunk 보강 옵션을 켠다. NVMe/PCIe/OCP/TCG/SPDM 같은 도메인 adapter는 필요에 따라 별도로 선택한다.
+- `기술 스펙 RAG`: storage/PCIe/security spec ingest를 위해 RAG sidecar와 chunk 보강 옵션을 켠다. NVMe/PCIe/OCP/TCG/SPDM/Caliptra 같은 도메인 adapter는 필요에 따라 별도로 선택한다.
 - `기술 스펙 Visual RAG`: `기술 스펙 RAG` 옵션에 figure text chunk, figure region OCR, deterministic figure description, figure structure sidecar를 함께 켠다.
 - `이미지 업로드 불가 RAG 대응`: `technical_spec_rag_visual` profile에 이미지 파일을 만들지 않는 `placeholder` mode를 더한 조합이다. PNG/JPG를 팀 RAG에 올릴 수 없는 기술 스펙 문서에 사용한다.
 - `민감정보 보호 RAG`: confidential-safe mode와 sanitized report를 켜고, 공유용 RAG JSONL sidecar 중심으로 산출한다.
@@ -88,7 +88,7 @@ python -m pdf2md.gui --doctor --doctor-format json
 - `Image`: 이미지 출력 방식이다. 기본값은 `referenced`다.
 - `Table`: 표 출력 방식이다. 기본값은 `auto`다.
 - `RAG tables`: RAG table sidecar 출력 방식이다.
-- `Domain`: NVMe, PCIe, OCP, TCG, SPDM, customer requirements, manual 같은 도메인 adapter 선택이다.
+- `Domain`: NVMe, PCIe, OCP, TCG, SPDM, Caliptra, customer requirements, manual 같은 도메인 adapter 선택이다.
 - `Manual domain label`: `Domain=manual`일 때 `domain_units_rag.jsonl`의 `adapter_profile`에 기록할 사용자 정의 라벨이다. 예: `Customer A Requirements`
 - `Manual domain keywords`: `Domain=manual`일 때 표 header 인식에 추가할 키워드다. 쉼표, 세미콜론, 줄바꿈으로 구분한다. 예: `Customer Key, Customer Requirement`
 
@@ -140,7 +140,7 @@ python -m pdf2md.gui --doctor --doctor-format json
 5. `Start conversion`을 누른다.
 6. 완료 후 Results 표에서 `Status`, `Warnings`, `Markdown`, `Report`를 확인한다.
 
-PNG/JPG 같은 이미지 asset을 업로드할 수 없는 팀 RAG라면 `이미지 업로드 불가 RAG 대응` preset을 선택한다. 이 preset은 `technical_spec_rag_visual`에 `image_mode=placeholder`를 적용해 `document.md`에 image placeholder를 남기고, `figures_rag.jsonl`, `figure_descriptions_rag.jsonl`, `figure_structures_rag.jsonl`, `retrieval_chunks_rag.jsonl`의 visual chunk record로 그림 주변의 관측 텍스트와 구조 provenance를 보존한다. 도메인 분류가 필요하면 같은 화면에서 `Domain`을 `nvme`, `pcie`, `spdm`, `manual` 등으로 지정한다.
+PNG/JPG 같은 이미지 asset을 업로드할 수 없는 팀 RAG라면 `이미지 업로드 불가 RAG 대응` preset을 선택한다. 이 preset은 `technical_spec_rag_visual`에 `image_mode=placeholder`를 적용해 `document.md`에 image placeholder를 남기고, `figures_rag.jsonl`, `figure_descriptions_rag.jsonl`, `figure_structures_rag.jsonl`, `retrieval_chunks_rag.jsonl`의 visual chunk record로 그림 주변의 관측 텍스트와 구조 provenance를 보존한다. 도메인 분류가 필요하면 같은 화면에서 `Domain`을 `nvme`, `pcie`, `spdm`, `caliptra`, `manual` 등으로 지정한다.
 
 회로도, 파형, 블록다이어그램처럼 의미가 그림 내부에 주로 있는 문서는 `기술 스펙 Visual RAG` 또는 `이미지 업로드 불가 RAG 대응` preset을 우선 사용한다. 두 preset은 `Figure region OCR`, `Generated figure descriptions`, `Figure structure extraction`을 함께 켠다. `Figure region OCR`은 figure bbox 영역을 로컬 OCR로 시도하고 결과를 `figures_rag.jsonl`의 diagnostics에만 기록한다. 원문 Markdown이나 text extraction 출력은 바꾸지 않는다. `Generated figure descriptions`와 `Figure structure extraction`은 deterministic context-only 방식이며 `figure_descriptions_rag.jsonl`, `figure_structures_rag.jsonl`, `retrieval_chunks_rag.jsonl`의 `figure_description`/`figure_structure` chunk로만 보강 정보를 기록한다.
 

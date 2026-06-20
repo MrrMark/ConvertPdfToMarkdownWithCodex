@@ -843,7 +843,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--preset-eval-domain-adapter",
         default="none",
-        choices=("none", "nvme", "pcie", "ocp", "tcg", "spdm", "customer-requirements"),
+        choices=("none", "nvme", "pcie", "ocp", "tcg", "spdm", "caliptra", "customer-requirements"),
     )
     parser.add_argument("--preset-eval-pages")
     parser.add_argument("--preset-eval-rag-eval-set", type=Path)

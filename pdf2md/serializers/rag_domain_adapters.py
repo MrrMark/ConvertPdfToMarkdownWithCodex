@@ -148,6 +148,43 @@ SPDM_HEADER_TOKENS = {
     "state",
     "value",
 }
+CALIPTRA_HEADER_TOKENS = {
+    "asset",
+    "assetcategory",
+    "attackpath",
+    "attackprofile",
+    "bits",
+    "capability",
+    "command",
+    "crypto",
+    "cryptographic",
+    "description",
+    "dice",
+    "dpe",
+    "entropy",
+    "field",
+    "firmware",
+    "interface",
+    "key",
+    "lifecycle",
+    "mailbox",
+    "measurement",
+    "mitigation",
+    "recovery",
+    "register",
+    "rot",
+    "rtd",
+    "rti",
+    "rtm",
+    "rtrec",
+    "rtu",
+    "securityproperty",
+    "securitystate",
+    "service",
+    "state",
+    "threat",
+    "value",
+}
 MANUAL_REQUIREMENT_TOKENS = OCP_HEADER_TOKENS | {
     "customer",
     "customerid",
@@ -197,7 +234,7 @@ class DomainAdapterSpec:
     def compatibility_group(self) -> str:
         if self.name in {"nvme", "ocp", "pcie"}:
             return "storage-technical-spec"
-        if self.name in {"tcg", "spdm"}:
+        if self.name in {"tcg", "spdm", "caliptra"}:
             return "security-technical-spec"
         if self.name in {"customer-requirements", "manual"}:
             return "customer-requirement-spec"
@@ -269,7 +306,7 @@ DOMAIN_ADAPTER_REGISTRY: dict[DomainAdapterMode, DomainAdapterSpec] = {
         unit_taxonomy=("requirement",),
         revision_hints=("ocp-datacenter-nvme-ssd", "requirement-id"),
         evaluator_hooks=("ssd_rag_contract", "latest_ocp_datacenter_nvme_ssd_benchmark"),
-        compatible_adapters=("nvme", "pcie", "tcg", "spdm"),
+        compatible_adapters=("nvme", "pcie", "tcg", "spdm", "caliptra"),
         required_normalized_fields=OCP_REQUIRED_NORMALIZED_FIELDS,
     ),
     DomainAdapterMode.TCG: DomainAdapterSpec(
@@ -290,7 +327,7 @@ DOMAIN_ADAPTER_REGISTRY: dict[DomainAdapterMode, DomainAdapterSpec] = {
         ),
         revision_hints=("tcg-storage", "opal", "enterprise"),
         evaluator_hooks=("ssd_rag_contract",),
-        compatible_adapters=("ocp",),
+        compatible_adapters=("ocp", "caliptra"),
         required_normalized_fields={
             "security_method": ("method", "uid", "name"),
             "security_object": ("security_object", "uid", "name"),
@@ -319,7 +356,7 @@ DOMAIN_ADAPTER_REGISTRY: dict[DomainAdapterMode, DomainAdapterSpec] = {
         ),
         revision_hints=("dmtf-spdm", "security-protocol-message"),
         evaluator_hooks=("ssd_rag_contract",),
-        compatible_adapters=("ocp",),
+        compatible_adapters=("ocp", "caliptra"),
         required_normalized_fields={
             "spdm_message": ("message", "message_code", "name"),
             "spdm_request_response": ("request", "response", "name"),
@@ -328,6 +365,40 @@ DOMAIN_ADAPTER_REGISTRY: dict[DomainAdapterMode, DomainAdapterSpec] = {
             "spdm_algorithm": ("algorithm", "name"),
             "spdm_key_exchange": ("key_exchange", "name"),
             "spdm_session": ("session_state", "name"),
+        },
+    ),
+    DomainAdapterMode.CALIPTRA: DomainAdapterSpec(
+        name=DomainAdapterMode.CALIPTRA.value,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="Caliptra",
+        keyword_profile="caliptra-rot-security-header-tokens",
+        header_tokens=frozenset(CALIPTRA_HEADER_TOKENS),
+        unit_taxonomy=(
+            "caliptra_rot_service",
+            "caliptra_asset",
+            "caliptra_threat",
+            "caliptra_interface",
+            "caliptra_mailbox_command",
+            "caliptra_register_field",
+            "caliptra_security_state",
+            "caliptra_measurement",
+            "caliptra_attestation",
+            "caliptra_crypto_key",
+        ),
+        revision_hints=("caliptra-2.x", "root-of-trust", "dice-dpe-attestation"),
+        evaluator_hooks=("ssd_rag_contract", "latest_ssd_security_spec_benchmark"),
+        compatible_adapters=("ocp", "tcg", "spdm", "pcie"),
+        required_normalized_fields={
+            "caliptra_rot_service": ("service", "capability", "name"),
+            "caliptra_asset": ("asset", "asset_category", "name"),
+            "caliptra_threat": ("threat", "attack_path", "mitigation", "name"),
+            "caliptra_interface": ("interface", "name"),
+            "caliptra_mailbox_command": ("command", "mailbox_command", "name"),
+            "caliptra_register_field": ("register_name", "field_name", "bit_range", "name"),
+            "caliptra_security_state": ("security_state", "state", "name"),
+            "caliptra_measurement": ("measurement", "name"),
+            "caliptra_attestation": ("attestation", "name"),
+            "caliptra_crypto_key": ("key_name", "asset", "name"),
         },
     ),
     DomainAdapterMode.CUSTOMER_REQUIREMENTS: DomainAdapterSpec(
@@ -693,6 +764,21 @@ def _unit_from_row(
     algorithm = _cell_value(cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm")
     key_exchange = _cell_value(cells, "Key Exchange", "KeyExchange", "Key Exchange Parameter")
     spdm_session = _cell_value(cells, "Session", "Session State", "State")
+    caliptra_service = _cell_value(cells, "RoT Service", "Service", "Capability", "Root of Trust Service")
+    caliptra_asset_category = _cell_value(cells, "Asset Category", "Category")
+    caliptra_asset = _cell_value(cells, "Asset", "Asset Name")
+    caliptra_security_property = _cell_value(cells, "Security Property", "Property")
+    caliptra_attack_profile = _cell_value(cells, "Attack Profile", "Attacker Profile")
+    caliptra_attack_path = _cell_value(cells, "Attack Path", "Threat", "Attack")
+    caliptra_mitigation = _cell_value(cells, "Mitigation", "Countermeasure", "Counter Measure")
+    caliptra_interface = _cell_value(cells, "Interface", "API", "Bus", "Port")
+    caliptra_mailbox_command = _cell_value(cells, "Mailbox Command", "Command", "Runtime Command")
+    caliptra_security_state = _cell_value(cells, "Security State", "State", "Lifecycle State")
+    caliptra_measurement = _cell_value(cells, "Measurement", "Measurement Type", "RTM")
+    caliptra_attestation = _cell_value(cells, "Attestation", "Quote", "Certificate")
+    caliptra_key = _cell_value(cells, "Key", "Key Name", "Secret", "Entropy")
+    caliptra_register = _cell_value(cells, "Register", "Register Name")
+    caliptra_field = _cell_value(cells, "Field", "Field Name", "Parameter")
     manual_tokens = manual_tokens or set()
 
     if domain_adapter in {DomainAdapterMode.OCP, DomainAdapterMode.CUSTOMER_REQUIREMENTS} and requirement_id:
@@ -751,6 +837,44 @@ def _unit_from_row(
             return "spdm_key_exchange", key_exchange, value or message_code, description, [f"{prefix}_key_exchange_row"]
         if spdm_session:
             return "spdm_session", spdm_session, value or message_code, description, [f"{prefix}_session_row"]
+    if domain_adapter is DomainAdapterMode.CALIPTRA:
+        if caliptra_asset:
+            return (
+                "caliptra_asset",
+                caliptra_asset,
+                caliptra_security_property or caliptra_attack_profile or value,
+                description or caliptra_mitigation,
+                [f"{prefix}_asset_row"],
+            )
+        if caliptra_attack_path or caliptra_mitigation:
+            name = caliptra_attack_path or caliptra_mitigation or "threat"
+            return "caliptra_threat", name, caliptra_attack_profile or value, description or caliptra_mitigation, [
+                f"{prefix}_threat_row"
+            ]
+        if caliptra_service:
+            return "caliptra_rot_service", caliptra_service, value or caliptra_security_property, description, [
+                f"{prefix}_rot_service_row"
+            ]
+        if caliptra_mailbox_command:
+            return "caliptra_mailbox_command", caliptra_mailbox_command, opcode or value, description, [
+                f"{prefix}_mailbox_command_row"
+            ]
+        if caliptra_interface:
+            return "caliptra_interface", caliptra_interface, value, description, [f"{prefix}_interface_row"]
+        if caliptra_security_state:
+            return "caliptra_security_state", caliptra_security_state, value, description, [f"{prefix}_security_state_row"]
+        if caliptra_measurement:
+            return "caliptra_measurement", caliptra_measurement, value, description, [f"{prefix}_measurement_row"]
+        if caliptra_attestation:
+            return "caliptra_attestation", caliptra_attestation, value, description, [f"{prefix}_attestation_row"]
+        if caliptra_key:
+            return "caliptra_crypto_key", caliptra_key, value or caliptra_security_property, description, [
+                f"{prefix}_crypto_key_row"
+            ]
+        if caliptra_register or caliptra_field:
+            return "caliptra_register_field", caliptra_field or caliptra_register or "", bits or value, description, [
+                f"{prefix}_register_field_row"
+            ]
     if domain_adapter is DomainAdapterMode.PCIE and (capability or field):
         return "register_field", capability or field or "", bits or value, description, [f"{prefix}_register_or_capability_row"]
 
@@ -959,6 +1083,62 @@ def _unit_from_technical_record(
             return "spdm_key_exchange", key_exchange, message_code or None, description, ["spdm_key_exchange_row"]
         if unit_type in {"spdm_session", "session_state"} and spdm_session:
             return "spdm_session", spdm_session, message_code or None, description, ["spdm_session_row"]
+
+    if domain_adapter is DomainAdapterMode.CALIPTRA:
+        caliptra_service = _cell_value(raw_cells, "RoT Service", "Service", "Capability", "Root of Trust Service")
+        caliptra_asset = _cell_value(raw_cells, "Asset", "Asset Name")
+        caliptra_asset_category = _cell_value(raw_cells, "Asset Category", "Category")
+        caliptra_security_property = _cell_value(raw_cells, "Security Property", "Property")
+        caliptra_attack_profile = _cell_value(raw_cells, "Attack Profile", "Attacker Profile")
+        caliptra_attack_path = _cell_value(raw_cells, "Attack Path", "Threat", "Attack")
+        caliptra_mitigation = _cell_value(raw_cells, "Mitigation", "Countermeasure", "Counter Measure")
+        caliptra_interface = _cell_value(raw_cells, "Interface", "API", "Bus", "Port")
+        caliptra_mailbox_command = _cell_value(raw_cells, "Mailbox Command", "Command", "Runtime Command") or command
+        caliptra_security_state = _cell_value(raw_cells, "Security State", "State", "Lifecycle State")
+        caliptra_measurement = _cell_value(raw_cells, "Measurement", "Measurement Type", "RTM")
+        caliptra_attestation = _cell_value(raw_cells, "Attestation", "Quote", "Certificate")
+        caliptra_key = _cell_value(raw_cells, "Key", "Key Name", "Secret", "Entropy")
+        caliptra_register = _cell_value(raw_cells, "Register", "Register Name")
+        caliptra_field = _cell_value(raw_cells, "Field", "Field Name", "Parameter") or field
+        if unit_type == "caliptra_asset" or caliptra_asset:
+            name = caliptra_asset or field or caliptra_asset_category
+            if name:
+                return "caliptra_asset", name, caliptra_security_property or caliptra_attack_profile or value or None, (
+                    description or caliptra_mitigation
+                ), ["caliptra_asset_row"]
+        if unit_type == "caliptra_threat" or caliptra_attack_path or caliptra_mitigation:
+            name = caliptra_attack_path or caliptra_mitigation or field or "threat"
+            return "caliptra_threat", name, caliptra_attack_profile or value or None, (
+                description or caliptra_mitigation
+            ), ["caliptra_threat_row"]
+        if unit_type == "caliptra_rot_service" or caliptra_service:
+            return "caliptra_rot_service", caliptra_service or field or "rot_service", value or None, description, [
+                "caliptra_rot_service_row"
+            ]
+        if unit_type == "caliptra_mailbox_command" or caliptra_mailbox_command:
+            return "caliptra_mailbox_command", caliptra_mailbox_command, value or None, description, [
+                "caliptra_mailbox_command_row"
+            ]
+        if unit_type == "caliptra_interface" or caliptra_interface:
+            return "caliptra_interface", caliptra_interface or field, value or None, description, ["caliptra_interface_row"]
+        if unit_type == "caliptra_security_state" or caliptra_security_state:
+            return "caliptra_security_state", caliptra_security_state or field, value or None, description, [
+                "caliptra_security_state_row"
+            ]
+        if unit_type == "caliptra_measurement" or caliptra_measurement:
+            return "caliptra_measurement", caliptra_measurement or field, value or None, description, [
+                "caliptra_measurement_row"
+            ]
+        if unit_type == "caliptra_attestation" or caliptra_attestation:
+            return "caliptra_attestation", caliptra_attestation or field, value or None, description, [
+                "caliptra_attestation_row"
+            ]
+        if unit_type == "caliptra_crypto_key" or caliptra_key:
+            return "caliptra_crypto_key", caliptra_key or field, value or None, description, ["caliptra_crypto_key_row"]
+        if unit_type in {"caliptra_register_field", "register_field", "bitfield"} and (caliptra_register or caliptra_field):
+            return "caliptra_register_field", caliptra_field or caliptra_register or field, value or None, description, [
+                "caliptra_register_field_row"
+            ]
 
     if domain_adapter is DomainAdapterMode.CUSTOMER_REQUIREMENTS:
         req_id = requirement_ref or _cell_value(raw_cells, "Requirement ID", "Req ID", "ID", "Requirement")
@@ -1178,6 +1358,32 @@ def _normalized_domain_fields(
                 "algorithm": _cell_value(cells, "Algorithm", "Algorithm Type", "Base Asym Algo", "Hash Algorithm"),
                 "key_exchange": _cell_value(cells, "Key Exchange", "KeyExchange", "Key Exchange Parameter"),
                 "session_state": _cell_value(cells, "Session", "Session State", "State"),
+            }
+        )
+    if domain_adapter is DomainAdapterMode.CALIPTRA:
+        fields.update(
+            {
+                "service": _cell_value(cells, "RoT Service", "Service", "Capability", "Root of Trust Service"),
+                "capability": _cell_value(cells, "Capability", "RoT Capability"),
+                "asset_category": _cell_value(cells, "Asset Category", "Category"),
+                "asset": _cell_value(cells, "Asset", "Asset Name"),
+                "security_property": _cell_value(cells, "Security Property", "Property"),
+                "attack_profile": _cell_value(cells, "Attack Profile", "Attacker Profile"),
+                "attack_path": _cell_value(cells, "Attack Path", "Threat", "Attack"),
+                "threat": _cell_value(cells, "Threat", "Attack", "Attack Path"),
+                "mitigation": _cell_value(cells, "Mitigation", "Countermeasure", "Counter Measure"),
+                "interface": _cell_value(cells, "Interface", "API", "Bus", "Port"),
+                "command": _cell_value(cells, "Mailbox Command", "Command", "Runtime Command"),
+                "mailbox_command": _cell_value(cells, "Mailbox Command", "Runtime Command"),
+                "register_name": fields.get("register_name") or _cell_value(cells, "Register", "Register Name"),
+                "field_name": fields.get("field_name") or _cell_value(cells, "Field", "Field Name", "Parameter"),
+                "bit_range": fields.get("bit_range") or _cell_value(cells, "Bits", "Bit", "Bit Range"),
+                "security_state": _cell_value(cells, "Security State", "State", "Lifecycle State"),
+                "state": _cell_value(cells, "State", "Lifecycle State"),
+                "measurement": _cell_value(cells, "Measurement", "Measurement Type", "RTM"),
+                "attestation": _cell_value(cells, "Attestation", "Quote", "Certificate"),
+                "key_name": _cell_value(cells, "Key", "Key Name", "Secret", "Entropy"),
+                "rot_category": _cell_value(cells, "RoT", "RTM", "RTI", "RTU", "RTD", "RTRec"),
             }
         )
     if domain_adapter is DomainAdapterMode.MANUAL:

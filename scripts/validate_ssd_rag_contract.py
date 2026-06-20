@@ -16,7 +16,7 @@ from pdf2md.serializers.rag_domain_adapters import (
 SCHEMA_VERSION = "1.0"
 REPORT_FILENAME = "ssd_rag_contract_report.json"
 HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-ALLOWED_HIL_SPEC_TYPES = {"NVMe", "PCIe", "OCP", "TCG", "SPDM", "CustomerRequirement"}
+ALLOWED_HIL_SPEC_TYPES = {"NVMe", "PCIe", "OCP", "TCG", "SPDM", "Caliptra", "CustomerRequirement"}
 ALLOWED_FTL_SPEC_TYPES = {
     "BMS",
     "ReadDisturb",
@@ -72,6 +72,18 @@ SPDM_DOMAIN_UNIT_TYPES = {
     "spdm_algorithm",
     "spdm_key_exchange",
     "spdm_session",
+}
+CALIPTRA_DOMAIN_UNIT_TYPES = {
+    "caliptra_rot_service",
+    "caliptra_asset",
+    "caliptra_threat",
+    "caliptra_interface",
+    "caliptra_mailbox_command",
+    "caliptra_register_field",
+    "caliptra_security_state",
+    "caliptra_measurement",
+    "caliptra_attestation",
+    "caliptra_crypto_key",
 }
 NVME_CORE_DOMAIN_UNIT_TYPES = {"command", "log_page", "feature", "register_field"}
 OCP_CORE_DOMAIN_UNIT_TYPES = {"requirement"}
@@ -567,6 +579,15 @@ def validate_ssd_rag_contract(
                 path="domain_units_rag.jsonl",
                 code="missing_spdm_security_unit",
                 message="SPDM domain output must include at least one SPDM security unit.",
+            )
+        if adapter == "caliptra" and domain_units and not any(
+            record.get("unit_type") in CALIPTRA_DOMAIN_UNIT_TYPES for record in domain_units
+        ):
+            _add_issue(
+                errors,
+                path="domain_units_rag.jsonl",
+                code="missing_caliptra_security_unit",
+                message="Caliptra domain output must include at least one Caliptra security unit.",
             )
         if adapter == "nvme":
             _validate_nvme_domain_units(domain_units, errors=errors)

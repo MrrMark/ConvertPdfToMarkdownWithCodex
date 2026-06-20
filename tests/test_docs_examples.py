@@ -117,15 +117,19 @@ def test_ssd_security_spec_contract_is_documented() -> None:
     implemented_specs = Path("docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md").read_text(encoding="utf-8")
 
     assert "latest_ssd_security_spec_benchmark_report.json" in output_schema
-    assert "`spec_document_type`: `spdm`, `spdm-storage-binding`, `tcg-storage`, or `pcie-base`" in output_schema
+    assert "`spec_document_type`: `spdm`, `spdm-storage-binding`, `tcg-storage`, `pcie-base`, or `caliptra`" in output_schema
     assert "security_domain_unit_counts" in output_schema
-    assert "domain_adapter=spdm`, `tcg`, or `pcie`" in output_schema
+    assert "domain_adapter=spdm`, `tcg`, `pcie`, or `caliptra`" in output_schema
+    assert "caliptra_asset" in output_schema
     assert "run_latest_ssd_security_spec_benchmark.py" in rag_recipes
     assert "--spec-document-type spdm-storage-binding" in rag_recipes
+    assert "--spec-document-type caliptra" in rag_recipes
     assert "DSP0274` SPDM 1.4.0" in rag_recipes
     assert "DSP0286` SPDM to Storage Binding 1.0.0" in rag_recipes
+    assert "https://spec.caliptra.io/" in rag_recipes
     assert "latest_ssd_security_spec_benchmark_scorecard.md" in rag_recipes
     assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" in implemented_specs
+    assert "Q135. Caliptra Security Spec Adapter And Evidence Path" in implemented_specs
     assert "`spdm`, `spdm-storage-binding`, `tcg-storage`, `pcie-base`" in implemented_specs
 
 
@@ -494,6 +498,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q132. Visual Sidecar Contract Validator" not in next_plan
     assert "Q133. Page-Window Sidecar Merge Memory Guard" not in next_plan
     assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" not in next_plan
+    assert "Q135. Caliptra Security Spec Adapter And Evidence Path" not in next_plan
     assert "현재 남은 작업 없음." in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
     assert "Q119. Table Confidence v2" not in next_plan
@@ -566,6 +571,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q132. Visual Sidecar Contract Validator" not in development_specs
     assert "Q133. Page-Window Sidecar Merge Memory Guard" not in development_specs
     assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" not in development_specs
+    assert "Q135. Caliptra Security Spec Adapter And Evidence Path" not in development_specs
     assert "현재 active 개발 명세 없음." in development_specs
     assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
     assert "Q119. Table Confidence v2" not in development_specs
@@ -598,6 +604,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q132. Visual Sidecar Contract Validator" in implemented_specs
     assert "Q133. Page-Window Sidecar Merge Memory Guard" in implemented_specs
     assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" in implemented_specs
+    assert "Q135. Caliptra Security Spec Adapter And Evidence Path" in implemented_specs
     assert "figure_ocr_evidence_rag.jsonl" in implemented_specs
     assert "pdf2md_validate_ssd_rag_contract" in implemented_specs
     assert "pdf2md_plan_large_spec_conversion" in implemented_specs
@@ -605,6 +612,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "merge_memory_guard" in implemented_specs
     assert "run_latest_ssd_security_spec_benchmark.py" in implemented_specs
     assert "latest_ssd_security_spec_benchmark_report.json" in implemented_specs
+    assert "HIL/Caliptra" in implemented_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
@@ -651,7 +659,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q134" in development_specs
+    assert "완료된 Q34-Q135" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q125. Domain Adapter Registry Hardening" in implemented_specs
     assert "adapter_metadata" in implemented_specs
@@ -767,6 +775,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "context-resolvable markers avoid Tesseract calls" in changelog
     assert "Q131-Q133 MCP stability guardrails" in changelog
     assert "Q134 SSD security spec benchmark path" in changelog
+    assert "Q135 Caliptra security spec support" in changelog
     assert "visual sidecar contract validation" in changelog
     assert "dependency-audit" in implemented_specs
     assert "pdf-outline-" in implemented_specs
@@ -965,6 +974,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q113 local-only figure description evaluation pack" in quality_scorecard
     assert "Q114 Docling layout adapter comparison mode" in quality_scorecard
     assert "Q134 SSD security spec benchmark evidence path" in quality_scorecard
+    assert "Q135 Caliptra security spec adapter and evidence path" in quality_scorecard
+    assert "domain_adapter=caliptra" in quality_scorecard
     assert "run_latest_ssd_security_spec_benchmark.py" in quality_scorecard
     assert "latest_nvme_command_set_scorecard.md" in quality_scorecard
     assert "이미지 업로드 불가 RAG 대응" in quality_scorecard

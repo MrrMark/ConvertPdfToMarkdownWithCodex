@@ -83,7 +83,7 @@ P0 안정화 후 구현:
 - M08은 Q118에서 내부 IR 기반 serializer boundary, Q119에서 table confidence v2, Q120에서 native hybrid chunking v2, Q121에서 layout sidecar diagnostics, Q122에서 region OCR evidence v2, Q123에서 OCR backend registry expansion, Q124에서 figure semantics v2, Q125에서 domain adapter registry hardening을 완료했다.
 - M09는 Q127-Q130에서 Agent Skill, client rule, MCP discovery/validation surface를 최신 sidecar 계약에 맞추는 작업을 완료했다.
 - M10은 Q131-Q133에서 대형 technical spec preflight, visual sidecar contract validator, page-window merge memory guard를 완료했다.
-- M11은 Q134에서 SPDM/TCG/PCIe SSD security spec benchmark evidence path를 완료했다.
+- M11은 Q134에서 SPDM/TCG/PCIe SSD security spec benchmark evidence path를 완료했고, Q135에서 Caliptra RoT security spec adapter/evidence path를 추가했다.
 
 ### M01. pipeline/report 집계 책임 분리
 
@@ -163,8 +163,9 @@ P0 안정화 후 구현:
 ### M11. SSD Security Spec Evidence Path
 
 - SPDM, SPDM to Storage Binding, TCG Storage, PCIe register/capability 스펙을 latest/smoke benchmark wrapper로 검증(Q134 완료)
-- `technical_spec_rag + domain_adapter=spdm|tcg|pcie` 변환과 SSD-RAG contract summary를 raw content 없이 기록
-- `security_domain_unit_counts`로 SPDM message/algorithm, TCG method/object, PCIe register field coverage를 추적
+- Caliptra RoT/security spec을 `domain_adapter=caliptra`, `HIL/Caliptra`, latest/smoke benchmark wrapper에 연결(Q135 완료)
+- `technical_spec_rag + domain_adapter=spdm|tcg|pcie|caliptra` 변환과 SSD-RAG contract summary를 raw content 없이 기록
+- `security_domain_unit_counts`로 SPDM message/algorithm, TCG method/object, PCIe register field, Caliptra RoT asset/threat/mailbox/register coverage를 추적
 
 ---
 

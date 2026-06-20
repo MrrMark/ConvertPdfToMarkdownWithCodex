@@ -22,6 +22,7 @@ from scripts import run_latest_nvme_command_set_eval
 from scripts import run_latest_ssd_security_spec_benchmark
 from scripts import run_release_gates
 from fixtures.pdf_builder import (
+    build_caliptra_security_slice_pdf,
     build_nvme_base_slice_pdf,
     build_nvme_command_set_slice_pdf,
     build_ocp_datacenter_nvme_ssd_slice_pdf,
@@ -615,6 +616,45 @@ def test_latest_ssd_security_spec_benchmark_writes_sanitized_spdm_summary(tmp_pa
     assert "Requester shall retrieve measurement blocks." not in serialized
 
 
+def test_latest_ssd_security_spec_benchmark_writes_sanitized_caliptra_summary(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "Caliptra-Synthetic.pdf"
+    build_caliptra_security_slice_pdf(input_pdf)
+    output_dir = tmp_path / "latest-ssd-security-caliptra-benchmark"
+
+    report = run_latest_ssd_security_spec_benchmark.run_latest_ssd_security_spec_benchmark(
+        run_latest_ssd_security_spec_benchmark.LatestSsdSecuritySpecBenchmarkConfig(
+            input_pdf=input_pdf,
+            output_dir=output_dir,
+            spec_document_type=run_latest_ssd_security_spec_benchmark.CALIPTRA_DOCUMENT,
+            mode=run_latest_ssd_security_spec_benchmark.FAST_SMOKE_MODE,
+            pages="1-2",
+        )
+    )
+    scorecard = (output_dir / run_latest_ssd_security_spec_benchmark.SCORECARD_FILENAME).read_text(encoding="utf-8")
+    counts = report["summary_counts"]
+
+    assert report["spec_document_type"] == "caliptra"
+    assert report["latest_spec_set"] == "Caliptra 2.1"
+    assert report["expected_revision"] == "2.1"
+    assert report["source_url"] == "https://spec.caliptra.io/"
+    assert report["option_matrix"]["domain_adapter"] == "caliptra"
+    assert report["option_matrix"]["contract_validator"]["ssd_agent_spec_type"] == "Caliptra"
+    assert "caliptra_asset" in report["option_matrix"]["security_unit_taxonomy"]
+    assert counts["security_domain_unit_counts"]["caliptra_asset"] >= 2
+    assert counts["security_domain_unit_counts"]["caliptra_mailbox_command"] >= 2
+    assert counts["contract_validation_status"] == "passed"
+    assert counts["contract_validation_passed"] is True
+    assert "| caliptra_asset |" in scorecard
+    assert report["raw_content_included"] is False
+    assert report["image_bytes_included"] is False
+    assert report["local_input_paths_included"] is False
+
+    serialized = json.dumps(report, ensure_ascii=False, sort_keys=True)
+    assert str(input_pdf) not in serialized
+    assert "GET_SYNTHETIC_MEASUREMENT" not in serialized
+    assert "Synthetic device identity seed" not in serialized
+
+
 def test_latest_ocp_datacenter_nvme_ssd_benchmark_distinguishes_full_and_smoke_modes() -> None:
     full = run_latest_ocp_datacenter_nvme_ssd_benchmark.build_option_matrix(
         mode=run_latest_ocp_datacenter_nvme_ssd_benchmark.FULL_PRECISION_MODE,
@@ -682,6 +722,12 @@ def test_latest_ssd_security_spec_benchmark_distinguishes_spec_families() -> Non
         spec_document_type=run_latest_ssd_security_spec_benchmark.PCIE_BASE_DOCUMENT,
         visual_mode=True,
     )
+    caliptra = run_latest_ssd_security_spec_benchmark.build_option_matrix(
+        mode=run_latest_ssd_security_spec_benchmark.FAST_SMOKE_MODE,
+        pages=None,
+        page_workers=1,
+        spec_document_type=run_latest_ssd_security_spec_benchmark.CALIPTRA_DOCUMENT,
+    )
 
     assert spdm["pages"] is None
     assert spdm["domain_adapter"] == "spdm"
@@ -696,6 +742,10 @@ def test_latest_ssd_security_spec_benchmark_distinguishes_spec_families() -> Non
     assert pcie["domain_adapter"] == "pcie"
     assert pcie["rag_profile"] == "technical_spec_rag_visual"
     assert pcie["contract_validator"]["ssd_agent_spec_type"] == "PCIe"
+    assert caliptra["pages"] == "1-3"
+    assert caliptra["domain_adapter"] == "caliptra"
+    assert caliptra["contract_validator"]["ssd_agent_spec_type"] == "Caliptra"
+    assert "caliptra_rot_service" in caliptra["security_unit_taxonomy"]
 
 
 def test_latest_nvme_base_benchmark_distinguishes_full_and_smoke_modes() -> None:

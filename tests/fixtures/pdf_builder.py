@@ -748,6 +748,79 @@ def build_spdm_security_slice_pdf(path: Path) -> None:
     )
 
 
+def build_caliptra_security_slice_pdf(path: Path) -> None:
+    """Build a sanitized Caliptra-shaped RoT/security slice without official specification text."""
+    write_pdf(
+        path,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("1 Caliptra Synthetic RoT Slice", 72, 800, 14),
+                    PositionedText("Table 1: Caliptra asset and threat slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Asset Category", "Asset", "Security Property", "Attack Profile", "Mitigation"],
+                            [
+                                "Die unique asset",
+                                "Synthetic device identity seed",
+                                "Confidentiality",
+                                "Logical attack",
+                                "Keep derived values inside the key vault.",
+                            ],
+                            [
+                                "Root of trust execution",
+                                "Synthetic ROM firmware",
+                                "Integrity",
+                                "Fault injection",
+                                "Use redundant decision checks.",
+                            ],
+                        ],
+                        24,
+                        730,
+                        [112, 136, 104, 94, 182],
+                        font_size=6,
+                    )
+                ],
+            ),
+            PageSpec(
+                texts=[
+                    PositionedText("2 Caliptra Mailbox and Register Slice", 72, 800, 14),
+                    PositionedText("Table 2: Caliptra command and register slice", 72, 760, 10),
+                ],
+                tables=[
+                    TableSpec(
+                        [
+                            ["Mailbox Command", "Interface", "Register", "Field", "Bits", "Description"],
+                            [
+                                "GET_SYNTHETIC_MEASUREMENT",
+                                "Mailbox",
+                                "CPTRA_STATUS",
+                                "READY",
+                                "0",
+                                "Synthetic command reports measured boot status.",
+                            ],
+                            [
+                                "SIGN_SYNTHETIC_QUOTE",
+                                "Mailbox",
+                                "CPTRA_FW_ERROR",
+                                "ERROR_CODE",
+                                "15:0",
+                                "Synthetic command signs attestation evidence.",
+                            ],
+                        ],
+                        24,
+                        730,
+                        [132, 72, 104, 86, 48, 186],
+                        font_size=6,
+                    )
+                ],
+            ),
+        ],
+    )
+
+
 def build_diagram_suite_pdf(path: Path) -> None:
     """Build vector-rendered diagram pages for figure crop fallback provenance."""
     state_machine_graphics = [
