@@ -5,6 +5,7 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add Q141-Q142 domain recommendation hardening: raw-content-free recommendation basis, ambiguity guard, and customer requirement coverage.
 - Add Q140 storage domain recommendation coverage for NVMe, PCIe, and OCP technical/storage spec preflight and GUI warnings.
 - Add Q136-Q139 quality/performance follow-ups: enum-driven technical domain recommendations, GUI security-domain warnings, security adapter header calibration, and preflight performance profile advice.
 - Add Q135 Caliptra security spec support across the domain adapter registry, SSD-RAG contract validation, and latest SSD security benchmark wrapper.

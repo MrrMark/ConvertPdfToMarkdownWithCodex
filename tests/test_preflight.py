@@ -113,6 +113,94 @@ def test_large_spec_preflight_recommends_storage_domain_adapters_without_raw_tex
         assert plan["recommendation"]["recommended_options"]["domain_adapter"] == expected_adapter
 
 
+def test_large_spec_preflight_records_recommendation_basis_without_raw_text(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "NVMe-Base-Synthetic.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText(
+                        "NVM Express Base Specification Admin Command Submission Queue Completion Queue CDW",
+                        72,
+                        760,
+                    )
+                ]
+            )
+        ],
+    )
+
+    recommendation = recommend_domain_adapter_for_pdf(input_pdf, PreflightOptions(sample_page_count=1))
+    basis = recommendation["recommendation_basis"]
+
+    assert basis["top_adapter"] == "nvme"
+    assert basis["top_score"] > basis["runner_up_score"]
+    assert basis["score_margin"] >= 2
+    assert basis["matched_candidate_count"] >= 1
+    assert basis["ambiguous"] is False
+    assert basis["raw_content_included"] is False
+    assert "sample_text" not in recommendation
+
+
+def test_large_spec_preflight_does_not_promote_ambiguous_domain_adapter(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "ambiguous-nvme-pcie.pdf"
+    write_pdf(input_pdf, [PageSpec(texts=[PositionedText("NVMe PCIe", 72, 760)])])
+
+    recommendation = recommend_domain_adapter_for_pdf(input_pdf, PreflightOptions(sample_page_count=1))
+    plan = plan_large_spec_conversion(input_pdf, PreflightOptions(sample_page_count=1))
+
+    assert recommendation["confidence"] == "low"
+    assert recommendation["recommendation_basis"]["ambiguous"] is True
+    assert recommendation["recommendation_basis"]["score_margin"] == 0
+    assert "domain_adapter" not in plan["recommendation"]["recommended_options"]
+
+
+def test_large_spec_preflight_recommends_customer_requirements_without_raw_text(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "customer-requirements-specification.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("Customer Requirements Specification", 72, 760),
+                    PositionedText("Supplier shall comply with the acceptance criteria and compliance matrix.", 72, 740),
+                ]
+            )
+        ],
+    )
+
+    recommendation = recommend_domain_adapter_for_pdf(input_pdf, PreflightOptions(sample_page_count=1))
+    plan = plan_large_spec_conversion(input_pdf, PreflightOptions(sample_page_count=1))
+
+    assert recommendation["recommended_domain_adapter"] == "customer-requirements"
+    assert recommendation["confidence"] == "high"
+    assert recommendation["raw_content_included"] is False
+    assert recommendation["recommendation_basis"]["top_adapter"] == "customer-requirements"
+    assert "sample_text" not in recommendation
+    assert plan["recommendation"]["recommended_options"]["domain_adapter"] == "customer-requirements"
+
+
+def test_large_spec_preflight_keeps_ocp_ahead_of_customer_requirements(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "OCP-Datacenter-NVMe-SSD-requirements.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("Open Compute Project Datacenter NVMe SSD", 72, 760),
+                    PositionedText("Requirement ID, telemetry profile, latency monitor, and cloud SSD behavior.", 72, 740),
+                ]
+            )
+        ],
+    )
+
+    recommendation = recommend_domain_adapter_for_pdf(input_pdf, PreflightOptions(sample_page_count=1))
+
+    assert recommendation["recommended_domain_adapter"] == "ocp"
+    assert recommendation["confidence"] == "high"
+    assert recommendation["recommendation_basis"]["top_adapter"] == "ocp"
+
+
 def test_large_spec_preflight_recommends_performance_profile_from_sample_metrics(tmp_path: Path) -> None:
     input_pdf = tmp_path / "table-dense-large-spec.pdf"
     table = TableSpec(
