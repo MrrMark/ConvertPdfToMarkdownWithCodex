@@ -23,9 +23,4 @@
 
 ## 남은 작업
 
-### P2 / Q125. Domain Adapter Registry Hardening
-
-NVMe/OCP/PCIe/TCG/SPDM/manual domain adapter를 registry/protocol 구조로 정리해 cross-spec 재처리와 고객별 adapter 확장을 안정화한다.
-schema contract와 validator는 core에서 통제한다.
-
-상세 명세: `docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md`
+현재 남은 작업 없음.

@@ -4,9 +4,10 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from pdf2md.models import LocalCorpusEvidencePack
+from pdf2md.models import DomainAdapterMode, LocalCorpusEvidencePack
+from pdf2md.serializers.rag_domain_adapters import build_domain_units
 from scripts.run_ssd_corpus_profile import build_evidence_pack, main as run_ssd_corpus_profile_main, run_profile
-from scripts.validate_ssd_rag_contract import validate_ssd_rag_contract
+from scripts.validate_ssd_rag_contract import DOMAIN_ADAPTER_TO_SPEC_TYPE, validate_ssd_rag_contract
 
 
 def _write_jsonl(path: Path, records: list[dict]) -> None:
@@ -188,6 +189,58 @@ def test_ssd_rag_contract_rejects_adapter_spec_type_mismatch(tmp_path: Path) -> 
 
     assert report["passed"] is False
     assert "adapter_spec_type_mismatch" in {error["code"] for error in report["errors"]}
+
+
+def test_ssd_rag_contract_accepts_registry_metadata_for_manual_adapter(tmp_path: Path) -> None:
+    source_sha256 = "9" * 64
+    rag_tables = [
+        {
+            "page": 1,
+            "table_index": 1,
+            "headers": ["Requirement ID", "Customer Requirement"],
+            "records": [
+                {
+                    "page": 1,
+                    "table_index": 1,
+                    "row_index": 1,
+                    "headers": ["Requirement ID", "Customer Requirement"],
+                    "cells": {
+                        "Requirement ID": "CUST-1",
+                        "Customer Requirement": "Controller shall preserve telemetry.",
+                    },
+                    "row_text": "Requirement ID = CUST-1 | Customer Requirement = Controller shall preserve telemetry.",
+                    "bbox": [72.0, 100.0, 300.0, 120.0],
+                }
+            ],
+        }
+    ]
+    domain_units = build_domain_units(
+        domain_adapter=DomainAdapterMode.MANUAL,
+        rag_tables=rag_tables,
+        manual_adapter_label="Customer A",
+        manual_adapter_keywords="Requirement ID, Customer Requirement",
+        source_sha256=source_sha256,
+    )
+
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [])
+    _write_jsonl(tmp_path / "requirements_rag.jsonl", [])
+    _write_jsonl(tmp_path / "technical_tables_rag.jsonl", [])
+    _write_jsonl(tmp_path / "domain_units_rag.jsonl", domain_units)
+    _write_jsonl(tmp_path / "cross_refs_rag.jsonl", [])
+    _write_jsonl(tmp_path / "figures_rag.jsonl", [])
+
+    report = validate_ssd_rag_contract(
+        output_dir=tmp_path,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="CustomerRequirement",
+        domain_adapter="manual",
+        require_tables=False,
+        source_sha256=source_sha256,
+    )
+
+    assert DOMAIN_ADAPTER_TO_SPEC_TYPE["manual"] == "CustomerRequirement"
+    assert report["passed"] is True
+    assert report["warnings"] == []
 
 
 def test_ssd_rag_contract_accepts_nvme_deep_shape(tmp_path: Path) -> None:

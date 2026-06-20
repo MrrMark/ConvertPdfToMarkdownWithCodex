@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from pdf2md.models import DomainAdapterMode
@@ -173,6 +174,235 @@ MANUAL_DESCRIPTION_FIELDS = (
     "Requirement Text",
     "Requirement",
 )
+
+DOMAIN_ADAPTER_REGISTRY_VERSION = "1.0"
+
+
+@dataclass(frozen=True)
+class DomainAdapterSpec:
+    """Stable registry metadata for a built-in domain adapter."""
+
+    name: str
+    ssd_agent_domain: str
+    ssd_agent_spec_type: str
+    keyword_profile: str
+    header_tokens: frozenset[str]
+    unit_taxonomy: tuple[str, ...]
+    revision_hints: tuple[str, ...]
+    evaluator_hooks: tuple[str, ...] = ()
+    compatible_adapters: tuple[str, ...] = ()
+    required_normalized_fields: dict[str, tuple[str, ...]] | None = None
+
+    @property
+    def compatibility_group(self) -> str:
+        if self.name in {"nvme", "ocp", "pcie"}:
+            return "storage-technical-spec"
+        if self.name in {"tcg", "spdm"}:
+            return "security-technical-spec"
+        if self.name in {"customer-requirements", "manual"}:
+            return "customer-requirement-spec"
+        return f"{self.name}-technical-spec"
+
+
+NVME_UNIT_TAXONOMY = (
+    "command",
+    "command_dword_field",
+    "command_pointer_field",
+    "log_page",
+    "feature",
+    "register_field",
+    "status_code",
+    "queue_field",
+    "namespace_field",
+    "controller_field",
+    "support_requirement",
+    "data_structure_field",
+    "enum_value",
+)
+NVME_REQUIRED_NORMALIZED_FIELDS = {
+    "command": ("opcode",),
+    "log_page": ("log_identifier",),
+    "feature": ("feature_identifier",),
+    "register_field": ("field_name", "register_name", "bit_range"),
+    "status_code": ("status_code_value",),
+    "queue_field": ("field_name",),
+    "namespace_field": ("field_name",),
+    "controller_field": ("field_name",),
+    "data_structure_field": ("field_name",),
+    "command_dword_field": ("command_dword", "field_name", "bit_range"),
+    "command_pointer_field": ("pointer_type", "field_name"),
+}
+OCP_REQUIRED_NORMALIZED_FIELDS = {
+    "requirement": ("requirement_id", "requirement_prefix", "requirement_family"),
+}
+DOMAIN_ADAPTER_REGISTRY: dict[DomainAdapterMode, DomainAdapterSpec] = {
+    DomainAdapterMode.NVME: DomainAdapterSpec(
+        name=DomainAdapterMode.NVME.value,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="NVMe",
+        keyword_profile="nvme-technical-header-tokens",
+        header_tokens=frozenset(NVME_HEADER_TOKENS),
+        unit_taxonomy=NVME_UNIT_TAXONOMY,
+        revision_hints=("nvme-base", "nvm-command-set", "revision-pattern:nvme"),
+        evaluator_hooks=("ssd_rag_contract", "latest_nvme_base_benchmark", "latest_nvme_command_set_eval"),
+        compatible_adapters=("ocp", "pcie"),
+        required_normalized_fields=NVME_REQUIRED_NORMALIZED_FIELDS,
+    ),
+    DomainAdapterMode.PCIE: DomainAdapterSpec(
+        name=DomainAdapterMode.PCIE.value,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="PCIe",
+        keyword_profile="pcie-register-header-tokens",
+        header_tokens=frozenset(PCIE_HEADER_TOKENS),
+        unit_taxonomy=("register_field",),
+        revision_hints=("pcie-base", "pcie-capability-registers"),
+        evaluator_hooks=("ssd_rag_contract",),
+        compatible_adapters=("nvme", "ocp"),
+        required_normalized_fields={"register_field": ("name", "value", "field_name", "bit_range")},
+    ),
+    DomainAdapterMode.OCP: DomainAdapterSpec(
+        name=DomainAdapterMode.OCP.value,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="OCP",
+        keyword_profile="ocp-requirement-header-tokens",
+        header_tokens=frozenset(OCP_HEADER_TOKENS),
+        unit_taxonomy=("requirement",),
+        revision_hints=("ocp-datacenter-nvme-ssd", "requirement-id"),
+        evaluator_hooks=("ssd_rag_contract", "latest_ocp_datacenter_nvme_ssd_benchmark"),
+        compatible_adapters=("nvme", "pcie", "tcg", "spdm"),
+        required_normalized_fields=OCP_REQUIRED_NORMALIZED_FIELDS,
+    ),
+    DomainAdapterMode.TCG: DomainAdapterSpec(
+        name=DomainAdapterMode.TCG.value,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="TCG",
+        keyword_profile="tcg-security-header-tokens",
+        header_tokens=frozenset(TCG_HEADER_TOKENS),
+        unit_taxonomy=(
+            "security_method",
+            "security_object",
+            "security_authority",
+            "security_field",
+            "security_provider",
+            "locking_range",
+            "key_management",
+            "session_state",
+        ),
+        revision_hints=("tcg-storage", "opal", "enterprise"),
+        evaluator_hooks=("ssd_rag_contract",),
+        compatible_adapters=("ocp",),
+        required_normalized_fields={
+            "security_method": ("method", "uid", "name"),
+            "security_object": ("security_object", "uid", "name"),
+            "security_authority": ("authority", "uid", "name"),
+            "security_field": ("security_field", "name"),
+            "security_provider": ("security_provider", "name"),
+            "locking_range": ("locking_range", "name"),
+            "key_management": ("key_name", "name"),
+            "session_state": ("session_state", "name"),
+        },
+    ),
+    DomainAdapterMode.SPDM: DomainAdapterSpec(
+        name=DomainAdapterMode.SPDM.value,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="SPDM",
+        keyword_profile="spdm-security-header-tokens",
+        header_tokens=frozenset(SPDM_HEADER_TOKENS),
+        unit_taxonomy=(
+            "spdm_message",
+            "spdm_request_response",
+            "spdm_measurement",
+            "spdm_certificate",
+            "spdm_algorithm",
+            "spdm_key_exchange",
+            "spdm_session",
+        ),
+        revision_hints=("dmtf-spdm", "security-protocol-message"),
+        evaluator_hooks=("ssd_rag_contract",),
+        compatible_adapters=("ocp",),
+        required_normalized_fields={
+            "spdm_message": ("message", "message_code", "name"),
+            "spdm_request_response": ("request", "response", "name"),
+            "spdm_measurement": ("measurement", "name"),
+            "spdm_certificate": ("certificate", "name"),
+            "spdm_algorithm": ("algorithm", "name"),
+            "spdm_key_exchange": ("key_exchange", "name"),
+            "spdm_session": ("session_state", "name"),
+        },
+    ),
+    DomainAdapterMode.CUSTOMER_REQUIREMENTS: DomainAdapterSpec(
+        name=DomainAdapterMode.CUSTOMER_REQUIREMENTS.value,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="CustomerRequirement",
+        keyword_profile="customer-requirement-header-tokens",
+        header_tokens=frozenset(OCP_HEADER_TOKENS | {"id", "reqid", "shall", "must"}),
+        unit_taxonomy=("requirement",),
+        revision_hints=("customer-requirement", "customer-requirement-id"),
+        evaluator_hooks=("ssd_rag_contract",),
+        compatible_adapters=("manual", "nvme", "ocp"),
+        required_normalized_fields={"requirement": ("requirement_id", "name", "value")},
+    ),
+    DomainAdapterMode.MANUAL: DomainAdapterSpec(
+        name=DomainAdapterMode.MANUAL.value,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="CustomerRequirement",
+        keyword_profile="manual-domain-adapter-keywords",
+        header_tokens=frozenset(MANUAL_REQUIREMENT_TOKENS),
+        unit_taxonomy=("requirement", "manual_field"),
+        revision_hints=("manual-domain-adapter", "customer-requirement"),
+        evaluator_hooks=("ssd_rag_contract",),
+        compatible_adapters=("customer-requirements", "nvme", "ocp"),
+        required_normalized_fields={
+            "requirement": ("requirement_id", "name", "value"),
+            "manual_field": ("name", "value"),
+        },
+    ),
+}
+
+
+def supported_domain_adapter_specs() -> tuple[DomainAdapterSpec, ...]:
+    """Return stable metadata for all built-in non-default domain adapters."""
+    return tuple(DOMAIN_ADAPTER_REGISTRY.values())
+
+
+def get_domain_adapter_spec(domain_adapter: DomainAdapterMode | str) -> DomainAdapterSpec:
+    """Return registry metadata for a supported domain adapter."""
+    if not isinstance(domain_adapter, DomainAdapterMode):
+        domain_adapter = DomainAdapterMode(domain_adapter)
+    try:
+        return DOMAIN_ADAPTER_REGISTRY[domain_adapter]
+    except KeyError as exc:
+        raise ValueError(f"Domain adapter does not have registry metadata: {domain_adapter.value}") from exc
+
+
+def _adapter_metadata(spec: DomainAdapterSpec, *, adapter_profile: str, unit_type: str) -> dict[str, Any]:
+    required_fields = (spec.required_normalized_fields or {}).get(unit_type, ())
+    return {
+        "registry_version": DOMAIN_ADAPTER_REGISTRY_VERSION,
+        "adapter": spec.name,
+        "adapter_profile": adapter_profile,
+        "ssd_agent_domain": spec.ssd_agent_domain,
+        "ssd_agent_spec_type": spec.ssd_agent_spec_type,
+        "keyword_profile": spec.keyword_profile,
+        "unit_taxonomy": list(spec.unit_taxonomy),
+        "revision_hints": list(spec.revision_hints),
+        "evaluator_hooks": list(spec.evaluator_hooks),
+        "required_normalized_fields": list(required_fields),
+    }
+
+
+def _cross_spec_compatibility(spec: DomainAdapterSpec) -> dict[str, Any]:
+    return {
+        "compatibility_group": spec.compatibility_group,
+        "compatible_adapters": list(spec.compatible_adapters),
+        "source_id_fields": [
+            "source_sha256",
+            "source_dedupe_key",
+            "stable_source_id",
+            "stable_requirement_seed",
+        ],
+        "stable_id_policy": "preserve_pdf2md_stable_source_metadata",
+    }
 
 
 def _clean_key(value: str) -> str:
@@ -598,20 +828,11 @@ def _unit_from_row(
 
 
 def _domain_tokens(domain_adapter: DomainAdapterMode, manual_tokens: set[str] | None = None) -> set[str]:
-    if domain_adapter is DomainAdapterMode.NVME:
-        return NVME_HEADER_TOKENS
-    if domain_adapter is DomainAdapterMode.PCIE:
-        return PCIE_HEADER_TOKENS
-    if domain_adapter is DomainAdapterMode.OCP:
-        return OCP_HEADER_TOKENS
-    if domain_adapter is DomainAdapterMode.TCG:
-        return TCG_HEADER_TOKENS
-    if domain_adapter is DomainAdapterMode.SPDM:
-        return SPDM_HEADER_TOKENS
-    if domain_adapter is DomainAdapterMode.CUSTOMER_REQUIREMENTS:
-        return OCP_HEADER_TOKENS | {"id", "reqid", "shall", "must"}
-    if domain_adapter is DomainAdapterMode.MANUAL:
-        return MANUAL_REQUIREMENT_TOKENS | set(manual_tokens or set())
+    if domain_adapter in DOMAIN_ADAPTER_REGISTRY:
+        tokens = set(get_domain_adapter_spec(domain_adapter).header_tokens)
+        if domain_adapter is DomainAdapterMode.MANUAL:
+            tokens.update(manual_tokens or set())
+        return tokens
     return set()
 
 
@@ -987,6 +1208,7 @@ def build_domain_units(
     records: list[dict[str, Any]] = []
     manual_tokens = set(_split_manual_adapter_keywords(manual_adapter_keywords))
     adapter_profile = _adapter_profile(domain_adapter, manual_adapter_label)
+    adapter_spec = get_domain_adapter_spec(domain_adapter)
     adapter_technical_records = (
         technical_table_records
         if technical_table_records is not None
@@ -1020,6 +1242,12 @@ def build_domain_units(
                     "domain": domain_adapter.value,
                     "adapter_profile": adapter_profile,
                     "adapter_version": "1.0",
+                    "adapter_metadata": _adapter_metadata(
+                        adapter_spec,
+                        adapter_profile=adapter_profile,
+                        unit_type=unit_type,
+                    ),
+                    "cross_spec_compatibility": _cross_spec_compatibility(adapter_spec),
                     "unit_type": unit_type,
                     "name": name,
                     "value": value,
@@ -1096,6 +1324,12 @@ def build_domain_units(
                     "domain": domain_adapter.value,
                     "adapter_profile": adapter_profile,
                     "adapter_version": "1.0",
+                    "adapter_metadata": _adapter_metadata(
+                        adapter_spec,
+                        adapter_profile=adapter_profile,
+                        unit_type=unit_type,
+                    ),
+                    "cross_spec_compatibility": _cross_spec_compatibility(adapter_spec),
                     "unit_type": unit_type,
                     "name": name,
                     "value": value,

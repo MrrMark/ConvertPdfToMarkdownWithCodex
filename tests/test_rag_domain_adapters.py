@@ -4,8 +4,32 @@ import json
 
 from pdf2md.models import DomainAdapterMode
 from pdf2md.serializers.rag_chunks import build_retrieval_chunks
-from pdf2md.serializers.rag_domain_adapters import build_domain_units, serialize_domain_units_jsonl
+from pdf2md.serializers.rag_domain_adapters import (
+    DOMAIN_ADAPTER_REGISTRY_VERSION,
+    build_domain_units,
+    get_domain_adapter_spec,
+    serialize_domain_units_jsonl,
+    supported_domain_adapter_specs,
+)
 from pdf2md.serializers.rag_tables import normalize_rag_table_payload
+
+
+def test_domain_adapter_registry_exposes_ssd_agent_contract_metadata() -> None:
+    specs = {spec.name: spec for spec in supported_domain_adapter_specs()}
+
+    assert specs["nvme"].ssd_agent_domain == "HIL"
+    assert specs["nvme"].ssd_agent_spec_type == "NVMe"
+    assert {"command", "command_dword_field", "status_code"} <= set(specs["nvme"].unit_taxonomy)
+    assert specs["nvme"].required_normalized_fields["command"] == ("opcode",)
+    assert "latest_nvme_command_set_eval" in specs["nvme"].evaluator_hooks
+    assert specs["ocp"].ssd_agent_spec_type == "OCP"
+    assert specs["ocp"].required_normalized_fields["requirement"] == (
+        "requirement_id",
+        "requirement_prefix",
+        "requirement_family",
+    )
+    assert specs["manual"].ssd_agent_spec_type == "CustomerRequirement"
+    assert get_domain_adapter_spec(DomainAdapterMode.MANUAL).keyword_profile == "manual-domain-adapter-keywords"
 
 
 def test_nvme_domain_adapter_extracts_command_and_register_units() -> None:
@@ -59,6 +83,29 @@ def test_nvme_domain_adapter_extracts_command_and_register_units() -> None:
     assert records[0]["source_dedupe_key"] == "page-0001-table-0001-row-0001|tech-table-000001"
     assert len(records[0]["stable_source_id"]) == 40
     assert len(records[0]["stable_requirement_seed"]) == 40
+    assert records[0]["adapter_metadata"] == {
+        "registry_version": DOMAIN_ADAPTER_REGISTRY_VERSION,
+        "adapter": "nvme",
+        "adapter_profile": "nvme",
+        "ssd_agent_domain": "HIL",
+        "ssd_agent_spec_type": "NVMe",
+        "keyword_profile": "nvme-technical-header-tokens",
+        "unit_taxonomy": list(get_domain_adapter_spec("nvme").unit_taxonomy),
+        "revision_hints": list(get_domain_adapter_spec("nvme").revision_hints),
+        "evaluator_hooks": list(get_domain_adapter_spec("nvme").evaluator_hooks),
+        "required_normalized_fields": ["opcode"],
+    }
+    assert records[0]["cross_spec_compatibility"] == {
+        "compatibility_group": "storage-technical-spec",
+        "compatible_adapters": ["ocp", "pcie"],
+        "source_id_fields": [
+            "source_sha256",
+            "source_dedupe_key",
+            "stable_source_id",
+            "stable_requirement_seed",
+        ],
+        "stable_id_policy": "preserve_pdf2md_stable_source_metadata",
+    }
 
     jsonl = serialize_domain_units_jsonl(records)
     assert json.loads(jsonl.splitlines()[0])["domain"] == "nvme"
@@ -438,6 +485,10 @@ def test_manual_domain_adapter_uses_user_keywords_without_generated_text() -> No
     assert record["description"] == "The controller shall preserve latency telemetry."
     assert record["classification_reasons"] == ["manual_requirement_id_row"]
     assert "Trace to customer acceptance test." in record["text"]
+    assert record["adapter_metadata"]["adapter"] == "manual"
+    assert record["adapter_metadata"]["ssd_agent_spec_type"] == "CustomerRequirement"
+    assert record["adapter_metadata"]["required_normalized_fields"] == ["requirement_id", "name", "value"]
+    assert record["cross_spec_compatibility"]["compatible_adapters"] == ["customer-requirements", "nvme", "ocp"]
 
 
 def test_domain_adapter_profiles_extract_pcie_ocp_tcg_and_customer_units() -> None:

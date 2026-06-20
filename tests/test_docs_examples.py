@@ -468,7 +468,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q115. Visual Technical Spec RAG Profile and Metrics" not in next_plan
     assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" not in next_plan
     assert "Q117. MCP NVMe Base Large Conversion Stability" not in next_plan
-    assert "현재 남은 작업 없음." not in next_plan
+    assert "현재 남은 작업 없음." in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
     assert "Q119. Table Confidence v2" not in next_plan
     assert "Q120. Native Hybrid Chunking v2" not in next_plan
@@ -476,8 +476,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q122. Region OCR Evidence v2" not in next_plan
     assert "Q123. OCR Backend Registry Expansion" not in next_plan
     assert "Q124. Figure Semantics v2" not in next_plan
-    assert "Q125. Domain Adapter Registry Hardening" in next_plan
-    assert "docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md" in next_plan
+    assert "Q125. Domain Adapter Registry Hardening" not in next_plan
+    assert "docs/PDF2MD_NATIVE_MIGRATION_DEVELOPMENT_SPEC.md" not in next_plan
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in next_plan
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in next_plan
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in next_plan
@@ -534,7 +534,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "generated_text=true" not in development_specs
     assert "placeholder + figure_text chunk" not in development_specs
     assert "다중 OCR backend" not in development_specs
-    assert "현재 active 개발 명세 없음." not in development_specs
+    assert "현재 active 개발 명세 없음." in development_specs
     assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
     assert "Q119. Table Confidence v2" not in development_specs
     assert "Q120. Native Hybrid Chunking v2" not in development_specs
@@ -542,8 +542,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q122. Region OCR Evidence v2" not in development_specs
     assert "Q123. OCR Backend Registry Expansion" not in development_specs
     assert "Q124. Figure Semantics v2" not in development_specs
-    assert "Q125. Domain Adapter Registry Hardening" in development_specs
-    assert "PDF2MD Native Migration Plan" in development_specs
+    assert "Q125. Domain Adapter Registry Hardening" not in development_specs
+    assert "PDF2MD Native Migration Plan" not in development_specs
     assert "Q85. RAG Preset Status And Warning Severity Calibration" not in development_specs
     assert "Q86. Full Technical Spec Table Quality Triage And Recovery" not in development_specs
     assert "Q87. Technical Spec RAG Preset Domain Profile UX" not in development_specs
@@ -604,8 +604,12 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q124" in development_specs
+    assert "완료된 Q34-Q125" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q125. Domain Adapter Registry Hardening" in implemented_specs
+    assert "adapter_metadata" in implemented_specs
+    assert "cross_spec_compatibility" in implemented_specs
+    assert "DomainAdapterSpec" in implemented_specs
     assert "Q124. Figure Semantics v2" in implemented_specs
     assert "observed_text" in implemented_specs
     assert "generated_content_scope" in implemented_specs

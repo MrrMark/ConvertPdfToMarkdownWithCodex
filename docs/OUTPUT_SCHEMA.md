@@ -1269,6 +1269,10 @@ Required per JSONL record:
 - `domain_unit_id`
 - `domain_unit_index`
 - `domain`
+- `adapter_profile`
+- `adapter_version`
+- `adapter_metadata`
+- `cross_spec_compatibility`
 - `unit_type`
 - `name`
 - `value`
@@ -1289,11 +1293,13 @@ Policy:
 
 - Default adapter is `none`, so this file is only written when a domain adapter is explicitly selected.
 - Supported adapter profiles are `nvme`, `pcie`, `ocp`, `tcg`, `spdm`, `customer-requirements`, and `manual`.
+- Q125 adds a built-in domain adapter registry. `adapter_metadata.registry_version` is `1.0` and records the selected adapter, SSD agent domain/spec type, keyword profile, supported unit taxonomy, revision hints, evaluator hooks, and unit-type-specific `required_normalized_fields`.
+- `cross_spec_compatibility` records the compatibility group, compatible adapters, and stable source ID fields (`source_sha256`, `source_dedupe_key`, `stable_source_id`, `stable_requirement_seed`) used for cross-spec merge/reprocessing.
 - NVMe domain units cover both NVMe Base and NVM Command Set specs. They may use `command`, `command_dword_field`, `command_pointer_field`, `log_page`, `feature`, `register_field`, `status_code`, `queue_field`, `namespace_field`, `controller_field`, `support_requirement`, `data_structure_field`, or `enum_value`. Their `normalized_fields` may include `canonical_name`, `opcode`, `command_dword`, `command_scope`, `queue_type`, `pointer_type`, `command_context`, `command_context_source`, `related_command_unit_id`, `related_command_opcode`, `relationship_hints`, `log_identifier`, `feature_identifier`, `register_name`, `offset`, `bit_range`, `field_name`, `status_code_type`, `status_code_value`, `status_code_group`, `error_class`, `retry_hint`, `controller_support`, `namespace_support`, `scope`, `access`, `reset_default`, and `requirement_ref`; empty values are omitted.
 - OCP domain units use `requirement`. Their `normalized_fields` include `requirement_id`, `requirement_prefix`, `requirement_number`, `requirement_family`, `normative_strength`, `ssd_requirement_status`, related NVMe hints such as `related_command`, `related_log_identifier`, `related_feature_identifier`, and source row fields `source_table_id`/`source_table_row_id`; empty values are omitted.
 - TCG domain units may use `security_method`, `security_object`, `security_authority`, `security_field`, `security_provider`, `locking_range`, `key_management`, or `session_state`; TCG is expected to map to SSD `HIL/TCG` without a CustomerRequirement fallback.
 - SPDM domain units may use `spdm_message`, `spdm_request_response`, `spdm_measurement`, `spdm_certificate`, `spdm_algorithm`, `spdm_key_exchange`, or `spdm_session`; SPDM maps to SSD `HIL/SPDM`.
-- Manual domain units keep `domain="manual"` and set `adapter_profile` to `--manual-domain-adapter-label` when provided, otherwise `manual`. `--manual-domain-adapter-keywords` only expands deterministic table header recognition; record `text`, `name`, `value`, and `description` are copied from observed table/technical-table provenance and are not generated.
+- Manual domain units keep `domain="manual"`, map to SSD `HIL/CustomerRequirement`, and set `adapter_profile` to `--manual-domain-adapter-label` when provided, otherwise `manual`. `--manual-domain-adapter-keywords` only expands deterministic table header recognition; record `text`, `name`, `value`, and `description` are copied from observed table/technical-table provenance and are not generated.
 - Adapter profiles consume the typed technical table sidecar where possible and keep domain heuristics out of the default conversion path.
 - `stable_source_id` and `stable_requirement_seed` are deterministic metadata seeds. They do not replace the ordinal `domain_unit_id`; downstream systems should prefer them when generating business IDs across repeated conversions.
 
