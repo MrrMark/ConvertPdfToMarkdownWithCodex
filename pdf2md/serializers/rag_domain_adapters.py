@@ -1519,6 +1519,22 @@ def build_domain_units(
                     "page_range": [page, page],
                     "bbox": technical_record.get("bbox"),
                     "heading_path": _heading_path(technical_record),
+                    **(
+                        {
+                            "column_header_paths": technical_record.get("column_header_paths"),
+                            "column_placeholder_header_ratio": technical_record.get(
+                                "column_placeholder_header_ratio",
+                                0.0,
+                            ),
+                        }
+                        if technical_record.get("column_header_paths")
+                        else {}
+                    ),
+                    **(
+                        {"stub_column_headers": technical_record.get("stub_column_headers")}
+                        if technical_record.get("stub_column_headers")
+                        else {}
+                    ),
                     "relationship_hints": list(technical_record.get("relationship_hints") or []),
                     "classification_confidence": 0.9,
                     "classification_reasons": reasons,
@@ -1581,6 +1597,22 @@ def build_domain_units(
                     "page_range": [page, page],
                     "bbox": table_row.get("bbox"),
                     "heading_path": _heading_path(table_row),
+                    **(
+                        {
+                            "column_header_paths": table_row.get("column_header_paths"),
+                            "column_placeholder_header_ratio": table_row.get(
+                                "column_placeholder_header_ratio",
+                                0.0,
+                            ),
+                        }
+                        if table_row.get("column_header_paths")
+                        else {}
+                    ),
+                    **(
+                        {"stub_column_headers": table_row.get("stub_column_headers")}
+                        if table_row.get("stub_column_headers")
+                        else {}
+                    ),
                     "classification_confidence": 0.88,
                     "classification_reasons": reasons,
                 },

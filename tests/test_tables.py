@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 
 from pdf2md.extractors.tables import (
+    TableQualityMetrics,
+    _build_table_grid,
     _compact_columns,
     _pick_mode,
     _serialize_html,
@@ -78,6 +80,64 @@ def test_split_notes_and_empty_rows() -> None:
     assert removed == 1
     assert notes == ["Notes: 1. O optional"]
     assert normalized == [["Col1", "Col2"], ["A", "B"]]
+
+
+def test_multi_row_header_lineage_preserves_parent_child_paths() -> None:
+    rows = [
+        ["Command Attributes", "Command Attributes", "Command Dword", "Command Dword", "Description"],
+        ["Queue Type", "Opcode", "CDW", "Field", ""],
+        ["I/O", "02h", "CDW10", "SLBA", "Starting LBA"],
+    ]
+    metrics = TableQualityMetrics(
+        selected_strategy="default",
+        empty_cell_ratio=0.0,
+        all_empty_rows_removed=0,
+        columns_compacted=0,
+        columns_merged=0,
+        quality_score=0.9,
+        data_density=0.8,
+        header_fill_ratio=0.9,
+    )
+
+    grid = _build_table_grid(rows, [], metrics)
+
+    assert grid.diagnostics.rag_header_strategy == "multi_row_flattened"
+    assert grid.diagnostics.headers[:4] == [
+        "Command Attributes / Queue Type",
+        "Command Attributes / Opcode",
+        "Command Dword / CDW",
+        "Command Dword / Field",
+    ]
+    assert grid.diagnostics.column_header_paths[0]["path"] == ["Command Attributes", "Queue Type"]
+    assert grid.diagnostics.column_header_paths[3]["path_text"] == "Command Dword / Field"
+    assert grid.diagnostics.column_placeholder_header_ratio == 0.0
+
+
+def test_placeholder_header_lineage_keeps_parent_and_neighbor_context() -> None:
+    rows = [
+        ["Opcode by Field", "", "Combined Opcode", "Combined Opcode", "Reference"],
+        ["", "", "1", "2", "Section"],
+        ["0000 00b", "10b", "02h", "Read", "3.3.4"],
+    ]
+    metrics = TableQualityMetrics(
+        selected_strategy="default",
+        empty_cell_ratio=0.0,
+        all_empty_rows_removed=0,
+        columns_compacted=0,
+        columns_merged=0,
+        quality_score=0.82,
+        data_density=0.8,
+        header_fill_ratio=0.7,
+    )
+
+    grid = _build_table_grid(rows, [], metrics)
+    placeholder = grid.diagnostics.column_header_paths[1]
+
+    assert grid.diagnostics.headers[1] == "Column 2"
+    assert placeholder["path"] == ["Opcode by Field", "Column 2"]
+    assert placeholder["inferred_parent_header"] == "Opcode by Field"
+    assert placeholder["neighbor_headers"] == ["Opcode by Field", "Combined Opcode / 1"]
+    assert grid.diagnostics.column_placeholder_header_ratio == 0.2
 
 
 def test_quality_score_improves_after_sparse_recovery() -> None:

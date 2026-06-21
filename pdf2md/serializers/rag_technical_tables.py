@@ -733,6 +733,24 @@ def build_technical_table_records(rag_tables: list[dict[str, Any]], *, source_sh
         heading_path = _heading_path(row)
         if heading_path:
             record["heading_path"] = heading_path
+        column_header_paths = row.get("column_header_paths")
+        if column_header_paths:
+            record["column_header_paths"] = column_header_paths
+            record["column_placeholder_header_ratio"] = row.get("column_placeholder_header_ratio", 0.0)
+            record["classification_reasons"] = sorted(
+                dict.fromkeys([*record["classification_reasons"], "header_lineage_available"])
+            )
+        stub_column_headers = row.get("stub_column_headers")
+        if stub_column_headers:
+            record["stub_column_headers"] = stub_column_headers
+        try:
+            placeholder_ratio = float(row.get("column_placeholder_header_ratio") or 0.0)
+        except (TypeError, ValueError):
+            placeholder_ratio = 0.0
+        if placeholder_ratio > 0:
+            record["classification_reasons"] = sorted(
+                dict.fromkeys([*record["classification_reasons"], "placeholder_header_context_available"])
+            )
         records.append(
             with_stable_source_metadata(
                 record,

@@ -23,12 +23,6 @@
 
 ## 남은 작업
 
-### Q144. Wide Technical Table Header Semantics
-
-- NVMe reservation/status/register, OCP compliance matrix처럼 넓고 다층 header가 있는 기술 표에서 `Column N` 의미 손실을 줄인다.
-- Markdown은 기존 HTML fallback 안전 정책을 유지하고, RAG sidecar에는 parent/child header path와 column lineage를 보존한다.
-- table confidence와 fallback diagnostics가 새 header lineage 품질 신호를 기록하도록 확장한다.
-
 ### Q145. Security Spec Text-Derived Domain Candidate Layer
 
 - TCG/SPDM/Caliptra 문서의 본문, 목록, heading에서 표로 잡히지 않는 security domain candidate를 보수적으로 추출한다.

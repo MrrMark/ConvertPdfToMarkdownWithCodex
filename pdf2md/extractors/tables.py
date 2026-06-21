@@ -146,6 +146,8 @@ class TableDiagnostics:
     merged_cell_suspected: bool
     rag_header_strategy: str
     headers: list[str]
+    column_header_paths: list[dict[str, Any]]
+    column_placeholder_header_ratio: float
     data_row_start_index: int
     reasons: list[str] = field(default_factory=list)
 
@@ -189,6 +191,8 @@ class RagTablePayload:
     header_depth: int
     header_confidence: float
     stub_column_count: int
+    column_header_paths: list[dict[str, Any]]
+    column_placeholder_header_ratio: float
     rag_header_strategy: str
     caption_distance: float | None = None
     caption_position: str | None = None
@@ -219,6 +223,9 @@ class RagTablePayload:
             "stub_column_count": self.stub_column_count,
             "rag_header_strategy": self.rag_header_strategy,
         }
+        if self.header_depth > 1 or self.column_placeholder_header_ratio > 0:
+            payload["column_header_paths"] = self.column_header_paths
+            payload["column_placeholder_header_ratio"] = self.column_placeholder_header_ratio
         if self.continuation_group is not None:
             payload["continuation_group"] = self.continuation_group
         if self.continued_from_page is not None:
@@ -835,6 +842,7 @@ def _candidate_debug_payload(candidate: TableExtractionCandidate, *, accepted: b
         "header_depth": candidate.diagnostics.header_depth,
         "header_confidence": candidate.diagnostics.header_confidence,
         "stub_column_count": candidate.diagnostics.stub_column_count,
+        "column_placeholder_header_ratio": candidate.diagnostics.column_placeholder_header_ratio,
         "rag_header_strategy": candidate.diagnostics.rag_header_strategy,
     }
     if candidate.metrics.header_rows_promoted:
@@ -1193,6 +1201,68 @@ def _flatten_multi_row_headers(rows: list[list[str]]) -> list[str]:
     return _unique_headers(headers)
 
 
+def _is_placeholder_header(header: str) -> bool:
+    normalized = header.strip().lower()
+    return normalized.startswith("column ") and normalized.removeprefix("column ").strip().isdigit()
+
+
+def _column_header_path_records(rows: list[list[str]], headers: list[str], header_depth: int) -> list[dict[str, Any]]:
+    """Return per-column header lineage without changing serialized cell text."""
+    paths: list[dict[str, Any]] = []
+    parent_row = rows[0] if rows else []
+    child_row = rows[1] if header_depth >= 2 and len(rows) > 1 else []
+    last_parent = ""
+    for idx, header in enumerate(headers):
+        parent = parent_row[idx].strip() if idx < len(parent_row) else ""
+        child = child_row[idx].strip() if idx < len(child_row) else ""
+        if parent:
+            last_parent = parent
+        elif header_depth >= 2 and last_parent and child:
+            parent = last_parent
+
+        placeholder = _is_placeholder_header(header)
+        inferred_parent = ""
+        raw_path = [part for part in (parent, child) if part]
+        if not raw_path and placeholder and last_parent:
+            inferred_parent = last_parent
+            raw_path = [last_parent, header]
+        if not raw_path:
+            raw_path = [header]
+        path: list[str] = []
+        for part in raw_path:
+            if part not in path:
+                path.append(part)
+        if not path:
+            path = [f"Column {idx + 1}"]
+        path_record = {
+            "column_index": idx + 1,
+            "header": header,
+            "path": path,
+            "path_text": " / ".join(path),
+            "source": "multi_row_header" if header_depth >= 2 else "single_row_header",
+            "placeholder": placeholder,
+        }
+        if inferred_parent:
+            path_record["inferred_parent_header"] = inferred_parent
+        if placeholder:
+            neighbor_headers = [
+                headers[neighbor_idx]
+                for neighbor_idx in (idx - 1, idx + 1)
+                if 0 <= neighbor_idx < len(headers) and not _is_placeholder_header(headers[neighbor_idx])
+            ]
+            if neighbor_headers:
+                path_record["neighbor_headers"] = neighbor_headers
+        paths.append(path_record)
+    return paths
+
+
+def _column_placeholder_header_ratio_from_paths(paths: list[dict[str, Any]]) -> float:
+    if not paths:
+        return 0.0
+    placeholder_count = sum(1 for path in paths if path.get("placeholder") is True)
+    return round(placeholder_count / len(paths), 4)
+
+
 def _detect_stub_column_count(rows: list[list[str]], header_depth: int) -> int:
     if len(rows) <= header_depth or not rows[0]:
         return 0
@@ -1250,6 +1320,7 @@ def _build_table_grid(rows: list[list[str]], notes: list[str], metrics: TableQua
     header_depth = 2 if _looks_like_multi_row_header(rows) else 1
     confidence = _header_confidence(rows, header_depth)
     headers = _flatten_multi_row_headers(rows) if header_depth == 2 else _unique_headers(rows[0] if rows else [])
+    column_header_paths = _column_header_path_records(rows, headers, header_depth)
     rag_header_strategy = "multi_row_flattened" if header_depth == 2 else "single_row"
     if metrics.header_rows_promoted:
         rag_header_strategy = "promoted_header_row"
@@ -1261,9 +1332,14 @@ def _build_table_grid(rows: list[list[str]], notes: list[str], metrics: TableQua
     stub_count = _detect_stub_column_count(rows, header_depth)
     if stub_count:
         reasons.add(TableReason.STUB_COLUMN)
+        for path in column_header_paths[:stub_count]:
+            path["stub"] = True
     merged = _merged_cell_suspected(rows, header_depth)
     if merged:
         reasons.add(TableReason.MERGED_CELL_SUSPECTED)
+    placeholder_ratio = _column_placeholder_header_ratio_from_paths(column_header_paths)
+    if placeholder_ratio > 0:
+        reasons.add(TableReason.HEADER_FRAGMENTED)
     if confidence < 0.5:
         reasons.add(TableReason.LOW_HEADER_CONFIDENCE)
         rag_header_strategy = "fallback_low_confidence"
@@ -1276,6 +1352,8 @@ def _build_table_grid(rows: list[list[str]], notes: list[str], metrics: TableQua
         merged_cell_suspected=merged,
         rag_header_strategy=rag_header_strategy,
         headers=headers,
+        column_header_paths=column_header_paths,
+        column_placeholder_header_ratio=placeholder_ratio,
         data_row_start_index=header_depth,
         reasons=sorted(reasons),
     )
@@ -1311,6 +1389,8 @@ def _build_rag_table_payload(
         cells = {header: padded[idx] if idx < len(padded) else "" for idx, header in enumerate(headers)}
         row_text = " | ".join(f"{header} = {cells[header]}" for header in headers)
         stub_cells = padded[: diagnostics.stub_column_count] if diagnostics.stub_column_count else []
+        stub_headers = headers[: diagnostics.stub_column_count] if diagnostics.stub_column_count else []
+        has_header_lineage = diagnostics.header_depth > 1 or diagnostics.column_placeholder_header_ratio > 0
         record = {
             "page": page_number,
             "table_index": table_index,
@@ -1330,12 +1410,17 @@ def _build_rag_table_payload(
             "header_confidence": diagnostics.header_confidence,
             "rag_header_strategy": diagnostics.rag_header_strategy,
         }
+        if has_header_lineage:
+            record["column_header_paths"] = diagnostics.column_header_paths
+            record["column_placeholder_header_ratio"] = diagnostics.column_placeholder_header_ratio
         if caption_distance is not None:
             record["caption_distance"] = caption_distance
         if caption_position is not None:
             record["caption_position"] = caption_position
         if stub_cells:
             record["stub_cells"] = stub_cells
+            if has_header_lineage:
+                record["stub_column_headers"] = stub_headers
         row_records.append(
             record
         )
@@ -1355,6 +1440,8 @@ def _build_rag_table_payload(
         header_depth=diagnostics.header_depth,
         header_confidence=diagnostics.header_confidence,
         stub_column_count=diagnostics.stub_column_count,
+        column_header_paths=diagnostics.column_header_paths,
+        column_placeholder_header_ratio=diagnostics.column_placeholder_header_ratio,
         rag_header_strategy=diagnostics.rag_header_strategy,
         caption_distance=caption_distance,
         caption_position=caption_position,
@@ -1770,6 +1857,10 @@ def _materialize_page_table_candidates(
             "merged_cell_suspected": candidate.diagnostics.merged_cell_suspected,
             "rag_header_strategy": candidate.diagnostics.rag_header_strategy,
         }
+        if candidate.diagnostics.column_placeholder_header_ratio > 0:
+            table_quality_item["column_placeholder_header_ratio"] = (
+                candidate.diagnostics.column_placeholder_header_ratio
+            )
         if candidate.metrics.header_rows_promoted:
             table_quality_item["header_rows_promoted"] = candidate.metrics.header_rows_promoted
         if candidate_result.adaptive_skipped_strategies:

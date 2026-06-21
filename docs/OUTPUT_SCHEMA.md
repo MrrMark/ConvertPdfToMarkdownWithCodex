@@ -914,6 +914,12 @@ Required per JSONL record:
 - `header_confidence`
 - `rag_header_strategy`
 
+Stable header lineage fields:
+
+- `column_header_paths`: per-column source-derived header path records. Each record includes `column_index`, `header`, `path`, `path_text`, `source`, and `placeholder`; placeholder records may include `inferred_parent_header` and `neighbor_headers`.
+- `column_placeholder_header_ratio`: ratio of fallback `Column N` headers in the row/table.
+- `stub_column_headers`: headers associated with row-label/stub columns when multi-row or placeholder lineage is emitted.
+
 Optional continuation fields:
 
 - `continuation_group`
@@ -1105,6 +1111,7 @@ Required per JSONL record:
 Policy:
 
 - `unit_type` is conservative and may include `command_opcode`, `opcode`, `command_dword_field`, `command_pointer_field`, `log_page`, `feature_identifier`, `register_field`, `status_code`, `queue_field`, `namespace_field`, `controller_field`, `support_requirement`, `data_structure_field`, `bitfield`, `enum_value`, `requirement_row`, `security_method`, `security_object`, `security_authority`, `security_field`, or `technical_parameter`.
+- Technical table records may carry `column_header_paths`, `column_placeholder_header_ratio`, and `stub_column_headers` copied from `tables_rag.jsonl` so wide/multi-row header context survives typed sidecar generation.
 - NVMe Base and NVM Command Set specs share the `domain_adapter="nvme"` contract. Command-set tables commonly map to `command_opcode`, `command_dword_field`, `command_pointer_field`, `status_code`, `feature_identifier`, `log_page`, `data_structure_field`, and `technical_parameter`; Base tables additionally commonly map to controller/register/queue/namespace fields.
 - Command Set records may include normalized command metadata: `command_dword` such as `CDW10`, `command_scope`/`queue_type` such as `admin` or `io`, and `pointer_type` such as `metadata` or `data`.
 - Command Set relationship metadata may include `command_context`, `command_context_source`, `related_command_unit_id`, `related_command_opcode`, and `relationship_hints`. These fields connect command opcode anchors with nearby CDW, pointer, and command-specific status rows when heading/table evidence is clear.
@@ -1148,6 +1155,7 @@ Optional per JSONL record:
 - `embedding_token_estimate`: token budget estimate for `embedding_text`.
 - `embedding_text_strategy`: deterministic strategy label such as `table_context_prefix`.
 - `context_metadata`: source-derived section/table/domain metadata for table-like chunks. It keeps repeated header, caption, confidence, and command/domain hints outside `text`.
+- `context_metadata.column_header_paths`, `context_metadata.column_placeholder_header_ratio`, and `context_metadata.stub_column_headers` may be present for table-like chunks when multi-row or placeholder header lineage is available.
 - `merged_source_chunk_ids`: original chunk ids represented by a merged sibling text chunk.
 - `merged_source_chunk_count`: number of original text chunks represented by a merged sibling text chunk.
 - `merge_strategy`: deterministic strategy label such as `adjacent_text_block_same_section_token_budget`.

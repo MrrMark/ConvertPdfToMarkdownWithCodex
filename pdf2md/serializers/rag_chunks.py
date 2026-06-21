@@ -47,6 +47,9 @@ OCP_REQUIREMENT_PRIORITY_BY_FAMILY = {
 TABLE_CONTEXT_INHERITED_FIELDS = (
     "caption_text",
     "headers",
+    "column_header_paths",
+    "column_placeholder_header_ratio",
+    "stub_column_headers",
     "heading_path",
     "heading_context_source",
     "table_confidence_v2",
@@ -59,6 +62,9 @@ CHUNK_CONTEXT_METADATA_FIELDS = (
     "table_id",
     "caption_text",
     "headers",
+    "column_header_paths",
+    "column_placeholder_header_ratio",
+    "stub_column_headers",
     "heading_path",
     "heading_context_source",
     "table_confidence_v2",
@@ -600,6 +606,21 @@ def _format_context_value(value: Any) -> str | None:
     return str(value).strip()
 
 
+def _column_header_path_texts(record: dict[str, Any]) -> list[str]:
+    texts: list[str] = []
+    for item in record.get("column_header_paths") or []:
+        if not isinstance(item, dict):
+            continue
+        path = item.get("path")
+        if isinstance(path, list):
+            text = " / ".join(str(part).strip() for part in path if str(part).strip())
+        else:
+            text = str(item.get("path_text") or item.get("header") or "").strip()
+        if text and text not in texts:
+            texts.append(text)
+    return texts
+
+
 def _metadata_search_key(value: Any) -> str | None:
     text = _format_context_value(value)
     if not text:
@@ -643,6 +664,9 @@ def _contextual_embedding_text(chunk_type: str, text: str, record: dict[str, Any
     headers = record.get("headers")
     if isinstance(headers, list) and headers:
         context_parts.append("Headers: " + " | ".join(str(header) for header in headers))
+    column_header_paths = _column_header_path_texts(record)
+    if column_header_paths:
+        context_parts.append("Header paths: " + " | ".join(column_header_paths))
     table_id = record.get("table_id")
     if table_id:
         context_parts.append(f"Table: {table_id}")
