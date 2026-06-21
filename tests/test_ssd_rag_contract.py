@@ -886,7 +886,10 @@ def test_ssd_corpus_profile_aggregates_rag_eval_metrics(tmp_path: Path, monkeypa
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr("scripts.run_ssd_corpus_profile.subprocess.run", lambda *_args, **_kwargs: SimpleNamespace(returncode=0))
+    monkeypatch.setattr(
+        "scripts.run_ssd_corpus_profile.subprocess.run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0),
+    )
 
     report = run_profile(profile)
 
@@ -897,6 +900,126 @@ def test_ssd_corpus_profile_aggregates_rag_eval_metrics(tmp_path: Path, monkeypa
     assert report["rag_metrics_by_domain"]["tcg"]["hit_at_k"]["average"] == 1.0
     assert report["rag_metrics_by_spec_type"]["TCG"]["chunk_token_p95"]["max"] == 11
     assert (output_dir / "rag_eval_report.json").exists()
+
+
+def test_ssd_corpus_profile_records_redacted_domain_coverage_failures(tmp_path: Path, monkeypatch) -> None:
+    output_dir = tmp_path / "tcg-output"
+    output_dir.mkdir()
+    source_sha256 = "c" * 64
+    _write_jsonl(
+        output_dir / "retrieval_chunks_rag.jsonl",
+        [
+            {
+                "chunk_id": "chunk-000001",
+                "schema_version": "1.0",
+                "chunk_index": 1,
+                "chunk_type": "domain_unit",
+                "text": "StartSession method starts a trusted session.",
+                "source_sha256": source_sha256,
+                "source_refs": [{"source_type": "domain_unit", "source_id": "domain-tcg-000001", "page": 1}],
+                "page_range": [1, 1],
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+                "heading_path": ["TCG Methods"],
+                "semantic_types": ["security_method"],
+                "normative_strength": None,
+                "retrieval_priority": 90,
+                "char_count": 43,
+                "token_estimate": 11,
+                "section_path": "TCG Methods",
+                "chunk_group_id": "domain-tcg",
+                "source_record_count": 1,
+                "source_dedupe_key": "domain-tcg-000001",
+                "chunk_boundary_policy": "source_record",
+                "chunk_boundary_reasons": ["domain_unit_boundary"],
+            }
+        ],
+    )
+    _write_jsonl(output_dir / "requirements_rag.jsonl", [])
+    _write_jsonl(
+        output_dir / "technical_tables_rag.jsonl",
+        [
+            {
+                "technical_table_unit_id": "tech-table-000001",
+                "unit_type": "security_method",
+                "page": 1,
+                "table_id": "page-0001-table-0001",
+                "table_row_id": "page-0001-table-0001-row-0001",
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            }
+        ],
+    )
+    _write_jsonl(
+        output_dir / "tables_rag.jsonl",
+        [
+            {
+                "table_row_id": "page-0001-table-0001-row-0001",
+                "table_id": "page-0001-table-0001",
+                "page": 1,
+                "bbox": [72.0, 100.0, 300.0, 120.0],
+            }
+        ],
+    )
+    _write_jsonl(
+        output_dir / "domain_units_rag.jsonl",
+        [
+            {
+                "domain_unit_id": "domain-tcg-000001",
+                "domain": "tcg",
+                "unit_type": "security_method",
+                "source_refs": [{"source_type": "table_row", "source_id": "page-0001-table-0001-row-0001"}],
+                "normalized_fields": {"method": "StartSession"},
+            }
+        ],
+    )
+    _write_jsonl(output_dir / "cross_refs_rag.jsonl", [])
+    _write_jsonl(output_dir / "figures_rag.jsonl", [])
+    input_pdf = tmp_path / "tcg.pdf"
+    input_pdf.write_bytes(b"tcg")
+    profile = tmp_path / "profile.json"
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_name": "ssd-local",
+                "documents": [
+                    {
+                        "name": "SecretVendor-TCG",
+                        "input_pdf": str(input_pdf),
+                        "output_dir": str(output_dir),
+                        "domain_adapter": "tcg",
+                        "ssd_agent_domain": "HIL",
+                        "ssd_agent_spec_type": "TCG",
+                        "coverage_expectations": {
+                            "min_domain_unit_type_counts": {"security_method": 1, "locking_range": 1},
+                            "min_normalized_field_coverage": {
+                                "security_method": {"method": 1.0, "uid": 1.0},
+                            },
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("scripts.run_ssd_corpus_profile.subprocess.run", lambda *_args, **_kwargs: SimpleNamespace(returncode=0))
+
+    report = run_profile(profile)
+    evidence_pack = build_evidence_pack(report)
+
+    LocalCorpusEvidencePack.model_validate(evidence_pack)
+    assert report["passed"] is False
+    assert report["documents"][0]["domain_coverage"]["domain_unit_type_counts"] == {"security_method": 1}
+    assert {failure["metric"] for failure in report["documents"][0]["coverage_failures"]} == {
+        "domain_unit_type_count:locking_range",
+        "normalized_field_coverage:security_method.uid",
+    }
+    assert evidence_pack["summary"]["coverage_failure_count"] == 2
+    assert evidence_pack["documents"][0]["coverage_summary"]["coverage_failure_count"] == 2
+    assert evidence_pack["domains"][0]["coverage_summary"]["domain_unit_count"] == 1
+    assert "coverage_failure" in {signature["category"] for signature in evidence_pack["failure_signatures"]}
+    serialized = json.dumps(evidence_pack, ensure_ascii=False, sort_keys=True)
+    assert "SecretVendor" not in serialized
+    assert "StartSession" not in serialized
+    assert evidence_pack["redaction_policy"]["raw_content_included"] is False
 
 
 def test_local_corpus_evidence_pack_redacts_paths_and_groups_failures() -> None:
