@@ -47,7 +47,7 @@ def test_pyproject_declares_modern_tooling_and_typed_package_contract() -> None:
     assert "wheel>=0.43.0" in dev_dependencies
     assert pyproject["tool"]["ruff"]["target-version"] == "py311"
     assert pyproject["tool"]["ruff"]["line-length"] == 120
-    assert pyproject["tool"]["ruff"]["lint"]["select"] == ["E9", "F63", "F7", "F82"]
+    assert pyproject["tool"]["ruff"]["lint"]["select"] == ["E9", "F63", "F7", "F82", "SIM"]
     assert pyproject["tool"]["setuptools"]["packages"]["find"]["include"] == ["pdf2md*"]
     assert pyproject["tool"]["setuptools"]["package-data"]["pdf2md"] == ["py.typed"]
     assert Path("pdf2md/py.typed").is_file()

@@ -180,6 +180,10 @@ window output은 `windows/pages-0001-0100/` 같은 안정적인 하위 디렉터
 
 ## Development
 
+아래 명령은 Quick Start처럼 가상환경을 활성화한 뒤 실행하는 기준입니다.
+가상환경을 활성화하지 않은 macOS shell에서 `python`이 없으면 `.venv311/bin/python -m ...` 또는
+`python3 -m ...` 형식으로 실행합니다.
+
 ```bash
 python -m pytest
 python -m ruff check .

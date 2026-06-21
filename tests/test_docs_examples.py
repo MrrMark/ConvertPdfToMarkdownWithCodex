@@ -39,6 +39,8 @@ def test_readme_is_concise_project_hub() -> None:
     assert 'python -m pip install -e ".[dev]"' in readme
     assert 'python -m pip install -e ".[mcp]"' in readme
     assert 'python -m pip install -e ".[dev,mcp]"' in readme
+    assert "가상환경을 활성화한 뒤 실행하는 기준" in readme
+    assert ".venv311/bin/python -m ..." in readme
     assert "Claude Code, Cline, Roo Code, Cursor, Continue" in readme
     assert 'PDF2MD_MCP_ROOTS="/path/to/project:/path/to/pdfs:/path/to/output"' in readme
     assert "`pdf2md`/`pdf2md-gui`/`pdf2md-mcp` console script metadata" in readme
@@ -48,6 +50,21 @@ def test_readme_is_concise_project_hub() -> None:
     assert "pdf/v10" not in readme
     assert "metadata.py" not in readme
     assert "html_table.py" not in readme
+
+
+def test_prd_uses_current_cli_figure_semantics_contract() -> None:
+    prd = Path("PRD_pdf_to_markdown_converter.md").read_text(encoding="utf-8")
+
+    assert "--rag-generated-figure-descriptions" in prd
+    assert "--figure-description-backend [local-vlm|docling]" in prd
+    assert "--figure-structure-extraction" in prd
+    assert "--figure-region-ocr" in prd
+    assert "--image-mode [referenced|embedded|placeholder|none]" in prd
+    assert "--ocr-backend [tesseract|tesseract-cli|rapidocr|ocrmac]" in prd
+    assert "figure_descriptions_rag.jsonl" in prd
+    assert "figure_structures_rag.jsonl" in prd
+    assert "--describe-images" not in prd
+    assert "--describe-images-output" not in prd
 
 
 def test_user_facing_markdown_docs_use_portable_links_and_quoted_extras() -> None:
@@ -512,6 +529,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q145. Security Spec Text-Derived Domain Candidate Layer" not in next_plan
     assert "Q146. Large Spec Plan Apply Workflow" not in next_plan
     assert "Q147. Security Visual Sidecar Fixture Coverage" not in next_plan
+    assert "Q148. Conversion Journal Artifact Inventory Throttling" not in next_plan
+    assert "Q149. Streaming RAG Sidecar Writers" not in next_plan
+    assert "Q150. PRD and Public Docs CLI Contract Alignment" not in next_plan
+    assert "Q151. Incremental Ruff Rule Expansion" not in next_plan
     assert "현재 남은 작업 없음." in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
     assert "Q119. Table Confidence v2" not in next_plan
@@ -572,6 +593,10 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q115. Visual Technical Spec RAG Profile and Metrics" not in development_specs
     assert "Q116. SSD Verification Agent PDF2MD Sidecar Handoff" not in development_specs
     assert "Q117. MCP NVMe Base Large Conversion Stability" not in development_specs
+    assert "Q148. Conversion Journal Artifact Inventory Throttling" not in development_specs
+    assert "Q149. Streaming RAG Sidecar Writers" not in development_specs
+    assert "Q150. PRD and Public Docs CLI Contract Alignment" not in development_specs
+    assert "Q151. Incremental Ruff Rule Expansion" not in development_specs
     assert "--rag-generated-figure-descriptions" not in development_specs
     assert "generated_text=true" not in development_specs
     assert "placeholder + figure_text chunk" not in development_specs
@@ -702,8 +727,16 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q147" in development_specs
+    assert "완료된 Q34-Q151" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
+    assert "Q148. Conversion Journal Artifact Inventory Throttling" in implemented_specs
+    assert "include_artifacts" in implemented_specs
+    assert "Q149. Streaming RAG Sidecar Writers" in implemented_specs
+    assert "write_jsonl()" in implemented_specs
+    assert "Q150. PRD and Public Docs CLI Contract Alignment" in implemented_specs
+    assert "figure_descriptions_rag.jsonl" in implemented_specs
+    assert "Q151. Incremental Ruff Rule Expansion" in implemented_specs
+    assert "`SIM` rule family" in implemented_specs
     assert "Q125. Domain Adapter Registry Hardening" in implemented_specs
     assert "adapter_metadata" in implemented_specs
     assert "cross_spec_compatibility" in implemented_specs

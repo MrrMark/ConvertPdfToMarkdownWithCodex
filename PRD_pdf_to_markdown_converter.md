@@ -253,11 +253,13 @@ alt text는 다음 우선순위로 생성한다.
 #### 6.5.5 이미지 설명 생성 정책
 
 - 기본값: **비활성화**
-- 옵션명 예시: `--describe-images`
-- 활성화 시에도 Markdown 본문에 바로 주입하지 말고 아래 중 하나를 선택 가능하게 한다.
-  - 주석 블록
-  - 별도 sidecar JSON
-  - appendix 섹션
+- 현재 CLI 옵션은 `--rag-generated-figure-descriptions`다.
+- figure OCR evidence와 구조화 sidecar는 각각 `--figure-region-ocr`, `--figure-structure-extraction`으로 opt-in 한다.
+- backend label은 `--figure-description-backend local-vlm|docling`으로 기록하되, 기본 구현은 deterministic local context 기반이다.
+- 활성화 시에도 Markdown 본문에 바로 주입하지 않고 아래 sidecar/chunk에만 기록한다.
+  - `figure_descriptions_rag.jsonl`
+  - `figure_structures_rag.jsonl`
+  - `retrieval_chunks_rag.jsonl`의 figure description/structure chunk
 
 기본 동작은 절대 환각된 서술을 본문에 넣지 않는다.
 
@@ -516,14 +518,26 @@ pdf2md INPUT_PDF [OPTIONS]
 -o, --output-dir PATH
 --pages TEXT
 --password TEXT
---image-mode [referenced|embedded|placeholder]
---table-mode [auto|gfm-only|html-only]
+--image-mode [referenced|embedded|placeholder|none]
+--table-mode [auto|markdown|html|gfm-only|html-only]
+--rag-profile [preserve|rag_optimized|technical_spec_rag|technical_spec_rag_visual|confidential_rag|preserve_with_sidecars]
+--rag-table-output [none|markdown|jsonl|both]
+--rag-sidecar-scope [full|minimal|none]
+--domain-adapter [none|nvme|pcie|ocp|tcg|spdm|caliptra|customer-requirements|manual]
 --force-ocr
 --ocr-lang TEXT
+--ocr-backend [tesseract|tesseract-cli|rapidocr|ocrmac]
+--page-workers INTEGER
 --remove-header-footer
 --keep-page-markers / --no-page-markers
---describe-images
---describe-images-output [comment|json|appendix]
+--rag-figure-text-chunks
+--figure-region-ocr
+--rag-generated-figure-descriptions
+--figure-description-backend [local-vlm|docling]
+--figure-structure-extraction
+--image-extraction-page-timeout-seconds FLOAT
+--image-extraction-stage-timeout-seconds FLOAT
+--figure-semantics-stage-timeout-seconds FLOAT
 --dedupe-images
 --debug
 --verbose

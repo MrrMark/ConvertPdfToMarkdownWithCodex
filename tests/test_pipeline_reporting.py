@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from pdf2md.extractors.ocr import OcrMetrics, OcrResult
 from pdf2md.extractors.tables import TableExtractionResult
 from pdf2md.extractors.text import PageLayoutMetadata, TextLayoutResult, TextLine
 from pdf2md.models import DomainAdapterMode, ImageMode, TableAsset, TableMode, WarningEntry
-from pdf2md.pipeline import EXIT_PARTIAL, EXIT_SUCCESS, run_conversion
+from pdf2md.pipeline import EXIT_PARTIAL, EXIT_SUCCESS, ConversionJournal, ConversionProgressEvent, run_conversion
 from pdf2md.reporting import determine_conversion_status, is_advisory_warning, warning_affects_exit_code
 
 
@@ -21,6 +22,50 @@ class _FixedDateTime(datetime):
     @classmethod
     def now(cls, tz=None):  # type: ignore[override]
         return cls(2024, 1, 2, 3, 4, 5, tzinfo=tz or timezone.utc)
+
+
+def test_conversion_journal_defers_artifact_scan_until_terminal_state(
+    sample_pdf: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    output_dir = tmp_path / "journal"
+    output_dir.mkdir()
+    config = Config(input_pdf=sample_pdf, output_dir=output_dir)
+    journal = ConversionJournal(config, started_at=datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc))
+    scan_count = 0
+
+    def fake_scan_artifacts() -> list[str]:
+        nonlocal scan_count
+        scan_count += 1
+        return ["document.md"]
+
+    monkeypatch.setattr(journal, "_scan_artifacts_written", fake_scan_artifacts)
+
+    journal.write_state()
+    journal.set_selected_pages([1, 2])
+    journal.handle_progress(
+        ConversionProgressEvent(
+            current=1,
+            total=2,
+            page=1,
+            status="page_finished",
+            stage="normalization",
+        )
+    )
+    journal.finish_stage("normalization", {"normalization": 10})
+
+    assert scan_count == 0
+    running_state = json.loads((output_dir / "conversion_state.json").read_text(encoding="utf-8"))
+    assert running_state["artifacts_written"] == []
+    assert running_state["completed_pages"] == [1]
+
+    journal.write_state(status="success", include_artifacts=True)
+
+    assert scan_count == 1
+    terminal_state = json.loads((output_dir / "conversion_state.json").read_text(encoding="utf-8"))
+    assert terminal_state["status"] == "success"
+    assert terminal_state["artifacts_written"] == ["document.md"]
 
 
 def test_pipeline_report_schema_and_partial_status(sample_pdf: Path, tmp_path: Path, monkeypatch) -> None:
@@ -304,10 +349,8 @@ def test_figure_semantics_stage_timeout_skips_remaining_visual_sidecars(
 
     def fake_monotonic() -> float:
         nonlocal last_tick
-        try:
+        with suppress(StopIteration):
             last_tick = next(ticks)
-        except StopIteration:
-            pass
         return last_tick
 
     monkeypatch.setattr(pipeline_module.time, "monotonic", fake_monotonic)

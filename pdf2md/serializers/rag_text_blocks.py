@@ -119,9 +119,7 @@ def _is_code_line(line: NormalizedLine) -> bool:
     style = (line.font_style_hint or "").lower()
     if "monospace" in style:
         return True
-    if (line.left_indent or 0.0) >= 96.0 and CODE_TOKEN_PATTERN.search(line.text):
-        return True
-    return False
+    return (line.left_indent or 0.0) >= 96.0 and CODE_TOKEN_PATTERN.search(line.text) is not None
 
 
 def _classify_line(
