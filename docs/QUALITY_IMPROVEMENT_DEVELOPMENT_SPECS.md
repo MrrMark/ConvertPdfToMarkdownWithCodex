@@ -23,46 +23,6 @@
 
 ## 현재 Active Development Specs
 
-### Q145. Security Spec Text-Derived Domain Candidate Layer
-
-#### 목표
-
-TCG/SPDM/Caliptra 보안 스펙에서 표로 추출되지 않는 본문/목록/heading 기반 domain signal을 보수적으로 기록한다. 기존 table-derived `domain_units_rag.jsonl` 계약은 신뢰도 높은 1차 산출물로 유지하고, 본문 기반 후보는 review 중심 계층으로 분리한다.
-
-#### 범위
-
-- SPDM message flow, request/response relationship, algorithm/certificate/measurement 설명 후보
-- TCG method/object/authority/session/locking range 설명 후보
-- Caliptra asset/threat/RoT service/mailbox/register/security state 설명 후보
-- 후보 record에는 source refs, heading path, candidate kind, confidence, classification reasons, review flag를 포함한다.
-- retrieval chunk에는 review-only semantic type 또는 낮은 priority를 부여한다.
-
-#### 제외 범위
-
-- 본문 내용을 요약/재서술한 domain unit 생성
-- low-confidence 후보를 확정 domain unit으로 승격
-- 생성형 분류기 또는 외부 API 호출
-
-#### 구현 단계
-
-1. 현재 `semantic_units_rag.jsonl`, `requirement_traceability_rag.jsonl`, `text_blocks_rag.jsonl`에서 재사용 가능한 source span 구조를 확인한다.
-2. 새 sidecar를 만들지, `domain_units_rag.jsonl`에 `candidate_status=review_only`로 포함할지 결정한다. schema 안정성 관점에서는 별도 sidecar 또는 명시 status가 필요하다.
-3. security adapter별 keyword/heading pattern을 `rag_domain_adapters.py`에서 table row logic과 분리해 구현한다.
-4. 후보 record가 retrieval chunk에 들어갈 때 낮은 priority와 `review_only` semantic type을 갖도록 `rag_chunks.py`를 확장한다.
-5. security text fixture를 추가한다.
-
-#### 검증 기준
-
-- `python -m pytest tests/test_rag_domain_adapters.py tests/test_rag_chunks.py`
-- 신규 security text fixture에서 review-only candidate가 생성되고, 확정 table-derived unit과 구분된다.
-- raw text는 source-derived span 범위만 사용하고 생성/요약 텍스트를 만들지 않는다.
-- `git diff --check`
-
-#### 성공 조건
-
-- 표가 없는 security spec section에서도 검색 가능한 후보 provenance가 남는다.
-- SSD/RAG contract validator가 확정 unit과 review candidate를 혼동하지 않는다.
-
 ### Q146. Large Spec Plan Apply Workflow
 
 #### 목표
@@ -144,4 +104,4 @@ TCG/SPDM/Caliptra 보안 스펙에서 표로 추출되지 않는 본문/목록/h
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q144 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q145 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pdf2md.pipeline as pipeline_module
 from pdf2md.config import Config
+from pdf2md.models import DomainAdapterMode
 from pdf2md.pipeline import EXIT_FATAL, EXIT_SUCCESS, ConversionProgressEvent, run_conversion
-from tests.fixtures.pdf_builder import build_multi_page_text_pdf
+from tests.fixtures.pdf_builder import PageSpec, PositionedText, build_multi_page_text_pdf, write_pdf
 
 
 def test_pipeline_generates_outputs(sample_pdf: Path, tmp_path: Path) -> None:
@@ -63,6 +64,43 @@ def test_pipeline_uses_custom_output_filenames(sample_pdf: Path, tmp_path: Path)
     assert (output_dir / "sample_manifest.json").exists()
     assert (output_dir / "sample_report.json").exists()
     assert (output_dir / "sample_assets" / "images").exists()
+
+
+def test_pipeline_emits_review_only_security_text_domain_candidates(tmp_path: Path) -> None:
+    input_pdf = tmp_path / "spdm-text.pdf"
+    output_dir = tmp_path / "spdm-out"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(
+                texts=[
+                    PositionedText("1 Security Protocol Flow", 72, 780, 14),
+                    PositionedText("SPDM GET_MEASUREMENTS message flow is described by this section.", 72, 748, 10),
+                ]
+            )
+        ],
+    )
+
+    result = run_conversion(
+        Config(
+            input_pdf=input_pdf,
+            output_dir=output_dir,
+            rag_profile="technical_spec_rag",
+            domain_adapter=DomainAdapterMode.SPDM,
+        )
+    )
+
+    assert result.exit_code == EXIT_SUCCESS
+    records = [
+        json.loads(line)
+        for line in (output_dir / "domain_units_rag.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert records[0]["candidate_status"] == "review_only"
+    assert records[0]["candidate_kind"] == "spdm_measurement_text"
+    assert records[0]["source_refs"][0]["source_type"] == "text_block"
+    assert records[0]["text"] == "SPDM GET_MEASUREMENTS message flow is described by this section."
+    assert records[0]["classification_confidence"] < 0.7
 
 
 def test_pipeline_writes_debug_artifacts(sample_pdf: Path, tmp_path: Path) -> None:

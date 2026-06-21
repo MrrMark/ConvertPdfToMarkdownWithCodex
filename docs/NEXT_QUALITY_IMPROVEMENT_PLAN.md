@@ -23,12 +23,6 @@
 
 ## 남은 작업
 
-### Q145. Security Spec Text-Derived Domain Candidate Layer
-
-- TCG/SPDM/Caliptra 문서의 본문, 목록, heading에서 표로 잡히지 않는 security domain candidate를 보수적으로 추출한다.
-- 기존 `domain_units_rag.jsonl`의 table-provenance 계약을 깨지 않도록 `review_only` 또는 낮은 confidence candidate layer로 분리한다.
-- 추출 결과는 원문 재서술 없이 source text span/provenance/heuristic reason 중심으로 기록한다.
-
 ### Q146. Large Spec Plan Apply Workflow
 
 - `pdf2md_plan_large_spec_conversion`의 권고를 CLI/MCP에서 더 쉽게 적용할 수 있는 plan-then-apply workflow를 설계/구현한다.

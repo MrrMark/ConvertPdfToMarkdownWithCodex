@@ -256,6 +256,16 @@ class DomainAdapterSpec:
         return f"{self.name}-technical-spec"
 
 
+@dataclass(frozen=True)
+class SecurityTextCandidateRule:
+    """Conservative source-text rule for review-only security domain candidates."""
+
+    unit_type: str
+    candidate_kind: str
+    reason: str
+    patterns: tuple[re.Pattern[str], ...]
+
+
 NVME_UNIT_TAXONOMY = (
     "command",
     "command_dword_field",
@@ -556,6 +566,175 @@ OCP_COMMAND_NAMES = (
 )
 OCP_SECURITY_PROTOCOLS = ("SPDM", "TCG", "IEEE 1667", "Opal")
 OCP_FORM_FACTORS = ("E1.S", "E1.L", "E3.S", "E3.L", "E3", "M.2", "U.2", "U.3", "SFF-8639")
+SECURITY_TEXT_CANDIDATE_ADAPTERS = {
+    DomainAdapterMode.TCG,
+    DomainAdapterMode.SPDM,
+    DomainAdapterMode.CALIPTRA,
+}
+SECURITY_TEXT_CANDIDATE_STATUS = "review_only"
+SECURITY_TEXT_CANDIDATE_CONFIDENCE_BY_BLOCK_TYPE = {
+    "heading": 0.64,
+    "list": 0.6,
+    "paragraph": 0.58,
+}
+
+
+def _candidate_patterns(*patterns: str) -> tuple[re.Pattern[str], ...]:
+    return tuple(re.compile(pattern, re.IGNORECASE) for pattern in patterns)
+
+
+SECURITY_TEXT_CANDIDATE_RULES: dict[DomainAdapterMode, tuple[SecurityTextCandidateRule, ...]] = {
+    DomainAdapterMode.SPDM: (
+        SecurityTextCandidateRule(
+            unit_type="spdm_request_response",
+            candidate_kind="spdm_request_response_text",
+            reason="spdm_request_response_text",
+            patterns=_candidate_patterns(r"\brequest(?:s)?\b.{0,80}\bresponse(?:s)?\b", r"\breq(?:uest)?\s*/\s*rsp(?:onse)?\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="spdm_certificate",
+            candidate_kind="spdm_certificate_text",
+            reason="spdm_certificate_text",
+            patterns=_candidate_patterns(r"\bcertificates?\b", r"\bGET_CERTIFICATE\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="spdm_measurement",
+            candidate_kind="spdm_measurement_text",
+            reason="spdm_measurement_text",
+            patterns=_candidate_patterns(r"\bmeasurements?\b", r"\bGET_MEASUREMENTS\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="spdm_algorithm",
+            candidate_kind="spdm_algorithm_text",
+            reason="spdm_algorithm_text",
+            patterns=_candidate_patterns(r"\balgorithms?\b", r"\bNEGOTIATE_ALGORITHMS\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="spdm_key_exchange",
+            candidate_kind="spdm_key_exchange_text",
+            reason="spdm_key_exchange_text",
+            patterns=_candidate_patterns(r"\bKEY_EXCHANGE\b", r"\bkey exchange\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="spdm_session",
+            candidate_kind="spdm_session_text",
+            reason="spdm_session_text",
+            patterns=_candidate_patterns(r"\bsessions?\b", r"\bEND_SESSION\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="spdm_message",
+            candidate_kind="spdm_message_text",
+            reason="spdm_message_text",
+            patterns=_candidate_patterns(
+                r"\b(?:GET_DIGESTS|DIGESTS|CHALLENGE|RESPOND_IF_READY|ERROR|FINISH|PSK_EXCHANGE|PSK_FINISH)\b",
+                r"\bSPDM\b.{0,80}\bmessage\b",
+            ),
+        ),
+    ),
+    DomainAdapterMode.TCG: (
+        SecurityTextCandidateRule(
+            unit_type="locking_range",
+            candidate_kind="tcg_locking_range_text",
+            reason="tcg_locking_range_text",
+            patterns=_candidate_patterns(r"\blocking\s+ranges?\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="security_provider",
+            candidate_kind="tcg_security_provider_text",
+            reason="tcg_security_provider_text",
+            patterns=_candidate_patterns(r"\bsecurity\s+providers?\b", r"\b(?:LockingSP|AdminSP)\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="security_authority",
+            candidate_kind="tcg_authority_text",
+            reason="tcg_authority_text",
+            patterns=_candidate_patterns(r"\bauthorit(?:y|ies)\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="session_state",
+            candidate_kind="tcg_session_text",
+            reason="tcg_session_text",
+            patterns=_candidate_patterns(r"\bsessions?\b", r"\bStartSession\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="key_management",
+            candidate_kind="tcg_key_management_text",
+            reason="tcg_key_management_text",
+            patterns=_candidate_patterns(r"\bkeys?\b", r"\bkey\s+management\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="security_method",
+            candidate_kind="tcg_method_text",
+            reason="tcg_method_text",
+            patterns=_candidate_patterns(r"\bmethods?\b", r"\b(?:Authenticate|Get|Set|Revert|Activate)\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="security_object",
+            candidate_kind="tcg_object_text",
+            reason="tcg_object_text",
+            patterns=_candidate_patterns(r"\bobjects?\b", r"\bUID\b"),
+        ),
+    ),
+    DomainAdapterMode.CALIPTRA: (
+        SecurityTextCandidateRule(
+            unit_type="caliptra_mailbox_command",
+            candidate_kind="caliptra_mailbox_text",
+            reason="caliptra_mailbox_text",
+            patterns=_candidate_patterns(
+                r"\bmailbox\b.{0,80}\bcommands?\b",
+                r"\bmailbox\b.{0,80}\bGET_[A-Z0-9_]*\b",
+            ),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="caliptra_register_field",
+            candidate_kind="caliptra_register_text",
+            reason="caliptra_register_text",
+            patterns=_candidate_patterns(r"\bregister\b", r"\bCPTRA_[A-Z0-9_]+\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="caliptra_measurement",
+            candidate_kind="caliptra_measurement_text",
+            reason="caliptra_measurement_text",
+            patterns=_candidate_patterns(r"\bmeasurements?\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="caliptra_attestation",
+            candidate_kind="caliptra_attestation_text",
+            reason="caliptra_attestation_text",
+            patterns=_candidate_patterns(r"\battestation\b", r"\bDICE\b", r"\bDPE\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="caliptra_crypto_key",
+            candidate_kind="caliptra_key_text",
+            reason="caliptra_key_text",
+            patterns=_candidate_patterns(r"\bkeys?\b", r"\bcrypto(?:graphic)?\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="caliptra_security_state",
+            candidate_kind="caliptra_security_state_text",
+            reason="caliptra_security_state_text",
+            patterns=_candidate_patterns(r"\bsecurity\s+states?\b", r"\blifecycle\s+states?\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="caliptra_threat",
+            candidate_kind="caliptra_threat_text",
+            reason="caliptra_threat_text",
+            patterns=_candidate_patterns(r"\bthreats?\b", r"\battack\s+paths?\b", r"\bmitigations?\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="caliptra_asset",
+            candidate_kind="caliptra_asset_text",
+            reason="caliptra_asset_text",
+            patterns=_candidate_patterns(r"\bassets?\b", r"\bdevice\s+identity\b", r"\bfirmware\b"),
+        ),
+        SecurityTextCandidateRule(
+            unit_type="caliptra_rot_service",
+            candidate_kind="caliptra_rot_service_text",
+            reason="caliptra_rot_service_text",
+            patterns=_candidate_patterns(r"\broot\s+of\s+trust\b", r"\bRoT\b", r"\bRTM\b|\bRTD\b|\bRTI\b|\bRTU\b"),
+        ),
+    ),
+}
 
 
 def _ocp_requirement_id(value: str | None) -> str | None:
@@ -1411,11 +1590,204 @@ def _normalized_domain_fields(
     return _without_empty_fields(fields)
 
 
+def _security_text_candidate_match(
+    domain_adapter: DomainAdapterMode,
+    text: str,
+) -> tuple[SecurityTextCandidateRule, re.Match[str]] | None:
+    for rule in SECURITY_TEXT_CANDIDATE_RULES.get(domain_adapter, ()):
+        for pattern in rule.patterns:
+            match = pattern.search(text)
+            if match is not None:
+                return rule, match
+    return None
+
+
+def _source_text_span(text: str, match: re.Match[str]) -> str:
+    return re.sub(r"\s+", " ", text[match.start() : match.end()].strip())
+
+
+def _candidate_confidence(block_type: str, heading_path: list[str]) -> float:
+    base = SECURITY_TEXT_CANDIDATE_CONFIDENCE_BY_BLOCK_TYPE.get(block_type, 0.56)
+    if heading_path:
+        base += 0.03
+    return round(min(base, 0.67), 2)
+
+
+def _candidate_normalized_fields(
+    *,
+    domain_adapter: DomainAdapterMode,
+    unit_type: str,
+    candidate_kind: str,
+    block: dict[str, Any],
+    source_text_span: str,
+) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "candidate_status": SECURITY_TEXT_CANDIDATE_STATUS,
+        "candidate_kind": candidate_kind,
+        "source_block_id": block.get("block_id"),
+        "source_block_type": block.get("block_type"),
+        "source_text_span": source_text_span,
+    }
+    if domain_adapter is DomainAdapterMode.SPDM:
+        if unit_type in {"spdm_message", "spdm_request_response"}:
+            fields["message"] = source_text_span
+        if unit_type == "spdm_certificate":
+            fields["certificate"] = source_text_span
+        if unit_type == "spdm_measurement":
+            fields["measurement"] = source_text_span
+        if unit_type == "spdm_algorithm":
+            fields["algorithm"] = source_text_span
+        if unit_type == "spdm_key_exchange":
+            fields["key_exchange"] = source_text_span
+        if unit_type == "spdm_session":
+            fields["session_state"] = source_text_span
+    if domain_adapter is DomainAdapterMode.TCG:
+        if unit_type == "security_method":
+            fields["method"] = source_text_span
+        if unit_type == "security_object":
+            fields["security_object"] = source_text_span
+        if unit_type == "security_authority":
+            fields["authority"] = source_text_span
+        if unit_type == "security_provider":
+            fields["security_provider"] = source_text_span
+        if unit_type == "locking_range":
+            fields["locking_range"] = source_text_span
+        if unit_type == "key_management":
+            fields["key_name"] = source_text_span
+        if unit_type == "session_state":
+            fields["session_state"] = source_text_span
+    if domain_adapter is DomainAdapterMode.CALIPTRA:
+        if unit_type == "caliptra_rot_service":
+            fields["service"] = source_text_span
+        if unit_type == "caliptra_asset":
+            fields["asset"] = source_text_span
+        if unit_type == "caliptra_threat":
+            fields["threat"] = source_text_span
+        if unit_type == "caliptra_mailbox_command":
+            fields["mailbox_command"] = source_text_span
+        if unit_type == "caliptra_register_field":
+            fields["register_name"] = source_text_span
+        if unit_type == "caliptra_security_state":
+            fields["security_state"] = source_text_span
+        if unit_type == "caliptra_measurement":
+            fields["measurement"] = source_text_span
+        if unit_type == "caliptra_attestation":
+            fields["attestation"] = source_text_span
+        if unit_type == "caliptra_crypto_key":
+            fields["key_name"] = source_text_span
+    return _without_empty_fields(fields)
+
+
+def _build_security_text_candidates(
+    *,
+    domain_adapter: DomainAdapterMode,
+    text_block_records: list[dict[str, Any]],
+    adapter_profile: str,
+    adapter_spec: DomainAdapterSpec,
+    source_sha256: str,
+    start_index: int,
+) -> list[dict[str, Any]]:
+    if domain_adapter not in SECURITY_TEXT_CANDIDATE_ADAPTERS:
+        return []
+
+    records: list[dict[str, Any]] = []
+    allowed_block_types = {"heading", "list", "paragraph"}
+    ordered_blocks = sorted(
+        text_block_records,
+        key=lambda block: (_page(block), int(block.get("block_index") or 0)),
+    )
+    for block in ordered_blocks:
+        block_type = str(block.get("block_type") or "")
+        if block_type not in allowed_block_types:
+            continue
+        text = str(block.get("text") or "").strip()
+        if not text:
+            continue
+        match_result = _security_text_candidate_match(domain_adapter, text)
+        if match_result is None:
+            continue
+        rule, match = match_result
+        source_text_span = _source_text_span(text, match)
+        if not source_text_span:
+            continue
+        heading_path = _heading_path(block)
+        page = _page(block)
+        block_id = str(block.get("block_id") or f"page-{page:04d}-block-unknown")
+        reasons = [
+            "security_text_candidate",
+            rule.reason,
+            f"block_type_{block_type}",
+        ]
+        if heading_path:
+            reasons.append("heading_context")
+        index = start_index + len(records)
+        records.append(
+            with_stable_source_metadata(
+                {
+                    "domain_unit_id": f"domain-{domain_adapter.value}-{index:06d}",
+                    "domain_unit_index": index,
+                    "domain": domain_adapter.value,
+                    "adapter_profile": adapter_profile,
+                    "adapter_version": "1.0",
+                    "adapter_metadata": _adapter_metadata(
+                        adapter_spec,
+                        adapter_profile=adapter_profile,
+                        unit_type=rule.unit_type,
+                    ),
+                    "cross_spec_compatibility": _cross_spec_compatibility(adapter_spec),
+                    "unit_type": rule.unit_type,
+                    "candidate_status": SECURITY_TEXT_CANDIDATE_STATUS,
+                    "candidate_kind": rule.candidate_kind,
+                    "review_required": True,
+                    "review_reasons": [
+                        "text_derived_candidate",
+                        "not_table_provenance",
+                        "requires_human_review",
+                    ],
+                    "name": source_text_span,
+                    "value": source_text_span,
+                    "description": "",
+                    "text": text,
+                    "normalized_fields": _candidate_normalized_fields(
+                        domain_adapter=domain_adapter,
+                        unit_type=rule.unit_type,
+                        candidate_kind=rule.candidate_kind,
+                        block=block,
+                        source_text_span=source_text_span,
+                    ),
+                    "candidate_evidence": {
+                        "source_text_span": source_text_span,
+                        "source_block_id": block.get("block_id"),
+                        "source_block_type": block_type,
+                    },
+                    "source_refs": [
+                        {
+                            "source_type": "text_block",
+                            "source_id": block.get("block_id"),
+                            "page": page,
+                            "bbox": block.get("bbox"),
+                        }
+                    ],
+                    "page_range": [page, page],
+                    "bbox": block.get("bbox"),
+                    "heading_path": heading_path,
+                    "relationship_hints": [],
+                    "classification_confidence": _candidate_confidence(block_type, heading_path),
+                    "classification_reasons": sorted(dict.fromkeys(reasons)),
+                },
+                source_sha256=source_sha256,
+                requirement_locator_id=f"{block_id}|{rule.candidate_kind}|{source_text_span}",
+            )
+        )
+    return records
+
+
 def build_domain_units(
     *,
     domain_adapter: DomainAdapterMode | str,
     rag_tables: list[dict[str, Any]],
     technical_table_records: list[dict[str, Any]] | None = None,
+    text_block_records: list[dict[str, Any]] | None = None,
     manual_adapter_label: str | None = None,
     manual_adapter_keywords: str | None = None,
     source_sha256: str = "",
@@ -1621,6 +1993,17 @@ def build_domain_units(
             )
         )
     deduped: list[dict[str, Any]] = []
+    if text_block_records:
+        records.extend(
+            _build_security_text_candidates(
+                domain_adapter=domain_adapter,
+                text_block_records=text_block_records,
+                adapter_profile=adapter_profile,
+                adapter_spec=adapter_spec,
+                source_sha256=source_sha256,
+                start_index=len(records) + 1,
+            )
+        )
     seen: set[tuple[str, str, str | None]] = set()
     for record in records:
         key = (str(record.get("unit_type")), str(record.get("name")), record.get("value"))
