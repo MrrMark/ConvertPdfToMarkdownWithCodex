@@ -1,5 +1,47 @@
 {
   "$defs": {
+    "LocalCorpusEvidenceCoverageSummary": {
+      "properties": {
+        "coverage_failure_count": {
+          "default": 0,
+          "title": "Coverage Failure Count",
+          "type": "integer"
+        },
+        "domain_unit_count": {
+          "default": 0,
+          "title": "Domain Unit Count",
+          "type": "integer"
+        },
+        "domain_unit_type_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Domain Unit Type Counts",
+          "type": "object"
+        },
+        "normalized_field_coverage": {
+          "items": {
+            "$ref": "#/$defs/LocalCorpusEvidenceNormalizedFieldCoverage"
+          },
+          "title": "Normalized Field Coverage",
+          "type": "array"
+        },
+        "technical_table_unit_count": {
+          "default": 0,
+          "title": "Technical Table Unit Count",
+          "type": "integer"
+        },
+        "technical_table_unit_type_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Technical Table Unit Type Counts",
+          "type": "object"
+        }
+      },
+      "title": "LocalCorpusEvidenceCoverageSummary",
+      "type": "object"
+    },
     "LocalCorpusEvidenceDocument": {
       "properties": {
         "contract_passed": {
@@ -25,6 +67,9 @@
           ],
           "default": null,
           "title": "Conversion Exit Code"
+        },
+        "coverage_summary": {
+          "$ref": "#/$defs/LocalCorpusEvidenceCoverageSummary"
         },
         "document_label": {
           "title": "Document Label",
@@ -80,6 +125,9 @@
     },
     "LocalCorpusEvidenceDomain": {
       "properties": {
+        "coverage_summary": {
+          "$ref": "#/$defs/LocalCorpusEvidenceCoverageSummary"
+        },
         "document_count": {
           "default": 0,
           "title": "Document Count",
@@ -118,6 +166,44 @@
       "title": "LocalCorpusEvidenceDomain",
       "type": "object"
     },
+    "LocalCorpusEvidenceNormalizedFieldCoverage": {
+      "properties": {
+        "coverage": {
+          "default": 0.0,
+          "title": "Coverage",
+          "type": "number"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "missing_count": {
+          "default": 0,
+          "title": "Missing Count",
+          "type": "integer"
+        },
+        "present_count": {
+          "default": 0,
+          "title": "Present Count",
+          "type": "integer"
+        },
+        "record_count": {
+          "default": 0,
+          "title": "Record Count",
+          "type": "integer"
+        },
+        "unit_type": {
+          "title": "Unit Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit_type",
+        "field"
+      ],
+      "title": "LocalCorpusEvidenceNormalizedFieldCoverage",
+      "type": "object"
+    },
     "LocalCorpusEvidenceRedactionPolicy": {
       "properties": {
         "commands_included": {
@@ -135,9 +221,24 @@
           "title": "Document Names Included",
           "type": "boolean"
         },
+        "image_bytes_included": {
+          "default": false,
+          "title": "Image Bytes Included",
+          "type": "boolean"
+        },
+        "local_paths_included": {
+          "default": false,
+          "title": "Local Paths Included",
+          "type": "boolean"
+        },
         "query_text_included": {
           "default": false,
           "title": "Query Text Included",
+          "type": "boolean"
+        },
+        "raw_content_included": {
+          "default": false,
+          "title": "Raw Content Included",
           "type": "boolean"
         },
         "raw_paths_included": {
@@ -148,6 +249,11 @@
         "source_filenames_included": {
           "default": false,
           "title": "Source Filenames Included",
+          "type": "boolean"
+        },
+        "table_row_content_included": {
+          "default": false,
+          "title": "Table Row Content Included",
           "type": "boolean"
         }
       },
@@ -282,6 +388,11 @@
         "conversion_failure_count": {
           "default": 0,
           "title": "Conversion Failure Count",
+          "type": "integer"
+        },
+        "coverage_failure_count": {
+          "default": 0,
+          "title": "Coverage Failure Count",
           "type": "integer"
         },
         "document_count": {

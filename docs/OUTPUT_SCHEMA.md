@@ -1606,14 +1606,24 @@ Stable summary fields:
 
 - `document_count`, `failed_document_count`, `failure_signature_count`
 - `conversion_failure_count`, `contract_error_count`, `contract_warning_count`
-- `rag_threshold_failure_count`, `budget_failure_count`
+- `rag_threshold_failure_count`, `budget_failure_count`, `coverage_failure_count`
+
+Stable coverage fields:
+
+- `documents[].coverage_summary`
+- `domains[].coverage_summary`
+- `coverage_summary.domain_unit_type_counts`
+- `coverage_summary.technical_table_unit_type_counts`
+- `coverage_summary.normalized_field_coverage`
 
 Policy:
 
 - `purpose` is `local_technical_corpus_evidence_pack`.
 - The evidence pack uses redacted document labels such as `document-000001`.
 - Raw `input_pdf`, `output_dir`, command arguments, profile path, source filename, and eval query text are not included.
-- Failure signatures are deterministic and group conversion, SSD contract, RAG threshold, and budget failures by domain/spec/category/code/metric.
+- Redaction markers include `raw_content_included=false`, `table_row_content_included=false`, `image_bytes_included=false`, and `local_paths_included=false`.
+- Domain coverage stores taxonomy field names and counts only; normalized field values and table row content are not included.
+- Failure signatures are deterministic and group conversion, SSD contract, RAG threshold, budget, and coverage failures by domain/spec/category/code/metric.
 - The pack is intended for sharing failure patterns from private/local technical corpora without sharing source PDFs or local filesystem metadata.
 
 ## corpus_evidence_analysis_report.json

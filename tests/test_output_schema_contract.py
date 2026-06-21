@@ -161,6 +161,10 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     assert figure_eval_schema["properties"]["purpose"]["default"] == "local_figure_description_eval"
     evidence_schema = json.loads((output_dir / "local_corpus_evidence_pack.schema.json").read_text(encoding="utf-8"))
     assert evidence_schema["properties"]["purpose"]["default"] == "local_technical_corpus_evidence_pack"
+    assert "coverage_failure_count" in evidence_schema["$defs"]["LocalCorpusEvidenceSummary"]["properties"]
+    assert "raw_content_included" in evidence_schema["$defs"]["LocalCorpusEvidenceRedactionPolicy"]["properties"]
+    assert "coverage_summary" in evidence_schema["$defs"]["LocalCorpusEvidenceDocument"]["properties"]
+    assert "coverage_summary" in evidence_schema["$defs"]["LocalCorpusEvidenceDomain"]["properties"]
     analysis_schema = json.loads(
         (output_dir / "corpus_evidence_analysis_report.schema.json").read_text(encoding="utf-8")
     )

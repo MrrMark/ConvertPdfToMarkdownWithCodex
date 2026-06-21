@@ -23,4 +23,26 @@
 
 ## 남은 작업
 
-현재 남은 작업 없음.
+### Q144. Wide Technical Table Header Semantics
+
+- NVMe reservation/status/register, OCP compliance matrix처럼 넓고 다층 header가 있는 기술 표에서 `Column N` 의미 손실을 줄인다.
+- Markdown은 기존 HTML fallback 안전 정책을 유지하고, RAG sidecar에는 parent/child header path와 column lineage를 보존한다.
+- table confidence와 fallback diagnostics가 새 header lineage 품질 신호를 기록하도록 확장한다.
+
+### Q145. Security Spec Text-Derived Domain Candidate Layer
+
+- TCG/SPDM/Caliptra 문서의 본문, 목록, heading에서 표로 잡히지 않는 security domain candidate를 보수적으로 추출한다.
+- 기존 `domain_units_rag.jsonl`의 table-provenance 계약을 깨지 않도록 `review_only` 또는 낮은 confidence candidate layer로 분리한다.
+- 추출 결과는 원문 재서술 없이 source text span/provenance/heuristic reason 중심으로 기록한다.
+
+### Q146. Large Spec Plan Apply Workflow
+
+- `pdf2md_plan_large_spec_conversion`의 권고를 CLI/MCP에서 더 쉽게 적용할 수 있는 plan-then-apply workflow를 설계/구현한다.
+- 대형 NVMe/OCP/security spec 변환 시 domain adapter, image mode, page workers, window size, timeout 적용 실수를 줄인다.
+- 권고 자동 적용은 명시 opt-in으로 두고, raw content 없는 option matrix와 재현 가능한 실행 기록을 남긴다.
+
+### Q147. Security Visual Sidecar Fixture Coverage
+
+- SPDM sequence diagram, TCG architecture diagram, Caliptra RoT/block diagram 계열 visual fixture/eval coverage를 추가한다.
+- `technical_spec_rag_visual`의 figure text, region OCR evidence, generated description, structure sidecar 계약을 security spec 관점에서 검증한다.
+- 생성 텍스트는 sidecar-only/opt-in 계약을 유지하고, 본문 Markdown에는 삽입하지 않는다.

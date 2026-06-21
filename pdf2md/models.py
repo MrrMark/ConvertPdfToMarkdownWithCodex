@@ -1247,10 +1247,14 @@ class FigureDescriptionEvalReport(BaseModel):
 
 
 class LocalCorpusEvidenceRedactionPolicy(BaseModel):
+    raw_content_included: bool = False
     raw_paths_included: bool = False
+    local_paths_included: bool = False
     commands_included: bool = False
     document_names_included: bool = False
     query_text_included: bool = False
+    table_row_content_included: bool = False
+    image_bytes_included: bool = False
     source_filenames_included: bool = False
     document_label_policy: str = "order_preserving_redacted_labels"
 
@@ -1264,6 +1268,25 @@ class LocalCorpusEvidenceSummary(BaseModel):
     contract_warning_count: int = 0
     rag_threshold_failure_count: int = 0
     budget_failure_count: int = 0
+    coverage_failure_count: int = 0
+
+
+class LocalCorpusEvidenceNormalizedFieldCoverage(BaseModel):
+    unit_type: str
+    field: str
+    record_count: int = 0
+    present_count: int = 0
+    missing_count: int = 0
+    coverage: float = 0.0
+
+
+class LocalCorpusEvidenceCoverageSummary(BaseModel):
+    domain_unit_count: int = 0
+    technical_table_unit_count: int = 0
+    domain_unit_type_counts: dict[str, int] = Field(default_factory=dict)
+    technical_table_unit_type_counts: dict[str, int] = Field(default_factory=dict)
+    normalized_field_coverage: list[LocalCorpusEvidenceNormalizedFieldCoverage] = Field(default_factory=list)
+    coverage_failure_count: int = 0
 
 
 class LocalCorpusEvidenceDomain(BaseModel):
@@ -1272,6 +1295,7 @@ class LocalCorpusEvidenceDomain(BaseModel):
     ssd_agent_spec_type: str
     document_count: int = 0
     failed_document_count: int = 0
+    coverage_summary: LocalCorpusEvidenceCoverageSummary = Field(default_factory=LocalCorpusEvidenceCoverageSummary)
     signature_ids: list[str] = Field(default_factory=list)
 
 
@@ -1284,6 +1308,7 @@ class LocalCorpusEvidenceDocument(BaseModel):
     contract_passed: Optional[bool] = None
     rag_eval_passed: Optional[bool] = None
     rag_eval_metrics: dict[str, float] = Field(default_factory=dict)
+    coverage_summary: LocalCorpusEvidenceCoverageSummary = Field(default_factory=LocalCorpusEvidenceCoverageSummary)
     signature_ids: list[str] = Field(default_factory=list)
 
 
