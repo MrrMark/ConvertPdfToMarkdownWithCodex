@@ -55,6 +55,18 @@ def test_retrieval_chunks_include_text_semantic_requirement_and_table_provenance
                     "page": 1,
                     "table_index": 1,
                     "row_index": 1,
+                    "headers": ["Field", "Value"],
+                    "column_header_paths": [
+                        {
+                            "column_index": 1,
+                            "header": "Field",
+                            "path": ["Register", "Field"],
+                            "path_text": "Register / Field",
+                            "source": "multi_row_header",
+                            "placeholder": False,
+                        }
+                    ],
+                    "column_placeholder_header_ratio": 0.0,
                     "row_text": "Field = Status | Description = Current status",
                     "bbox": [72.0, 120.0, 420.0, 150.0],
                 }
@@ -68,6 +80,7 @@ def test_retrieval_chunks_include_text_semantic_requirement_and_table_provenance
         requirements=[requirement],
         rag_tables=rag_tables,
         source_sha256="a" * 64,
+        contextual_embedding_text=True,
     )
 
     assert [chunk["chunk_type"] for chunk in chunks] == [
@@ -83,6 +96,8 @@ def test_retrieval_chunks_include_text_semantic_requirement_and_table_provenance
     assert chunks[1]["source_refs"][-1]["source_type"] == "requirement"
     assert chunks[2]["semantic_types"] == ["definition"]
     assert chunks[3]["source_refs"][0]["source_id"] == "page-0001-table-0001-row-0001"
+    assert chunks[3]["context_metadata"]["column_header_paths"][0]["path_text"] == "Register / Field"
+    assert "Header paths: Register / Field" in chunks[3]["embedding_text"]
     assert chunks[0]["chunk_boundary_reasons"] == ["text_block_boundary"]
     assert chunks[0]["section_path"] == "1 Requirements"
     assert len(chunks[1]["stable_source_id"]) == 40
@@ -94,6 +109,7 @@ def test_retrieval_chunks_include_text_semantic_requirement_and_table_provenance
         requirements=[requirement],
         rag_tables=rag_tables,
         source_sha256="a" * 64,
+        contextual_embedding_text=True,
     )
     assert repeated_chunks[1]["stable_source_id"] == chunks[1]["stable_source_id"]
     assert repeated_chunks[1]["stable_requirement_seed"] == chunks[1]["stable_requirement_seed"]

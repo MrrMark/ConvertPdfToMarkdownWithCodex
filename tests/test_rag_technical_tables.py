@@ -498,6 +498,27 @@ def test_technical_tables_extract_official_command_set_header_variants() -> None
                         "2 Command",
                         "Reference Section",
                     ],
+                    "column_header_paths": [
+                        {
+                            "column_index": 1,
+                            "header": "Opcode by Field",
+                            "path": ["Opcode by Field"],
+                            "path_text": "Opcode by Field",
+                            "source": "multi_row_header",
+                            "placeholder": False,
+                        },
+                        {
+                            "column_index": 2,
+                            "header": "Column 2",
+                            "path": ["Opcode by Field", "Column 2"],
+                            "path_text": "Opcode by Field / Column 2",
+                            "source": "multi_row_header",
+                            "placeholder": True,
+                            "inferred_parent_header": "Opcode by Field",
+                            "neighbor_headers": ["Opcode by Field", "Combined Opcode 1"],
+                        },
+                    ],
+                    "column_placeholder_header_ratio": 0.2,
                     "cells": {
                         "Opcode by Field": "0000 00b",
                         "Column 2": "10b",
@@ -541,6 +562,9 @@ def test_technical_tables_extract_official_command_set_header_variants() -> None
     assert [record["unit_type"] for record in records] == ["command_opcode", "status_code"]
     assert records[0]["command"] == "Read"
     assert records[0]["opcode"] == "02h"
+    assert records[0]["column_header_paths"][1]["path_text"] == "Opcode by Field / Column 2"
+    assert records[0]["column_placeholder_header_ratio"] == 0.2
+    assert "placeholder_header_context_available" in records[0]["classification_reasons"]
     assert records[0]["command_context"] == "Read"
     assert records[0]["relationship_hints"] == ["command_anchor"]
     assert records[1]["status_code_type"] == "Command Specific Status"

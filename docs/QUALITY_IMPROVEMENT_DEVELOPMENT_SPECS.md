@@ -23,45 +23,6 @@
 
 ## 현재 Active Development Specs
 
-### Q144. Wide Technical Table Header Semantics
-
-#### 목표
-
-NVMe reservation matrix, status/register bitfield table, OCP compliance matrix처럼 넓고 다층 header를 가진 표에서 RAG sidecar의 컬럼 의미 손실을 줄인다. Markdown 출력은 기존 보수 정책을 유지하며, 복잡 표는 계속 HTML fallback을 우선한다.
-
-#### 범위
-
-- table extraction 이후 RAG payload 생성 단계에서 parent/child header lineage를 보존한다.
-- `Column N` fallback header가 생긴 경우 가능한 parent header, stub header, neighboring header, caption/heading context를 별도 metadata로 기록한다.
-- `tables_rag.jsonl`, `technical_tables_rag.jsonl`, `domain_units_rag.jsonl`, `retrieval_chunks_rag.jsonl`의 context metadata가 header lineage를 사용할 수 있게 한다.
-- table confidence/fallback diagnostics에 header lineage 품질 신호를 추가한다.
-
-#### 제외 범위
-
-- 복잡 표를 억지로 GFM으로 변환
-- pdfplumber 외 신규 table engine의 기본 runtime 도입
-- 셀 내용을 추정/보정하는 의미 변경 후처리
-
-#### 구현 단계
-
-1. `pdf2md/extractors/tables.py`의 multi-row header flattening, placeholder header, stub cell 경로를 정리한다.
-2. `RagTablePayload.records[]`에 `header_lineage` 또는 `column_header_path` 후보 필드를 설계한다.
-3. `pdf2md/serializers/rag_tables.py`와 `rag_technical_tables.py`가 새 header lineage를 보존하도록 확장한다.
-4. NVMe overwide/multi-row matrix fixture를 추가해 `Column N`만 남는 상황을 재현한다.
-5. 기존 schema/docs를 갱신한다.
-
-#### 검증 기준
-
-- `python -m pytest tests/test_tables.py tests/test_rag_tables.py tests/test_rag_technical_tables.py`
-- overwide/multi-row table 신규 fixture에서 `Column N`만으로는 손실되던 parent/child context가 sidecar metadata에 남는다.
-- Markdown body는 기존 HTML fallback 정책을 유지한다.
-- `git diff --check`
-
-#### 성공 조건
-
-- wide table의 RAG row가 검색/검증 가능한 header path를 가진다.
-- table confidence와 fallback reason이 더 구체적인 triage 정보를 제공한다.
-
 ### Q145. Security Spec Text-Derived Domain Candidate Layer
 
 #### 목표
@@ -183,4 +144,4 @@ TCG/SPDM/Caliptra 보안 스펙에서 표로 추출되지 않는 본문/목록/h
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q143 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q144 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

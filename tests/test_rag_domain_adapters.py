@@ -50,6 +50,25 @@ def test_nvme_domain_adapter_extracts_command_and_register_units() -> None:
                         "table_index": 1,
                         "row_index": 1,
                         "headers": ["Command", "Opcode", "Description"],
+                        "column_header_paths": [
+                            {
+                                "column_index": 1,
+                                "header": "Command",
+                                "path": ["Command Attributes", "Command"],
+                                "path_text": "Command Attributes / Command",
+                                "source": "multi_row_header",
+                                "placeholder": False,
+                            },
+                            {
+                                "column_index": 2,
+                                "header": "Opcode",
+                                "path": ["Command Attributes", "Opcode"],
+                                "path_text": "Command Attributes / Opcode",
+                                "source": "multi_row_header",
+                                "placeholder": False,
+                            },
+                        ],
+                        "column_placeholder_header_ratio": 0.0,
                         "cells": {"Command": "KV Store", "Opcode": "0x81", "Description": "Store a key value pair"},
                         "row_text": "Command = KV Store | Opcode = 0x81 | Description = Store a key value pair",
                         "bbox": [72.0, 120.0, 420.0, 150.0],
@@ -83,6 +102,8 @@ def test_nvme_domain_adapter_extracts_command_and_register_units() -> None:
     assert records[0]["source_refs"][0]["source_id"] == "page-0001-table-0001-row-0001"
     assert records[0]["source_refs"][1]["source_type"] == "technical_table_unit"
     assert records[0]["source_refs"][1]["source_id"] == "tech-table-000001"
+    assert records[0]["column_header_paths"][1]["path_text"] == "Command Attributes / Opcode"
+    assert records[0]["column_placeholder_header_ratio"] == 0.0
     assert records[1]["source_refs"][0]["source_id"] == "page-0001-table-0002-row-0001"
     assert records[0]["source_sha256"] == "f" * 64
     assert records[0]["source_dedupe_key"] == "page-0001-table-0001-row-0001|tech-table-000001"
