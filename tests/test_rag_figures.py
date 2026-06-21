@@ -11,7 +11,7 @@ from pdf2md.extractors.images import ImageExtractionResult
 from pdf2md.extractors.ocr import OcrResult
 from pdf2md.extractors.ocr_backends import OCRBackendMetadata, OCRBackendResult
 from pdf2md.extractors.tables import TableExtractionResult
-from pdf2md.models import ExcludedImageAsset, ImageAsset, ImageMode, RagSidecarScope, RagTableOutputMode
+from pdf2md.models import DomainAdapterMode, ExcludedImageAsset, ImageAsset, ImageMode, RagSidecarScope, RagTableOutputMode
 from pdf2md.serializers.rag_chunks import build_retrieval_chunks
 from pdf2md.serializers.rag_figure_semantics import (
     augment_figure_records_with_region_ocr,
@@ -23,6 +23,8 @@ from pdf2md.serializers.rag_ocr_evidence import build_region_ocr_evidence_record
 from scripts.validate_artifact_integrity import validate_artifact_integrity
 from scripts.validate_index_contract import validate_index_contract
 from scripts.validate_provenance_integrity import validate_provenance_integrity
+from scripts.validate_visual_sidecar_contract import validate_visual_sidecar_contract
+from tests.fixtures.pdf_builder import build_security_diagram_pdf
 
 
 class _FakeRegionImage:
@@ -778,3 +780,186 @@ def test_pipeline_writes_region_ocr_evidence_sidecar_without_markdown_pollution(
     assert validate_index_contract(output_dir=output_dir)["passed"] is True
     assert validate_provenance_integrity(output_dir=output_dir)["passed"] is True
     assert validate_artifact_integrity(output_dir=output_dir)["passed"] is True
+
+
+def test_security_visual_diagram_fixtures_emit_sidecars_without_markdown_pollution(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    cases = [
+        {
+            "name": "spdm",
+            "domain_adapter": DomainAdapterMode.SPDM,
+            "title": "SPDM Measurement Flow",
+            "caption": "Figure 1: SPDM sequence diagram for measurement exchange",
+            "diagram_lines": [
+                "Requester -> Responder: GET_MEASUREMENTS",
+                "Responder -> Requester: MEASUREMENTS",
+                "Requester -> Responder: CHALLENGE_AUTH",
+            ],
+            "ocr_text": "SPDMREQ1 SPDMRSP1",
+            "expected_figure_kind": "sequence_diagram",
+            "expected_structure_type": "sequence_diagram",
+            "expected_label": "SPDMREQ1",
+        },
+        {
+            "name": "tcg",
+            "domain_adapter": DomainAdapterMode.TCG,
+            "title": "TCG Storage Architecture",
+            "caption": "Figure 1: TCG storage architecture diagram",
+            "diagram_lines": [
+                "Host -> Security Provider: STARTSESSION",
+                "Locking SP -> Locking Range: READLOCKED",
+                "Authority -> Method: AUTHENTICATE",
+            ],
+            "ocr_text": "TCGAUTH1 LOCKING1",
+            "expected_figure_kind": "block_diagram",
+            "expected_structure_type": "block_diagram",
+            "expected_label": "TCGAUTH1",
+        },
+        {
+            "name": "caliptra",
+            "domain_adapter": DomainAdapterMode.CALIPTRA,
+            "title": "Caliptra RoT Block Diagram",
+            "caption": "Figure 1: Caliptra Root of Trust block diagram",
+            "diagram_lines": [
+                "SoC -> Caliptra RoT: mailbox command",
+                "Caliptra RoT -> DICE: derive identity",
+                "DPE -> Firmware: certificate chain",
+            ],
+            "ocr_text": "CALIPTRA1 DPE1",
+            "expected_figure_kind": "block_diagram",
+            "expected_structure_type": "block_diagram",
+            "expected_label": "CALIPTRA1",
+        },
+    ]
+
+    for case in cases:
+        input_pdf = tmp_path / f"{case['name']}-security-diagram.pdf"
+        output_dir = tmp_path / f"{case['name']}-out"
+        build_security_diagram_pdf(
+            input_pdf,
+            title=str(case["title"]),
+            caption=str(case["caption"]),
+            diagram_lines=list(case["diagram_lines"]),
+        )
+        monkeypatch.setattr(figure_semantics_module, "pdfium", _FakePdfium)
+        monkeypatch.setattr(
+            figure_semantics_module,
+            "get_ocr_backend",
+            lambda name, *, pytesseract_module, text=case["ocr_text"]: _FakeRegionOCRBackend(
+                text=str(text),
+                confidence="92",
+            ),
+        )
+
+        def fake_extract_images(*args, **kwargs):  # noqa: ANN002, ANN003
+            return ImageExtractionResult(
+                assets=[
+                    ImageAsset(
+                        page=1,
+                        index=1,
+                        path=f"assets/images/{case['name']}-security-diagram.png",
+                        caption_text=str(case["caption"]),
+                        caption_source="nearby_caption",
+                        caption_confidence=0.93,
+                        bbox=[72.0, 90.0, 520.0, 360.0],
+                        width=448,
+                        height=270,
+                        sha256=str(case["name"]) * 8,
+                        source="page_crop",
+                        crop_reason="captioned_security_diagram_fixture",
+                        anchor_line_index=1,
+                        anchor_top=90.0,
+                    )
+                ]
+            )
+
+        monkeypatch.setattr(pipeline_module, "extract_images", fake_extract_images)
+        monkeypatch.setattr(pipeline_module, "extract_tables", lambda *args, **kwargs: TableExtractionResult())
+        monkeypatch.setattr(pipeline_module, "run_ocr", lambda *args, **kwargs: OcrResult())
+
+        result = pipeline_module.run_conversion(
+            Config(
+                input_pdf=input_pdf,
+                output_dir=output_dir,
+                image_mode=ImageMode.PLACEHOLDER,
+                rag_table_output=RagTableOutputMode.JSONL,
+                rag_sidecar_scope=RagSidecarScope.FULL,
+                rag_profile="technical_spec_rag_visual",
+                domain_adapter=case["domain_adapter"],
+                keep_page_markers=True,
+                rag_figure_text_chunks=True,
+                figure_region_ocr=True,
+                rag_generated_figure_descriptions=True,
+                figure_structure_extraction=True,
+            )
+        )
+
+        assert result.exit_code == 0
+        figures = [
+            json.loads(line)
+            for line in (output_dir / "figures_rag.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        descriptions = [
+            json.loads(line)
+            for line in (output_dir / "figure_descriptions_rag.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        structures = [
+            json.loads(line)
+            for line in (output_dir / "figure_structures_rag.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        ocr_evidence = [
+            json.loads(line)
+            for line in (output_dir / "figure_ocr_evidence_rag.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        retrieval_chunks = [
+            json.loads(line)
+            for line in (output_dir / "retrieval_chunks_rag.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        markdown = (output_dir / "document.md").read_text(encoding="utf-8")
+        report = json.loads((output_dir / "report.json").read_text(encoding="utf-8"))
+
+        assert figures[0]["figure_kind"] == case["expected_figure_kind"]
+        assert figures[0]["diagram_candidate"] is True
+        assert case["expected_label"] in figures[0]["detected_labels"]
+        assert figures[0]["figure_region_ocr"]["region_ocr"]["candidate"]["text"] == case["ocr_text"]
+        assert ocr_evidence[0]["target_type"] == "figure"
+        assert ocr_evidence[0]["status"] == "accepted"
+        assert ocr_evidence[0]["ocr_text"] == case["ocr_text"]
+        assert ocr_evidence[0]["report_only"] is True
+        assert ocr_evidence[0]["text_replaced"] is False
+        assert ocr_evidence[0]["markdown_inserted"] is False
+        assert descriptions[0]["generated_text"] is True
+        assert descriptions[0]["generated_content_scope"] == "sidecar_only"
+        assert descriptions[0]["markdown_inserted"] is False
+        assert descriptions[0]["source_refs"][0]["source_id"] == figures[0]["figure_id"]
+        assert case["expected_label"] in descriptions[0]["observed_text"]["detected_labels"]
+        assert structures[0]["structure_type"] == case["expected_structure_type"]
+        assert structures[0]["review_required"] is True
+        assert structures[0]["source_refs"][0]["source_id"] == figures[0]["figure_id"]
+        assert case["expected_label"] in {node["label"] for node in structures[0]["nodes"]}
+        chunk_types = {chunk["chunk_type"] for chunk in retrieval_chunks}
+        assert {"figure_text", "figure_description", "figure_structure"}.issubset(chunk_types)
+        description_chunk = next(chunk for chunk in retrieval_chunks if chunk["chunk_type"] == "figure_description")
+        structure_chunk = next(chunk for chunk in retrieval_chunks if chunk["chunk_type"] == "figure_structure")
+        assert {ref["source_type"] for ref in description_chunk["source_refs"]} == {
+            "figure",
+            "figure_description",
+        }
+        assert {ref["source_type"] for ref in structure_chunk["source_refs"]} == {"figure", "figure_structure"}
+        assert "Generated figure description (context-only)." not in markdown
+        assert "figure_structure:" not in markdown
+        assert case["ocr_text"] not in markdown
+        assert report["summary"]["figure_ocr_evidence_record_count"] == 1
+        assert report["summary"]["figure_description_record_count"] == 1
+        assert report["summary"]["figure_structure_record_count"] == 1
+        assert validate_visual_sidecar_contract(output_dir, require_visual_sidecars=True)["passed"] is True
+        assert validate_index_contract(output_dir=output_dir)["passed"] is True
+        assert validate_provenance_integrity(output_dir=output_dir)["passed"] is True
+        assert validate_artifact_integrity(output_dir=output_dir)["passed"] is True

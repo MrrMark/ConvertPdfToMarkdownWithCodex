@@ -383,6 +383,71 @@ def test_retrieval_chunks_can_include_assetless_figure_text_chunks() -> None:
     assert "observed_caption" in chunk["chunk_boundary_reasons"]
 
 
+def test_retrieval_chunks_link_security_visual_semantics_to_sidecar_sources() -> None:
+    figure = {
+        "figure_id": "page-0001-figure-0001",
+        "page": 1,
+        "figure_index": 1,
+        "bbox": [72.0, 120.0, 420.0, 320.0],
+        "caption_text": "Figure 1: SPDM sequence diagram",
+        "caption_confidence": 0.91,
+        "heading_path": ["SPDM Measurement Flow"],
+        "figure_kind": "sequence_diagram",
+        "diagram_candidate": True,
+        "detected_labels": ["SPDMREQ1", "SPDMRSP1"],
+        "nearby_text_refs": [],
+        "source_refs": [{"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1}],
+    }
+    description = {
+        "description_id": "figure-description-000001",
+        "description_index": 1,
+        "figure_id": "page-0001-figure-0001",
+        "page": 1,
+        "bbox": [72.0, 120.0, 420.0, 320.0],
+        "heading_path": ["SPDM Measurement Flow"],
+        "text": "Generated figure description (context-only).\nDetected labels: SPDMREQ1 | SPDMRSP1",
+        "generated_text": True,
+        "generation_strategy": "deterministic_context_summary",
+        "source_refs": [{"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1}],
+    }
+    structure = {
+        "structure_id": "figure-structure-000001",
+        "structure_index": 1,
+        "figure_id": "page-0001-figure-0001",
+        "page": 1,
+        "bbox": [72.0, 120.0, 420.0, 320.0],
+        "heading_path": ["SPDM Measurement Flow"],
+        "text": "figure_structure: sequence_diagram\nnodes_or_labels: SPDMREQ1 | SPDMRSP1",
+        "generated_text": False,
+        "derived_from_context": True,
+        "source_refs": [{"source_type": "figure", "source_id": "page-0001-figure-0001", "page": 1}],
+    }
+
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        figure_records=[figure],
+        figure_description_records=[description],
+        figure_structure_records=[structure],
+        include_figure_text_chunks=True,
+        source_sha256="f" * 64,
+    )
+
+    assert [chunk["chunk_type"] for chunk in chunks] == ["figure_text", "figure_description", "figure_structure"]
+    description_chunk = chunks[1]
+    structure_chunk = chunks[2]
+    assert description_chunk["generated_text"] is True
+    assert structure_chunk["derived_from_context"] is True
+    assert {ref["source_type"] for ref in description_chunk["source_refs"]} == {"figure", "figure_description"}
+    assert {ref["source_type"] for ref in structure_chunk["source_refs"]} == {"figure", "figure_structure"}
+    assert description_chunk["semantic_types"] == ["figure_description", "generated_text"]
+    assert structure_chunk["semantic_types"] == ["context_derived", "figure_structure"]
+    assert "figure_description_boundary" in description_chunk["chunk_boundary_reasons"]
+    assert "figure_structure_boundary" in structure_chunk["chunk_boundary_reasons"]
+
+
 def test_retrieval_chunks_skip_captionless_low_confidence_figure_diagnostics() -> None:
     figure_records = [
         {

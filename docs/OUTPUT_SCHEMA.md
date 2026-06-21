@@ -420,6 +420,7 @@ Policy:
 
 - OCR evidence must cite the target figure through `source_refs` and must not replace Markdown/source text.
 - Generated figure descriptions must set `generated_text=true`, remain `generated_content_scope="sidecar_only"`, and keep `markdown_inserted=false`.
+- `technical_spec_rag_visual` security diagram fixtures cover SPDM sequence diagrams, TCG architecture diagrams, and Caliptra RoT/block diagrams with the same sidecar-only generated/derived text policy.
 - The report is validation metadata only. It must not include raw figure captions, OCR text, generated descriptions, raw PDF text, full Markdown body, or image bytes.
 
 ## debug/table-quality-review-pack.json
