@@ -97,6 +97,11 @@ CHUNK_CONTEXT_METADATA_FIELDS = (
     "error_class",
     "retry_hint",
     "relationship_hints",
+    "candidate_status",
+    "candidate_kind",
+    "review_required",
+    "review_reasons",
+    "source_text_span",
 )
 TokenCounter = Callable[[str], int]
 
@@ -644,6 +649,8 @@ def _technical_table_retrieval_priority(record: dict[str, Any]) -> int:
 
 
 def _domain_unit_retrieval_priority(record: dict[str, Any]) -> int:
+    if record.get("candidate_status") == "review_only":
+        return 58
     unit_type = str(record.get("unit_type") or "")
     if record.get("domain") == "ocp" and unit_type == "requirement":
         family = str(_record_metadata_value(record, "requirement_family") or "")
@@ -700,6 +707,10 @@ def _contextual_embedding_text(chunk_type: str, text: str, record: dict[str, Any
         ("Error class", "error_class"),
         ("Retry hint", "retry_hint"),
         ("Relationship hints", "relationship_hints"),
+        ("Candidate status", "candidate_status"),
+        ("Candidate kind", "candidate_kind"),
+        ("Review reasons", "review_reasons"),
+        ("Source text span", "source_text_span"),
     ):
         _append_metadata_context(context_parts, record, label, field)
     if not context_parts:
@@ -1061,6 +1072,13 @@ def build_retrieval_chunks(
         text = str(record.get("text") or "").strip()
         if not text:
             continue
+        unit_type = str(record.get("unit_type") or "domain_unit")
+        is_review_only = record.get("candidate_status") == "review_only"
+        semantic_types = [unit_type]
+        boundary_reasons = ["domain_unit_boundary"]
+        if is_review_only:
+            semantic_types.extend(["review_only", str(record.get("candidate_kind") or "domain_candidate")])
+            boundary_reasons.append("review_only_domain_candidate")
         append_chunk(
             chunk_type="domain_unit",
             text=text,
@@ -1076,10 +1094,10 @@ def build_retrieval_chunks(
             page_range=_page_range_from_record(record),
             bbox=_bbox(record),
             heading_path=_heading_path(record),
-            semantic_types=[str(record.get("unit_type") or "domain_unit")],
+            semantic_types=semantic_types,
             normative_strength=None,
             retrieval_priority=_domain_unit_retrieval_priority(record),
-            boundary_reasons=["domain_unit_boundary"],
+            boundary_reasons=boundary_reasons,
             chunk_group_id=f"domain-{record.get('domain') or 'unknown'}",
             embedding_text=_contextual_embedding_text("domain_unit", text, record)
             if contextual_embedding_text

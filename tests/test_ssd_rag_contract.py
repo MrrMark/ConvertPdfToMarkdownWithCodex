@@ -92,6 +92,53 @@ def test_ssd_rag_contract_accepts_tcg_first_class_spec_type(tmp_path: Path) -> N
     assert report["sample_mapped_chunk"]["metadata"]["source_sha256"] == source_sha256
 
 
+def test_ssd_rag_contract_does_not_treat_review_only_domain_candidates_as_confirmed_units(
+    tmp_path: Path,
+) -> None:
+    source_sha256 = "c" * 64
+    candidates = build_domain_units(
+        domain_adapter=DomainAdapterMode.TCG,
+        rag_tables=[],
+        technical_table_records=[],
+        text_block_records=[
+            {
+                "block_id": "page-0001-block-0001",
+                "page": 1,
+                "block_index": 1,
+                "block_type": "paragraph",
+                "text": "The LockingSP controls locking range access.",
+                "bbox": [72.0, 100.0, 320.0, 118.0],
+                "heading_path": ["TCG Locking"],
+            }
+        ],
+        source_sha256=source_sha256,
+    )
+    candidates[0]["normalized_fields"] = {"candidate_status": "review_only"}
+
+    _write_jsonl(tmp_path / "retrieval_chunks_rag.jsonl", [])
+    _write_jsonl(tmp_path / "requirements_rag.jsonl", [])
+    _write_jsonl(tmp_path / "technical_tables_rag.jsonl", [])
+    _write_jsonl(tmp_path / "tables_rag.jsonl", [])
+    _write_jsonl(tmp_path / "domain_units_rag.jsonl", candidates)
+    _write_jsonl(tmp_path / "cross_refs_rag.jsonl", [])
+    _write_jsonl(tmp_path / "figures_rag.jsonl", [])
+
+    report = validate_ssd_rag_contract(
+        output_dir=tmp_path,
+        ssd_agent_domain="HIL",
+        ssd_agent_spec_type="TCG",
+        domain_adapter="tcg",
+        document_id="TCG_DOC",
+        source_sha256=source_sha256,
+    )
+
+    codes = {error["code"] for error in report["errors"]}
+    assert report["passed"] is False
+    assert "empty_confirmed_domain_units" in codes
+    assert "missing_tcg_security_unit" in codes
+    assert "missing_adapter_required_normalized_field" not in codes
+
+
 def test_ssd_rag_contract_accepts_spdm_first_class_spec_type(tmp_path: Path) -> None:
     source_sha256 = "b" * 64
     _write_jsonl(

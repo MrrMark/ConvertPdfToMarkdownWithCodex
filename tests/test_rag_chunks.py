@@ -118,6 +118,47 @@ def test_retrieval_chunks_include_text_semantic_requirement_and_table_provenance
     assert json.loads(jsonl.splitlines()[1])["normative_strength"] == "required"
 
 
+def test_retrieval_chunks_keep_review_only_domain_candidates_low_priority() -> None:
+    domain_candidate = {
+        "domain_unit_id": "domain-spdm-000001",
+        "domain_unit_index": 1,
+        "domain": "spdm",
+        "unit_type": "spdm_measurement",
+        "candidate_status": "review_only",
+        "candidate_kind": "spdm_measurement_text",
+        "review_required": True,
+        "review_reasons": ["text_derived_candidate", "not_table_provenance"],
+        "text": "SPDM GET_MEASUREMENTS message flow",
+        "normalized_fields": {
+            "source_text_span": "GET_MEASUREMENTS",
+            "candidate_status": "review_only",
+            "candidate_kind": "spdm_measurement_text",
+        },
+        "source_refs": [{"source_type": "text_block", "source_id": "page-0001-block-0001", "page": 1}],
+        "page_range": [1, 1],
+        "bbox": [72.0, 72.0, 300.0, 90.0],
+        "heading_path": ["SPDM Messages"],
+    }
+
+    chunks = build_retrieval_chunks(
+        text_block_records=[],
+        semantic_units=[],
+        requirements=[],
+        rag_tables=[],
+        domain_units=[domain_candidate],
+        source_sha256="b" * 64,
+        contextual_embedding_text=True,
+    )
+
+    assert chunks[0]["chunk_type"] == "domain_unit"
+    assert chunks[0]["retrieval_priority"] == 58
+    assert chunks[0]["semantic_types"] == ["review_only", "spdm_measurement", "spdm_measurement_text"]
+    assert chunks[0]["chunk_boundary_reasons"] == ["domain_unit_boundary", "review_only_domain_candidate"]
+    assert chunks[0]["context_metadata"]["candidate_status"] == "review_only"
+    assert chunks[0]["context_metadata"]["source_text_span"] == "GET_MEASUREMENTS"
+    assert "Candidate status: review_only" in chunks[0]["embedding_text"]
+
+
 def test_retrieval_chunks_include_traceability_and_technical_table_units() -> None:
     trace = {
         "trace_id": "req-trace-000001",

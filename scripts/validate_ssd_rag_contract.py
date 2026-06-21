@@ -104,6 +104,14 @@ NVME_NORMALIZED_FIELD_REQUIREMENTS = {
 STABLE_METADATA_FIELDS = ("source_sha256", "source_dedupe_key", "stable_source_id", "stable_requirement_seed")
 
 
+def _is_review_only_domain_candidate(record: dict[str, Any]) -> bool:
+    return record.get("candidate_status") == "review_only"
+
+
+def _confirmed_domain_units(domain_units: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [record for record in domain_units if not _is_review_only_domain_candidate(record)]
+
+
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise FileNotFoundError(str(path))
@@ -241,6 +249,8 @@ def _validate_nvme_domain_units(domain_units: list[dict[str, Any]], *, errors: l
             message="NVMe domain output must include at least one command, log_page, feature, or register_field unit.",
         )
     for index, record in enumerate(domain_units, start=1):
+        if _is_review_only_domain_candidate(record):
+            continue
         unit_type = str(record.get("unit_type") or "")
         normalized_fields = record.get("normalized_fields")
         path = f"domain_units_rag.jsonl[{index}]"
@@ -266,6 +276,8 @@ def _validate_ocp_domain_units(domain_units: list[dict[str, Any]], *, errors: li
             message="OCP domain output must include at least one requirement unit.",
         )
     for index, record in enumerate(domain_units, start=1):
+        if _is_review_only_domain_candidate(record):
+            continue
         path = f"domain_units_rag.jsonl[{index}]"
         if record.get("unit_type") != "requirement":
             continue
@@ -322,6 +334,7 @@ def _validate_domain_adapter_registry_metadata(
 
     for index, record in enumerate(domain_units, start=1):
         path = f"domain_units_rag.jsonl[{index}]"
+        review_only = _is_review_only_domain_candidate(record)
         unit_type = str(record.get("unit_type") or "")
         if unit_type and unit_type not in spec.unit_taxonomy:
             _add_issue(
@@ -398,7 +411,7 @@ def _validate_domain_adapter_registry_metadata(
                 code="invalid_adapter_required_normalized_fields",
                 message="adapter_metadata.required_normalized_fields must be a list.",
             )
-        elif required_fields:
+        elif required_fields and not review_only:
             if not isinstance(normalized_fields, dict):
                 _add_issue(
                     errors,
@@ -531,6 +544,7 @@ def validate_ssd_rag_contract(
     tables = _optional_jsonl(output_dir / "tables_rag.jsonl")
     technical_tables = _optional_jsonl(output_dir / "technical_tables_rag.jsonl")
     domain_units = _optional_jsonl(output_dir / "domain_units_rag.jsonl")
+    confirmed_domain_units = _confirmed_domain_units(domain_units)
     requirement_traceability = _optional_jsonl(output_dir / "requirement_traceability_rag.jsonl")
     if require_tables:
         _validate_table_rows(
@@ -552,6 +566,13 @@ def validate_ssd_rag_contract(
     if require_domain_units and adapter:
         if not domain_units:
             _add_issue(errors, path="domain_units_rag.jsonl", code="empty_domain_units", message="Expected domain unit records.")
+        elif not confirmed_domain_units:
+            _add_issue(
+                errors,
+                path="domain_units_rag.jsonl",
+                code="empty_confirmed_domain_units",
+                message="Only review-only domain candidates were found; expected confirmed domain unit records.",
+            )
         for index, record in enumerate(domain_units, start=1):
             path = f"domain_units_rag.jsonl[{index}]"
             if record.get("domain") != adapter:
@@ -566,14 +587,18 @@ def validate_ssd_rag_contract(
             errors=errors,
             warnings=warnings,
         )
-        if adapter == "tcg" and domain_units and not any(record.get("unit_type") in TCG_DOMAIN_UNIT_TYPES for record in domain_units):
+        if adapter == "tcg" and domain_units and not any(
+            record.get("unit_type") in TCG_DOMAIN_UNIT_TYPES for record in confirmed_domain_units
+        ):
             _add_issue(
                 errors,
                 path="domain_units_rag.jsonl",
                 code="missing_tcg_security_unit",
                 message="TCG domain output must include at least one security unit.",
             )
-        if adapter == "spdm" and domain_units and not any(record.get("unit_type") in SPDM_DOMAIN_UNIT_TYPES for record in domain_units):
+        if adapter == "spdm" and domain_units and not any(
+            record.get("unit_type") in SPDM_DOMAIN_UNIT_TYPES for record in confirmed_domain_units
+        ):
             _add_issue(
                 errors,
                 path="domain_units_rag.jsonl",
@@ -581,7 +606,7 @@ def validate_ssd_rag_contract(
                 message="SPDM domain output must include at least one SPDM security unit.",
             )
         if adapter == "caliptra" and domain_units and not any(
-            record.get("unit_type") in CALIPTRA_DOMAIN_UNIT_TYPES for record in domain_units
+            record.get("unit_type") in CALIPTRA_DOMAIN_UNIT_TYPES for record in confirmed_domain_units
         ):
             _add_issue(
                 errors,
@@ -590,9 +615,9 @@ def validate_ssd_rag_contract(
                 message="Caliptra domain output must include at least one Caliptra security unit.",
             )
         if adapter == "nvme":
-            _validate_nvme_domain_units(domain_units, errors=errors)
+            _validate_nvme_domain_units(confirmed_domain_units, errors=errors)
         if adapter == "ocp":
-            _validate_ocp_domain_units(domain_units, errors=errors)
+            _validate_ocp_domain_units(confirmed_domain_units, errors=errors)
 
     if adapter == "nvme":
         _validate_nvme_technical_tables(technical_tables, errors=errors)

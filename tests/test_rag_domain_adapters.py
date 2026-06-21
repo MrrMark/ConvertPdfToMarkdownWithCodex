@@ -137,6 +137,83 @@ def test_nvme_domain_adapter_extracts_command_and_register_units() -> None:
     assert json.loads(jsonl.splitlines()[0])["domain"] == "nvme"
 
 
+def test_security_text_domain_candidates_are_review_only_and_source_derived() -> None:
+    text_blocks = [
+        {
+            "block_id": "page-0001-block-0001",
+            "page": 1,
+            "block_index": 1,
+            "block_type": "heading",
+            "text": "SPDM GET_MEASUREMENTS message flow",
+            "bbox": [72.0, 72.0, 300.0, 90.0],
+            "heading_path": ["SPDM GET_MEASUREMENTS message flow"],
+        },
+        {
+            "block_id": "page-0002-block-0001",
+            "page": 2,
+            "block_index": 1,
+            "block_type": "paragraph",
+            "text": "The LockingSP authority controls locking range access.",
+            "bbox": [72.0, 112.0, 360.0, 130.0],
+            "heading_path": ["TCG Storage"],
+        },
+        {
+            "block_id": "page-0003-block-0001",
+            "page": 3,
+            "block_index": 1,
+            "block_type": "list",
+            "text": "Caliptra mailbox command GET_IDEV_CERT returns certificate evidence.",
+            "bbox": [72.0, 152.0, 420.0, 170.0],
+            "heading_path": ["Caliptra RoT"],
+        },
+    ]
+
+    spdm_records = build_domain_units(
+        domain_adapter=DomainAdapterMode.SPDM,
+        rag_tables=[],
+        technical_table_records=[],
+        text_block_records=text_blocks,
+        source_sha256="1" * 64,
+    )
+    tcg_records = build_domain_units(
+        domain_adapter=DomainAdapterMode.TCG,
+        rag_tables=[],
+        technical_table_records=[],
+        text_block_records=text_blocks,
+        source_sha256="2" * 64,
+    )
+    caliptra_records = build_domain_units(
+        domain_adapter=DomainAdapterMode.CALIPTRA,
+        rag_tables=[],
+        technical_table_records=[],
+        text_block_records=text_blocks,
+        source_sha256="3" * 64,
+    )
+
+    spdm = spdm_records[0]
+    assert spdm["candidate_status"] == "review_only"
+    assert spdm["candidate_kind"] == "spdm_measurement_text"
+    assert spdm["review_required"] is True
+    assert spdm["text"] == "SPDM GET_MEASUREMENTS message flow"
+    assert spdm["description"] == ""
+    assert spdm["normalized_fields"]["source_text_span"] == "GET_MEASUREMENTS"
+    assert spdm["source_refs"] == [
+        {
+            "source_type": "text_block",
+            "source_id": "page-0001-block-0001",
+            "page": 1,
+            "bbox": [72.0, 72.0, 300.0, 90.0],
+        }
+    ]
+    assert "not_table_provenance" in spdm["review_reasons"]
+    assert len(spdm["stable_source_id"]) == 40
+
+    assert tcg_records[0]["candidate_kind"] == "tcg_locking_range_text"
+    assert tcg_records[0]["normalized_fields"]["source_text_span"] == "locking range"
+    assert caliptra_records[0]["candidate_kind"] == "caliptra_mailbox_text"
+    assert caliptra_records[0]["normalized_fields"]["source_text_span"] == "mailbox command"
+
+
 def test_nvme_domain_adapter_populates_expanded_normalized_fields() -> None:
     rag_tables = normalize_rag_table_payload(
         [

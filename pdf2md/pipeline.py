@@ -1493,6 +1493,7 @@ def _run_conversion_impl(
                 domain_adapter=domain_adapter,
                 rag_tables=contextual_rag_tables,
                 technical_table_records=technical_table_records,
+                text_block_records=text_block_records,
                 manual_adapter_label=config.manual_domain_adapter_label,
                 manual_adapter_keywords=config.manual_domain_adapter_keywords,
                 source_sha256=source_sha256,
