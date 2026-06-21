@@ -203,7 +203,7 @@ class ConversionJournal:
         self.remember_warnings(result.warnings)
         if result.report is not None:
             self.failed_pages.update(result.report.failed_pages)
-        self.write_state(status=result.status.value)
+        self.write_state(status=result.status.value, include_artifacts=True)
 
     def mark_failure(self, warning: WarningEntry) -> None:
         self.last_warning_code = warning.code
@@ -215,7 +215,7 @@ class ConversionJournal:
             return None
         return max(self.completed_pages)
 
-    def artifacts_written(self) -> list[str]:
+    def _scan_artifacts_written(self) -> list[str]:
         if not self.config.output_dir.exists():
             return []
         artifacts: list[str] = []
@@ -224,6 +224,9 @@ class ConversionJournal:
                 continue
             artifacts.append(path.relative_to(self.config.output_dir).as_posix())
         return sorted(artifacts)
+
+    def artifacts_written(self) -> list[str]:
+        return self._scan_artifacts_written()
 
     def interrupted_summary_extras(self) -> dict[str, object]:
         return {
@@ -235,7 +238,7 @@ class ConversionJournal:
             "resume_hint": self.resume_hint,
         }
 
-    def write_state(self, *, status: str = "running") -> None:
+    def write_state(self, *, status: str = "running", include_artifacts: bool = False) -> None:
         now = datetime.now(timezone.utc)
         payload = ConversionState(
             input_file=self._public_input_file(),
@@ -250,7 +253,7 @@ class ConversionJournal:
             completed_pages=sorted(self.completed_pages),
             failed_pages=sorted(self.failed_pages),
             skipped_pages=sorted(self.skipped_pages),
-            artifacts_written=self.artifacts_written(),
+            artifacts_written=self.artifacts_written() if include_artifacts else [],
             stage_durations_ms=dict(sorted(self.stage_durations_ms.items())),
             last_warning_code=self.last_warning_code,
         )
@@ -2057,7 +2060,7 @@ def _build_interrupted_conversion_result(
     write_json(report_path, serialize_report(report))
     if config.confidential_safe_mode:
         write_json(config.output_dir / config.sanitized_report_filename, serialize_report(report))
-    journal.write_state(status=status_label)
+    journal.write_state(status=status_label, include_artifacts=True)
 
     markdown_path = config.output_dir / config.markdown_filename
     manifest_path = config.output_dir / config.manifest_filename

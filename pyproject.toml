@@ -67,6 +67,7 @@ select = [
   "F63",
   "F7",
   "F82",
+  "SIM",
 ]
 
 [tool.ruff.format]

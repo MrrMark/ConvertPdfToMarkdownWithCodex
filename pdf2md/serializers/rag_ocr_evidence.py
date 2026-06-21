@@ -209,9 +209,7 @@ def _table_region_ocr_eligible(table: dict[str, Any]) -> bool:
     if not isinstance(records, list) or not records:
         return False
     source_mode = str(table.get("source_mode") or "").strip().lower()
-    if source_mode in TABLE_OCR_SOURCE_MODES:
-        return True
-    return False
+    return source_mode in TABLE_OCR_SOURCE_MODES
 
 
 def _table_region_ocr_records(

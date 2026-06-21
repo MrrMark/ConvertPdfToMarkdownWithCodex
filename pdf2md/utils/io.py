@@ -22,6 +22,14 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     )
 
 
+def write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
+    """Write JSONL records without materializing the entire sidecar string."""
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False))
+            handle.write("\n")
+
+
 def validate_output_bundle(
     output_dir: Path,
     *,

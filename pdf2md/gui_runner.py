@@ -9,6 +9,7 @@ import os
 import platform
 import shutil
 import sys
+from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Sequence
@@ -504,10 +505,8 @@ def _tk_window_diagnostic(
         )
     finally:
         if root is not None and hasattr(root, "destroy"):
-            try:
+            with suppress(Exception):  # noqa: BLE001
                 root.destroy()
-            except Exception:  # noqa: BLE001
-                pass
     return GuiDiagnostic(
         code="tk_window_available",
         severity="info",

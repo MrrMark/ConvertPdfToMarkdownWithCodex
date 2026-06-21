@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
@@ -104,10 +105,8 @@ def save_gui_recent_state(
 def clear_gui_recent_state(path: Path | None = None) -> GuiRecentState:
     """Remove persisted GUI recent-path state if it exists and return empty state."""
     state_path = path or default_gui_state_path()
-    try:
+    with suppress(FileNotFoundError):
         state_path.unlink()
-    except FileNotFoundError:
-        pass
     return GuiRecentState()
 
 

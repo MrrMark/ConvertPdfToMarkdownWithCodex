@@ -955,9 +955,7 @@ def _candidate_allows_adaptive_strategy_skip(candidate: TableExtractionCandidate
         return False
     if _placeholder_header_ratio(candidate.diagnostics.headers) > TABLE_ADAPTIVE_MAX_PLACEHOLDER_HEADER_RATIO:
         return False
-    if set(candidate.decision.reasons) & TABLE_ADAPTIVE_BLOCKING_REASONS:
-        return False
-    return True
+    return not (set(candidate.decision.reasons) & TABLE_ADAPTIVE_BLOCKING_REASONS)
 
 
 def _can_skip_fallback_table_strategies(default_candidates: list[TableExtractionCandidate]) -> bool:
