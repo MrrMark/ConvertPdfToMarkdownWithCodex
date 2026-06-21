@@ -23,45 +23,8 @@
 
 ## 현재 Active Development Specs
 
-### Q147. Security Visual Sidecar Fixture Coverage
-
-#### 목표
-
-`technical_spec_rag_visual`의 visual sidecar 품질을 security spec 관점에서 검증한다. SPDM sequence diagram, TCG architecture diagram, Caliptra RoT/block diagram처럼 그림 자체가 검색/검증 단서인 문서에서 figure text/region OCR/description/structure sidecar 계약을 방어한다.
-
-#### 범위
-
-- security diagram fixture를 추가한다.
-- `figures_rag.jsonl`, `figure_ocr_evidence_rag.jsonl`, `figure_descriptions_rag.jsonl`, `figure_structures_rag.jsonl`, `retrieval_chunks_rag.jsonl` linkage를 검증한다.
-- generated description은 opt-in이고 sidecar-only라는 계약을 재검증한다.
-- Markdown 본문에는 생성 설명을 넣지 않는다.
-
-#### 제외 범위
-
-- 외부 VLM/API 호출
-- 생성 설명을 authoritative text로 취급
-- 이미지 자체를 repo에 대량 추가
-
-#### 구현 단계
-
-1. 기존 figure semantics/visual sidecar tests와 schema validator를 확인한다.
-2. `tests/fixtures/pdf_builder.py` 또는 작은 deterministic image fixture로 security diagram page를 만든다.
-3. `technical_spec_rag_visual + domain_adapter=spdm|tcg|caliptra` smoke 변환 테스트를 추가한다.
-4. visual sidecar validator가 security diagram fixture의 source linkage와 generated-text flags를 확인하도록 보강한다.
-5. docs/OUTPUT_SCHEMA.md와 RAG recipe에 security visual fixture coverage를 기록한다.
-
-#### 검증 기준
-
-- `python -m pytest tests/test_rag_figures.py tests/test_visual_sidecar_contract.py tests/test_rag_chunks.py`
-- generated figure description이 Markdown body에 들어가지 않는다.
-- visual sidecar source refs와 retrieval chunk refs가 validator를 통과한다.
-- `git diff --check`
-
-#### 성공 조건
-
-- security spec diagram이 text/table-only path보다 더 검색 가능한 visual evidence를 제공한다.
-- generated/derived visual text와 observed/source text가 명확히 구분된다.
+현재 active 개발 명세 없음.
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q146 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q147 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

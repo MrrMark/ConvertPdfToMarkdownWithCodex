@@ -99,6 +99,86 @@ def test_validate_visual_sidecar_contract_accepts_linked_bundle(tmp_path: Path) 
     assert report["findings"] == []
 
 
+def test_validate_visual_sidecar_contract_accepts_security_diagram_bundle_without_raw_text(tmp_path: Path) -> None:
+    output_dir = tmp_path / "security-out"
+    output_dir.mkdir(parents=True)
+    figure_ref = _figure_source_ref("page-0001-figure-0001")
+    _write_json(
+        output_dir / "manifest.json",
+        {"options": {"rag_profile": "technical_spec_rag_visual", "domain_adapter": "spdm"}},
+    )
+    _write_json(output_dir / "report.json", {"summary": {"warning_count": 0}})
+    _write_jsonl(
+        output_dir / "figures_rag.jsonl",
+        [
+            {
+                "figure_id": "page-0001-figure-0001",
+                "page": 1,
+                "bbox": [10, 20, 30, 40],
+                "figure_kind": "sequence_diagram",
+                "caption": "SPDM confidential fixture text",
+            }
+        ],
+    )
+    _write_jsonl(
+        output_dir / "page_layout_rag.jsonl",
+        [
+            {
+                "layout_id": "layout-page-0001",
+                "page": 1,
+                "region_refs": [figure_ref],
+                "region_ref_count": 1,
+            }
+        ],
+    )
+    _write_jsonl(
+        output_dir / "figure_ocr_evidence_rag.jsonl",
+        [
+            {
+                "evidence_id": "ocr-0001",
+                "target_type": "figure",
+                "target_id": "page-0001-figure-0001",
+                "source_refs": [figure_ref],
+                "ocr_text": "SPDMREQ1 SPDMRSP1",
+                "text_replaced": False,
+                "markdown_inserted": False,
+            }
+        ],
+    )
+    _write_jsonl(
+        output_dir / "figure_descriptions_rag.jsonl",
+        [
+            {
+                "description_id": "description-0001",
+                "figure_id": "page-0001-figure-0001",
+                "source_refs": [figure_ref],
+                "generated_text": True,
+                "generated_content_scope": "sidecar_only",
+                "markdown_inserted": False,
+            }
+        ],
+    )
+    _write_jsonl(
+        output_dir / "figure_structures_rag.jsonl",
+        [
+            {
+                "structure_id": "structure-0001",
+                "figure_id": "page-0001-figure-0001",
+                "source_refs": [figure_ref],
+                "generated_text": False,
+            }
+        ],
+    )
+
+    report = validate_visual_sidecar_contract(output_dir, require_visual_sidecars=True)
+
+    assert report["passed"] is True
+    assert report["summary"]["figure_ocr_evidence_record_count"] == 1
+    assert report["summary"]["figure_description_record_count"] == 1
+    assert report["summary"]["figure_structure_record_count"] == 1
+    assert "SPDMREQ1" not in json.dumps(report, ensure_ascii=False, sort_keys=True)
+
+
 def test_validate_visual_sidecar_contract_rejects_generated_markdown_insertion(tmp_path: Path) -> None:
     output_dir = tmp_path / "out"
     output_dir.mkdir()

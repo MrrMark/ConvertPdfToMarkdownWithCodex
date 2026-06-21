@@ -251,6 +251,27 @@ def build_layout_stress_pdf(path: Path) -> None:
     )
 
 
+def build_security_diagram_pdf(path: Path, *, title: str, caption: str, diagram_lines: list[str]) -> None:
+    """Build a one-page security-spec diagram fixture with source text near the figure region."""
+    texts = [
+        PositionedText(title, 72, 790, 14),
+        PositionedText(caption, 72, 748, 10),
+    ]
+    texts.extend(
+        PositionedText(line, 96, 710 - index * 24, 10, font_resource="F2")
+        for index, line in enumerate(diagram_lines)
+    )
+    graphics = [
+        "1 w 72 490 448 250 re S",
+        "0.75 w 112 640 120 44 re S",
+        "0.75 w 352 640 120 44 re S",
+        "112 612 m 472 612 l S",
+        "112 588 m 472 588 l S",
+        "112 564 m 472 564 l S",
+    ]
+    write_pdf(path, [PageSpec(texts=texts, graphics=graphics)])
+
+
 def build_repeated_header_footer_pdf(path: Path) -> None:
     pages = [
         PageSpec(

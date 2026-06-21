@@ -121,12 +121,14 @@ def test_ssd_security_spec_contract_is_documented() -> None:
     assert "security_domain_unit_counts" in output_schema
     assert "domain_adapter=spdm`, `tcg`, `pcie`, or `caliptra`" in output_schema
     assert "caliptra_asset" in output_schema
+    assert "SPDM sequence diagrams, TCG architecture diagrams, and Caliptra RoT/block diagrams" in output_schema
     assert "run_latest_ssd_security_spec_benchmark.py" in rag_recipes
     assert "--spec-document-type spdm-storage-binding" in rag_recipes
     assert "--spec-document-type caliptra" in rag_recipes
     assert "DSP0274` SPDM 1.4.0" in rag_recipes
     assert "DSP0286` SPDM to Storage Binding 1.0.0" in rag_recipes
     assert "https://spec.caliptra.io/" in rag_recipes
+    assert "SPDM sequence diagram, TCG architecture diagram, Caliptra RoT/block diagram" in rag_recipes
     assert "latest_ssd_security_spec_benchmark_scorecard.md" in rag_recipes
     assert "Q134. Latest SSD Security Spec Benchmark Evidence Path" in implemented_specs
     assert "Q135. Caliptra Security Spec Adapter And Evidence Path" in implemented_specs
@@ -509,8 +511,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q144. Wide Technical Table Header Semantics" not in next_plan
     assert "Q145. Security Spec Text-Derived Domain Candidate Layer" not in next_plan
     assert "Q146. Large Spec Plan Apply Workflow" not in next_plan
-    assert "Q147. Security Visual Sidecar Fixture Coverage" in next_plan
-    assert "현재 남은 작업 없음." not in next_plan
+    assert "Q147. Security Visual Sidecar Fixture Coverage" not in next_plan
+    assert "현재 남은 작업 없음." in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
     assert "Q119. Table Confidence v2" not in next_plan
     assert "Q120. Native Hybrid Chunking v2" not in next_plan
@@ -591,8 +593,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q144. Wide Technical Table Header Semantics" not in development_specs
     assert "Q145. Security Spec Text-Derived Domain Candidate Layer" not in development_specs
     assert "Q146. Large Spec Plan Apply Workflow" not in development_specs
-    assert "Q147. Security Visual Sidecar Fixture Coverage" in development_specs
-    assert "현재 active 개발 명세 없음." not in development_specs
+    assert "Q147. Security Visual Sidecar Fixture Coverage" not in development_specs
+    assert "현재 active 개발 명세 없음." in development_specs
     assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
     assert "Q119. Table Confidence v2" not in development_specs
     assert "Q120. Native Hybrid Chunking v2" not in development_specs
@@ -632,6 +634,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q144. Wide Technical Table Header Semantics" in implemented_specs
     assert "Q145. Security Spec Text-Derived Domain Candidate Layer" in implemented_specs
     assert "Q146. Large Spec Plan Apply Workflow" in implemented_specs
+    assert "Q147. Security Visual Sidecar Fixture Coverage" in implemented_specs
     assert "figure_ocr_evidence_rag.jsonl" in implemented_specs
     assert "pdf2md_validate_ssd_rag_contract" in implemented_specs
     assert "pdf2md_plan_large_spec_conversion" in implemented_specs
@@ -652,6 +655,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "candidate_status=review_only" in implemented_specs
     assert "plan_apply_report.json" in implemented_specs
     assert "apply_plan_path" in implemented_specs
+    assert "security visual sidecar fixture coverage" in implemented_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
@@ -698,7 +702,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q146" in development_specs
+    assert "완료된 Q34-Q147" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q125. Domain Adapter Registry Hardening" in implemented_specs
     assert "adapter_metadata" in implemented_specs

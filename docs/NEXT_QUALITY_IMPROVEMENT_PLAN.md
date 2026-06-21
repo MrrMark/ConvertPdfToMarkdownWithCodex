@@ -23,8 +23,4 @@
 
 ## 남은 작업
 
-### Q147. Security Visual Sidecar Fixture Coverage
-
-- SPDM sequence diagram, TCG architecture diagram, Caliptra RoT/block diagram 계열 visual fixture/eval coverage를 추가한다.
-- `technical_spec_rag_visual`의 figure text, region OCR evidence, generated description, structure sidecar 계약을 security spec 관점에서 검증한다.
-- 생성 텍스트는 sidecar-only/opt-in 계약을 유지하고, 본문 Markdown에는 삽입하지 않는다.
+현재 남은 작업 없음.

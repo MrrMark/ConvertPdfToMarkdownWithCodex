@@ -63,6 +63,7 @@ python3 -m pdf2md spec.pdf -o output/spec \
 - `retrieval_chunks_rag.jsonl`에는 `chunk_type="figure_text"`, `chunk_type="figure_description"`, `chunk_type="figure_structure"` record가 추가된다.
 - `figure_text.text`는 관측된 caption/heading/label/nearby text와 conservative figure kind만 사용한다.
 - 외부 VLM/LLM picture description이나 pixel interpretation은 사용하지 않으며, deterministic description은 `document.md` 본문이 아니라 sidecar와 retrieval chunk에만 기록한다.
+- SPDM sequence diagram, TCG architecture diagram, Caliptra RoT/block diagram은 security visual fixture coverage로 검증한다. 이 경로에서도 region OCR/generation 결과는 sidecar-only이며 Markdown 본문에는 삽입하지 않는다.
 - `figure_text.source_refs[]`는 `figures_rag.jsonl`의 `figure_id`, page, bbox로 해소되어야 하며 image path는 넣지 않는다.
 - `figure_description`과 `figure_structure` chunk는 figure provenance와 해당 generated sidecar provenance를 함께 가져야 한다.
 - `--rag-sidecar-scope minimal`을 함께 쓰더라도 visual chunk가 켜져 있으면 figure provenance 해소에 필요한 visual sidecar는 함께 생성된다.
