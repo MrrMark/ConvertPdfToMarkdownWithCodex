@@ -27,6 +27,43 @@ def _write_jsonl(path: Path, records: list[dict]) -> None:
     )
 
 
+def _large_spec_plan_payload(*, domain_adapter: str = "spdm", window_size: int | None = None) -> dict:
+    recommended_options = {
+        "rag_profile": "technical_spec_rag",
+        "domain_adapter": domain_adapter,
+        "image_mode": "none",
+        "rag_sidecar_scope": "minimal",
+        "page_workers": 2,
+        "image_extraction_page_timeout_seconds": None,
+        "image_extraction_stage_timeout_seconds": 120,
+        "figure_semantics_stage_timeout_seconds": 60,
+    }
+    if window_size is not None:
+        recommended_options["window_size"] = window_size
+    return {
+        "schema_version": "1.0",
+        "purpose": "large_spec_preflight_plan",
+        "input_pdf": "/tmp/security.pdf",
+        "source_sha256": "2" * 64,
+        "total_pages": 300,
+        "selected_page_count": 300,
+        "sampled_pages": [1, 150, 300],
+        "recommendation": {
+            "preferred_mcp_tool": "pdf2md_convert_pdf_windowed" if window_size is not None else "pdf2md_convert_pdf",
+            "recommended_options": recommended_options,
+            "recommended_option_sources": {
+                "domain_adapter": "domain_adapter_recommendation",
+                "window_size": "page_windowing_recommendation",
+            },
+            "domain_adapter_recommendation": {
+                "recommended_domain_adapter": domain_adapter,
+                "confidence": "high",
+                "recommendation_basis": {"ambiguous": False},
+            },
+        },
+    }
+
+
 def _valid_retrieval_chunk(*, page: int, source_sha256: str) -> dict:
     text = f"Chunk page {page}"
     block_id = f"page-{page:04d}-block-0001"
@@ -286,6 +323,59 @@ def test_convert_pdf_accepts_no_image_mode_override(
     assert result["options"]["image_extraction_page_timeout_seconds"] == 10
     assert result["options"]["image_extraction_stage_timeout_seconds"] == 20
     assert result["options"]["figure_semantics_stage_timeout_seconds"] == 30
+
+
+def test_convert_pdf_apply_plan_maps_options_and_returns_audit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "spec.pdf"
+    input_pdf.write_bytes(b"%PDF-1.4\n% synthetic placeholder\n")
+    output_dir = tmp_path / "out"
+    plan_path = tmp_path / "large-spec-plan.json"
+    _write_json(plan_path, _large_spec_plan_payload())
+    captured = {}
+
+    def fake_run_conversion(config):  # noqa: ANN001
+        captured["config"] = config
+        output_dir.mkdir()
+        markdown_path = output_dir / "document.md"
+        manifest_path = output_dir / "manifest.json"
+        report_path = output_dir / "report.json"
+        markdown_path.write_text("# Spec\n", encoding="utf-8")
+        manifest_path.write_text("{}", encoding="utf-8")
+        report_path.write_text("{}", encoding="utf-8")
+        return SimpleNamespace(
+            exit_code=0,
+            markdown_path=markdown_path,
+            manifest_path=manifest_path,
+            report_path=report_path,
+            warnings=[],
+            status=ConversionStatus.SUCCESS,
+            report=None,
+        )
+
+    monkeypatch.setattr(mcp_server, "run_conversion", fake_run_conversion)
+
+    result = mcp_server.convert_pdf(
+        input_pdf=str(input_pdf),
+        output_dir=str(output_dir),
+        apply_plan_path=str(plan_path),
+        roots=[tmp_path],
+    )
+
+    config = captured["config"]
+    audit = json.loads((output_dir / "plan_apply_report.json").read_text(encoding="utf-8"))
+    assert config.rag_profile == "technical_spec_rag"
+    assert config.domain_adapter == "spdm"
+    assert config.image_mode == "none"
+    assert config.rag_sidecar_scope == "minimal"
+    assert config.page_workers == 2
+    assert result["plan_apply"]["applied_options"]["domain_adapter"] == "spdm"
+    assert result["plan_apply_report_uri"].endswith("plan_apply_report.json")
+    assert result["artifact_uris"]["plan_apply_report.json"].endswith("plan_apply_report.json")
+    assert audit["option_matrix"]["after"]["rag_profile"] == "technical_spec_rag"
+    assert "sample_text" not in json.dumps(result["plan_apply"], ensure_ascii=False, sort_keys=True)
 
 
 def test_plan_page_windows_returns_deterministic_contract(tmp_path: Path) -> None:
@@ -575,6 +665,66 @@ def test_convert_pdf_windowed_orchestrates_windows_and_merge(
     assert result["status"] == "success"
     assert result["window_count"] == 2
     assert result["merge"]["merge_report_uri"].endswith("page_window_merge_report.json")
+
+
+def test_convert_pdf_windowed_apply_plan_uses_recommended_window_size(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    input_pdf = tmp_path / "spec.pdf"
+    write_pdf(
+        input_pdf,
+        [
+            PageSpec(texts=[PositionedText(f"Page {page}", 72, 760)])
+            for page in range(1, 4)
+        ],
+    )
+    output_root = tmp_path / "out"
+    plan_path = tmp_path / "large-spec-plan.json"
+    _write_json(plan_path, _large_spec_plan_payload(window_size=1))
+    converted: list[dict] = []
+
+    def fake_convert_page_window(**kwargs):  # noqa: ANN003
+        converted.append(kwargs)
+        return {
+            "conversion": {
+                "status": "success",
+                "exit_code": 0,
+                "output_dir": str(output_root / "windows" / kwargs["window_id"]),
+                "warning_count": 0,
+                "report_summary": {"processed_pages": 1},
+            }
+        }
+
+    def fake_merge_window_outputs(**kwargs):  # noqa: ANN003
+        assert kwargs["window_size"] == 1
+        assert kwargs["output_dir"] == str(output_root)
+        return {"status": "success", "merge_report_uri": "file:///tmp/page_window_merge_report.json"}
+
+    monkeypatch.setattr(mcp_server, "convert_page_window", fake_convert_page_window)
+    monkeypatch.setattr(mcp_server, "merge_window_outputs", fake_merge_window_outputs)
+
+    result = mcp_server.convert_pdf_windowed(
+        input_pdf=str(input_pdf),
+        output_dir=str(output_root),
+        pages="1-3",
+        apply_plan_path=str(plan_path),
+        roots=[tmp_path],
+    )
+
+    assert [item["window_id"] for item in converted] == [
+        "pages-0001-0001",
+        "pages-0002-0002",
+        "pages-0003-0003",
+    ]
+    assert {item["window_size"] for item in converted} == {1}
+    assert {item["rag_profile"] for item in converted} == {"technical_spec_rag"}
+    assert {item["domain_adapter"] for item in converted} == {"spdm"}
+    assert {item["image_mode"] for item in converted} == {"none"}
+    assert result["window_count"] == 3
+    assert result["plan_apply"]["applied_options"]["window_size"] == 1
+    assert result["plan_apply_report_uri"].endswith("plan_apply_report.json")
+    assert (output_root / "plan_apply_report.json").exists()
 
 
 def test_convert_pdf_requires_domain_adapter_for_technical_profile(tmp_path: Path) -> None:

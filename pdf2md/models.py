@@ -880,6 +880,25 @@ class PageWindowMergeReport(BaseModel):
     warnings: list[PageWindowMergeWarning] = Field(default_factory=list)
 
 
+class PlanApplySkippedOption(BaseModel):
+    option: str
+    value: Any = None
+    reason: str
+
+
+class PlanApplyReport(BaseModel):
+    schema_version: str = "1.0"
+    purpose: str = "large_spec_plan_apply_audit"
+    raw_content_included: bool = False
+    policy: dict[str, Any] = Field(default_factory=dict)
+    source_plan: dict[str, Any] = Field(default_factory=dict)
+    recommended_options: dict[str, Any] = Field(default_factory=dict)
+    explicit_options: list[str] = Field(default_factory=list)
+    applied_options: dict[str, Any] = Field(default_factory=dict)
+    skipped_options: list[PlanApplySkippedOption] = Field(default_factory=list)
+    option_matrix: dict[str, Any] = Field(default_factory=dict)
+
+
 class DoclingBenchmarkFinding(BaseModel):
     severity: str
     code: str

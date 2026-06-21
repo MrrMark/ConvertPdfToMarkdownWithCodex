@@ -23,46 +23,6 @@
 
 ## 현재 Active Development Specs
 
-### Q146. Large Spec Plan Apply Workflow
-
-#### 목표
-
-대형 NVMe/OCP/TCG/SPDM/Caliptra 스펙 변환 전에 생성한 preflight 권고를 사용자가 안전하게 적용할 수 있는 workflow를 제공한다. 현재 preflight는 권고를 잘 반환하지만, 실제 CLI/MCP 변환 옵션 적용은 별도 수동 단계라 실수가 발생할 수 있다.
-
-#### 범위
-
-- CLI 또는 MCP에 plan file을 받아 conversion config로 변환하는 opt-in 경로를 추가한다.
-- 적용 가능한 옵션은 `rag_profile`, `domain_adapter`, `image_mode`, `rag_sidecar_scope`, `page_workers`, timeout, window size로 제한한다.
-- 적용 전/후 option matrix를 raw-content-free report에 기록한다.
-- low/ambiguous domain adapter recommendation은 자동 적용하지 않는다.
-- 기존 직접 옵션이 plan과 충돌하면 직접 옵션 우선 또는 fail-fast 중 하나로 명시 정책을 정한다.
-
-#### 제외 범위
-
-- 사용자의 명시적 동의 없는 자동 옵션 변경
-- raw sample text 저장
-- 외부 job scheduler나 cloud execution
-
-#### 구현 단계
-
-1. `pdf2md/preflight.py`의 `recommended_options`를 `Config`/MCP option으로 매핑하는 helper를 추가한다.
-2. CLI에 `--apply-plan path` 또는 별도 script를 추가할지 결정한다.
-3. MCP `pdf2md_convert_pdf`/windowed 경로에 plan 적용 option을 추가한다.
-4. option conflict policy와 audit record를 report/manifest에 남긴다.
-5. small/large/table-dense/security-domain recommendation fixture를 추가한다.
-
-#### 검증 기준
-
-- `python -m pytest tests/test_preflight.py tests/test_cli.py tests/test_mcp_server.py`
-- ambiguous recommendation은 적용되지 않는다.
-- explicit CLI option과 plan option 충돌 정책이 테스트로 고정된다.
-- `git diff --check`
-
-#### 성공 조건
-
-- 사용자가 `plan -> apply` 경로로 대형 spec 변환을 재현 가능하게 실행할 수 있다.
-- 적용된 권고와 생략된 권고가 report에서 식별 가능하다.
-
 ### Q147. Security Visual Sidecar Fixture Coverage
 
 #### 목표
@@ -104,4 +64,4 @@
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q145 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q146 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

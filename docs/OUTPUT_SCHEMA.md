@@ -26,6 +26,7 @@
 - `docs/schema/provenance_integrity_report.schema.json`
 - `docs/schema/artifact_integrity_report.schema.json`
 - `docs/schema/page_window_merge_report.schema.json`
+- `docs/schema/plan_apply_report.schema.json`
 - `docs/schema/visual_sidecar_contract_report.schema.json`
 - `docs/schema/docling_benchmark_report.schema.json`
 - `docs/schema/docling_artifact_comparison.schema.json`
@@ -348,6 +349,40 @@ Stable nested fields:
 - `validation_summary.merged.passed`
 
 The merge report is operational metadata only. It must not include raw full Markdown body, raw PDF text, or full sidecar record bodies.
+
+## plan_apply_report.json
+
+Emitted by CLI `--apply-plan` and MCP `apply_plan_path` workflows when a `large_spec_preflight_plan` is explicitly applied.
+
+Required:
+
+- `schema_version`
+- `purpose="large_spec_plan_apply_audit"`
+- `raw_content_included=false`
+- `policy`
+- `source_plan`
+- `recommended_options`
+- `explicit_options`
+- `applied_options`
+- `skipped_options`
+- `option_matrix`
+
+Stable nested fields:
+
+- `policy.opt_in_required=true`
+- `policy.conflict_resolution="explicit_option_precedence"`
+- `policy.low_or_ambiguous_domain_adapter_applied=false`
+- `source_plan.source_sha256`
+- `source_plan.selected_page_count`
+- `source_plan.sampled_pages`
+- `source_plan.preferred_mcp_tool`
+- `option_matrix.before.<option>`
+- `option_matrix.after.<option>`
+- `skipped_options[].option`
+- `skipped_options[].reason`
+- `skipped_options[].value`
+
+The report is operational metadata only. It must not include raw sample text, raw Markdown body, PDF text, table rows, or image bytes. Low/ambiguous `domain_adapter_recommendation` values are skipped unless the adapter was explicitly supplied to the preflight planner, and direct conversion options keep precedence over plan recommendations.
 
 ## visual_sidecar_contract_report.json
 

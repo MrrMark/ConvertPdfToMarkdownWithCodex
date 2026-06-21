@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,18 @@ HIGH_TABLE_DENSITY_THRESHOLD = 1.0
 MODERATE_SPEC_PAGE_THRESHOLD = 50
 MAX_RECOMMENDED_PAGE_WORKERS = 4
 DOMAIN_RECOMMENDATION_SAMPLE_TEXT_LIMIT = 12000
+PLAN_APPLY_REPORT_FILENAME = "plan_apply_report.json"
+PLAN_APPLY_CONFIG_OPTIONS = (
+    "rag_profile",
+    "domain_adapter",
+    "image_mode",
+    "rag_sidecar_scope",
+    "page_workers",
+    "image_extraction_page_timeout_seconds",
+    "image_extraction_stage_timeout_seconds",
+    "figure_semantics_stage_timeout_seconds",
+)
+PLAN_APPLY_WINDOWED_OPTIONS = (*PLAN_APPLY_CONFIG_OPTIONS, "window_size")
 DOMAIN_RECOMMENDATION_KEYWORDS: dict[str, tuple[str, ...]] = {
     "nvme": (
         "nvme",
@@ -425,13 +438,25 @@ def plan_large_spec_conversion(input_pdf: Path, options: PreflightOptions | None
         "image_extraction_stage_timeout_seconds": 180 if selected_page_count >= VERY_LARGE_SPEC_PAGE_THRESHOLD else 120,
         "figure_semantics_stage_timeout_seconds": 90 if options.prefer_visual else 60,
     }
+    recommended_option_sources: dict[str, str] = {
+        "rag_profile": "large_spec_profile_recommendation",
+        "image_mode": "image_mode_recommendation",
+        "rag_sidecar_scope": "sidecar_scope_recommendation",
+        "page_workers": "performance_profile_recommendation",
+        "image_extraction_page_timeout_seconds": "timeout_recommendation",
+        "image_extraction_stage_timeout_seconds": "timeout_recommendation",
+        "figure_semantics_stage_timeout_seconds": "timeout_recommendation",
+    }
     recommended_domain_adapter = domain_recommendation.get("recommended_domain_adapter")
     if options.domain_adapter:
         recommended_options["domain_adapter"] = options.domain_adapter
+        recommended_option_sources["domain_adapter"] = "explicit_preflight_option"
     elif recommended_domain_adapter and domain_recommendation.get("confidence") in {"high", "medium"}:
         recommended_options["domain_adapter"] = recommended_domain_adapter
+        recommended_option_sources["domain_adapter"] = "domain_adapter_recommendation"
     if recommend_windowed:
         recommended_options["window_size"] = window_size
+        recommended_option_sources["window_size"] = "page_windowing_recommendation"
 
     return {
         "schema_version": "1.0",
@@ -459,6 +484,7 @@ def plan_large_spec_conversion(input_pdf: Path, options: PreflightOptions | None
             "preferred_mcp_tool": "pdf2md_convert_pdf_windowed" if recommend_windowed else "pdf2md_convert_pdf",
             "window_size": window_size if recommend_windowed else None,
             "recommended_options": recommended_options,
+            "recommended_option_sources": recommended_option_sources,
             "domain_adapter_recommendation": domain_recommendation,
             "performance_profile": {
                 "name": performance_profile,
@@ -482,3 +508,156 @@ def plan_large_spec_conversion(input_pdf: Path, options: PreflightOptions | None
             },
         },
     }
+
+
+def load_large_spec_plan(path: Path) -> dict[str, Any]:
+    """Load and validate a large-spec preflight plan JSON file."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected JSON object plan: {path}")
+    if payload.get("purpose") != "large_spec_preflight_plan":
+        raise ValueError("plan purpose must be large_spec_preflight_plan")
+    recommendation = payload.get("recommendation")
+    if not isinstance(recommendation, dict):
+        raise ValueError("plan recommendation must be an object")
+    recommended_options = recommendation.get("recommended_options")
+    if not isinstance(recommended_options, dict):
+        raise ValueError("plan recommendation.recommended_options must be an object")
+    return payload
+
+
+def _ordered_plan_options(options: dict[str, Any]) -> list[str]:
+    known_order = list(PLAN_APPLY_WINDOWED_OPTIONS)
+    known = [option for option in known_order if option in options]
+    unknown = sorted(option for option in options if option not in known_order)
+    return known + unknown
+
+
+def _plan_source(plan: dict[str, Any], source_plan_path: Path | None) -> dict[str, Any]:
+    recommendation = plan.get("recommendation", {})
+    source = {
+        "purpose": plan.get("purpose"),
+        "schema_version": plan.get("schema_version"),
+        "input_pdf": plan.get("input_pdf"),
+        "source_sha256": plan.get("source_sha256"),
+        "total_pages": plan.get("total_pages"),
+        "selected_page_count": plan.get("selected_page_count"),
+        "sampled_pages": plan.get("sampled_pages", []),
+        "preferred_mcp_tool": recommendation.get("preferred_mcp_tool") if isinstance(recommendation, dict) else None,
+    }
+    if source_plan_path is not None:
+        source["plan_path"] = str(source_plan_path)
+    return source
+
+
+def _domain_adapter_apply_allowed(plan: dict[str, Any], value: Any) -> tuple[bool, str | None]:
+    recommendation = plan.get("recommendation", {})
+    if not isinstance(recommendation, dict):
+        return False, "missing_domain_adapter_recommendation"
+    option_sources = recommendation.get("recommended_option_sources", {})
+    if isinstance(option_sources, dict) and option_sources.get("domain_adapter") == "explicit_preflight_option":
+        return True, None
+    domain_recommendation = recommendation.get("domain_adapter_recommendation", {})
+    if not isinstance(domain_recommendation, dict):
+        return False, "missing_domain_adapter_recommendation"
+    basis = domain_recommendation.get("recommendation_basis", {})
+    ambiguous = bool(isinstance(basis, dict) and basis.get("ambiguous"))
+    confidence = domain_recommendation.get("confidence")
+    recommended = domain_recommendation.get("recommended_domain_adapter")
+    if recommended == value and confidence in {"high", "medium"} and not ambiguous:
+        return True, None
+    return False, "low_or_ambiguous_domain_adapter_recommendation"
+
+
+def apply_large_spec_plan_options(
+    plan: dict[str, Any],
+    *,
+    current_options: dict[str, Any],
+    explicit_options: set[str] | None = None,
+    allowed_options: tuple[str, ...] = PLAN_APPLY_CONFIG_OPTIONS,
+    source_plan_path: Path | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Apply safe preflight recommendations over current options and return an audit."""
+    if plan.get("purpose") != "large_spec_preflight_plan":
+        raise ValueError("plan purpose must be large_spec_preflight_plan")
+    recommendation = plan.get("recommendation", {})
+    if not isinstance(recommendation, dict):
+        raise ValueError("plan recommendation must be an object")
+    recommended_options = recommendation.get("recommended_options", {})
+    if not isinstance(recommended_options, dict):
+        raise ValueError("plan recommendation.recommended_options must be an object")
+
+    allowed = set(allowed_options)
+    explicit = set(explicit_options or set())
+    before = {option: current_options.get(option) for option in allowed_options}
+    after = dict(before)
+    applied_options: dict[str, Any] = {}
+    skipped_options: list[dict[str, Any]] = []
+
+    for option in _ordered_plan_options(recommended_options):
+        value = recommended_options[option]
+        if option not in allowed:
+            skipped_options.append(
+                {
+                    "option": option,
+                    "value": value,
+                    "reason": "not_supported_by_target",
+                }
+            )
+            continue
+        if option in explicit:
+            skipped_options.append(
+                {
+                    "option": option,
+                    "value": value,
+                    "reason": "explicit_option_precedence",
+                }
+            )
+            continue
+        if value is None:
+            skipped_options.append(
+                {
+                    "option": option,
+                    "value": value,
+                    "reason": "null_recommendation",
+                }
+            )
+            continue
+        if option == "domain_adapter":
+            allowed_domain_adapter, reason = _domain_adapter_apply_allowed(plan, value)
+            if not allowed_domain_adapter:
+                skipped_options.append(
+                    {
+                        "option": option,
+                        "value": value,
+                        "reason": reason,
+                    }
+                )
+                continue
+        after[option] = value
+        applied_options[option] = value
+
+    audit = {
+        "schema_version": "1.0",
+        "purpose": "large_spec_plan_apply_audit",
+        "raw_content_included": False,
+        "policy": {
+            "opt_in_required": True,
+            "conflict_resolution": "explicit_option_precedence",
+            "low_or_ambiguous_domain_adapter_applied": False,
+        },
+        "source_plan": _plan_source(plan, source_plan_path),
+        "recommended_options": {
+            option: recommended_options[option]
+            for option in _ordered_plan_options(recommended_options)
+            if option in allowed
+        },
+        "explicit_options": sorted(explicit),
+        "applied_options": applied_options,
+        "skipped_options": skipped_options,
+        "option_matrix": {
+            "before": before,
+            "after": after,
+        },
+    }
+    return applied_options, audit
