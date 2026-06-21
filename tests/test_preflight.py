@@ -4,7 +4,13 @@ import json
 from pathlib import Path
 
 from pdf2md import mcp_server
-from pdf2md.preflight import PreflightOptions, plan_large_spec_conversion, recommend_domain_adapter_for_pdf
+from pdf2md.preflight import (
+    PLAN_APPLY_CONFIG_OPTIONS,
+    PreflightOptions,
+    apply_large_spec_plan_options,
+    plan_large_spec_conversion,
+    recommend_domain_adapter_for_pdf,
+)
 from scripts.plan_large_spec_conversion import main as plan_large_spec_main
 from tests.fixtures.pdf_builder import PageSpec, PositionedText, TableSpec, write_pdf
 
@@ -228,6 +234,119 @@ def test_large_spec_preflight_recommends_performance_profile_from_sample_metrics
     assert recommendation["recommended_options"]["page_workers"] == 2
     assert "large_or_table_dense_document" in recommendation["reasons"]["page_workers"]
     assert recommendation["performance_profile"]["raw_content_included"] is False
+
+
+def test_large_spec_plan_apply_maps_safe_recommendations_without_raw_content() -> None:
+    plan = {
+        "schema_version": "1.0",
+        "purpose": "large_spec_preflight_plan",
+        "input_pdf": "/tmp/security.pdf",
+        "source_sha256": "0" * 64,
+        "total_pages": 300,
+        "selected_page_count": 300,
+        "sampled_pages": [1, 150, 300],
+        "recommendation": {
+            "preferred_mcp_tool": "pdf2md_convert_pdf",
+            "recommended_options": {
+                "rag_profile": "technical_spec_rag",
+                "domain_adapter": "spdm",
+                "image_mode": "none",
+                "rag_sidecar_scope": "minimal",
+                "page_workers": 2,
+                "image_extraction_page_timeout_seconds": None,
+                "image_extraction_stage_timeout_seconds": 120,
+                "figure_semantics_stage_timeout_seconds": 60,
+            },
+            "recommended_option_sources": {
+                "domain_adapter": "domain_adapter_recommendation",
+            },
+            "domain_adapter_recommendation": {
+                "recommended_domain_adapter": "spdm",
+                "confidence": "high",
+                "recommendation_basis": {"ambiguous": False},
+            },
+        },
+    }
+
+    applied_options, audit = apply_large_spec_plan_options(
+        plan,
+        current_options={
+            "rag_profile": "preserve",
+            "domain_adapter": None,
+            "image_mode": None,
+            "rag_sidecar_scope": None,
+            "page_workers": 1,
+            "image_extraction_page_timeout_seconds": None,
+            "image_extraction_stage_timeout_seconds": None,
+            "figure_semantics_stage_timeout_seconds": None,
+        },
+        explicit_options=set(),
+        allowed_options=PLAN_APPLY_CONFIG_OPTIONS,
+    )
+
+    assert applied_options["rag_profile"] == "technical_spec_rag"
+    assert applied_options["domain_adapter"] == "spdm"
+    assert applied_options["image_mode"] == "none"
+    assert applied_options["rag_sidecar_scope"] == "minimal"
+    assert applied_options["page_workers"] == 2
+    assert "image_extraction_page_timeout_seconds" not in applied_options
+    assert audit["purpose"] == "large_spec_plan_apply_audit"
+    assert audit["raw_content_included"] is False
+    assert audit["policy"]["conflict_resolution"] == "explicit_option_precedence"
+    assert audit["option_matrix"]["before"]["rag_profile"] == "preserve"
+    assert audit["option_matrix"]["after"]["rag_profile"] == "technical_spec_rag"
+    assert audit["skipped_options"] == [
+        {
+            "option": "image_extraction_page_timeout_seconds",
+            "reason": "null_recommendation",
+            "value": None,
+        }
+    ]
+    assert "sample_text" not in json.dumps(audit, ensure_ascii=False, sort_keys=True)
+
+
+def test_large_spec_plan_apply_rejects_low_ambiguous_domain_adapter() -> None:
+    plan = {
+        "schema_version": "1.0",
+        "purpose": "large_spec_preflight_plan",
+        "recommendation": {
+            "recommended_options": {
+                "rag_profile": "technical_spec_rag",
+                "domain_adapter": "spdm",
+            },
+            "recommended_option_sources": {
+                "domain_adapter": "domain_adapter_recommendation",
+            },
+            "domain_adapter_recommendation": {
+                "recommended_domain_adapter": "spdm",
+                "confidence": "low",
+                "recommendation_basis": {"ambiguous": True},
+            },
+        },
+    }
+
+    applied_options, audit = apply_large_spec_plan_options(
+        plan,
+        current_options={
+            "rag_profile": "preserve",
+            "domain_adapter": None,
+            "image_mode": None,
+            "rag_sidecar_scope": None,
+            "page_workers": 1,
+            "image_extraction_page_timeout_seconds": None,
+            "image_extraction_stage_timeout_seconds": None,
+            "figure_semantics_stage_timeout_seconds": None,
+        },
+        explicit_options=set(),
+    )
+
+    assert applied_options == {"rag_profile": "technical_spec_rag"}
+    assert audit["option_matrix"]["after"]["domain_adapter"] is None
+    assert {
+        "option": "domain_adapter",
+        "reason": "low_or_ambiguous_domain_adapter_recommendation",
+        "value": "spdm",
+    } in audit["skipped_options"]
 
 
 def test_plan_large_spec_conversion_script_writes_report(tmp_path: Path) -> None:

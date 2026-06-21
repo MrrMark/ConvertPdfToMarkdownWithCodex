@@ -8,6 +8,48 @@ from pathlib import Path
 from pdf2md.config import default_output_dir_for_input
 
 
+def _write_large_spec_plan(path: Path, *, domain_adapter: str = "spdm") -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "purpose": "large_spec_preflight_plan",
+                "input_pdf": "/tmp/security.pdf",
+                "source_sha256": "1" * 64,
+                "total_pages": 250,
+                "selected_page_count": 250,
+                "sampled_pages": [1, 125, 250],
+                "recommendation": {
+                    "preferred_mcp_tool": "pdf2md_convert_pdf",
+                    "recommended_options": {
+                        "rag_profile": "technical_spec_rag",
+                        "domain_adapter": domain_adapter,
+                        "image_mode": "none",
+                        "rag_sidecar_scope": "minimal",
+                        "page_workers": 2,
+                        "image_extraction_page_timeout_seconds": None,
+                        "image_extraction_stage_timeout_seconds": 120,
+                        "figure_semantics_stage_timeout_seconds": 60,
+                    },
+                    "recommended_option_sources": {
+                        "domain_adapter": "domain_adapter_recommendation",
+                    },
+                    "domain_adapter_recommendation": {
+                        "recommended_domain_adapter": domain_adapter,
+                        "confidence": "high",
+                        "recommendation_basis": {"ambiguous": False},
+                    },
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def test_cli_runs_and_writes_outputs(sample_pdf: Path, tmp_path: Path) -> None:
     output_dir = tmp_path / "cli-out"
     cmd = [
@@ -174,6 +216,75 @@ def test_cli_technical_spec_profile_strict_mode_requires_domain_adapter(
 
     assert completed.returncode == 2
     assert "technical spec RAG profiles require --domain-adapter" in completed.stderr
+
+
+def test_cli_apply_plan_maps_preflight_options_and_writes_audit(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-apply-plan"
+    plan_path = tmp_path / "large-spec-plan.json"
+    _write_large_spec_plan(plan_path)
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--pages",
+        "1",
+        "--apply-plan",
+        str(plan_path),
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    audit = json.loads((output_dir / "plan_apply_report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["rag_profile"] == "technical_spec_rag"
+    assert manifest["options"]["domain_adapter"] == "spdm"
+    assert manifest["options"]["image_mode"] == "none"
+    assert manifest["options"]["rag_sidecar_scope"] == "minimal"
+    assert audit["purpose"] == "large_spec_plan_apply_audit"
+    assert audit["raw_content_included"] is False
+    assert audit["applied_options"]["page_workers"] == 2
+    assert audit["option_matrix"]["before"]["rag_profile"] == "preserve"
+    assert audit["option_matrix"]["after"]["domain_adapter"] == "spdm"
+    assert "sample_text" not in json.dumps(audit, ensure_ascii=False, sort_keys=True)
+
+
+def test_cli_apply_plan_keeps_explicit_option_precedence(sample_pdf: Path, tmp_path: Path) -> None:
+    output_dir = tmp_path / "cli-apply-plan-explicit"
+    plan_path = tmp_path / "large-spec-plan.json"
+    _write_large_spec_plan(plan_path, domain_adapter="spdm")
+    cmd = [
+        sys.executable,
+        "-m",
+        "pdf2md",
+        str(sample_pdf),
+        "-o",
+        str(output_dir),
+        "--pages",
+        "1",
+        "--apply-plan",
+        str(plan_path),
+        "--domain-adapter",
+        "tcg",
+    ]
+
+    completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+    audit = json.loads((output_dir / "plan_apply_report.json").read_text(encoding="utf-8"))
+    assert manifest["options"]["rag_profile"] == "technical_spec_rag"
+    assert manifest["options"]["domain_adapter"] == "tcg"
+    assert audit["option_matrix"]["before"]["domain_adapter"] == "tcg"
+    assert audit["option_matrix"]["after"]["domain_adapter"] == "tcg"
+    assert {
+        "option": "domain_adapter",
+        "reason": "explicit_option_precedence",
+        "value": "spdm",
+    } in audit["skipped_options"]
 
 
 def test_cli_uses_default_output_dir_when_output_dir_is_omitted(sample_pdf: Path) -> None:

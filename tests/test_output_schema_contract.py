@@ -65,6 +65,7 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "provenance_integrity_report.schema.json",
         "artifact_integrity_report.schema.json",
         "page_window_merge_report.schema.json",
+        "plan_apply_report.schema.json",
         "visual_sidecar_contract_report.schema.json",
         "docling_benchmark_report.schema.json",
         "docling_artifact_comparison.schema.json",
@@ -104,6 +105,10 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
     assert page_window_schema["properties"]["purpose"]["default"] == "page_window_merge"
     assert "sidecar_inventory" in page_window_schema["properties"]
     assert "merge_memory_guard" in page_window_schema["properties"]
+    plan_apply_schema = json.loads((output_dir / "plan_apply_report.schema.json").read_text(encoding="utf-8"))
+    assert plan_apply_schema["properties"]["purpose"]["default"] == "large_spec_plan_apply_audit"
+    assert "option_matrix" in plan_apply_schema["properties"]
+    assert "skipped_options" in plan_apply_schema["properties"]
     visual_contract_schema = json.loads(
         (output_dir / "visual_sidecar_contract_report.schema.json").read_text(encoding="utf-8")
     )

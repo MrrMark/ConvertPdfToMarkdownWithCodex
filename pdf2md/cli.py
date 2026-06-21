@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -21,8 +23,26 @@ from pdf2md.models import (
     TableMode,
 )
 from pdf2md.pipeline import run_conversion
+from pdf2md.preflight import (
+    PLAN_APPLY_CONFIG_OPTIONS,
+    PLAN_APPLY_REPORT_FILENAME,
+    apply_large_spec_plan_options,
+    load_large_spec_plan,
+)
 from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, TECHNICAL_SPEC_RAG_PROFILES, rag_profile_options
 from pdf2md.utils.logging import configure_logging
+
+
+PLAN_APPLY_CLI_FLAGS = {
+    "--rag-profile": "rag_profile",
+    "--domain-adapter": "domain_adapter",
+    "--image-mode": "image_mode",
+    "--rag-sidecar-scope": "rag_sidecar_scope",
+    "--page-workers": "page_workers",
+    "--image-extraction-page-timeout-seconds": "image_extraction_page_timeout_seconds",
+    "--image-extraction-stage-timeout-seconds": "image_extraction_stage_timeout_seconds",
+    "--figure-semantics-stage-timeout-seconds": "figure_semantics_stage_timeout_seconds",
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,6 +55,15 @@ def build_parser() -> argparse.ArgumentParser:
         choices=SUPPORTED_RAG_PURPOSE_PROFILES,
         default="preserve",
         help="Purpose-specific local option bundle for RAG-oriented conversion.",
+    )
+    parser.add_argument(
+        "--apply-plan",
+        type=Path,
+        default=None,
+        help=(
+            "Opt-in apply a large-spec preflight plan JSON to safe conversion options. "
+            "Direct CLI options keep precedence."
+        ),
     )
     parser.add_argument("--skip-existing", action="store_true", default=False, help="Skip batch documents with existing core outputs")
     parser.add_argument(
@@ -240,6 +269,63 @@ def _option_value(value: object | None, default: object) -> object:
     return default if value is None else value
 
 
+def _explicit_plan_apply_options(argv: list[str]) -> set[str]:
+    explicit_options: set[str] = set()
+    for token in argv:
+        option = token.split("=", 1)[0]
+        mapped = PLAN_APPLY_CLI_FLAGS.get(option)
+        if mapped is not None:
+            explicit_options.add(mapped)
+    return explicit_options
+
+
+def _plan_apply_current_options(args: argparse.Namespace) -> dict[str, object | None]:
+    return {
+        "rag_profile": args.rag_profile,
+        "domain_adapter": args.domain_adapter,
+        "image_mode": args.image_mode,
+        "rag_sidecar_scope": args.rag_sidecar_scope,
+        "page_workers": args.page_workers,
+        "image_extraction_page_timeout_seconds": args.image_extraction_page_timeout_seconds,
+        "image_extraction_stage_timeout_seconds": args.image_extraction_stage_timeout_seconds,
+        "figure_semantics_stage_timeout_seconds": args.figure_semantics_stage_timeout_seconds,
+    }
+
+
+def _apply_plan_to_args(
+    args: argparse.Namespace,
+    parser: argparse.ArgumentParser,
+    *,
+    explicit_options: set[str],
+) -> None:
+    if args.apply_plan is None:
+        args._plan_apply_audit = None
+        return
+    try:
+        plan_path = args.apply_plan.resolve()
+        plan = load_large_spec_plan(plan_path)
+        applied_options, audit = apply_large_spec_plan_options(
+            plan,
+            current_options=_plan_apply_current_options(args),
+            explicit_options=explicit_options,
+            allowed_options=PLAN_APPLY_CONFIG_OPTIONS,
+            source_plan_path=plan_path,
+        )
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        parser.error(str(exc))
+    for option, value in applied_options.items():
+        setattr(args, option, value)
+    args._plan_apply_audit = audit
+
+
+def _write_plan_apply_report(output_dir: Path, audit: dict[str, object] | None) -> None:
+    if audit is None:
+        return
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / PLAN_APPLY_REPORT_FILENAME
+    report_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def _build_single_config(args: argparse.Namespace) -> Config:
     input_pdf = Path(args.input_pdf)
     output_dir = Path(args.output_dir) if args.output_dir is not None else default_output_dir_for_input(input_pdf)
@@ -397,7 +483,8 @@ def _validate_profile_contract(args: argparse.Namespace, parser: argparse.Argume
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    argv_tokens = list(sys.argv[1:] if argv is None else argv)
+    args = parser.parse_args(argv_tokens)
     configure_logging(verbose=args.verbose, debug=args.debug)
 
     if args.input_pdf and args.input_dir:
@@ -408,6 +495,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error("--previous-corpus-manifest is only supported with --input-dir batch mode.")
     if args.reuse_unchanged and args.previous_corpus_manifest is None:
         parser.error("--reuse-unchanged requires --previous-corpus-manifest.")
+    if args.apply_plan is not None and args.input_dir:
+        parser.error("--apply-plan is only supported for single PDF conversion.")
+    _apply_plan_to_args(args, parser, explicit_options=_explicit_plan_apply_options(argv_tokens))
     _validate_profile_contract(args, parser)
 
     if args.input_dir:
@@ -420,4 +510,5 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     config = _build_single_config(args)
     result = run_conversion(config)
+    _write_plan_apply_report(config.output_dir, args._plan_apply_audit)
     return result.exit_code

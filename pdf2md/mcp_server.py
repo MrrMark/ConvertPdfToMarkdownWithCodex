@@ -22,7 +22,15 @@ from pdf2md.models import (
     TableMode,
 )
 from pdf2md.pipeline import ConversionResult, run_conversion
-from pdf2md.preflight import PreflightOptions, plan_large_spec_conversion as build_large_spec_preflight_plan
+from pdf2md.preflight import (
+    PLAN_APPLY_CONFIG_OPTIONS,
+    PLAN_APPLY_REPORT_FILENAME,
+    PLAN_APPLY_WINDOWED_OPTIONS,
+    PreflightOptions,
+    apply_large_spec_plan_options,
+    load_large_spec_plan,
+    plan_large_spec_conversion as build_large_spec_preflight_plan,
+)
 from pdf2md.rag_profiles import SUPPORTED_RAG_PURPOSE_PROFILES, TECHNICAL_SPEC_RAG_PROFILES, rag_profile_options
 from pdf2md.utils.page_range import parse_page_range
 from pdf2md.utils.pdf import open_pdf_reader
@@ -40,6 +48,7 @@ ARTIFACT_FILENAMES = (
     "document.md",
     "manifest.json",
     "report.json",
+    PLAN_APPLY_REPORT_FILENAME,
     PAGE_WINDOW_MERGE_REPORT_FILENAME,
     "sanitized_report.json",
     "rag_tables.md",
@@ -372,6 +381,50 @@ def plan_large_spec_conversion(
     )
 
 
+MCP_PLAN_APPLY_DEFAULTS = {
+    "rag_profile": "preserve",
+    "domain_adapter": None,
+    "image_mode": None,
+    "rag_sidecar_scope": None,
+    "page_workers": 1,
+    "image_extraction_page_timeout_seconds": None,
+    "image_extraction_stage_timeout_seconds": None,
+    "figure_semantics_stage_timeout_seconds": None,
+    "window_size": 100,
+}
+
+
+def _mcp_explicit_plan_apply_options(current_options: dict[str, Any]) -> set[str]:
+    return {
+        option
+        for option, value in current_options.items()
+        if value != MCP_PLAN_APPLY_DEFAULTS.get(option)
+    }
+
+
+def _apply_plan_options_for_mcp(
+    *,
+    apply_plan_path: str | None,
+    current_options: dict[str, Any],
+    allowed_options: tuple[str, ...],
+    roots: list[Path],
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    effective_options = dict(current_options)
+    if apply_plan_path is None:
+        return effective_options, None
+    resolved_plan = ensure_within_roots(apply_plan_path, roots, label="apply_plan_path")
+    plan = load_large_spec_plan(resolved_plan)
+    applied_options, audit = apply_large_spec_plan_options(
+        plan,
+        current_options=current_options,
+        explicit_options=_mcp_explicit_plan_apply_options(current_options),
+        allowed_options=allowed_options,
+        source_plan_path=resolved_plan,
+    )
+    effective_options.update(applied_options)
+    return effective_options, audit
+
+
 def _find_window(plan: dict[str, Any], window_id: str) -> dict[str, Any]:
     for window in plan["windows"]:
         if window["window_id"] == window_id:
@@ -480,6 +533,14 @@ def _read_jsonl(path: Path, *, window: dict[str, Any], file_name: str) -> list[W
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_plan_apply_report(output_dir: Path, audit: dict[str, Any] | None) -> str | None:
+    if audit is None:
+        return None
+    report_path = output_dir / PLAN_APPLY_REPORT_FILENAME
+    _write_json(report_path, audit)
+    return report_path.resolve().as_uri()
 
 
 def _write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
@@ -1214,6 +1275,7 @@ def convert_pdf_windowed(
     output_dir: str | None = None,
     pages: str | None = None,
     password: str | None = None,
+    apply_plan_path: str | None = None,
     window_size: int = 100,
     rag_profile: str = "preserve",
     domain_adapter: str | None = None,
@@ -1244,6 +1306,32 @@ def convert_pdf_windowed(
 ) -> dict[str, Any]:
     """Plan, convert, validate, and merge deterministic page windows for one PDF."""
     allowed_roots = _allowed_roots(roots)
+    current_options = {
+        "rag_profile": rag_profile,
+        "domain_adapter": domain_adapter,
+        "image_mode": image_mode,
+        "rag_sidecar_scope": rag_sidecar_scope,
+        "page_workers": page_workers,
+        "image_extraction_page_timeout_seconds": image_extraction_page_timeout_seconds,
+        "image_extraction_stage_timeout_seconds": image_extraction_stage_timeout_seconds,
+        "figure_semantics_stage_timeout_seconds": figure_semantics_stage_timeout_seconds,
+        "window_size": window_size,
+    }
+    effective_options, plan_apply_audit = _apply_plan_options_for_mcp(
+        apply_plan_path=apply_plan_path,
+        current_options=current_options,
+        allowed_options=PLAN_APPLY_WINDOWED_OPTIONS,
+        roots=allowed_roots,
+    )
+    rag_profile = str(effective_options["rag_profile"])
+    domain_adapter = effective_options["domain_adapter"]
+    image_mode = effective_options["image_mode"]
+    rag_sidecar_scope = effective_options["rag_sidecar_scope"]
+    page_workers = int(effective_options["page_workers"])
+    image_extraction_page_timeout_seconds = effective_options["image_extraction_page_timeout_seconds"]
+    image_extraction_stage_timeout_seconds = effective_options["image_extraction_stage_timeout_seconds"]
+    figure_semantics_stage_timeout_seconds = effective_options["figure_semantics_stage_timeout_seconds"]
+    window_size = int(effective_options["window_size"])
     plan = plan_page_windows(
         input_pdf=input_pdf,
         output_dir=output_dir,
@@ -1252,6 +1340,7 @@ def convert_pdf_windowed(
         window_size=window_size,
         roots=allowed_roots,
     )
+    plan_apply_report_uri = _write_plan_apply_report(Path(plan["output_dir"]), plan_apply_audit)
     conversions: list[dict[str, Any]] = []
     for window in plan["windows"]:
         try:
@@ -1301,6 +1390,8 @@ def convert_pdf_windowed(
                 "window_count": plan["window_count"],
                 "conversions": conversions,
                 "merge": None,
+                "plan_apply": plan_apply_audit,
+                "plan_apply_report_uri": plan_apply_report_uri,
             }
         conversions.append(
             {
@@ -1337,6 +1428,8 @@ def convert_pdf_windowed(
         "window_count": plan["window_count"],
         "conversions": conversions,
         "merge": merge,
+        "plan_apply": plan_apply_audit,
+        "plan_apply_report_uri": plan_apply_report_uri,
     }
 
 
@@ -1517,6 +1610,7 @@ def convert_pdf(
     manual_domain_adapter_keywords: str | None = None,
     pages: str | None = None,
     password: str | None = None,
+    apply_plan_path: str | None = None,
     image_mode: str | None = None,
     table_mode: str | None = None,
     rag_table_output: str | None = None,
@@ -1543,6 +1637,30 @@ def convert_pdf(
         ensure_within_roots(resolved_output, allowed_roots, label="output_dir")
     else:
         resolved_output = ensure_within_roots(output_dir, allowed_roots, label="output_dir")
+    current_options = {
+        "rag_profile": rag_profile,
+        "domain_adapter": domain_adapter,
+        "image_mode": image_mode,
+        "rag_sidecar_scope": rag_sidecar_scope,
+        "page_workers": page_workers,
+        "image_extraction_page_timeout_seconds": image_extraction_page_timeout_seconds,
+        "image_extraction_stage_timeout_seconds": image_extraction_stage_timeout_seconds,
+        "figure_semantics_stage_timeout_seconds": figure_semantics_stage_timeout_seconds,
+    }
+    effective_options, plan_apply_audit = _apply_plan_options_for_mcp(
+        apply_plan_path=apply_plan_path,
+        current_options=current_options,
+        allowed_options=PLAN_APPLY_CONFIG_OPTIONS,
+        roots=allowed_roots,
+    )
+    rag_profile = str(effective_options["rag_profile"])
+    domain_adapter = effective_options["domain_adapter"]
+    image_mode = effective_options["image_mode"]
+    rag_sidecar_scope = effective_options["rag_sidecar_scope"]
+    page_workers = int(effective_options["page_workers"])
+    image_extraction_page_timeout_seconds = effective_options["image_extraction_page_timeout_seconds"]
+    image_extraction_stage_timeout_seconds = effective_options["image_extraction_stage_timeout_seconds"]
+    figure_semantics_stage_timeout_seconds = effective_options["figure_semantics_stage_timeout_seconds"]
     config = _build_config(
         input_pdf=resolved_input,
         output_dir=resolved_output,
@@ -1569,6 +1687,7 @@ def convert_pdf(
         skip_existing=skip_existing,
     )
     result = run_conversion(config)
+    plan_apply_report_uri = _write_plan_apply_report(resolved_output, plan_apply_audit)
     return {
         "schema_version": "1.0",
         "status": result.status.value,
@@ -1578,9 +1697,11 @@ def convert_pdf(
         "markdown_uri": result.markdown_path.resolve().as_uri() if result.markdown_path else None,
         "manifest_uri": result.manifest_path.resolve().as_uri() if result.manifest_path else None,
         "report_uri": result.report_path.resolve().as_uri() if result.report_path else None,
+        "plan_apply_report_uri": plan_apply_report_uri,
         "warning_count": len(result.warnings),
         "warnings_preview": _warning_preview(result, warning_limit),
         "report_summary": _report_summary(result),
+        "plan_apply": plan_apply_audit,
         "options": {
             "rag_profile": rag_profile,
             "domain_adapter": config.domain_adapter,
@@ -1986,6 +2107,7 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
         output_dir: str | None = None,
         pages: str | None = None,
         password: str | None = None,
+        apply_plan_path: str | None = None,
         window_size: int = 100,
         rag_profile: str = "preserve",
         domain_adapter: str | None = None,
@@ -2018,6 +2140,7 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
             output_dir=output_dir,
             pages=pages,
             password=password,
+            apply_plan_path=apply_plan_path,
             window_size=window_size,
             rag_profile=rag_profile,
             domain_adapter=domain_adapter,
@@ -2057,6 +2180,7 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
         manual_domain_adapter_keywords: str | None = None,
         pages: str | None = None,
         password: str | None = None,
+        apply_plan_path: str | None = None,
         image_mode: str | None = None,
         table_mode: str | None = None,
         rag_table_output: str | None = None,
@@ -2084,6 +2208,7 @@ def build_mcp_server(*, project_root: Path | None = None) -> Any:
             manual_domain_adapter_keywords=manual_domain_adapter_keywords,
             pages=pages,
             password=password,
+            apply_plan_path=apply_plan_path,
             image_mode=image_mode,
             table_mode=table_mode,
             rag_table_output=rag_table_output,

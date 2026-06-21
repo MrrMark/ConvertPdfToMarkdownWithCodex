@@ -23,12 +23,6 @@
 
 ## 남은 작업
 
-### Q146. Large Spec Plan Apply Workflow
-
-- `pdf2md_plan_large_spec_conversion`의 권고를 CLI/MCP에서 더 쉽게 적용할 수 있는 plan-then-apply workflow를 설계/구현한다.
-- 대형 NVMe/OCP/security spec 변환 시 domain adapter, image mode, page workers, window size, timeout 적용 실수를 줄인다.
-- 권고 자동 적용은 명시 opt-in으로 두고, raw content 없는 option matrix와 재현 가능한 실행 기록을 남긴다.
-
 ### Q147. Security Visual Sidecar Fixture Coverage
 
 - SPDM sequence diagram, TCG architecture diagram, Caliptra RoT/block diagram 계열 visual fixture/eval coverage를 추가한다.

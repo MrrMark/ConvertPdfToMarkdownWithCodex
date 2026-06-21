@@ -508,7 +508,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q143. Real Spec Regression Evidence Pack Expansion" not in next_plan
     assert "Q144. Wide Technical Table Header Semantics" not in next_plan
     assert "Q145. Security Spec Text-Derived Domain Candidate Layer" not in next_plan
-    assert "Q146. Large Spec Plan Apply Workflow" in next_plan
+    assert "Q146. Large Spec Plan Apply Workflow" not in next_plan
     assert "Q147. Security Visual Sidecar Fixture Coverage" in next_plan
     assert "현재 남은 작업 없음." not in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
@@ -590,7 +590,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q143. Real Spec Regression Evidence Pack Expansion" not in development_specs
     assert "Q144. Wide Technical Table Header Semantics" not in development_specs
     assert "Q145. Security Spec Text-Derived Domain Candidate Layer" not in development_specs
-    assert "Q146. Large Spec Plan Apply Workflow" in development_specs
+    assert "Q146. Large Spec Plan Apply Workflow" not in development_specs
     assert "Q147. Security Visual Sidecar Fixture Coverage" in development_specs
     assert "현재 active 개발 명세 없음." not in development_specs
     assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
@@ -631,6 +631,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q143. Real Spec Regression Evidence Pack Expansion" in implemented_specs
     assert "Q144. Wide Technical Table Header Semantics" in implemented_specs
     assert "Q145. Security Spec Text-Derived Domain Candidate Layer" in implemented_specs
+    assert "Q146. Large Spec Plan Apply Workflow" in implemented_specs
     assert "figure_ocr_evidence_rag.jsonl" in implemented_specs
     assert "pdf2md_validate_ssd_rag_contract" in implemented_specs
     assert "pdf2md_plan_large_spec_conversion" in implemented_specs
@@ -649,6 +650,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "column_header_paths" in implemented_specs
     assert "Header paths:" in implemented_specs
     assert "candidate_status=review_only" in implemented_specs
+    assert "plan_apply_report.json" in implemented_specs
+    assert "apply_plan_path" in implemented_specs
     assert "Q72. Shared Batch Runner And GUI Batch Artifact Parity" not in development_specs
     assert "Q73. GUI Incremental Corpus Options" not in development_specs
     assert "Q74. CLI/GUI Golden Parity Gate" not in development_specs
@@ -695,7 +698,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q145" in development_specs
+    assert "완료된 Q34-Q146" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q125. Domain Adapter Registry Hardening" in implemented_specs
     assert "adapter_metadata" in implemented_specs
@@ -937,6 +940,9 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "figure_text_chunk_record_count" in output_schema
     assert "rag_sidecar_omitted_outputs" in output_schema
     assert "rag_sidecar_scope_omitted" in output_schema
+    assert "plan_apply_report.json" in output_schema
+    assert "docs/schema/plan_apply_report.schema.json" in output_schema
+    assert "explicit_option_precedence" in output_schema
     assert "figures_rag.jsonl" in output_schema
     assert "domain_units_rag.jsonl" in output_schema
     assert "requirement_traceability_rag.jsonl" in output_schema
