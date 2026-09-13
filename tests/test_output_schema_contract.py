@@ -77,6 +77,8 @@ def test_output_schema_export_is_deterministic(tmp_path: Path) -> None:
         "local_corpus_evidence_pack.schema.json",
         "corpus_evidence_analysis_report.schema.json",
         "corpus_evidence_trend_report.schema.json",
+        "source_quality_report.schema.json",
+        "source_quality_truth.schema.json",
     ]
     assert export_output_schema.check_schema_files(output_dir) == []
     manifest_schema = json.loads((output_dir / "manifest.schema.json").read_text(encoding="utf-8"))

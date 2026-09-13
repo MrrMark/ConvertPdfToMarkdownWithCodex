@@ -629,6 +629,10 @@
           "title": "Rag Text Block Record Count",
           "type": "integer"
         },
+        "region_ocr_backend_call_count": {
+          "description": "Actual region OCR backend recognize calls, including failed calls; figure and table targets combined.",
+          "type": "integer"
+        },
         "region_ocr_evidence_accepted_count": {
           "description": "Number of OCR evidence records accepted by confidence threshold.",
           "type": "integer"
@@ -651,6 +655,22 @@
         },
         "region_ocr_evidence_table_record_count": {
           "description": "Number of OCR evidence records targeting table bbox candidates.",
+          "type": "integer"
+        },
+        "region_ocr_page_cache_hit_count": {
+          "description": "Region requests served from the current page image without another render.",
+          "type": "integer"
+        },
+        "region_ocr_page_render_count": {
+          "description": "Actual PDF page render calls for region OCR, including failed render calls.",
+          "type": "integer"
+        },
+        "region_ocr_result_cache_hit_count": {
+          "description": "Identical crop/backend/language requests served without another backend call.",
+          "type": "integer"
+        },
+        "region_ocr_skipped_decorative_count": {
+          "description": "Excluded TINY_DECORATIVE figure targets explicitly skipped before region OCR.",
           "type": "integer"
         },
         "requirement_file_count": {

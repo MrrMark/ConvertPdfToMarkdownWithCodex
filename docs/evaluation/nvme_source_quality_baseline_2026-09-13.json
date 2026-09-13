@@ -1,0 +1,112 @@
+{
+  "schema_version": "1.0",
+  "purpose": "local_source_quality_corpus_identity",
+  "evaluated_at": "2026-09-13",
+  "baseline_conversion_date": "2026-09-11",
+  "profile": "technical_spec_rag_visual",
+  "source_document": "NVM-Express-Base-Specification-Revision-2.3-2025.08.01-Ratified.pdf",
+  "truth_storage": "local-only: output/source_quality_q152",
+  "scope": "Selected source assertions, not full-document accuracy",
+  "cases": [
+    {
+      "case_id": "front_matter",
+      "input_sha256": "9c5ef8a735d30ad7017d88658dc2454e4b47b1da173bad53da38fcdb450f46e5",
+      "pages": [
+        {
+          "page": 1,
+          "physical_page": 1,
+          "printed_page": "i"
+        },
+        {
+          "page": 2,
+          "physical_page": 2,
+          "printed_page": "ii"
+        },
+        {
+          "page": 3,
+          "physical_page": 3,
+          "printed_page": "iii"
+        },
+        {
+          "page": 4,
+          "physical_page": 4,
+          "printed_page": "iv"
+        },
+        {
+          "page": 5,
+          "physical_page": 5,
+          "printed_page": "v"
+        }
+      ],
+      "assertion_count": 4,
+      "known_failure_assertion_count": 3,
+      "quality_passed": false,
+      "gate_passed": true
+    },
+    {
+      "case_id": "controller_tables",
+      "input_sha256": "5a6aa491db9dbcb46b21a1bcf901cc03e1ffd927dc57a6011d5e904551992185",
+      "pages": [
+        {
+          "page": 1,
+          "physical_page": 696,
+          "printed_page": "672"
+        },
+        {
+          "page": 2,
+          "physical_page": 697,
+          "printed_page": "673"
+        },
+        {
+          "page": 3,
+          "physical_page": 698,
+          "printed_page": "674"
+        },
+        {
+          "page": 4,
+          "physical_page": 699,
+          "printed_page": "675"
+        },
+        {
+          "page": 5,
+          "physical_page": 700,
+          "printed_page": "676"
+        }
+      ],
+      "assertion_count": 8,
+      "known_failure_assertion_count": 5,
+      "quality_passed": false,
+      "gate_passed": true
+    },
+    {
+      "case_id": "sgl_figures_tables",
+      "input_sha256": "1fefe74693a264aa1134ed217d40d4630cb0100347f471613307cd397dca0749",
+      "pages": [
+        {
+          "page": 1,
+          "physical_page": 181,
+          "printed_page": "157"
+        },
+        {
+          "page": 2,
+          "physical_page": 182,
+          "printed_page": "158"
+        },
+        {
+          "page": 3,
+          "physical_page": 183,
+          "printed_page": "159"
+        },
+        {
+          "page": 4,
+          "physical_page": 184,
+          "printed_page": "160"
+        }
+      ],
+      "assertion_count": 5,
+      "known_failure_assertion_count": 2,
+      "quality_passed": false,
+      "gate_passed": true
+    }
+  ]
+}

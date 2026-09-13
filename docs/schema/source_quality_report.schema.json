@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "QualityCheckResult": {
+      "description": "A source assertion result without copies of source text.",
+      "properties": {
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "expected_failure_records": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Expected Failure Records",
+          "type": "array"
+        },
+        "failed_records": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Failed Records",
+          "type": "array"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "page": {
+          "title": "Page",
+          "type": "integer"
+        },
+        "physical_page": {
+          "title": "Physical Page",
+          "type": "integer"
+        },
+        "printed_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Printed Page"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "known_failure",
+            "regression",
+            "stale_allowlist"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "kind",
+        "page",
+        "physical_page",
+        "status"
+      ],
+      "title": "QualityCheckResult",
+      "type": "object"
+    }
+  },
+  "description": "Keep regression-gate success distinct from source-quality success.",
+  "properties": {
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "gate_passed": {
+      "title": "Gate Passed",
+      "type": "boolean"
+    },
+    "input_sha256": {
+      "title": "Input Sha256",
+      "type": "string"
+    },
+    "purpose": {
+      "const": "source_quality_evaluation",
+      "default": "source_quality_evaluation",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "quality_passed": {
+      "title": "Quality Passed",
+      "type": "boolean"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/QualityCheckResult"
+      },
+      "title": "Results",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "truth_sha256": {
+      "title": "Truth Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "case_id",
+    "input_sha256",
+    "truth_sha256",
+    "quality_passed",
+    "gate_passed",
+    "results"
+  ],
+  "title": "SourceQualityReport",
+  "type": "object"
+}

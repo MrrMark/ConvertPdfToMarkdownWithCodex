@@ -38,6 +38,8 @@
 - `docs/schema/local_corpus_evidence_pack.schema.json`
 - `docs/schema/corpus_evidence_analysis_report.schema.json`
 - `docs/schema/corpus_evidence_trend_report.schema.json`
+- `docs/schema/source_quality_report.schema.json`
+- `docs/schema/source_quality_truth.schema.json`
 
 Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 
@@ -45,6 +47,42 @@ Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 python scripts/export_output_schema.py
 python scripts/export_output_schema.py --check
 ```
+
+## Q153 영역 OCR 진단과 작업량
+
+Q153 영역 OCR은 기존 sidecar의 레코드·ID·파일명을 유지한다. 이미 `TINY_DECORATIVE`로 제외된 그림은
+`figure_region_ocr.region_ocr.status=not_attempted`, `reason=tiny_decorative`, `attempted=false`를 기록하며,
+OCR evidence에는 `status=not_attempted`, `rejected_reason=tiny_decorative`를 남긴다. 실제 이미지와 다른 제외 사유는 이 규칙으로 생략하지 않는다.
+
+영역 OCR이 실행된 `report.json.summary`에는 다음 선택적 정수 지표를 추가한다. 그림과 OCR 대상 표를 합산한다.
+
+| 필드 | 의미 |
+| --- | --- |
+| `region_ocr_backend_call_count` | 실제 backend `recognize` 호출 수. 실패 호출 포함, cache hit 제외 |
+| `region_ocr_page_render_count` | 실제 page `render` 호출 수. 실패 렌더 포함 |
+| `region_ocr_page_cache_hit_count` | 이미 렌더된 현재 페이지 이미지 재사용 수 |
+| `region_ocr_result_cache_hit_count` | 같은 crop·backend 인스턴스·언어·scale의 OCR 결과 재사용 수 |
+| `region_ocr_skipped_decorative_count` | 영역 OCR 전에 제외한 장식 후보 수 |
+
+기존 `figure_region_ocr_attempted_count`는 호환성을 위해 처리한 그림 레코드 수를 계속 나타낸다.
+기존 `figure_region_ocr_render_attempted_count`도 레코드의 attempted 진단 집계이며 실제 렌더 호출 수가 아니다.
+성능 분석에는 새 지표를 사용한다. Tesseract의 text/confidence 하위 호출은 통합하지 않으므로
+backend 호출 1회와 외부 Tesseract 실행 1회는 같은 단위가 아니다.
+
+## 원문 품질 평가 입력과 보고서
+
+Q152의 별도 `scripts/evaluate_source_quality.py`가 `source_quality_truth` 입력을 읽고
+`source_quality_report.json`을 생성한다. 자동 변환의 기본 산출물에는 추가되지 않는다.
+
+- 입력: `case_id`, PDF `input_sha256`, 검토 근거, 모든 slice 페이지의 물리/인쇄 페이지 매핑, 개별 `checks`.
+- 출력: `schema_version=1.0`, `purpose=source_quality_evaluation`, 입력·정답 SHA-256,
+  `quality_passed`, `gate_passed`, 개별 `results`.
+- 결과별 `status`: `passed`, `known_failure`, `regression`, `stale_allowlist`.
+- `quality_passed`는 명시한 원문 검사에 한정하며, 알려진 실패가 있으면 false다.
+- `gate_passed`는 예상한 기준선을 유지했는지 나타낸다. 알려진 실패만 있으면 true지만 새 실패나 오래된 허용 목록이 있으면 false다.
+- 원문 토큰은 정답 입력에만 들어가며 보고서에는 복사하지 않는다.
+
+정답 작성과 실행 방법은 [원문 기준 품질 평가](SOURCE_QUALITY_EVALUATION.md)를 따른다.
 
 ## document.md
 

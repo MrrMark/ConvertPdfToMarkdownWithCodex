@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0",
+  "task": "Q153",
+  "date": "2026-09-13",
+  "baseline_commit": "13caebb9ac1eb6faf9607fd9c5ae88ea6dfcfd76",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.11.15",
+  "versions": {
+    "pypdf": "6.9.2",
+    "pdfplumber": "0.11.9",
+    "pypdfium2": "5.6.0",
+    "pytesseract": "0.3.13",
+    "pillow": "12.2.0"
+  },
+  "method": "Sequential isolated runtime; front matter cold 1 + warm 5, other cases once; imports excluded, conversion and output writing included; backend recognize calls instrumented.",
+  "profile": "technical_spec_rag_visual",
+  "domain_adapter": "nvme",
+  "page_workers": 1,
+  "scope": "Local CPU, no hardware isolation; front matter repeated; controller and SGL compatibility runs only. No cross-tool comparison.",
+  "cases": [
+    {
+      "case_id": "front_matter",
+      "input_sha256": "9c5ef8a735d30ad7017d88658dc2454e4b47b1da173bad53da38fcdb450f46e5",
+      "before_seconds": [
+        25.183580291981343,
+        27.007082416967023,
+        34.579755583021324,
+        27.680090499983635,
+        29.12665399996331,
+        29.628296499955468
+      ],
+      "after_seconds": [
+        2.605271417007316,
+        2.1737242080271244,
+        2.08583187503973,
+        2.0543959159986116,
+        2.0632465410162695,
+        2.1929357500048354
+      ],
+      "before_backend_calls": 159,
+      "after_backend_calls": 5,
+      "after_work_counters": {
+        "region_ocr_backend_call_count": 5,
+        "region_ocr_page_render_count": 1,
+        "region_ocr_page_cache_hit_count": 4,
+        "region_ocr_result_cache_hit_count": 0,
+        "region_ocr_skipped_decorative_count": 154
+      },
+      "markdown_identical_all_runs": true,
+      "manifest_identical": true,
+      "retained_ocr_evidence_identical": true,
+      "artifact_index_provenance_passed": true,
+      "visual_contract_existing_error_count": 462,
+      "visual_contract_findings_unchanged": true,
+      "before_warm_median_seconds": 29.12665399996331,
+      "after_warm_median_seconds": 2.08583187503973,
+      "warm_reduction_percent": 92.83875217852912
+    },
+    {
+      "case_id": "controller_tables",
+      "input_sha256": "5a6aa491db9dbcb46b21a1bcf901cc03e1ffd927dc57a6011d5e904551992185",
+      "before_seconds": [
+        4.918976458022371
+      ],
+      "after_seconds": [
+        0.8436744170030579
+      ],
+      "before_backend_calls": 8,
+      "after_backend_calls": 1,
+      "after_work_counters": {
+        "region_ocr_backend_call_count": 1,
+        "region_ocr_page_render_count": 1,
+        "region_ocr_page_cache_hit_count": 0,
+        "region_ocr_result_cache_hit_count": 0,
+        "region_ocr_skipped_decorative_count": 7
+      },
+      "markdown_identical_all_runs": true,
+      "manifest_identical": true,
+      "retained_ocr_evidence_identical": true,
+      "artifact_index_provenance_passed": true,
+      "visual_contract_existing_error_count": 22,
+      "visual_contract_findings_unchanged": true
+    },
+    {
+      "case_id": "sgl_figures_tables",
+      "input_sha256": "1fefe74693a264aa1134ed217d40d4630cb0100347f471613307cd397dca0749",
+      "before_seconds": [
+        4.744122000003699
+      ],
+      "after_seconds": [
+        1.0761068749707192
+      ],
+      "before_backend_calls": 1,
+      "after_backend_calls": 1,
+      "after_work_counters": {
+        "region_ocr_backend_call_count": 1,
+        "region_ocr_page_render_count": 1,
+        "region_ocr_page_cache_hit_count": 0,
+        "region_ocr_result_cache_hit_count": 0,
+        "region_ocr_skipped_decorative_count": 0
+      },
+      "markdown_identical_all_runs": true,
+      "manifest_identical": true,
+      "retained_ocr_evidence_identical": true,
+      "artifact_index_provenance_passed": true,
+      "visual_contract_existing_error_count": 0,
+      "visual_contract_findings_unchanged": true
+    }
+  ]
+}

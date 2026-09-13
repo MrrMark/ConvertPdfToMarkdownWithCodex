@@ -298,6 +298,28 @@ def build_simple_table_pdf(path: Path) -> None:
     )
 
 
+def build_nested_cell_table_pdf(path: Path) -> None:
+    """Build a parent byte cell with a separately bounded child bit table."""
+    write_pdf(path, [PageSpec(
+        texts=[
+            PositionedText("Figure 1: Nested identifier", 50, 740),
+            PositionedText("Bytes", 55, 684, 10),
+            PositionedText("Description", 145, 684, 10),
+            PositionedText("15", 55, 620, 10),
+            PositionedText("Identifier", 145, 655, 10),
+        ],
+        graphics=[
+            "1 w 50 570 420 130 re S",
+            "140 570 m 140 700 l S",
+            "50 675 m 470 675 l S",
+        ],
+        tables=[TableSpec(
+            [["Bits", "Meaning"], ["07:04", "Type 0h"], ["03:00", "Subtype 1h"]],
+            150, 640, [65, 235], row_height=20,
+        )],
+    )])
+
+
 def build_complex_table_pdf(path: Path) -> None:
     write_pdf(
         path,

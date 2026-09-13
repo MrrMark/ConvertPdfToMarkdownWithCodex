@@ -5,6 +5,8 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Reduce Q153 region OCR work by skipping excluded decorative figures and sharing bounded page/crop caches across figure and table targets. Preserve source artifacts and expose actual work counters. / Q153 장식 후보 OCR 제외, 그림·표 렌더 및 결과 재사용, 실제 작업량 지표를 추가했다.
+- Add Q152 offline source-quality evaluation with exact known-failure gates, PDF identity checks, nested-table regression fixtures, and versioned truth/report schemas. / Q152 원문 기준 품질 평가, 명시적 알려진 실패 관리, PDF 식별 검사, 중첩 표 회귀 fixture 및 정답/보고서 스키마를 추가했다.
 - Add Q151 incremental Ruff rule expansion by enabling `SIM` and cleaning existing simplify violations without public artifact changes.
 - Add Q150 PRD/public docs CLI contract alignment for current figure semantics sidecar options and virtualenv-aware development commands.
 - Add Q149 streaming RAG sidecar writers so JSONL sidecars are written record-by-record while preserving existing byte output contracts.

@@ -209,6 +209,11 @@ def _add_report_summary_json_schema_extras(schema: dict[str, Any]) -> None:
             "Number of OCR evidence records skipped because local OCR/runtime was unavailable."
         ),
         "region_ocr_evidence_not_attempted_count": "Number of OCR evidence records that were not attempted.",
+        "region_ocr_backend_call_count": "Actual region OCR backend recognize calls, including failed calls; figure and table targets combined.",
+        "region_ocr_page_render_count": "Actual PDF page render calls for region OCR, including failed render calls.",
+        "region_ocr_page_cache_hit_count": "Region requests served from the current page image without another render.",
+        "region_ocr_result_cache_hit_count": "Identical crop/backend/language requests served without another backend call.",
+        "region_ocr_skipped_decorative_count": "Excluded TINY_DECORATIVE figure targets explicitly skipped before region OCR.",
     }.items():
         properties.setdefault(name, {"type": "integer", "description": description})
     properties.setdefault(
