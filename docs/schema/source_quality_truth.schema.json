@@ -1,0 +1,232 @@
+{
+  "$defs": {
+    "TruthCheck": {
+      "additionalProperties": false,
+      "description": "One narrow source assertion and, optionally, its exact known failures.",
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "check_id": {
+          "minLength": 1,
+          "title": "Check Id",
+          "type": "string"
+        },
+        "column": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column"
+        },
+        "count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Count"
+        },
+        "kind": {
+          "enum": [
+            "text_sequence",
+            "table_count",
+            "table_cell",
+            "nested_table",
+            "figure_region",
+            "no_empty_tables",
+            "no_decorative_ocr"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "known_failure_records": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Known Failure Records",
+          "type": "array"
+        },
+        "minimum_iou": {
+          "default": 0.7,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Minimum Iou",
+          "type": "number"
+        },
+        "page": {
+          "exclusiveMinimum": 0,
+          "title": "Page",
+          "type": "integer"
+        },
+        "record_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Record Id"
+        },
+        "row_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row Label"
+        },
+        "tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tokens",
+          "type": "array"
+        }
+      },
+      "required": [
+        "check_id",
+        "kind",
+        "page"
+      ],
+      "title": "TruthCheck",
+      "type": "object"
+    },
+    "TruthPage": {
+      "additionalProperties": false,
+      "description": "Map an output page to the original physical and printed page.",
+      "properties": {
+        "page": {
+          "exclusiveMinimum": 0,
+          "title": "Page",
+          "type": "integer"
+        },
+        "physical_page": {
+          "exclusiveMinimum": 0,
+          "title": "Physical Page",
+          "type": "integer"
+        },
+        "printed_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Printed Page"
+        }
+      },
+      "required": [
+        "page",
+        "physical_page"
+      ],
+      "title": "TruthPage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Versioned, manually reviewed source truth for one exact PDF slice.",
+  "properties": {
+    "case_id": {
+      "minLength": 1,
+      "title": "Case Id",
+      "type": "string"
+    },
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/TruthCheck"
+      },
+      "minItems": 1,
+      "title": "Checks",
+      "type": "array"
+    },
+    "input_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Sha256",
+      "type": "string"
+    },
+    "pages": {
+      "items": {
+        "$ref": "#/$defs/TruthPage"
+      },
+      "minItems": 1,
+      "title": "Pages",
+      "type": "array"
+    },
+    "review_note": {
+      "minLength": 1,
+      "title": "Review Note",
+      "type": "string"
+    },
+    "reviewed_from": {
+      "enum": [
+        "rendered_source_pdf",
+        "synthetic_source_definition"
+      ],
+      "title": "Reviewed From",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "case_id",
+    "input_sha256",
+    "reviewed_from",
+    "review_note",
+    "pages",
+    "checks"
+  ],
+  "title": "SourceTruth",
+  "type": "object"
+}

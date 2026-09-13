@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,91 @@ FIGURE_SEMANTICS_SCHEMA_VERSION = "2.0"
 FIGURE_LABEL_PATTERN = re.compile(r"\b(?:[A-Z]{2,}[A-Z0-9_-]*-\d+|[A-Z]{2,}[0-9]+|[A-Z][A-Za-z]+)\b")
 REGION_OCR_RENDER_SCALE = 2.0
 REGION_OCR_MIN_CROP_PIXELS = 4
+REGION_OCR_MAX_CACHED_CROPS = 128
+
+
+def _close_resource(resource: object | None) -> None:
+    close = getattr(resource, "close", None)
+    if close is not None:
+        close()
+
+
+def _skip_decorative_ocr(record: dict[str, Any]) -> bool:
+    return record.get("status") == "excluded" and (
+        "TINY_DECORATIVE" in (record.get("classification_reasons") or [])
+        or record.get("crop_rejected_reason") == "TINY_DECORATIVE"
+    )
+
+
+def _not_attempted_result(reason: str, backend: str) -> dict[str, Any]:
+    return {"status": "not_attempted", "backend": backend, "reason": reason,
+            "attempted": False, "candidate": None, "rejected": None}
+
+
+class RegionOCRCache:
+    """Own one rendered page and a bounded cache of crop results for one OCR session.
+
+    The document is borrowed. Backend identity, language, scale and pixel crop form
+    the result key; neither page images nor results survive a page switch.
+    """
+
+    def __init__(self) -> None:
+        self.scale = REGION_OCR_RENDER_SCALE
+        self.page_index: int | None = None
+        self.document: object | None = None
+        self.page: object | None = None
+        self.bitmap: object | None = None
+        self.image: object | None = None
+        self.results: OrderedDict[tuple, object] = OrderedDict()
+        self.metrics = dict.fromkeys([
+            "region_ocr_backend_call_count", "region_ocr_page_render_count",
+            "region_ocr_page_cache_hit_count", "region_ocr_result_cache_hit_count",
+            "region_ocr_skipped_decorative_count",
+        ], 0)
+
+    def page_image(self, document: object, page_index: int) -> object:
+        """Render on page change and release the preceding page before allocating."""
+        if self.document is document and self.page_index == page_index and self.image is not None:
+            self.metrics["region_ocr_page_cache_hit_count"] += 1
+            return self.image
+        self.close()
+        self.document, self.page_index = document, page_index
+        self.page = document.get_page(page_index)
+        self.metrics["region_ocr_page_render_count"] += 1
+        self.bitmap = self.page.render(scale=self.scale)
+        self.image = self.bitmap.to_pil()
+        return self.image
+
+    def recognize(self, backend: object, crop_box: tuple, *, lang: str) -> object:
+        """Reuse an identical crop result without changing backend text/confidence calls."""
+        key = (id(backend), lang, self.scale, crop_box)
+        if key in self.results:
+            self.metrics["region_ocr_result_cache_hit_count"] += 1
+            self.results.move_to_end(key)
+            return self.results[key]
+        crop = self.image.crop(crop_box)
+        try:
+            self.metrics["region_ocr_backend_call_count"] += 1
+            result = backend.recognize(crop, lang=lang)
+        finally:
+            _close_resource(crop)
+        self.results[key] = result
+        if len(self.results) > REGION_OCR_MAX_CACHED_CROPS:
+            self.results.popitem(last=False)
+        return result
+
+    def close(self) -> None:
+        """Release PIL, PDFium bitmap, page and cached results in ownership order."""
+        try:
+            _close_resource(self.image)
+        finally:
+            try:
+                _close_resource(self.bitmap)
+            finally:
+                _close_resource(self.page)
+                self.image = self.bitmap = self.page = self.document = None
+                self.page_index = None
+                self.results.clear()
 
 
 def _page_of(record: dict[str, Any]) -> int:
@@ -187,6 +273,7 @@ def _region_ocr_result(
     ocr_lang: str,
     ocr_backend: str,
     runtime_unavailable_reason: str | None,
+    cache: RegionOCRCache | None = None,
 ) -> dict[str, Any]:
     bbox = _bbox(record)
     if bbox is None:
@@ -203,16 +290,16 @@ def _region_ocr_result(
     if document is None or backend is None:
         return _runtime_unavailable_result("runtime_not_initialized", backend=ocr_backend)
 
-    page = None
+    local_cache = cache if cache is not None else RegionOCRCache()
     try:
-        page = document.get_page(_page_of(record) - 1)
-        bitmap = page.render(scale=REGION_OCR_RENDER_SCALE)
-        image = bitmap.to_pil()
+        if _page_of(record) < 1:
+            raise ValueError("invalid page")
+        image = local_cache.page_image(document, _page_of(record) - 1)
         crop_box = _crop_box(
             bbox=bbox,
             image_width=int(getattr(image, "width", 0)),
             image_height=int(getattr(image, "height", 0)),
-            scale=REGION_OCR_RENDER_SCALE,
+            scale=local_cache.scale,
         )
         if crop_box is None:
             return {
@@ -223,8 +310,7 @@ def _region_ocr_result(
                 "candidate": None,
                 "rejected": {"reason": "invalid_bbox", "bbox": bbox},
             }
-        region_image = image.crop(crop_box)
-        backend_result = backend.recognize(region_image, lang=ocr_lang)
+        backend_result = local_cache.recognize(backend, crop_box, lang=ocr_lang)
         metrics = _extract_confidence_metrics(backend_result.confidence_data)
         confidence = round(metrics.mean / 100.0, 4)
         text = backend_result.text.strip()
@@ -264,8 +350,8 @@ def _region_ocr_result(
             "rejected": {"reason": reason},
         }
     finally:
-        if page is not None:
-            page.close()
+        if cache is None:
+            local_cache.close()
 
 
 def augment_figure_records_with_region_ocr(
@@ -274,6 +360,7 @@ def augment_figure_records_with_region_ocr(
     pdf_path: Path | None = None,
     ocr_lang: str = "eng",
     ocr_backend: str = "tesseract",
+    region_results: list[dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Promote figure OCR evidence into deterministic report-only region OCR diagnostics."""
     augmented: list[dict[str, Any]] = []
@@ -288,8 +375,13 @@ def augment_figure_records_with_region_ocr(
     crop_rejected_count = 0
     runtime_unavailable_count = 0
 
+    if region_results is not None and len(region_results) != len(records):
+        raise ValueError("region_results must match figure records")
+    cache = RegionOCRCache()
     pdfium_module, backend, runtime_unavailable_reason = (
-        _region_ocr_runtime(ocr_backend=ocr_backend) if pdf_path is not None else (None, None, None)
+        _region_ocr_runtime(ocr_backend=ocr_backend)
+        if pdf_path is not None and region_results is None and any(not _skip_decorative_ocr(r) for r in records)
+        else (None, None, None)
     )
     document = None
     if pdf_path is not None and runtime_unavailable_reason is None and pdfium_module is not None:
@@ -299,10 +391,15 @@ def augment_figure_records_with_region_ocr(
             runtime_unavailable_reason = "pdf_open_failed"
 
     try:
-        for record in records:
+        for index, record in enumerate(records):
             updated = dict(record)
             attempted_count += 1
-            if pdf_path is None:
+            if _skip_decorative_ocr(record):
+                region_result = _not_attempted_result("tiny_decorative", ocr_backend)
+                cache.metrics["region_ocr_skipped_decorative_count"] += 1
+            elif region_results is not None:
+                region_result = region_results[index]
+            elif pdf_path is None:
                 region_result = {
                     "status": "not_attempted",
                     "backend": ocr_backend,
@@ -319,6 +416,7 @@ def augment_figure_records_with_region_ocr(
                     ocr_lang=ocr_lang,
                     ocr_backend=ocr_backend,
                     runtime_unavailable_reason=runtime_unavailable_reason,
+                    cache=cache,
                 )
             if region_result["attempted"]:
                 render_attempted_count += 1
@@ -391,12 +489,14 @@ def augment_figure_records_with_region_ocr(
             }
             augmented.append(updated)
     finally:
+        cache.close()
         if document is not None:
             close = getattr(document, "close", None)
             if close is not None:
                 close()
 
     return augmented, {
+        **cache.metrics,
         "figure_region_ocr_attempted_count": attempted_count,
         "figure_region_ocr_candidate_count": candidate_count,
         "figure_region_ocr_promoted_label_count": promoted_label_count,

@@ -6,6 +6,9 @@ from typing import Any
 
 from pdf2md.serializers.rag_figure_semantics import (
     FIGURE_REGION_OCR_CONFIDENCE_THRESHOLD,
+    RegionOCRCache,
+    _not_attempted_result,
+    _skip_decorative_ocr,
     _region_ocr_result,
     _region_ocr_runtime,
 )
@@ -212,6 +215,58 @@ def _table_region_ocr_eligible(table: dict[str, Any]) -> bool:
     return source_mode in TABLE_OCR_SOURCE_MODES
 
 
+def prepare_region_ocr_results(
+    *, figure_records: list[dict[str, Any]], rag_tables: list[dict[str, Any]],
+    pdf_path: Path, ocr_backend: str, ocr_lang: str, password: str | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, int]]:
+    """Process figure/table crops together by page, retaining only result metadata.
+
+    Output order stays figure input order and table IDs remain unchanged. The
+    cache and PDF are closed before consumers serialize any evidence records.
+    """
+    tables = [table for table in normalize_rag_table_payload(rag_tables) if _table_region_ocr_eligible(table)]
+    jobs = [(record, "figure", index) for index, record in enumerate(figure_records)]
+    jobs.extend((record, "table", index) for index, record in enumerate(tables))
+    figures: list[dict[str, Any]] = [{} for _ in figure_records]
+    table_results: dict[str, dict[str, Any]] = {}
+    cache = RegionOCRCache()
+    document = None
+    backend = None
+    reason = None
+    try:
+        if any(kind != "figure" or not _skip_decorative_ocr(record) for record, kind, _ in jobs):
+            pdfium_module, backend, reason = _region_ocr_runtime(ocr_backend=ocr_backend)
+            if reason is None and pdfium_module is not None:
+                try:
+                    kwargs = {"password": password} if password is not None else {}
+                    document = pdfium_module.PdfDocument(str(pdf_path), **kwargs)
+                except Exception:  # noqa: BLE001
+                    reason = "pdf_open_failed"
+        ordered_jobs = sorted(jobs, key=lambda job: (_page_of(job[0]), job[1], job[2]))
+        for position, (record, kind, index) in enumerate(ordered_jobs):
+            if kind == "figure" and _skip_decorative_ocr(record):
+                result = _not_attempted_result("tiny_decorative", ocr_backend)
+                cache.metrics["region_ocr_skipped_decorative_count"] += 1
+            else:
+                result = _region_ocr_result(
+                    document=document, backend=backend, record=record, ocr_lang=ocr_lang,
+                    ocr_backend=ocr_backend, runtime_unavailable_reason=reason, cache=cache,
+                )
+            if kind == "figure":
+                figures[index] = result
+            else:
+                table_results[str(record["table_id"])] = result
+            if position + 1 == len(ordered_jobs) or _page_of(ordered_jobs[position + 1][0]) != _page_of(record):
+                cache.close()
+    finally:
+        try:
+            cache.close()
+        finally:
+            if document is not None:
+                document.close()
+    return figures, table_results, cache.metrics
+
+
 def _table_region_ocr_records(
     *,
     rag_tables: list[dict[str, Any]],
@@ -220,6 +275,7 @@ def _table_region_ocr_records(
     ocr_backend: str,
     ocr_lang: str,
     start_index: int,
+    prepared_results: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     eligible_tables = [
         table
@@ -230,7 +286,8 @@ def _table_region_ocr_records(
         return []
 
     pdfium_module, backend, runtime_unavailable_reason = (
-        _region_ocr_runtime(ocr_backend=ocr_backend) if pdf_path is not None else (None, None, "pdf_path_not_provided")
+        _region_ocr_runtime(ocr_backend=ocr_backend)
+        if pdf_path is not None and prepared_results is None else (None, None, "pdf_path_not_provided")
     )
     document = None
     if pdf_path is not None and runtime_unavailable_reason is None and pdfium_module is not None:
@@ -240,18 +297,20 @@ def _table_region_ocr_records(
             runtime_unavailable_reason = "pdf_open_failed"
 
     records: list[dict[str, Any]] = []
+    cache = RegionOCRCache()
     try:
         for offset, table in enumerate(
             sorted(eligible_tables, key=lambda item: (_page_of(item), int(item.get("table_index") or 0))),
             start=start_index,
         ):
-            region_ocr = _region_ocr_result(
+            region_ocr = prepared_results[str(table["table_id"])] if prepared_results is not None else _region_ocr_result(
                 document=document,
                 backend=backend,
                 record=table,
                 ocr_lang=ocr_lang,
                 ocr_backend=ocr_backend,
                 runtime_unavailable_reason=runtime_unavailable_reason,
+                cache=cache,
             )
             table_id = str(table.get("table_id") or "")
             records.append(
@@ -274,6 +333,7 @@ def _table_region_ocr_records(
                 )
             )
     finally:
+        cache.close()
         if document is not None:
             close = getattr(document, "close", None)
             if close is not None:
@@ -289,6 +349,7 @@ def build_region_ocr_evidence_records(
     pdf_path: Path | None = None,
     ocr_backend: str = "tesseract",
     ocr_lang: str = "eng",
+    table_region_results: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Build report-only OCR evidence records without mutating Markdown/text sources."""
     records: list[dict[str, Any]] = []
@@ -318,6 +379,7 @@ def build_region_ocr_evidence_records(
             ocr_backend=ocr_backend,
             ocr_lang=ocr_lang,
             start_index=len(records) + 1,
+            prepared_results=table_region_results,
         )
     )
     metrics = {

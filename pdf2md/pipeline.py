@@ -71,7 +71,7 @@ from pdf2md.serializers.rag_figure_semantics import (
 )
 from pdf2md.serializers.rag_figures import build_figure_records
 from pdf2md.serializers.rag_layout import build_page_layout_records
-from pdf2md.serializers.rag_ocr_evidence import build_region_ocr_evidence_records
+from pdf2md.serializers.rag_ocr_evidence import build_region_ocr_evidence_records, prepare_region_ocr_results
 from pdf2md.serializers.rag_requirements import build_requirement_traceability_records
 from pdf2md.serializers.rag_tables import (
     annotate_rag_tables_with_heading_context,
@@ -1346,6 +1346,7 @@ def _run_conversion_impl(
             text_block_records,
         )
 
+    prepared_table_region_results = None
     if write_figure_rag_sidecar and not figure_semantics_timeout_expired("rag_figures"):
         ensure_figure_semantics_clock()
         mark_stage("rag_figures")
@@ -1356,12 +1357,20 @@ def _run_conversion_impl(
             text_block_records=text_block_records,
         )
         if effective_figure_region_ocr and not figure_semantics_timeout_expired("figure_region_ocr"):
+            prepared_figure_results, prepared_table_region_results, region_work_metrics = prepare_region_ocr_results(
+                figure_records=figure_records,
+                rag_tables=contextual_rag_tables if write_figure_ocr_evidence_sidecar and rag_table_output.writes_jsonl() else [],
+                pdf_path=config.input_pdf, ocr_lang=config.ocr_lang, ocr_backend=config.ocr_backend,
+                password=config.password,
+            )
             figure_records, figure_region_ocr_metrics = augment_figure_records_with_region_ocr(
                 figure_records,
                 pdf_path=config.input_pdf,
                 ocr_lang=config.ocr_lang,
                 ocr_backend=config.ocr_backend,
+                region_results=prepared_figure_results,
             )
+            figure_region_ocr_metrics.update(region_work_metrics)
         figure_rag_record_count, figure_rag_file_count = write_figure_rag_output(config, figure_records)
         finish_stage("rag_figures", figure_rag_started)
 
@@ -1375,6 +1384,7 @@ def _run_conversion_impl(
             pdf_path=config.input_pdf,
             ocr_lang=config.ocr_lang,
             ocr_backend=config.ocr_backend,
+            table_region_results=prepared_table_region_results,
         )
         figure_ocr_evidence_record_count, figure_ocr_evidence_file_count = write_figure_ocr_evidence_output(
             config,

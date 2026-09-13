@@ -31,6 +31,7 @@ from pdf2md.models import (
     RequirementChangeImpactReport,
     VisualSidecarContractReport,
 )
+from pdf2md.quality_eval import SourceQualityReport, SourceTruth
 
 
 SCHEMA_FILES: dict[str, type] = {
@@ -58,6 +59,8 @@ SCHEMA_FILES: dict[str, type] = {
     "local_corpus_evidence_pack.schema.json": LocalCorpusEvidencePack,
     "corpus_evidence_analysis_report.schema.json": CorpusEvidenceAnalysisReport,
     "corpus_evidence_trend_report.schema.json": CorpusEvidenceTrendReport,
+    "source_quality_report.schema.json": SourceQualityReport,
+    "source_quality_truth.schema.json": SourceTruth,
 }
 
 
