@@ -67,6 +67,8 @@ class ImageExtractionResult:
     stage_timed_out: bool = False
     last_page: int | None = None
     last_image_count: int = 0
+    vector_source_lines: dict[str, list[dict]] = field(default_factory=dict)
+    vector_attempted_pages: set[int] = field(default_factory=set)
 
 
 @dataclass(frozen=True)
@@ -1324,13 +1326,18 @@ def _append_figure_crop_fallbacks(
     image_mode: ImageMode,
     assets_dirname: str,
     page_text_lines: dict[int, list[dict]],
+    confirmed_table_bboxes: dict[int, list[list[float]]] | None = None,
 ) -> None:
-    existing_pages = {asset.page for asset in result.assets}
+    existing_pages = {asset.page for asset in result.assets} | result.vector_attempted_pages
     images_root = output_dir / assets_dirname / "images"
     for page_number in selected_pages:
         if page_number in existing_pages:
             continue
         captions = _figure_caption_lines(page_text_lines.get(page_number, []))
+        captions = [caption for caption in captions if not any(
+            0 <= box[1] - float(caption.get("bottom", 0)) <= 40
+            for box in (confirmed_table_bboxes or {}).get(page_number, [])
+        )]
         if not captions:
             continue
         caption = captions[0]
@@ -1434,6 +1441,60 @@ def _append_figure_crop_fallbacks(
         result.debug_candidates_by_page.setdefault(page_number, []).append(debug_payload)
 
 
+def _append_vector_figure_crops(
+    *, result: ImageExtractionResult, page: Any, page_number: int, pdf_path: Path,
+    password: str | None, output_dir: Path, assets_dirname: str, image_mode: ImageMode,
+    text_lines: list[dict], table_bboxes: list[list[float]],
+    should_stop: Callable[[], bool] | None = None,
+) -> None:
+    from pdf2md.extractors.vector_figures import contains_bbox, detect_framed_vector_figures
+    from pdf2md.models import FigureSourceTextLine
+
+    diagnostics = []
+    candidates = detect_framed_vector_figures(page, text_lines=text_lines, confirmed_table_bboxes=table_bboxes,
+                                            diagnostics=diagnostics)
+    for item in diagnostics:
+        result.vector_attempted_pages.add(page_number)
+        result.warnings.append(WarningEntry(code=WarningCode.IMAGE_CROP_REJECTED, page=page_number,
+            message="Ambiguous vector figure boundary; source text retained.", details=item))
+    for candidate in candidates:
+        if should_stop is not None and should_stop():
+            break
+        frame = candidate["bbox"]
+        if any(asset.page == page_number and asset.bbox and contains_bbox(asset.bbox, frame)
+               for asset in result.assets):
+            continue
+        result.vector_attempted_pages.add(page_number)
+        caption = candidate["caption"]
+        caption_text = str(caption["text"])
+        # One point outside the closed path preserves both halves of its stroke.
+        box = [max(0, frame[0]-1), max(0, frame[1]-1), min(page.width, frame[2]+1), min(page.height, frame[3]+1)]
+        try:
+            data, width, height = _render_page_crop(pdf_path=pdf_path, password=password, page_number=page_number, bbox=box)
+            diagnostics = _analyze_crop_content(data, crop_bbox=box, page_width=page.width, page_height=page.height)
+            if diagnostics.rejected_reason:
+                raise ValueError(diagnostics.rejected_reason)
+            index = max([asset.index for asset in result.assets + result.excluded_assets if asset.page == page_number], default=0) + 1
+            filename = f"page-{page_number:04d}-figure-{index:03d}.png"
+            path = f"{assets_dirname}/images/{filename}"
+            _append_figure_asset(
+                result=result, image_mode=image_mode, image_bytes=data, page_number=page_number,
+                index=index, extension="png", rel_path=path, disk_path=output_dir / path,
+                top=float(caption["bottom"]), bbox_payload=box, width=width, height=height,
+                sha256=hashlib.sha256(data).hexdigest(), caption_text=caption_text, dedupe_of=None,
+                source="page_crop", caption_confidence=0.9, crop_reason="captioned_vector_diagram",
+                crop_content_ratio=diagnostics.content_ratio,
+            )
+            result.vector_source_lines[path] = candidate["source_text_lines"]
+            result.assets[-1].source_text_lines = [FigureSourceTextLine(**line) for line in candidate["source_text_lines"]]
+        except Exception as exc:  # noqa: BLE001
+            result.warnings.append(WarningEntry(
+                code=WarningCode.IMAGE_EXTRACTION_FAILED, page=page_number,
+                message=f"Vector figure preservation failed: {exc}",
+                details={"caption_text": caption_text, "bbox": box, "reason": "vector_crop_failed", "source_text_retained": True},
+            ))
+
+
 def extract_images(
     reader: PdfReader,
     pdf_path: Path,
@@ -1451,6 +1512,7 @@ def extract_images(
     image_extraction_stage_timeout_seconds: float | None = None,
     progress: ImageExtractionProgressCallback | None = None,
     time_provider: TimeProvider = time.monotonic,
+    confirmed_table_bboxes: dict[int, list[list[float]]] | None = None,
 ) -> ImageExtractionResult:
     result = ImageExtractionResult()
     if image_mode == ImageMode.NONE:
@@ -1792,6 +1854,38 @@ def extract_images(
         for marker, recovery in _resolve_structure_markers(all_pending_markers, ocr_cache=structure_ocr_cache):
             _append_structure_marker_result(result, marker, recovery)
 
+    if confirmed_table_bboxes is not None and pdf is not None and not result.stage_timed_out:
+        elapsed_by_page = {event.get("page"): (event.get("elapsed_ms") or 0) / 1000
+                           for event in result.progress_events if event.get("status") == "image_extraction_page_finished"}
+        for current, page_number in enumerate(selected_pages, start=1):
+            if page_number in result.skipped_pages or page_number in result.timed_out_pages:
+                continue
+            if _timeout_expired(stage_started_at, image_extraction_stage_timeout_seconds, now=time_provider()):
+                record_stage_timeout(page_number, 0)
+                break
+            try:
+                vector_started = time_provider() - elapsed_by_page.get(page_number, 0)
+                def vector_should_stop() -> bool:
+                    now = time_provider()
+                    if _timeout_expired(stage_started_at, image_extraction_stage_timeout_seconds, now=now):
+                        record_stage_timeout(page_number, 0)
+                        return True
+                    if _timeout_expired(vector_started, image_extraction_page_timeout_seconds, now=now):
+                        record_page_timeout(current=current, page_number=page_number, page_started_at=vector_started,
+                                            image_count=0, processed_image_count=0)
+                        return True
+                    return False
+                _append_vector_figure_crops(
+                    result=result, page=pdf.pages[page_number-1], page_number=page_number,
+                    pdf_path=pdf_path, password=password, output_dir=output_dir, assets_dirname=assets_dirname,
+                    image_mode=image_mode, text_lines=page_text_lines.get(page_number, []),
+                    table_bboxes=confirmed_table_bboxes.get(page_number, []),
+                    should_stop=vector_should_stop,
+                )
+            except Exception as exc:  # noqa: BLE001
+                result.warnings.append(WarningEntry(code=WarningCode.IMAGE_EXTRACTION_FAILED, page=page_number,
+                    message=f"Vector figure detection failed: {exc}", details={"reason": "vector_detection_failed"}))
+
     if figure_crop_fallback:
         now = time_provider()
         if _timeout_expired(stage_started_at, image_extraction_stage_timeout_seconds, now=now):
@@ -1807,6 +1901,7 @@ def extract_images(
                 image_mode=image_mode,
                 assets_dirname=assets_dirname,
                 page_text_lines=page_text_lines,
+                confirmed_table_bboxes=confirmed_table_bboxes,
             )
 
     return result

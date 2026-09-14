@@ -307,6 +307,9 @@ def build_nested_cell_table_pdf(path: Path) -> None:
             PositionedText("Description", 145, 684, 10),
             PositionedText("15", 55, 620, 10),
             PositionedText("Identifier", 145, 655, 10),
+            # Some exporters leave a tiny standalone space outside the child
+            # grid near its bottom border. It must not count as trailing prose.
+            PositionedText(" ", 145, 575, 0.48),
         ],
         graphics=[
             "1 w 50 570 420 130 re S",

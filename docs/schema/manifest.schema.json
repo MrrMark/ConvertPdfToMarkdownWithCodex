@@ -147,6 +147,33 @@
       "title": "ExcludedImageAsset",
       "type": "object"
     },
+    "FigureSourceTextLine": {
+      "description": "Unmodified source text within a successfully preserved vector figure.",
+      "properties": {
+        "bbox": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Bbox",
+          "type": "array"
+        },
+        "line_index": {
+          "title": "Line Index",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "line_index",
+        "text",
+        "bbox"
+      ],
+      "title": "FigureSourceTextLine",
+      "type": "object"
+    },
     "ImageAsset": {
       "properties": {
         "alt_text": {
@@ -325,6 +352,21 @@
           "title": "Source",
           "type": "string"
         },
+        "source_text_lines": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/FigureSourceTextLine"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Text Lines"
+        },
         "width": {
           "anyOf": [
             {
@@ -344,6 +386,36 @@
         "path"
       ],
       "title": "ImageAsset",
+      "type": "object"
+    },
+    "NestedTableStructure": {
+      "description": "A bounded child table owned by exactly one parent cell.",
+      "properties": {
+        "bbox": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Bbox",
+          "type": "array"
+        },
+        "cells": {
+          "items": {
+            "$ref": "#/$defs/TableCellStructure"
+          },
+          "title": "Cells",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "bbox",
+        "cells"
+      ],
+      "title": "NestedTableStructure",
       "type": "object"
     },
     "TableAsset": {
@@ -410,6 +482,21 @@
           ],
           "default": null,
           "title": "Caption Text"
+        },
+        "cell_structure": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/TableCellStructure"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cell Structure"
         },
         "continuation_confidence": {
           "anyOf": [
@@ -547,6 +634,69 @@
         "mode"
       ],
       "title": "TableAsset",
+      "type": "object"
+    },
+    "TableCellStructure": {
+      "description": "Original cell content and its geometrically verified child tables.",
+      "properties": {
+        "bbox": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Bbox",
+          "type": "array"
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/NestedTableStructure"
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "col_span": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Col Span",
+          "type": "integer"
+        },
+        "column": {
+          "minimum": 0,
+          "title": "Column",
+          "type": "integer"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "raw_text": {
+          "title": "Raw Text",
+          "type": "string"
+        },
+        "row": {
+          "minimum": 0,
+          "title": "Row",
+          "type": "integer"
+        },
+        "row_span": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Row Span",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "row",
+        "column",
+        "bbox",
+        "raw_text",
+        "text"
+      ],
+      "title": "TableCellStructure",
       "type": "object"
     },
     "WarningEntry": {

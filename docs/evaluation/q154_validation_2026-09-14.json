@@ -1,0 +1,92 @@
+{
+  "task": "Q154",
+  "date": "2026-09-14",
+  "baseline_commit": "b3c6b8d",
+  "environment": "local CPU, Python 3.11",
+  "profile": "technical_spec_rag_visual",
+  "domain_adapter": "nvme",
+  "tests": {
+    "pytest_passed": 555,
+    "q154_test_cases": 15,
+    "ruff_passed": true,
+    "schema_check_passed": true,
+    "cli_help_passed": true,
+    "goldens_modified": false,
+    "windows_ci_run": false
+  },
+  "cases": {
+    "controller_tables": {
+      "quality_passed": true,
+      "gate_passed": true,
+      "tables": 3,
+      "vectors": 3,
+      "artifact_integrity_passed": true,
+      "index": {
+        "passed": true,
+        "findings": 0
+      },
+      "provenance": {
+        "passed": true,
+        "findings": 0
+      },
+      "visual": {
+        "passed": false,
+        "findings": 22
+      },
+      "visual_findings_unchanged": false,
+      "visual_findings_equal_except_line_and_record_id": true,
+      "actual_page_4_tables_equal_except_continuation_diagnostics": true,
+      "input_sha256": "5a6aa491db9dbcb46b21a1bcf901cc03e1ffd927dc57a6011d5e904551992185"
+    },
+    "sgl_figures_tables": {
+      "quality_passed": false,
+      "gate_passed": true,
+      "tables": 10,
+      "vectors": 0,
+      "artifact_integrity_passed": true,
+      "q153_byte_comparison": {
+        "document.md": true,
+        "manifest.json": true
+      },
+      "index": {
+        "passed": true,
+        "findings": 0
+      },
+      "provenance": {
+        "passed": true,
+        "findings": 0
+      },
+      "visual": {
+        "passed": true,
+        "findings": 0
+      },
+      "visual_findings_unchanged": true,
+      "input_sha256": "1fefe74693a264aa1134ed217d40d4630cb0100347f471613307cd397dca0749"
+    },
+    "front_matter": {
+      "quality_passed": true,
+      "gate_passed": true,
+      "tables": 0,
+      "vectors": 0,
+      "artifact_integrity_passed": true,
+      "q153_byte_comparison": {
+        "document.md": true,
+        "manifest.json": true
+      },
+      "index": {
+        "passed": true,
+        "findings": 0
+      },
+      "provenance": {
+        "passed": true,
+        "findings": 0
+      },
+      "visual": {
+        "passed": false,
+        "findings": 462
+      },
+      "visual_findings_unchanged": true,
+      "input_sha256": "9c5ef8a735d30ad7017d88658dc2454e4b47b1da173bad53da38fcdb450f46e5"
+    }
+  }
+}

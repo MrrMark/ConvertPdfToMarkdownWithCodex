@@ -1,0 +1,116 @@
+{
+  "task": "Q155",
+  "date": "2026-09-14",
+  "baseline": "Q154 locally validated outputs (unmerged)",
+  "environment": "local CPU, Python 3.11",
+  "profile": "technical_spec_rag_visual",
+  "domain_adapter": "nvme",
+  "validation": {
+    "pytest_passed": 566,
+    "q155_test_cases": 11,
+    "ruff_passed": true,
+    "schema_check_passed": true,
+    "cli_help_passed": true,
+    "goldens_modified": false,
+    "source_pdf_visually_checked": true,
+    "html_screen_check": "blocked by browser local URL policy",
+    "windows_ci_run": false
+  },
+  "cases": {
+    "sgl_figures_tables": {
+      "input_sha256": "1fefe74693a264aa1134ed217d40d4630cb0100347f471613307cd397dca0749",
+      "exit_code": 0,
+      "quality_passed": true,
+      "gate_passed": true,
+      "tables": 10,
+      "nested_parent_tables": 7,
+      "rag_rows": 43,
+      "rag_row_content_unchanged": true,
+      "visual_findings_unchanged": true,
+      "contracts": {
+        "artifact": {
+          "passed": true,
+          "findings": 0
+        },
+        "index": {
+          "passed": true,
+          "findings": 0
+        },
+        "provenance": {
+          "passed": true,
+          "findings": 0
+        },
+        "visual": {
+          "passed": true,
+          "findings": 0
+        }
+      }
+    },
+    "controller_tables": {
+      "input_sha256": "5a6aa491db9dbcb46b21a1bcf901cc03e1ffd927dc57a6011d5e904551992185",
+      "exit_code": 0,
+      "quality_passed": true,
+      "gate_passed": true,
+      "tables": 3,
+      "nested_parent_tables": 0,
+      "rag_rows": 7,
+      "rag_row_content_unchanged": true,
+      "visual_findings_unchanged": true,
+      "contracts": {
+        "artifact": {
+          "passed": true,
+          "findings": 0
+        },
+        "index": {
+          "passed": true,
+          "findings": 0
+        },
+        "provenance": {
+          "passed": true,
+          "findings": 0
+        },
+        "visual": {
+          "passed": false,
+          "findings": 22
+        }
+      },
+      "q154_bytes_unchanged": {
+        "document.md": true,
+        "manifest.json": true
+      }
+    },
+    "front_matter": {
+      "input_sha256": "9c5ef8a735d30ad7017d88658dc2454e4b47b1da173bad53da38fcdb450f46e5",
+      "exit_code": 0,
+      "quality_passed": true,
+      "gate_passed": true,
+      "tables": 0,
+      "nested_parent_tables": 0,
+      "rag_rows": 0,
+      "rag_row_content_unchanged": true,
+      "visual_findings_unchanged": true,
+      "contracts": {
+        "artifact": {
+          "passed": true,
+          "findings": 0
+        },
+        "index": {
+          "passed": true,
+          "findings": 0
+        },
+        "provenance": {
+          "passed": true,
+          "findings": 0
+        },
+        "visual": {
+          "passed": false,
+          "findings": 462
+        }
+      },
+      "q154_bytes_unchanged": {
+        "document.md": true,
+        "manifest.json": true
+      }
+    }
+  }
+}

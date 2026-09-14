@@ -188,7 +188,7 @@ def test_real_conversion_simple_table_has_no_false_positive(tmp_path: Path) -> N
     assert _evaluate(case).quality_passed
 
 
-def test_synthetic_pdf_reproduces_nested_structure_loss(tmp_path: Path) -> None:
+def test_synthetic_pdf_preserves_nested_structure(tmp_path: Path) -> None:
     case = _case(tmp_path, "", [
         {"check_id": "parent", "kind": "table_count", "page": 1, "count": 1},
         {"check_id": "raw-cell", "kind": "table_cell", "page": 1,
@@ -196,8 +196,7 @@ def test_synthetic_pdf_reproduces_nested_structure_loss(tmp_path: Path) -> None:
          "tokens": ["Identifier", "07:04", "Type 0h", "03:00", "Subtype 1h"]},
         {"check_id": "nested", "kind": "nested_table", "page": 1,
          "record_id": "page-0001-table-0001", "row_label": "15", "column": 1,
-         "tokens": ["Bits", "Meaning", "07:04", "Type 0h", "03:00", "Subtype 1h"],
-         "known_failure_records": ["page-0001-table-0001"]},
+         "tokens": ["Bits", "Meaning", "07:04", "Type 0h", "03:00", "Subtype 1h"]},
     ])
     build_nested_cell_table_pdf(case[1])
     payload = json.loads(case[2].read_text())
@@ -207,8 +206,8 @@ def test_synthetic_pdf_reproduces_nested_structure_loss(tmp_path: Path) -> None:
     result = run_conversion(Config(input_pdf=case[1], output_dir=case[0], keep_page_markers=True))
     assert result.exit_code == 0
     report = _evaluate(case)
-    assert report.gate_passed and not report.quality_passed
-    assert [result.status for result in report.results] == ["passed", "passed", "known_failure"]
+    assert report.gate_passed and report.quality_passed
+    assert [result.status for result in report.results] == ["passed", "passed", "passed"]
 
 
 def test_gfm_escaped_pipe_cell_and_html_entities(tmp_path: Path) -> None:

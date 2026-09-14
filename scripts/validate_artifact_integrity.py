@@ -5,6 +5,7 @@ import argparse
 import json
 import re
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
@@ -13,6 +14,58 @@ from pdf2md.models import ArtifactIntegrityReport
 
 
 SCHEMA_VERSION = "1.0"
+
+
+class _HtmlTableContentParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.stack: list[dict[str, Any]] = []
+        self.empty_tables: list[dict[str, Any]] = []
+        self.pending_id: str | None = None
+
+    def handle_comment(self, data: str) -> None:
+        match = re.match(r"\s*table:\s*page=(\d+)\s+index=(\d+)", data)
+        if match:
+            self.pending_id = f"page-{int(match[1]):04d}-table-{int(match[2]):04d}"
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "table":
+            self.stack.append({"content": False, "line": self.getpos()[0], "record_id": self.pending_id})
+            self.pending_id = None
+        if tag == "img" and dict(attrs).get("src"):
+            for table in self.stack:
+                table["content"] = True
+
+    def handle_data(self, data: str) -> None:
+        if data.strip():
+            for table in self.stack:
+                table["content"] = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "table" and self.stack:
+            table = self.stack.pop()
+            if not table["content"]:
+                self.empty_tables.append(table)
+
+
+def _without_fenced_code(markdown: str) -> str:
+    """Hide fenced examples from HTML validation while preserving line numbers."""
+    lines = []
+    fence = ""
+    for line in markdown.splitlines(keepends=True):
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line.rstrip("\r\n"))
+        if fence:
+            if marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence) and not marker[2].strip():
+                fence = ""
+            lines.append("\n" if line.endswith("\n") else "")
+        elif marker and (marker[1][0] != "`" or "`" not in marker[2]):
+            fence = marker[1]
+            lines.append("\n" if line.endswith("\n") else "")
+        else:
+            lines.append(line)
+    return "".join(lines)
+
+
 REPORT_FILENAME = "artifact_integrity_report.json"
 SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 IMAGE_LINK_PATTERN = re.compile(r"!\[[^\]]*]\((?P<target>[^)]+)\)")
@@ -516,6 +569,49 @@ def _file_summaries(output_dir: Path, findings: list[dict[str, Any]], link_count
     return summaries
 
 
+def _validate_table_cell_refs(output_dir: Path, manifest: dict | None, findings: list[dict]) -> None:
+    """Verify unique nested IDs and resolve optional row references in their own table."""
+    known: dict[tuple[int, int], set[str]] = {}
+    all_ids: set[str] = set()
+    for table in (manifest or {}).get("tables", []):
+        if not isinstance(table, dict) or not table.get("cell_structure"):
+            continue
+        cell_ids: set[str] = set()
+        pending = list(table["cell_structure"])
+        while pending:
+            node = pending.pop()
+            if not isinstance(node, dict):
+                continue
+            identifier = node.get("id")
+            if not isinstance(identifier, str) or not identifier or identifier in all_ids:
+                _add_finding(findings, severity="error", code="invalid_table_structure_id", file="manifest.json",
+                             field="tables.cell_structure", message="Nested table/cell IDs must be nonempty and unique.")
+            else:
+                all_ids.add(identifier)
+                if "row" in node:
+                    cell_ids.add(identifier)
+            pending.extend(node.get("children", []))
+            pending.extend(node.get("cells", []))
+        known[(table.get("page"), table.get("index"))] = cell_ids
+    path = output_dir / "tables_rag.jsonl"
+    if not path.is_file():
+        return
+    with path.open(encoding="utf-8") as stream:
+        for line, raw in enumerate(stream, start=1):
+            try:
+                record = json.loads(raw)
+            except json.JSONDecodeError:
+                continue  # The normal JSONL validator reports malformed rows.
+            if not isinstance(record, dict) or "cell_refs" not in record:
+                continue
+            refs = record["cell_refs"]
+            targets = known.get((record.get("page"), record.get("table_index")), set())
+            if (not isinstance(refs, list) or any(not isinstance(ref, str) or ref not in targets for ref in refs)
+                    or len(refs) != len(set(refs))):
+                _add_finding(findings, severity="error", code="invalid_table_cell_ref", file="tables_rag.jsonl",
+                             line=line, field="cell_refs", message="Cell references must be unique and resolve in their parent table.")
+
+
 def validate_artifact_integrity(
     *,
     output_dir: Path,
@@ -524,7 +620,17 @@ def validate_artifact_integrity(
     findings: list[dict[str, Any]] = []
     output_dir = output_dir.resolve()
     markdown_link_count, markdown_paths = _validate_markdown_links(output_dir, findings)
+    markdown_file = output_dir / "document.md"
+    if markdown_file.is_file():
+        parser = _HtmlTableContentParser()
+        parser.feed(_without_fenced_code(markdown_file.read_text(encoding="utf-8")))
+        parser.close()
+        for table in parser.empty_tables:
+            _add_finding(findings, severity="error", code="empty_html_table", file="document.md",
+                line=table["line"], record_id=table["record_id"], field="table",
+                message="Final HTML table has no text or image content, including its nested cells.")
     manifest = _read_json(output_dir / "manifest.json", file_name="manifest.json", findings=findings)
+    _validate_table_cell_refs(output_dir, manifest, findings)
     report = _read_json(output_dir / "report.json", file_name="report.json", findings=findings)
     allow_missing_image_assets = _image_mode_omits_asset_files(manifest)
     manifest_asset_count, manifest_paths = _validate_manifest_assets(
