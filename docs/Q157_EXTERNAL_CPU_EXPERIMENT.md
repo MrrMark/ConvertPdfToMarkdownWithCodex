@@ -125,4 +125,4 @@ PyMuPDF는 단순 텍스트·이미지 처리 후보로 남기되 기술 표 보
 Marker 런타임 부재, 실제 box 집계, 토큰/구조 평가 경계, truth hash 불일치,
 전체 PDF 바이트 보존, 공개 집계의 경로/원문 제외를 검증한다.
 Ruff·schema 동기화·CLI help 검사를 수행했으며 기존 golden은 변경하지 않았다.
-Q156/Q157은 PR #142에 커밋했으며 PR merge 전이다.
+Q156/Q157은 2026-09-15 PR #142, merge commit `9e004e5`로 main에 반영했다.

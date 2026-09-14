@@ -7,6 +7,36 @@ Active backlog는 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`, active 개발 명세�
 
 ## Archive 범위
 
+### Q156/Q157 머지 완료
+
+2026-09-15 PR #142, merge commit `9e004e5`로 main에 반영했다.
+최종 Mac Python 3.11/3.14 각 592개 테스트와 Linux 3.11/3.14·Windows 3.11 CI가 통과했다.
+같이 머지한 Q158은 사용자 정답 승인이 남아 active 명세에 유지한다.
+
+### Q156. 비교 벤치마크 공정성
+
+동일 PDF slice를 독립 프로세스에서 처리하고 native 유효 CLI 옵션과 Docling의 실제 표·그림 객체 수를 기록한다.
+
+- input hash, 패키지/모델 버전, worker/thread, peak RSS를 기록한다.
+- import·설정·모델 준비와 convert/export/write 계측을 분리한다.
+- cold 1회와 warm 5회의 중앙값·범위를 사용하고 소표본 p95를 보고하지 않는다.
+- 원문 품질·처리량·기능 지원을 분리하고 미지원 기능을 품질 0점으로 환산하지 않는다.
+
+구현 당시 575개 테스트 통과. [Q156 구현 결과](Q156_FAIR_BENCHMARK_IMPLEMENTATION.md)에
+계측 계약과 실제 native smoke 결과를 보관한다.
+
+### Q157. 외부 CPU 도구 비교 실험
+
+별도 환경의 고정 버전 Docling 2.126.0, Marker 2.0.0 fast, PyMuPDF4LLM 1.27.2.2로 Q152 corpus를 비교했다.
+
+- 원본을 로컬에서만 파싱하고 모델 다운로드는 계측에서 제외한다.
+- 설치·실행 불가 사유를 기록하며 임의 버전 변경 또는 클라우드 대체를 하지 않는다.
+- MinerU/Paddle VLM/GPU와 제품 backend 통합은 범위 밖이다.
+
+Native·Docling·PyMuPDF4LLM은 3개 사례에서 각 6회 성공했다.
+Marker는 로컬 llama-server 부재를 기록했다. 구현 당시 582개 테스트 통과.
+[Q157 실험 보고서](Q157_EXTERNAL_CPU_EXPERIMENT.md)에 실측·재현·한계를 보관한다.
+
 ### Q154/Q155 머지 완료
 
 2026-09-14 PR #141, merge commit `a01981b`로 main에 반영했다. Python 3.11·3.14 CI 통과.

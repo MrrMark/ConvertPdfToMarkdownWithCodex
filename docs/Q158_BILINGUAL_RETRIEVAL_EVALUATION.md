@@ -94,8 +94,8 @@ Linux Python 3.11·3.14 및 Windows Python 3.11의 test/schema/lint/CLI 검사�
 1. `output/q158_validation/QUERY_REVIEW.md`의 질문·정답 참조에 대한 사람 검토 및 수정 반영.
 2. 검토한 평가 세트로 재실행하여 확정 기준선 기록.
 
-원문 대조·구현·Mac/Windows/Linux 검증은 완료했다. Q158은 정답 세트의 사용자 승인과
-PR merge 전이며 전체 완료나 release 승인으로 표시하지 않는다.
+원문 대조·구현·Mac/Windows/Linux 검증은 완료했고 2026-09-15 PR #142(`9e004e5`)로 main에 반영했다.
+정답 세트의 사용자 승인과 확정 기준선 재실행이 남아 전체 완료나 release 승인으로 표시하지 않는다.
 
 [원문 없는 잠정 집계](evaluation/q158_provisional_2026-09-14.json)에 지표·입력 hash·검토 상태와
 원문 품질/내부 무결성 결과를 분리하여 보관한다.
