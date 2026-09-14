@@ -5,6 +5,8 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Preserve Q155 child tables inside verified parent cells with HTML spans, deterministic cell IDs and row references; retain flat RAG text and report uncertain ownership. / Q155 중첩 표·병합 셀·셀 참조를 보존하고, 기존 검색 텍스트 유지 및 구조 손실 진단을 추가했다.
+- Preserve Q154 captioned vector diagrams as referenced crops, reject empty table candidates, retain original diagram text as evidence, and detect empty final HTML tables. / Q154 캡션·도형 근거가 있는 벡터 도식을 보존하고 빈 표를 제외하며 원문 evidence와 최종 HTML 검사를 추가했다.
 - Reduce Q153 region OCR work by skipping excluded decorative figures and sharing bounded page/crop caches across figure and table targets. Preserve source artifacts and expose actual work counters. / Q153 장식 후보 OCR 제외, 그림·표 렌더 및 결과 재사용, 실제 작업량 지표를 추가했다.
 - Add Q152 offline source-quality evaluation with exact known-failure gates, PDF identity checks, nested-table regression fixtures, and versioned truth/report schemas. / Q152 원문 기준 품질 평가, 명시적 알려진 실패 관리, PDF 식별 검사, 중첩 표 회귀 fixture 및 정답/보고서 스키마를 추가했다.
 - Add Q151 incremental Ruff rule expansion by enabling `SIM` and cleaning existing simplify violations without public artifact changes.

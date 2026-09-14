@@ -31,33 +31,6 @@
 - 각 Q 작업의 회귀 검사를 먼저 작성하고, 변경 후 unit/integration/CLI/golden 검사를 실행한다.
 - 기존 무결성 검사 통과를 원문 품질 통과로 해석하지 않는다.
 
-### Q152. 원문 기준 품질 평가
-
-입력 PDF SHA-256, slice 페이지와 원본 물리 페이지·인쇄 페이지를 고정한다. NVMe 14페이지의 렌더를 기준으로 사람이 확인한 정답을 로컬에 작성한다. 정답은 변환 산출물에서 자동 생성하지 않는다.
-
-- 별도 평가기는 원문 토큰, 표 셀/중첩 관계, 도식 위치·캡션, 장식 이미지 OCR 낭비를 검사한다.
-- finding은 case/check/page/record/type을 식별한다. 입력·정답 오류는 평가 실패로 처리한다.
-- 알려진 실패는 check ID 단위로 명시하며 예상하지 못한 실패와 오래된 allowlist 항목은 gate를 실패시킨다. 알려진 실패만 있는 경우에도 원문 품질은 통과로 표시하지 않는다.
-- 실제 원문·정답은 `output/`에 보관하고 저장소에는 합성 fixture, 입력 식별 정보, 집계 결과만 보관한다.
-- 최소 검출 대상: 장식 후보 154개 OCR, 빈 HTML 표 4개, Figure 729–731 도식 누락, Figure 118/119 중첩 구조 손실.
-- 합성 검사는 정상 표·병합/중첩 표·벡터 도식·한영 토큰·읽기 순서·스캔/OCR 증거와 잘못된 평가 입력을 포함한다.
-
-구현 결과(2026-09-13, PR merge 전): `pdf2md/quality_eval.py`, `scripts/evaluate_source_quality.py` 및 입력/보고서 JSON Schema를 추가했다. NVMe 로컬 14페이지의 17개 assertion에서 알려진 실패를 재현했다. 합성 중첩 셀 PDF의 실제 변환 회귀 검사와 평가기 단위 검사를 추가했다. 기존 변환기 동작과 golden은 변경하지 않았다. 실행 방법·범위·제한은 `docs/SOURCE_QUALITY_EVALUATION.md`, 공유 가능한 입력 식별 정보와 집계는 `docs/evaluation/nvme_source_quality_baseline_2026-09-13.json`에 기록했다.
-
-검증 결과: 로컬 Python 3.11에서 전체 530개 테스트(unit/integration/CLI/golden 포함), Ruff, schema `--check`, CLI `--help`가 통과했다. Q152 신규 검사 23개를 포함한다. 실제 문서 평가는 17개 assertion을 재실행하여 기준선 통과·원문 품질 실패를 각각 확인했다. 이 수치는 Q152 완료 시점이며 이후 결과는 각 항목을 따른다.
-
-### Q153. 선택적 영역 OCR 및 렌더 재사용
-
-Q152 기준선이 고정된 뒤 `TINY_DECORATIVE`로 이미 제외된 후보만 OCR에서 제외한다. 제외된 레코드와 provenance는 유지하고 `not_attempted` 및 구체적 사유를 기록한다.
-
-- figure/table 영역 OCR이 변환 단위 세션을 공유한다. 페이지별 렌더·결과 캐시는 제한된 수명으로 관리하고 페이지 처리 후 해제한다.
-- 동일 page/crop/scale/lang/backend/settings에 한해서 결과를 재사용한다.
-- Tesseract text/confidence 호출 통합은 이번 범위에서 제외한다.
-- 실제 OCR 호출 수, 제외 수, 페이지 렌더 수, 캐시 적중 수를 보고한다.
-- 검증: 제외 후보 154건의 OCR 호출 0회, Markdown 동일, 유지 후보 증거 동일, 동일 환경 front-matter 중앙값 50% 이상 단축 목표. runtime 누락·잘못된 bbox·페이지 실패도 검사한다.
-
-구현 결과(2026-09-13, PR merge 전): 장식 후보 제외, 한 페이지 렌더와 128개 crop 결과 캐시, 그림·표의 페이지 단위 공동 처리, 실제 작업량 지표를 추가했다. 전체 540개 테스트 및 lint/schema 검사 통과. 같은 로컬 환경의 cold 1회/warm 5회 비교에서 front-matter 중앙값 29.127초 → 2.086초(92.8% 단축), backend 호출 159 → 5회, 수정 후 렌더 1회를 확인했다. 세 실제 입력의 Markdown/manifest 및 유지 대상 OCR evidence는 동일하다. 상세 근거와 기존 visual validator 오류는 `docs/Q153_REGION_OCR_IMPLEMENTATION.md`에 기록했다.
-
 ### Q154. 빈 표 억제 및 벡터 도식 보존
 
 셀 내용과 경계를 함께 검사하여 전부 빈 표를 확정 단계에서 제외하고 진단을 남긴다. 표 제외만으로 도식으로 승격하지 않는다. 원문 캡션과 도형 증거가 있는 경우 기존 crop 로직을 활용한다.
@@ -66,6 +39,9 @@ Q152 기준선이 고정된 뒤 `TINY_DECORATIVE`로 이미 제외된 후보만 
 - crop 성공 시 도식 내부 조각난 텍스트를 일반 본문에서 제거하되 figure evidence로 보존한다. 실패·불확실 시 원문 유지와 warning을 우선한다.
 - 최종 빈 HTML 표는 fallback 여부와 무관하게 integrity 오류로 처리한다.
 - 검증: controller 페이지 3의 빈 표 4개 제거와 도식 3개 보존, 페이지 4 실제 표 3개 유지, SGL 표 유지.
+
+2026-09-14 구현 및 로컬 검증 완료. 구현 범위·실제 문서 결과·제한사항은
+[Q154 구현 결과](Q154_VECTOR_FIGURE_IMPLEMENTATION.md)에 기록한다. PR merge까지 이 항목을 유지한다.
 
 ### Q155. 중첩 표 구조 보존
 
@@ -76,6 +52,9 @@ Q152 기준선이 고정된 뒤 `TINY_DECORATIVE`로 이미 제외된 후보만 
 - 자식 ID는 부모 ID와 구조 위치에서 결정한다. 자식 표를 별도의 동일 검색 청크로 중복 생성하지 않는다.
 - 확정 불가 시 원문 fallback과 actionable `structure_loss`를 기록한다.
 - 검증: Figure 118/119 byte 15 안의 07:04/03:00 중첩 관계, 단순 표 불변, 순환·누락·중복 방지.
+
+2026-09-14 구현 및 로컬 검증 완료. [Q155 구현 결과](Q155_NESTED_TABLE_IMPLEMENTATION.md)에
+원문 품질·회귀 결과와 화면 검증 제한을 기록한다. PR merge까지 이 항목을 유지한다.
 
 ### Q156. 비교 벤치마크 공정성
 
@@ -114,4 +93,4 @@ Q153 실측 중 이전 버전부터 존재하던 visual 계약 오류를 발견�
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q151 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q153 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

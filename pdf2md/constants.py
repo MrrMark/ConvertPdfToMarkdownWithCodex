@@ -26,6 +26,8 @@ class WarningCode:
     TABLE_COMPLEXITY_HTML_FALLBACK = "TABLE_COMPLEXITY_HTML_FALLBACK"
     TABLE_COMPLEXITY_MARKDOWN_COERCED = "TABLE_COMPLEXITY_MARKDOWN_COERCED"
     TABLE_EXTRACTION_FAILED = "TABLE_EXTRACTION_FAILED"
+    TABLE_EMPTY_CANDIDATE_REJECTED = "TABLE_EMPTY_CANDIDATE_REJECTED"
+    TABLE_STRUCTURE_LOSS = "TABLE_STRUCTURE_LOSS"
 
 
 class WarningDomain:
@@ -121,6 +123,11 @@ WARNING_CODE_REGISTRY: dict[str, WarningCodeSpec] = {
         WarningDomain.TABLE,
     ),
     WarningCode.TABLE_EXTRACTION_FAILED: WarningCodeSpec(WarningCode.TABLE_EXTRACTION_FAILED, WarningDomain.TABLE),
+    WarningCode.TABLE_STRUCTURE_LOSS: WarningCodeSpec(WarningCode.TABLE_STRUCTURE_LOSS, WarningDomain.TABLE),
+    WarningCode.TABLE_EMPTY_CANDIDATE_REJECTED: WarningCodeSpec(
+        WarningCode.TABLE_EMPTY_CANDIDATE_REJECTED, WarningDomain.TABLE,
+        default_severity=WarningSeverity.ADVISORY, affects_exit_code=False,
+    ),
 }
 
 

@@ -7,6 +7,38 @@ Active backlog는 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`, active 개발 명세�
 
 ## Archive 범위
 
+### Q152/Q153 머지 완료
+
+PR #140으로 2026-09-13 main에 머지했다. 커밋: b3c6b8d.
+
+### Q152. 원문 기준 품질 평가
+
+입력 PDF SHA-256, slice 페이지와 원본 물리 페이지·인쇄 페이지를 고정한다. NVMe 14페이지의 렌더를 기준으로 사람이 확인한 정답을 로컬에 작성한다. 정답은 변환 산출물에서 자동 생성하지 않는다.
+
+- 별도 평가기는 원문 토큰, 표 셀/중첩 관계, 도식 위치·캡션, 장식 이미지 OCR 낭비를 검사한다.
+- finding은 case/check/page/record/type을 식별한다. 입력·정답 오류는 평가 실패로 처리한다.
+- 알려진 실패는 check ID 단위로 명시하며 예상하지 못한 실패와 오래된 allowlist 항목은 gate를 실패시킨다. 알려진 실패만 있는 경우에도 원문 품질은 통과로 표시하지 않는다.
+- 실제 원문·정답은 `output/`에 보관하고 저장소에는 합성 fixture, 입력 식별 정보, 집계 결과만 보관한다.
+- 최소 검출 대상: 장식 후보 154개 OCR, 빈 HTML 표 4개, Figure 729–731 도식 누락, Figure 118/119 중첩 구조 손실.
+- 합성 검사는 정상 표·병합/중첩 표·벡터 도식·한영 토큰·읽기 순서·스캔/OCR 증거와 잘못된 평가 입력을 포함한다.
+
+구현 결과(2026-09-13, PR #140 머지 완료): `pdf2md/quality_eval.py`, `scripts/evaluate_source_quality.py` 및 입력/보고서 JSON Schema를 추가했다. NVMe 로컬 14페이지의 17개 assertion에서 알려진 실패를 재현했다. 합성 중첩 셀 PDF의 실제 변환 회귀 검사와 평가기 단위 검사를 추가했다. 기존 변환기 동작과 golden은 변경하지 않았다. 실행 방법·범위·제한은 `docs/SOURCE_QUALITY_EVALUATION.md`, 공유 가능한 입력 식별 정보와 집계는 `docs/evaluation/nvme_source_quality_baseline_2026-09-13.json`에 기록했다.
+
+검증 결과: 로컬 Python 3.11에서 전체 530개 테스트(unit/integration/CLI/golden 포함), Ruff, schema `--check`, CLI `--help`가 통과했다. Q152 신규 검사 23개를 포함한다. 실제 문서 평가는 17개 assertion을 재실행하여 기준선 통과·원문 품질 실패를 각각 확인했다. 이 수치는 Q152 완료 시점이며 이후 결과는 각 항목을 따른다.
+
+### Q153. 선택적 영역 OCR 및 렌더 재사용
+
+Q152 기준선이 고정된 뒤 `TINY_DECORATIVE`로 이미 제외된 후보만 OCR에서 제외한다. 제외된 레코드와 provenance는 유지하고 `not_attempted` 및 구체적 사유를 기록한다.
+
+- figure/table 영역 OCR이 변환 단위 세션을 공유한다. 페이지별 렌더·결과 캐시는 제한된 수명으로 관리하고 페이지 처리 후 해제한다.
+- 동일 page/crop/scale/lang/backend/settings에 한해서 결과를 재사용한다.
+- Tesseract text/confidence 호출 통합은 이번 범위에서 제외한다.
+- 실제 OCR 호출 수, 제외 수, 페이지 렌더 수, 캐시 적중 수를 보고한다.
+- 검증: 제외 후보 154건의 OCR 호출 0회, Markdown 동일, 유지 후보 증거 동일, 동일 환경 front-matter 중앙값 50% 이상 단축 목표. runtime 누락·잘못된 bbox·페이지 실패도 검사한다.
+
+구현 결과(2026-09-13, PR #140 머지 완료): 장식 후보 제외, 한 페이지 렌더와 128개 crop 결과 캐시, 그림·표의 페이지 단위 공동 처리, 실제 작업량 지표를 추가했다. 전체 540개 테스트 및 lint/schema 검사 통과. 같은 로컬 환경의 cold 1회/warm 5회 비교에서 front-matter 중앙값 29.127초 → 2.086초(92.8% 단축), backend 호출 159 → 5회, 수정 후 렌더 1회를 확인했다. 세 실제 입력의 Markdown/manifest 및 유지 대상 OCR evidence는 동일하다. 상세 근거와 기존 visual validator 오류는 `docs/Q153_REGION_OCR_IMPLEMENTATION.md`에 기록했다.
+
+
 - Q34-Q42: 2026-05-14 기준 97/100 평가를 만든 RAG 운영/검증/병렬화 개선
 - Q43: Q31-Q42 이후 scorecard refresh와 다음 backlog 축소
 - Q46: RAG expected source coverage gate

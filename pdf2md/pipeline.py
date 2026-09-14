@@ -1175,7 +1175,9 @@ def _run_conversion_impl(
             assets_dirname=config.assets_dirname,
             dedupe_images=config.dedupe_images,
             figure_crop_fallback=config.figure_crop_fallback,
-            pdf=shared_plumber_pdf,
+            confirmed_table_bboxes={page: [asset.bbox for asset in table_result.assets if asset.page == page and asset.bbox]
+                                   for page in selected_pages},
+            pdf=shared_plumber_pdf or pdf_context.get_pdfplumber_pdf(),
             page_image_boxes=page_image_boxes,
             page_text_lines=raw_lines_by_page,
             image_extraction_page_timeout_seconds=config.image_extraction_page_timeout_seconds,
@@ -1204,9 +1206,13 @@ def _run_conversion_impl(
         for block in blocks:
             if block.bbox is None:
                 continue
+            is_vector = any(asset.page == page and asset.index == block.index
+                            and asset.crop_reason == "captioned_vector_diagram" for asset in image_result.assets)
+            if is_vector and image_mode not in {ImageMode.REFERENCED, ImageMode.EMBEDDED}:
+                continue
             block_regions_by_page.setdefault(page, []).append(
                 BlockRegion(
-                    block_type="image",
+                    block_type="vector_image" if is_vector else "image",
                     block_index=block.index,
                     bbox=block.bbox,
                 )
@@ -1297,6 +1303,14 @@ def _run_conversion_impl(
         line_tops = page_line_tops.get(page, [])
         for block in blocks:
             anchor_index = _find_anchor_index(line_tops, block.top)
+            if any(asset.page == page and asset.index == block.index
+                   and asset.crop_reason == "captioned_vector_diagram" for asset in image_result.assets):
+                # Text-block serialization uses original source line indices,
+                # not positions in the filtered/merged normalized line list.
+                normalized = normalized_lines_by_page_for_blocks.get(page, [])
+                anchor_index = (min(normalized[anchor_index].source_line_indices)
+                                if anchor_index < len(normalized) else
+                                max((i for line in normalized for i in line.source_line_indices), default=-1) + 1)
             block.anchor_line_index = anchor_index
             page_blocks_with_anchor.setdefault(page, []).append((anchor_index, block.top, block.markdown))
             for asset in image_result.assets:
@@ -1356,6 +1370,12 @@ def _run_conversion_impl(
             excluded_images=image_result.excluded_assets,
             text_block_records=text_block_records,
         )
+        for record in figure_records:
+            if record.get("path") in image_result.vector_source_lines:
+                record["source_text_lines"] = image_result.vector_source_lines[record["path"]]
+                record["figure_kind"] = "diagram"
+                record["diagram_candidate"] = True
+                record["classification_reasons"].append("caption_frame_nodes_connector")
         if effective_figure_region_ocr and not figure_semantics_timeout_expired("figure_region_ocr"):
             prepared_figure_results, prepared_table_region_results, region_work_metrics = prepare_region_ocr_results(
                 figure_records=figure_records,

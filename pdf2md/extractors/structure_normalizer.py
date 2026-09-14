@@ -62,6 +62,10 @@ def _line_should_be_suppressed(
     cy = (line_bbox[1] + line_bbox[3]) / 2.0
 
     for region in regions:
+        if region.block_type == "vector_image":
+            from pdf2md.extractors.vector_figures import contains_bbox
+            if not contains_bbox(list(region.bbox), list(line_bbox), tolerance=0.0):
+                continue
         x0, y0, x1, y1 = region.bbox
         expanded = (x0 - 2.0, y0 - 2.0, x1 + 2.0, y1 + 2.0)
         center_inside = expanded[0] <= cx <= expanded[2] and expanded[1] <= cy <= expanded[3]

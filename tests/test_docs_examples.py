@@ -533,7 +533,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q149. Streaming RAG Sidecar Writers" not in next_plan
     assert "Q150. PRD and Public Docs CLI Contract Alignment" not in next_plan
     assert "Q151. Incremental Ruff Rule Expansion" not in next_plan
-    assert "Q152. 원문 기준 품질 평가" in next_plan
+    assert "Q152. 원문 기준 품질 평가" not in next_plan
+    assert "Q154. 빈 표 억제 및 벡터 도식 보존" in next_plan
     assert "Q158. 한글 검색 평가 및 회귀 마감" in next_plan
     assert "Q118. Native Document IR and Serializer Boundary" not in next_plan
     assert "Q119. Table Confidence v2" not in next_plan
@@ -620,7 +621,8 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "Q145. Security Spec Text-Derived Domain Candidate Layer" not in development_specs
     assert "Q146. Large Spec Plan Apply Workflow" not in development_specs
     assert "Q147. Security Visual Sidecar Fixture Coverage" not in development_specs
-    assert "### Q152. 원문 기준 품질 평가" in development_specs
+    assert "### Q152. 원문 기준 품질 평가" in implemented_specs
+    assert "### Q154. 빈 표 억제 및 벡터 도식 보존" in development_specs
     assert "### Q158. 한글 검색 평가 및 회귀 마감" in development_specs
     assert "Q118. Native Document IR and Serializer Boundary" not in development_specs
     assert "Q119. Table Confidence v2" not in development_specs
@@ -729,7 +731,7 @@ def test_ci_and_next_plan_contracts_are_present() -> None:
     assert "P0-3. Page-Window Batch Conversion and Merge Contract" in mcp_nvme_stability_spec
     assert "interrupted_report.json" in mcp_nvme_stability_spec
     assert "page_window_merge_report.json" in mcp_nvme_stability_spec
-    assert "완료된 Q34-Q151" in development_specs
+    assert "완료된 Q34-Q153" in development_specs
     assert "Quality Improvement Implemented Specs" in implemented_specs
     assert "Q148. Conversion Journal Artifact Inventory Throttling" in implemented_specs
     assert "include_artifacts" in implemented_specs

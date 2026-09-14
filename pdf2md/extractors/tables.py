@@ -14,6 +14,7 @@ import pdfplumber
 from pdf2md.constants import TableDecisionReason, TableModeEmission, TableReason, WarningCode
 from pdf2md.models import LineType, TableAsset, TableMode, WarningEntry
 from pdf2md.utils.structure import classify_structure_line
+from pdf2md.extractors.nested_tables import recover_cell_structure, assign_structure_ids, serialize_cell_structure
 
 TABLE_STRATEGIES: list[tuple[str, dict[str, Any] | None]] = [
     ("default", None),
@@ -109,6 +110,8 @@ class TableExtractionCandidate:
     metrics: TableQualityMetrics
     decision: TableRecoveryDecision
     diagnostics: "TableDiagnostics"
+    cell_structure: list[dict] | None = None
+    structure_loss: str | None = None
 
 
 @dataclass
@@ -926,6 +929,13 @@ def _extract_strategy_candidates(
                 diagnostics=table_grid.diagnostics,
             )
         )
+    if strategy in {"default", "lines_strict"}:
+        for candidate in extracted:
+            original = next(table for table in raw_candidates if tuple(table.bbox) == candidate.bbox)
+            candidate.cell_structure, candidate.structure_loss = recover_cell_structure(
+                original, raw_candidates, candidate.rows,
+                process=lambda raw: _process_rows(raw, strategy)[0], sanitize=_sanitize_cell,
+            )
     return extracted
 
 
@@ -934,9 +944,13 @@ def _dedupe_candidates_by_bbox(candidates: list[TableExtractionCandidate]) -> li
     for candidate in candidates:
         bbox_key = tuple(round(v, 1) for v in candidate.bbox)
         previous = candidates_by_bbox.get(bbox_key)
-        if previous is None or candidate.quality_score > previous.quality_score:
+        if previous is None or (bool(candidate.cell_structure), candidate.quality_score) > (
+            bool(previous.cell_structure), previous.quality_score
+        ):
             candidates_by_bbox[bbox_key] = candidate
-        elif previous is not None and candidate.quality_score == previous.quality_score:
+        elif previous is not None and (bool(candidate.cell_structure), candidate.quality_score) == (
+            bool(previous.cell_structure), previous.quality_score
+        ):
             prev_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == previous.strategy)
             curr_rank = next(i for i, (name, _) in enumerate(TABLE_STRATEGIES) if name == candidate.strategy)
             if curr_rank < prev_rank:
@@ -1018,8 +1032,16 @@ def _prune_candidates_with_debug(
         id(candidate): _candidate_debug_payload(candidate, accepted=False) for candidate in candidates
     }
     ranked = list(candidates)
+    # Empty geometry is common in vector connector paths. Reject before ranking
+    # so a large empty box cannot suppress a smaller, real table.
+    ranked = [candidate for candidate in ranked if any(cell.strip() for row in candidate.rows for cell in row)]
+    for candidate in candidates:
+        if not any(cell.strip() for row in candidate.rows for cell in row):
+            debug_by_id[id(candidate)]["suppression_reason"] = "empty_table_candidate"
     ranked.sort(
-        key=lambda item: (_candidate_rank_for_page_size(page_width, page_height, item.bbox, item.quality_score), _bbox_area(item.bbox)),
+        key=lambda item: (bool(item.cell_structure),
+                          _candidate_rank_for_page_size(page_width, page_height, item.bbox, item.quality_score),
+                          _bbox_area(item.bbox)),
         reverse=True,
     )
     deduped: list[TableExtractionCandidate] = []
@@ -1411,6 +1433,9 @@ def _build_rag_table_payload(
         if has_header_lineage:
             record["column_header_paths"] = diagnostics.column_header_paths
             record["column_placeholder_header_ratio"] = diagnostics.column_placeholder_header_ratio
+        if candidate.cell_structure:
+            source_row = diagnostics.data_row_start_index + row_index - 1
+            record["cell_refs"] = [cell['id'] for cell in candidate.cell_structure if cell['row'] == source_row]
         if caption_distance is not None:
             record["caption_distance"] = caption_distance
         if caption_position is not None:
@@ -1710,14 +1735,33 @@ def _materialize_page_table_candidates(
             debug_item["adaptive_skipped_strategies"] = candidate_result.adaptive_skipped_strategies
             debug_item["adaptive_skip_reason"] = candidate_result.adaptive_skip_reason
     result.debug_candidates_by_page[page_number] = debug_candidates
+    rejected_boxes = sorted({tuple(item["bbox"]) for item in debug_candidates
+                             if item.get("suppression_reason") == "empty_table_candidate"})
+    if rejected_boxes:
+        result.warnings.append(WarningEntry(
+            code=WarningCode.TABLE_EMPTY_CANDIDATE_REJECTED,
+            message="Empty table geometry was rejected; source text is retained.",
+            page=page_number, details={"reason": "empty_table_candidate", "bboxes": rejected_boxes},
+        ))
 
     page_blocks: list[TableBlock] = []
     for index, candidate in enumerate(deduped, start=1):
+        if candidate.cell_structure:
+            candidate.cell_structure = assign_structure_ids(
+                candidate.cell_structure, f"page-{page_number:04d}-table-{index:04d}")
         mode, fallback_reason, reasons = _pick_mode(
             table_mode,
             candidate.rows,
             complexity_reasons=candidate.decision.reasons,
         )
+        if candidate.cell_structure:
+            mode = TableModeEmission.HTML
+            reasons = sorted(set(reasons) | {"nested_table"})
+        if candidate.structure_loss:
+            result.warnings.append(WarningEntry(code=WarningCode.TABLE_STRUCTURE_LOSS, page=page_number,
+                message="Nested table ownership could not be verified; original flat cell text retained.",
+                details={"table_index": index, "reason": "structure_loss", "cause": candidate.structure_loss,
+                         "bbox": list(candidate.bbox)}))
         if fallback_reason:
             result.warnings.append(
                 WarningEntry(
@@ -1758,7 +1802,9 @@ def _materialize_page_table_candidates(
                 }
             )
 
-        if mode == TableModeEmission.HTML:
+        if candidate.cell_structure:
+            rendered = serialize_cell_structure(candidate.cell_structure)
+        elif mode == TableModeEmission.HTML:
             rendered = _serialize_html(candidate.rows, candidate.notes)
         elif mode == TableModeEmission.MARKDOWN:
             rendered = _serialize_markdown_forced(candidate.rows, candidate.notes)
@@ -1812,6 +1858,7 @@ def _materialize_page_table_candidates(
                 table_confidence_v2_reasons=table_confidence["table_confidence_v2_reasons"],
                 caption_text=caption_text,
                 caption_source="nearby_table_caption" if caption_text else None,
+                cell_structure=candidate.cell_structure,
             )
         )
         result.rag_tables.append(

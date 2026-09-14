@@ -48,6 +48,54 @@ python scripts/export_output_schema.py
 python scripts/export_output_schema.py --check
 ```
 
+## Q155 중첩 표 셀 구조
+
+`manifest.json.tables[].cell_structure`는 경계로 소유 관계가 확인된 중첩 표에만 추가되는
+선택적 셀 목록이다. 일반 표에서는 필드를 생략한다. 자식 표를 별도 최상위 table asset이나
+RAG 행으로 추가하지 않으며 기존 `cells`·`row_text`·최상위 table ID는 유지한다.
+
+| 필드 | 의미 |
+| --- | --- |
+| `id` | 부모 table ID와 셀 위치에서 결정되는 ID |
+| `row`, `column` | 처리된 표의 0부터 시작하는 행·열, 헤더 포함 |
+| `row_span`, `col_span` | 물리 셀 경계로 확인한 양수 병합 범위 |
+| `bbox` | PDF point 단위 `[x0, top, x1, bottom]`, 좌상단 기준 |
+| `raw_text` | 기존 평문 셀 내용, 자식 표 텍스트 포함, 안전한 공백 정리 적용 |
+| `text` | HTML에서 자식 표와 중복되지 않도록 분리한 부모 고유 텍스트 |
+| `children` | 자식 표 목록. 각 항목은 `id`, `bbox`, 재귀적 `cells`를 갖는다. |
+
+셀 ID는 `{table_id}-cell-{row:04d}-{column:04d}`,
+자식 표 ID는 `{cell_id}-table-{ordinal:04d}`다. Ordinal은 공간 순서로 정렬한 1부터 시작하는 번호다.
+`tables_rag.jsonl` 행의 선택적 `cell_refs`는 manifest 내 해당 부모 표의 셀 ID를 참조한다.
+Artifact 검사는 중복·빈 구조 ID를 `invalid_table_structure_id`, 누락·중복·다른 표의 셀 참조를
+`invalid_table_cell_ref` error로 보고한다.
+
+확인된 중첩 표는 `gfm-only`·`markdown` 요청에도 HTML로 보존하며 `nested_table` fallback 근거를 남긴다.
+경계·셀 대응이 모호하면 `TABLE_STRUCTURE_LOSS` warning에 `reason=structure_loss`, 상세 `cause`,
+페이지·표 인덱스·bbox를 기록하고 기존 평문을 유지한다. 이 경고는 actionable이며 부분 실패 종료 코드 2에 반영된다.
+
+## Q154 벡터 도식 원문과 빈 표 진단
+
+기하학적 근거로 보존한 벡터 도식은 `manifest.json.images[]`에
+`source=page_crop`, `crop_reason=captioned_vector_diagram`을 기록한다.
+선택적 `source_text_lines`는 도식 내부의 추출 원문을 보존한다.
+
+| 필드 | 의미 |
+| --- | --- |
+| `source_text_lines[].line_index` | 해당 페이지 원시 추출 줄 목록의 0부터 시작하는 인덱스 |
+| `source_text_lines[].text` | 재서술하지 않은 추출 텍스트 |
+| `source_text_lines[].bbox` | PDF point 단위 `[x0, top, x1, bottom]`, 좌상단 기준 |
+
+같은 evidence를 `figures_rag.jsonl`에도 추가하며 `figure_kind=diagram`,
+`diagram_candidate=true`, `classification_reasons`의 `caption_frame_nodes_connector`로 판정 근거를 남긴다.
+Sidecar를 끄더라도 manifest의 evidence는 유지한다. 일반 이미지에서는 새 필드를 생략한다.
+새 그림이 추가되면 뒤따르는 순번 기반 sidecar ID는 변경될 수 있다.
+
+전부 빈 셀로 구성된 표 후보는 확정 전에 제외하고 `TABLE_EMPTY_CANDIDATE_REJECTED` warning에
+페이지와 bbox를 기록한다. 이 advisory 자체는 종료 코드를 변경하지 않는다.
+최종 Markdown의 빈 HTML 표는 artifact integrity의 `empty_html_table` error이며,
+줄 번호와 가능한 경우 table record ID를 제공한다. 중첩 셀과 이미지 내용을 검사하고 fenced code 예제는 제외한다.
+
 ## Q153 영역 OCR 진단과 작업량
 
 Q153 영역 OCR은 기존 sidecar의 레코드·ID·파일명을 유지한다. 이미 `TINY_DECORATIVE`로 제외된 그림은

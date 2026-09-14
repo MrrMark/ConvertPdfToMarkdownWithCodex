@@ -271,7 +271,8 @@ def _failed_records(check: TruthCheck, output: Path, markdown: str, tables: list
                 if check.column is None or check.column >= len(row):
                     continue
                 cell = row[check.column]
-                if check.kind == "table_cell" and _sequence_present(" ".join(cell.text), check.tokens):
+                cell_text = " ".join(cell.text) + " " + " ".join(_table_text(child) for child in cell.children)
+                if check.kind == "table_cell" and _sequence_present(cell_text, check.tokens):
                     return []
                 if check.kind == "nested_table" and any(
                     _sequence_present(_table_text(child), check.tokens) for child in cell.children

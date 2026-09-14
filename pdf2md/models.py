@@ -350,6 +350,13 @@ class ReportSummary(BaseModel):
     confidential_safe_mode: bool = False
 
 
+class FigureSourceTextLine(BaseModel):
+    """Unmodified source text within a successfully preserved vector figure."""
+    line_index: int
+    text: str
+    bbox: list[float]
+
+
 class ImageAsset(BaseModel):
     page: int
     index: int
@@ -369,6 +376,7 @@ class ImageAsset(BaseModel):
     crop_reason: Optional[str] = None
     crop_content_ratio: Optional[float] = None
     crop_rejected_reason: Optional[str] = None
+    source_text_lines: Optional[list[FigureSourceTextLine]] = None
 
 
 class ExcludedImageAsset(BaseModel):
@@ -386,6 +394,28 @@ class ExcludedImageAsset(BaseModel):
     width: Optional[int] = None
     height: Optional[int] = None
     sha256: Optional[str] = None
+
+
+class NestedTableStructure(BaseModel):
+    """A bounded child table owned by exactly one parent cell."""
+
+    id: str
+    bbox: list[float]
+    cells: list["TableCellStructure"]
+
+
+class TableCellStructure(BaseModel):
+    """Original cell content and its geometrically verified child tables."""
+
+    id: str
+    row: int = Field(ge=0)
+    column: int = Field(ge=0)
+    row_span: int = Field(default=1, ge=1)
+    col_span: int = Field(default=1, ge=1)
+    bbox: list[float]
+    raw_text: str
+    text: str
+    children: list[NestedTableStructure] = Field(default_factory=list)
 
 
 class TableAsset(BaseModel):
@@ -409,6 +439,7 @@ class TableAsset(BaseModel):
     continuation_reasons: list[str] = Field(default_factory=list)
     continuation_rejected_reasons: list[str] = Field(default_factory=list)
     continuation_features: dict[str, Any] = Field(default_factory=dict)
+    cell_structure: Optional[list[TableCellStructure]] = None
 
 
 class NormalizedLine(BaseModel):
