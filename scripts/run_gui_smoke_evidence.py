@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -580,7 +581,9 @@ def _contains_absolute_path(text: str) -> bool:
     if str(Path.cwd().resolve(strict=False)) in text or str(Path.home().resolve(strict=False)) in text:
         return True
     if os.name == "nt":
-        return ":\\" in text or ":/" in text
+        # JSON-escaped help text contains ':\\n'; a drive path requires
+        # a separate drive letter followed by a slash, not just a colon.
+        return re.search(r"(?<!\w)[A-Za-z]:[\\/]", text) is not None
     return "/Users/" in text or "/home/" in text or "/private/" in text
 
 

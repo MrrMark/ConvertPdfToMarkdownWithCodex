@@ -8,6 +8,14 @@ from scripts import run_gui_smoke_evidence as smoke
 from scripts import run_preset_eval
 
 
+def test_windows_path_detection_does_not_treat_escaped_newline_as_drive(monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr(smoke, "os", SimpleNamespace(name="nt"))
+    assert not smoke._contains_absolute_path(json.dumps({"help": "Options:\n  --help"}))
+    assert smoke._contains_absolute_path(json.dumps({"path": r"C:\private\source.pdf"}))
+    assert smoke._contains_absolute_path(json.dumps({"path": "D:/private/source.pdf"}))
+
+
 def test_gui_smoke_redaction_removes_local_absolute_roots(tmp_path: Path) -> None:
     text = f"{Path.cwd().resolve()}/docs {Path.home().resolve()}/profile {tmp_path}/smoke"
 

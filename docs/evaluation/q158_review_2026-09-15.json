@@ -1,0 +1,62 @@
+{
+  "review_date": "2026-09-15",
+  "reviewer_kind": "assistant",
+  "reviewer": "Codex",
+  "method": "rendered_source_pdf_visual_review",
+  "question_count": 30,
+  "source_physical_pages": [
+    696,
+    698,
+    699
+  ],
+  "semantic_or_reference_mismatch_count": 0,
+  "critical_token_assertions_strengthened": [
+    6,
+    13
+  ],
+  "human_review_complete": false,
+  "metrics": {
+    "lexical": {
+      "ko": {
+        "recall_at_5": 0.9333333333333333,
+        "mrr_at_5": 0.7666666666666667,
+        "citation_coverage_at_5": 0.9333333333333333,
+        "critical_token_preservation_at_5": 0.9333333333333333
+      },
+      "en": {
+        "recall_at_5": 0.8666666666666667,
+        "mrr_at_5": 0.5,
+        "citation_coverage_at_5": 0.8666666666666667,
+        "critical_token_preservation_at_5": 0.8666666666666667
+      },
+      "all": {
+        "recall_at_5": 0.9,
+        "mrr_at_5": 0.6333333333333333,
+        "citation_coverage_at_5": 0.9,
+        "critical_token_preservation_at_5": 0.9
+      }
+    },
+    "bm25": {
+      "ko": {
+        "recall_at_5": 0.8,
+        "mrr_at_5": 0.5777777777777777,
+        "citation_coverage_at_5": 0.8,
+        "critical_token_preservation_at_5": 0.8
+      },
+      "en": {
+        "recall_at_5": 0.9333333333333333,
+        "mrr_at_5": 0.7888888888888889,
+        "citation_coverage_at_5": 0.9333333333333333,
+        "critical_token_preservation_at_5": 0.9333333333333333
+      },
+      "all": {
+        "recall_at_5": 0.8666666666666667,
+        "mrr_at_5": 0.6833333333333332,
+        "citation_coverage_at_5": 0.8666666666666667,
+        "critical_token_preservation_at_5": 0.8666666666666667
+      }
+    }
+  },
+  "eval_set_sha256": "e53988da594893f633ba4da3698fb70cb022986a7ef6f66dcd7b05d8eb122dc7",
+  "chunks_sha256": "c244923c8c3f4e6eeec510ab418008116a5716c3a30c68b672edc591eddb2c16"
+}

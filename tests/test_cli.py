@@ -705,8 +705,8 @@ def test_cli_batch_mode_generates_per_pdf_outputs(
     corpus_alpha = next(item for item in corpus_manifest["documents"] if item["doc_id"] == "alpha")
     assert len(corpus_alpha["source_sha256"]) == 64
     assert corpus_alpha["selected_pages"] == [1, 2]
-    assert corpus_alpha["files"]["retrieval_chunks_rag"].endswith("alpha/retrieval_chunks_rag.jsonl")
-    assert corpus_alpha["files"]["figures_rag"].endswith("alpha/figures_rag.jsonl")
+    assert Path(corpus_alpha["files"]["retrieval_chunks_rag"]).as_posix().endswith("alpha/retrieval_chunks_rag.jsonl")
+    assert Path(corpus_alpha["files"]["figures_rag"]).as_posix().endswith("alpha/figures_rag.jsonl")
 
 
 def test_cli_batch_mode_skip_existing_marks_document_skipped(sample_pdf: Path, tmp_path: Path) -> None:

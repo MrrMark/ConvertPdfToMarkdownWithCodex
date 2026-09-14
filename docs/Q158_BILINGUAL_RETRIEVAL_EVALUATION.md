@@ -24,6 +24,7 @@ BM25는 양수 log-IDF, k1=1.2, b=0.75를 사용한다. 반복 query term은 한
   bbox의 시각적 정확도나 생성 답변의 근거 충실성을 평가하는 지표는 아니다.
 - Critical token preservation@5: 정답 참조와 일치한 검색 chunk의 `text`에 보존된 중요 토큰 비율.
   무관한 chunk나 `embedding_text`에만 토큰이 있어도 통과시키지 않는다.
+  숫자·식별자 경계도 확인해 `10h` 안의 `0h`처럼 다른 값의 일부를 정답으로 인정하지 않는다.
 
 결과는 `ko`, `en`, 전체를 따로 기록한다. 품질 임계값은 아직 설정하지 않았으며,
 `review_gate_passed`는 사람 검토 기록만 뜻한다. `review.status=human_reviewed`와 reviewer가 없으면
@@ -36,6 +37,12 @@ BM25는 양수 log-IDF, k1=1.2, b=0.75를 사용한다. 반복 query term은 한
 중요 토큰을 제시했다. 구성은 언어별 requirement 6개·table row 6개·figure 3개다.
 원문 PDF의 페이지 텍스트에서 중요 토큰을 대조한 뒤 기존 sidecar ID에 연결했다.
 사람의 정답 검토는 아직 완료되지 않았고, 자동 대조를 사람 검토로 표시하지 않았다.
+
+2026-09-15 추가 원문 검토: Codex가 원본 696·698·699페이지를 렌더링하여 요구사항 6개,
+표 행 6개, 그림 3개와 한·영 질문 쌍을 대조했다. 페이지·ID·질문 의미의 불일치는 없었다.
+6번 답의 중요 토큰은 숫자 일부 매칭을 피하도록 인용된 값 전체로 강화했고,
+13번은 그림 캡션 식별에 더해 실제 답인 인터페이스 구성 토큰도 확인하도록 보완했다.
+로컬 세트는 `agent_reviewed`로 기록했으며 사람 승인으로 변경하지 않았다. 보완 후 지표는 동일했다.
 
 ```bash
 .venv311/bin/python scripts/run_bm25_eval.py \
@@ -72,7 +79,13 @@ Controller artifact integrity도 통과했지만 visual 계약 검사는 front m
 controller 22건 오류가 남아 있다. Q159에서 해소할 기존 오류이며 이번 작업에서 숨기거나 제외하지 않았다.
 
 CI는 기존 Ubuntu Python 3.11/3.14를 유지하고 Windows Python 3.11 CPU 조합을 추가했다.
-새 workflow의 원격 Linux/Windows 실행 결과는 아직 없다. 로컬 Mac 결과를 Windows 통과로 간주하지 않는다.
+[PR #142](https://github.com/MrrMark/ConvertPdfToMarkdownWithCodex/pull/142)에서 원격 검증을 진행한다.
+최초 실행에서 Linux 두 조합은 통과했으나 Windows에서 4건이 실패했다.
+두 경로 구분자 테스트는 플랫폼 표현을 정규화하고, 마이크로초 타임아웃 테스트는
+실제 OS 시계 대신 주입 가능한 결정적 시계로 수정했다. GUI smoke는 JSON 도움말의
+콜론 뒤 줄바꿈을 Windows 드라이브 경로로 오인한 문제였다. 실제 드라이브 문자와 경로
+구분자를 검사하도록 수정하고, 실제 경로 검출을 유지하는 회귀 테스트를 추가했다.
+최신 커밋의 원격 결과는 PR checks에서 확인한다.
 
 ## 남은 완료 조건
 
@@ -84,3 +97,5 @@ CI는 기존 Ubuntu Python 3.11/3.14를 유지하고 Windows Python 3.11 CPU 조
 
 [원문 없는 잠정 집계](evaluation/q158_provisional_2026-09-14.json)에 지표·입력 hash·검토 상태와
 원문 품질/내부 무결성 결과를 분리하여 보관한다.
+[2026-09-15 원문 대조 집계](evaluation/q158_review_2026-09-15.json)는 보강한 중요 토큰 기준으로
+재실행한 결과다. 질문 원문과 실제 정답은 포함하지 않는다.
