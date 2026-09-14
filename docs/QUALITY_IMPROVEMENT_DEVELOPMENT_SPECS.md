@@ -69,7 +69,9 @@ Marker 2.0.0은 로컬 llama-server 부재를 명시했다. 전체 테스트 582
 - 전체 회귀와 release gate를 실행하고 원문 품질과 내부 무결성 결과를 각각 보고한다.
 
 2026-09-14 BM25 및 별도 한·영 평가 CLI 구현. 질문 30개는 로컬 검토 초안이며 사람 검토 대기다.
-Windows CPU CI 조합을 추가했고 원격 실행 확인은 PR 단계에 남긴다.
+2026-09-15 원문 렌더링 대조와 중요 토큰 검사 보완 완료. Mac Python 3.11/3.14 각 592개,
+PR #142의 Windows Python 3.11 및 Linux Python 3.11/3.14 CI가 모두 통과했다.
+사람 검토 승인과 PR merge는 대기 중이다.
 진행 결과와 잠정 지표는 [Q158 보고서](Q158_BILINGUAL_RETRIEVAL_EVALUATION.md)에 기록한다.
 
 ### Q159. Visual sidecar 참조 계약 검증

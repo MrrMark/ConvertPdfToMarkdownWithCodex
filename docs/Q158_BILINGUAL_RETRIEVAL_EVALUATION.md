@@ -65,8 +65,8 @@ BM25는 양수 log-IDF, k1=1.2, b=0.75를 사용한다. 반복 query term은 한
 
 ## 회귀 및 release 검증
 
-Mac Python 3.11 및 3.14에서 전체 unit/integration/CLI/golden **각 590개가 통과**했다.
-BM25 전용 회귀 8개를 포함하며 Ruff 및 diff 공백 검사도 통과했다.
+Mac Python 3.11 및 3.14에서 전체 unit/integration/CLI/golden **각 592개가 통과**했다.
+BM25 전용 회귀 9개와 Windows 경로 검사 회귀를 포함하며 Ruff 및 diff 공백 검사도 통과했다.
 한글 조사 차이·Unicode 정규화·식별자·수식·빈 입력·결정적 동점·ID 중복·부분 recall·잘못된 page 및
 bbox·무관한 토큰의 거짓 통과를 검사한다. 제품 변환 로직과 golden 산출물은 변경하지 않았다.
 
@@ -79,21 +79,23 @@ Controller artifact integrity도 통과했지만 visual 계약 검사는 front m
 controller 22건 오류가 남아 있다. Q159에서 해소할 기존 오류이며 이번 작업에서 숨기거나 제외하지 않았다.
 
 CI는 기존 Ubuntu Python 3.11/3.14를 유지하고 Windows Python 3.11 CPU 조합을 추가했다.
-[PR #142](https://github.com/MrrMark/ConvertPdfToMarkdownWithCodex/pull/142)에서 원격 검증을 진행한다.
+[PR #142](https://github.com/MrrMark/ConvertPdfToMarkdownWithCodex/pull/142)에서 원격 검증을 수행했다.
 최초 실행에서 Linux 두 조합은 통과했으나 Windows에서 4건이 실패했다.
 두 경로 구분자 테스트는 플랫폼 표현을 정규화하고, 마이크로초 타임아웃 테스트는
 실제 OS 시계 대신 주입 가능한 결정적 시계로 수정했다. GUI smoke는 JSON 도움말의
 콜론 뒤 줄바꿈을 Windows 드라이브 경로로 오인한 문제였다. 실제 드라이브 문자와 경로
 구분자를 검사하도록 수정하고, 실제 경로 검출을 유지하는 회귀 테스트를 추가했다.
-최신 커밋의 원격 결과는 PR checks에서 확인한다.
+2026-09-15 코드 커밋 `9071f2b`의 [CI 실행 34863609979](https://github.com/MrrMark/ConvertPdfToMarkdownWithCodex/actions/runs/34863609979)에서
+Linux Python 3.11·3.14 및 Windows Python 3.11의 test/schema/lint/CLI 검사가 모두 통과했다.
+이후 문서 변경을 포함한 최신 상태는 PR checks에서 확인한다.
 
 ## 남은 완료 조건
 
 1. `output/q158_validation/QUERY_REVIEW.md`의 질문·정답 참조에 대한 사람 검토 및 수정 반영.
 2. 검토한 평가 세트로 재실행하여 확정 기준선 기록.
-3. PR에서 새 Windows 및 기존 Linux CI의 실제 통과 확인.
 
-따라서 Q158은 구현·로컬 검증 단계이며 전체 완료나 release 승인 상태는 아니다.
+원문 대조·구현·Mac/Windows/Linux 검증은 완료했다. Q158은 정답 세트의 사용자 승인과
+PR merge 전이며 전체 완료나 release 승인으로 표시하지 않는다.
 
 [원문 없는 잠정 집계](evaluation/q158_provisional_2026-09-14.json)에 지표·입력 hash·검토 상태와
 원문 품질/내부 무결성 결과를 분리하여 보관한다.
