@@ -679,6 +679,8 @@ def test_cli_batch_mode_generates_per_pdf_outputs(
     assert batch_report["summary"]["skipped_count"] == 0
     alpha_entry = next(item for item in batch_report["documents"] if Path(item["input_pdf"]).name == "alpha.pdf")
     beta_entry = next(item for item in batch_report["documents"] if Path(item["input_pdf"]).name == "beta.pdf")
+    alpha_entry["files"] = {key: Path(value).as_posix() if value is not None else None
+                            for key, value in alpha_entry["files"].items()}
     assert alpha_entry["files"]["markdown"].endswith("alpha/alpha.md")
     assert beta_entry["status"] == "failed"
     assert alpha_entry["duration_ms"] >= 0
@@ -703,8 +705,8 @@ def test_cli_batch_mode_generates_per_pdf_outputs(
     corpus_alpha = next(item for item in corpus_manifest["documents"] if item["doc_id"] == "alpha")
     assert len(corpus_alpha["source_sha256"]) == 64
     assert corpus_alpha["selected_pages"] == [1, 2]
-    assert corpus_alpha["files"]["retrieval_chunks_rag"].endswith("alpha/retrieval_chunks_rag.jsonl")
-    assert corpus_alpha["files"]["figures_rag"].endswith("alpha/figures_rag.jsonl")
+    assert Path(corpus_alpha["files"]["retrieval_chunks_rag"]).as_posix().endswith("alpha/retrieval_chunks_rag.jsonl")
+    assert Path(corpus_alpha["files"]["figures_rag"]).as_posix().endswith("alpha/figures_rag.jsonl")
 
 
 def test_cli_batch_mode_skip_existing_marks_document_skipped(sample_pdf: Path, tmp_path: Path) -> None:

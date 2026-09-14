@@ -32,6 +32,7 @@ from pdf2md.models import (
     VisualSidecarContractReport,
 )
 from pdf2md.quality_eval import SourceQualityReport, SourceTruth
+from pdf2md.benchmark_models import FairBenchmarkReport
 
 
 SCHEMA_FILES: dict[str, type] = {
@@ -61,6 +62,7 @@ SCHEMA_FILES: dict[str, type] = {
     "corpus_evidence_trend_report.schema.json": CorpusEvidenceTrendReport,
     "source_quality_report.schema.json": SourceQualityReport,
     "source_quality_truth.schema.json": SourceTruth,
+    "fair_benchmark_report.schema.json": FairBenchmarkReport,
 }
 
 

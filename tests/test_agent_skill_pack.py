@@ -195,13 +195,14 @@ def test_install_agent_skill_pack_dry_run_lists_all_clients() -> None:
     )
 
     assert completed.returncode == 0
-    assert ".agents/skills/pdf2md-rag-ingest" in completed.stdout
-    assert ".claude/skills/pdf2md-rag-ingest" in completed.stdout
-    assert ".cline/skills/pdf2md-rag-ingest" in completed.stdout
-    assert ".roo/skills/pdf2md-rag-ingest" in completed.stdout
-    assert ".cursor/rules/pdf2md-rag-ingest.mdc" in completed.stdout
-    assert ".continue/rules/pdf2md-rag-ingest.md" in completed.stdout
-    assert "agent-pack/skills/pdf2md-rag-ingest" in completed.stdout
-    assert "agent-adapters/cursor/pdf2md-rag-ingest.mdc" in completed.stdout
-    assert "agent-adapters/continue/pdf2md-rag-ingest.md" in completed.stdout
+    output = completed.stdout.replace("\\", "/")
+    assert ".agents/skills/pdf2md-rag-ingest" in output
+    assert ".claude/skills/pdf2md-rag-ingest" in output
+    assert ".cline/skills/pdf2md-rag-ingest" in output
+    assert ".roo/skills/pdf2md-rag-ingest" in output
+    assert ".cursor/rules/pdf2md-rag-ingest.mdc" in output
+    assert ".continue/rules/pdf2md-rag-ingest.md" in output
+    assert "agent-pack/skills/pdf2md-rag-ingest" in output
+    assert "agent-adapters/cursor/pdf2md-rag-ingest.mdc" in output
+    assert "agent-adapters/continue/pdf2md-rag-ingest.md" in output
     assert "<-" in completed.stdout

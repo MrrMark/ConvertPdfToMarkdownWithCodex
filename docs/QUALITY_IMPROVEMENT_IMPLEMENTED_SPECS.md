@@ -7,6 +7,35 @@ Active backlog는 `docs/NEXT_QUALITY_IMPROVEMENT_PLAN.md`, active 개발 명세�
 
 ## Archive 범위
 
+### Q154/Q155 머지 완료
+
+2026-09-14 PR #141, merge commit `a01981b`로 main에 반영했다. Python 3.11·3.14 CI 통과.
+
+### Q154. 빈 표 억제 및 벡터 도식 보존
+
+셀 내용과 경계를 함께 검사하여 전부 빈 표를 확정 단계에서 제외하고 진단을 남긴다. 표 제외만으로 도식으로 승격하지 않는다. 원문 캡션과 도형 증거가 있는 경우 기존 crop 로직을 활용한다.
+
+- 확정된 실제 표와 겹치는 Figure 캡션은 crop에서 제외한다.
+- crop 성공 시 도식 내부 조각난 텍스트를 일반 본문에서 제거하되 figure evidence로 보존한다. 실패·불확실 시 원문 유지와 warning을 우선한다.
+- 최종 빈 HTML 표는 fallback 여부와 무관하게 integrity 오류로 처리한다.
+- 검증: controller 페이지 3의 빈 표 4개 제거와 도식 3개 보존, 페이지 4 실제 표 3개 유지, SGL 표 유지.
+
+2026-09-14 구현 및 로컬 검증 완료. 구현 범위·실제 문서 결과·제한사항은
+[Q154 구현 결과](Q154_VECTOR_FIGURE_IMPLEMENTATION.md)에 기록한다. PR #141로 merge 완료.
+
+### Q155. 중첩 표 구조 보존
+
+내부 셀 모델은 row/column/span/bbox/raw text/children을 가진다. 단순 bbox 겹침이 아닌 경계와 포함 관계로 중첩을 판정한다.
+
+- 부모 `<td>` 내부에 실제 HTML `<table>`을 직렬화하고 병합 셀은 HTML로 보존한다.
+- `TableAsset.cell_structure` 및 선택적 row `cell_refs`를 추가한다. 기존 cells/row_text/최상위 table ID를 유지한다.
+- 자식 ID는 부모 ID와 구조 위치에서 결정한다. 자식 표를 별도의 동일 검색 청크로 중복 생성하지 않는다.
+- 확정 불가 시 원문 fallback과 actionable `structure_loss`를 기록한다.
+- 검증: Figure 118/119 byte 15 안의 07:04/03:00 중첩 관계, 단순 표 불변, 순환·누락·중복 방지.
+
+2026-09-14 구현 및 로컬 검증 완료. [Q155 구현 결과](Q155_NESTED_TABLE_IMPLEMENTATION.md)에
+원문 품질·회귀 결과와 화면 검증 제한을 기록한다. PR #141로 merge 완료.
+
 ### Q152/Q153 머지 완료
 
 PR #140으로 2026-09-13 main에 머지했다. 커밋: b3c6b8d.

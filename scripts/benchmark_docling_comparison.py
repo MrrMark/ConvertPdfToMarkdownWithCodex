@@ -473,6 +473,8 @@ def render_scorecard(report: dict[str, Any]) -> str:
     lines = [
         "# Docling Benchmark Scorecard",
         "",
+        "Legacy artifact comparison: timing values use different scopes and are not comparable. Use `benchmark_fair_comparison.py` for Q156 measurements.",
+        "",
         f"- Document label: `{report.get('document_label')}`",
         f"- Compared: `{report.get('summary', {}).get('compared')}`",
         f"- Docling available: `{report.get('summary', {}).get('docling_available')}`",
@@ -610,7 +612,7 @@ def run_docling_comparison(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build a sanitized Docling/current-tool comparison pack.")
+    parser = argparse.ArgumentParser(description="Legacy artifact comparison pack. For isolated performance measurements use benchmark_fair_comparison.py.")
     parser.add_argument("--input-pdf", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--document-label", default="doc-0001")

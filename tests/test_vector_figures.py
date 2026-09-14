@@ -115,6 +115,12 @@ def test_text_is_preserved_when_assets_or_sidecars_are_omitted(tmp_path: Path, o
 
 def test_vector_page_timeout_keeps_unrendered_source(monkeypatch, tmp_path: Path) -> None:
     import pdf2md.extractors.images as images
+    from functools import partial
+    from itertools import count
+    # A microsecond real-time limit depends on the platform's clock resolution.
+    # Advance a deterministic clock beyond the limit before the crop is started.
+    ticks = count(step=0.01)
+    monkeypatch.setattr("pdf2md.pipeline.extract_images", partial(images.extract_images, time_provider=lambda: next(ticks)))
     source, output = tmp_path / "source.pdf", tmp_path / "output"
     vector_pdf(source)
     render = images._render_page_crop

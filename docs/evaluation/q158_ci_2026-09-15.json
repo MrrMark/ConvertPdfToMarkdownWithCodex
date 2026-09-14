@@ -1,0 +1,18 @@
+{
+  "purpose": "q158_code_validation",
+  "code_commit": "9071f2ba416c34c52f9902e5072410879eafe0cd",
+  "pull_request": "https://github.com/MrrMark/ConvertPdfToMarkdownWithCodex/pull/142",
+  "ci_run": "https://github.com/MrrMark/ConvertPdfToMarkdownWithCodex/actions/runs/34863609979",
+  "remote_jobs": {
+    "ubuntu_python_3_11": "success",
+    "ubuntu_python_3_14": "success",
+    "windows_python_3_11": "success"
+  },
+  "local_macos_tests": {
+    "python_3_11": {"passed": 592, "failed": 0},
+    "python_3_14": {"passed": 592, "failed": 0}
+  },
+  "source_review": "assistant_visual_review_completed",
+  "human_review_complete": false,
+  "merge_complete": false
+}
