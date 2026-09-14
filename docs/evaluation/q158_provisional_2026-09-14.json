@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0",
+  "top_k": 5,
+  "query_count": 30,
+  "human_review_complete": false,
+  "review_gate_passed": false,
+  "quality_thresholds": "not_configured",
+  "metrics": {
+    "lexical": {
+      "ko": {
+        "recall_at_5": 0.9333333333333333,
+        "mrr_at_5": 0.7666666666666667,
+        "citation_coverage_at_5": 0.9333333333333333,
+        "critical_token_preservation_at_5": 0.9333333333333333
+      },
+      "en": {
+        "recall_at_5": 0.8666666666666667,
+        "mrr_at_5": 0.5,
+        "citation_coverage_at_5": 0.8666666666666667,
+        "critical_token_preservation_at_5": 0.8666666666666667
+      },
+      "all": {
+        "recall_at_5": 0.9,
+        "mrr_at_5": 0.6333333333333333,
+        "citation_coverage_at_5": 0.9,
+        "critical_token_preservation_at_5": 0.9
+      }
+    },
+    "bm25": {
+      "ko": {
+        "recall_at_5": 0.8,
+        "mrr_at_5": 0.5777777777777777,
+        "citation_coverage_at_5": 0.8,
+        "critical_token_preservation_at_5": 0.8
+      },
+      "en": {
+        "recall_at_5": 0.9333333333333333,
+        "mrr_at_5": 0.7888888888888889,
+        "citation_coverage_at_5": 0.9333333333333333,
+        "critical_token_preservation_at_5": 0.9333333333333333
+      },
+      "all": {
+        "recall_at_5": 0.8666666666666667,
+        "mrr_at_5": 0.6833333333333332,
+        "citation_coverage_at_5": 0.8666666666666667,
+        "critical_token_preservation_at_5": 0.8666666666666667
+      }
+    }
+  },
+  "scope": "local lexical/BM25; citation metadata coverage, not answer faithfulness",
+  "parameters": {
+    "k1": 1.2,
+    "b": 0.75,
+    "tokenizer": "unicode_identifier_hangul_bigram_v1"
+  },
+  "chunks_sha256": "c244923c8c3f4e6eeec510ab418008116a5716c3a30c68b672edc591eddb2c16",
+  "eval_set_sha256": "1dc24b0dfb1bdea16d9277fe1dc0e9073bcfdbf41f818d272de883a47550ef1f",
+  "purpose": "q158_provisional_bilingual_retrieval",
+  "remote_ci": {
+    "linux": "not_run_for_this_change",
+    "windows": "not_run_for_this_change"
+  },
+  "release_gates": {
+    "passed": true,
+    "summary": {
+      "failed_count": 0,
+      "passed_count": 8,
+      "total_gate_commands": 8
+    },
+    "performance_regression_baseline": "not_supplied"
+  },
+  "source_quality": {
+    "front_matter": {
+      "quality_passed": true,
+      "gate_passed": true
+    },
+    "controller_tables": {
+      "quality_passed": true,
+      "gate_passed": true
+    },
+    "sgl_figures_tables": {
+      "quality_passed": true,
+      "gate_passed": true
+    }
+  },
+  "artifact_integrity": {
+    "controller_tables": {
+      "passed": true,
+      "summary": {
+        "checked_assets": 6,
+        "checked_files": 16,
+        "checked_links": 3,
+        "checked_records": 565,
+        "error_count": 0,
+        "file_map_missing_count": 0,
+        "info_count": 0,
+        "missing_assets": 0,
+        "orphan_assets": 0,
+        "sidecar_count_mismatches": 0,
+        "warning_count": 0
+      }
+    }
+  },
+  "visual_contract": {
+    "front_matter_errors": 462,
+    "controller_errors": 22,
+    "follow_up": "Q159"
+  }
+}

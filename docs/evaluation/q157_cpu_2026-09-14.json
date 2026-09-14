@@ -1,0 +1,1403 @@
+{
+  "purpose": "q157_fixed_version_cpu_experiment",
+  "quality_scope": "source_token_smoke_only; full structural and retrieval quality not measured",
+  "cases": {
+    "front_matter": {
+      "source_sha256": "9c5ef8a735d30ad7017d88658dc2454e4b47b1da173bad53da38fcdb450f46e5",
+      "slice_sha256": "9c5ef8a735d30ad7017d88658dc2454e4b47b1da173bad53da38fcdb450f46e5",
+      "source_pages": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "method": {
+        "cold_runs": 1,
+        "warm_runs": 5,
+        "cold_definition": "first_conversion_after_explicit_setup",
+        "warm_definition": "same_process_and_engine_fresh_output_directory",
+        "timed_region": "convert_export_write",
+        "os_cache_cleared": false,
+        "download_policy": "preprovisioned_local_models_only",
+        "input_preparation_method": "byte_copy"
+      },
+      "timing_samples_complete": false,
+      "engines": [
+        {
+          "engine": "native",
+          "status": "success",
+          "packages": {
+            "pdf2md": "0.1.0",
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.9.2",
+            "pypdfium2": "5.6.0"
+          },
+          "source_code_identity": {
+            "file_count": 68,
+            "tree_sha256": "745dfb84dcb0295bab5ef7dd6d70e86d5e4716f63b94d786a66fb68b431d5c8a"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 0.4430897919810377,
+          "setup_seconds": 0.197430708038155,
+          "process_wall_seconds": 12.206629917025566,
+          "peak_rss": {
+            "bytes": 254967808,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "summary": {
+            "warm_success_count": 5,
+            "warm_complete": true,
+            "warm_median_seconds": 1.8430655419942923,
+            "warm_min_seconds": 1.8191539169638418,
+            "warm_max_seconds": 1.8580578340333886
+          },
+          "input_identity_verified": true,
+          "source_token_smoke": {
+            "scope": "selected_tokens_document_wide_only",
+            "page_cell_order_and_geometry": "not_evaluated",
+            "checks": [
+              {
+                "check_id": "contents-text",
+                "expected_token_count": 3,
+                "found_token_count": 3
+              }
+            ],
+            "all_selected_tokens_present": true
+          },
+          "samples": [
+            {
+              "phase": "cold",
+              "index": 0,
+              "status": "success",
+              "convert_export_write_seconds": 2.149857875017915,
+              "counts": {
+                "tables": 0,
+                "pictures": 5,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 1,
+              "status": "success",
+              "convert_export_write_seconds": 1.8191539169638418,
+              "counts": {
+                "tables": 0,
+                "pictures": 5,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 2,
+              "status": "success",
+              "convert_export_write_seconds": 1.8430655419942923,
+              "counts": {
+                "tables": 0,
+                "pictures": 5,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 3,
+              "status": "success",
+              "convert_export_write_seconds": 1.8548353749793023,
+              "counts": {
+                "tables": 0,
+                "pictures": 5,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 4,
+              "status": "success",
+              "convert_export_write_seconds": 1.8412400829838589,
+              "counts": {
+                "tables": 0,
+                "pictures": 5,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 5,
+              "status": "success",
+              "convert_export_write_seconds": 1.8580578340333886,
+              "counts": {
+                "tables": 0,
+                "pictures": 5,
+                "pages": 5
+              }
+            }
+          ]
+        },
+        {
+          "engine": "docling",
+          "status": "success",
+          "version_check": {
+            "expected": "2.126.0",
+            "actual": "2.126.0"
+          },
+          "packages": {
+            "docling": "2.126.0",
+            "docling-core": "2.96.0",
+            "torch": "2.14.0",
+            "transformers": "5.17.0"
+          },
+          "models": {
+            "file_count": 66,
+            "tree_sha256": "ca18521cf91fa51c73898763323eb3e524a9acc794bd2a0d5bc814d40e059c58"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 4.999158250051551,
+          "setup_seconds": 12.979945958999451,
+          "process_wall_seconds": 105.00786675000563,
+          "peak_rss": {
+            "bytes": 2256044032,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "summary": {
+            "warm_success_count": 5,
+            "warm_complete": true,
+            "warm_median_seconds": 14.276714208011981,
+            "warm_min_seconds": 14.131615499965847,
+            "warm_max_seconds": 14.31108716694871
+          },
+          "input_identity_verified": true,
+          "source_token_smoke": {
+            "scope": "selected_tokens_document_wide_only",
+            "page_cell_order_and_geometry": "not_evaluated",
+            "checks": [
+              {
+                "check_id": "contents-text",
+                "expected_token_count": 3,
+                "found_token_count": 3
+              }
+            ],
+            "all_selected_tokens_present": true
+          },
+          "samples": [
+            {
+              "phase": "cold",
+              "index": 0,
+              "status": "success",
+              "convert_export_write_seconds": 15.116987749992404,
+              "counts": {
+                "tables": 2,
+                "pictures": 1,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 1,
+              "status": "success",
+              "convert_export_write_seconds": 14.278594165982213,
+              "counts": {
+                "tables": 2,
+                "pictures": 1,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 2,
+              "status": "success",
+              "convert_export_write_seconds": 14.31108716694871,
+              "counts": {
+                "tables": 2,
+                "pictures": 1,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 3,
+              "status": "success",
+              "convert_export_write_seconds": 14.131615499965847,
+              "counts": {
+                "tables": 2,
+                "pictures": 1,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 4,
+              "status": "success",
+              "convert_export_write_seconds": 14.182143374986481,
+              "counts": {
+                "tables": 2,
+                "pictures": 1,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 5,
+              "status": "success",
+              "convert_export_write_seconds": 14.276714208011981,
+              "counts": {
+                "tables": 2,
+                "pictures": 1,
+                "pages": 5
+              }
+            }
+          ]
+        },
+        {
+          "engine": "pymupdf",
+          "status": "success",
+          "version_check": {
+            "expected": "1.27.2.2",
+            "actual": "1.27.2.2"
+          },
+          "packages": {
+            "pymupdf4llm": "1.27.2.2",
+            "pymupdf": "1.27.2.2",
+            "pymupdf-layout": "1.27.2.2",
+            "onnxruntime": "1.30.0"
+          },
+          "models": {
+            "file_count": 4,
+            "tree_sha256": "0c3fdbaeaafa35eddc5359e532002ac1b096d7cdf443274e2bd89a614f38cc0f"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 3.5252620420069434,
+          "setup_seconds": 0.03056562499841675,
+          "process_wall_seconds": 29.68679325003177,
+          "peak_rss": {
+            "bytes": 556777472,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "summary": {
+            "warm_success_count": 5,
+            "warm_complete": true,
+            "warm_median_seconds": 4.325849957996979,
+            "warm_min_seconds": 4.309591791999992,
+            "warm_max_seconds": 4.349814166023862
+          },
+          "input_identity_verified": true,
+          "source_token_smoke": {
+            "scope": "selected_tokens_document_wide_only",
+            "page_cell_order_and_geometry": "not_evaluated",
+            "checks": [
+              {
+                "check_id": "contents-text",
+                "expected_token_count": 3,
+                "found_token_count": 3
+              }
+            ],
+            "all_selected_tokens_present": true
+          },
+          "samples": [
+            {
+              "phase": "cold",
+              "index": 0,
+              "status": "success",
+              "convert_export_write_seconds": 4.31919604196446,
+              "counts": {
+                "pages": 5,
+                "tables": 3,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 1,
+              "status": "success",
+              "convert_export_write_seconds": 4.349814166023862,
+              "counts": {
+                "pages": 5,
+                "tables": 3,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 2,
+              "status": "success",
+              "convert_export_write_seconds": 4.325849957996979,
+              "counts": {
+                "pages": 5,
+                "tables": 3,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 3,
+              "status": "success",
+              "convert_export_write_seconds": 4.338704790978227,
+              "counts": {
+                "pages": 5,
+                "tables": 3,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 4,
+              "status": "success",
+              "convert_export_write_seconds": 4.32159191602841,
+              "counts": {
+                "pages": 5,
+                "tables": 3,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 5,
+              "status": "success",
+              "convert_export_write_seconds": 4.309591791999992,
+              "counts": {
+                "pages": 5,
+                "tables": 3,
+                "pictures": 0
+              }
+            }
+          ]
+        },
+        {
+          "engine": "marker",
+          "status": "unavailable",
+          "version_check": {
+            "expected": "2.0.0",
+            "actual": "2.0.0"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 0.0029039999935775995,
+          "process_wall_seconds": 0.07490183302434161,
+          "peak_rss": {
+            "bytes": 28884992,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "unavailable_reason": "marker_fast_requires_local_llama_server_missing",
+          "error": {
+            "stage": "import",
+            "type": "ExternalUnavailable"
+          },
+          "input_identity_verified": true,
+          "samples": []
+        }
+      ]
+    },
+    "controller_tables": {
+      "source_sha256": "5a6aa491db9dbcb46b21a1bcf901cc03e1ffd927dc57a6011d5e904551992185",
+      "slice_sha256": "5a6aa491db9dbcb46b21a1bcf901cc03e1ffd927dc57a6011d5e904551992185",
+      "source_pages": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "method": {
+        "cold_runs": 1,
+        "warm_runs": 5,
+        "cold_definition": "first_conversion_after_explicit_setup",
+        "warm_definition": "same_process_and_engine_fresh_output_directory",
+        "timed_region": "convert_export_write",
+        "os_cache_cleared": false,
+        "download_policy": "preprovisioned_local_models_only",
+        "input_preparation_method": "byte_copy"
+      },
+      "timing_samples_complete": false,
+      "engines": [
+        {
+          "engine": "native",
+          "status": "success",
+          "packages": {
+            "pdf2md": "0.1.0",
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.9.2",
+            "pypdfium2": "5.6.0"
+          },
+          "source_code_identity": {
+            "file_count": 68,
+            "tree_sha256": "745dfb84dcb0295bab5ef7dd6d70e86d5e4716f63b94d786a66fb68b431d5c8a"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 0.709174791991245,
+          "setup_seconds": 0.04297912499168888,
+          "process_wall_seconds": 9.113953625026625,
+          "peak_rss": {
+            "bytes": 212664320,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "summary": {
+            "warm_success_count": 5,
+            "warm_complete": true,
+            "warm_median_seconds": 1.3519617919810116,
+            "warm_min_seconds": 1.3457619170076214,
+            "warm_max_seconds": 1.3643817499978468
+          },
+          "input_identity_verified": true,
+          "source_token_smoke": {
+            "scope": "selected_tokens_document_wide_only",
+            "page_cell_order_and_geometry": "not_evaluated",
+            "checks": [
+              {
+                "check_id": "figure-729",
+                "expected_token_count": 2,
+                "found_token_count": 2
+              },
+              {
+                "check_id": "figure-730",
+                "expected_token_count": 2,
+                "found_token_count": 2
+              },
+              {
+                "check_id": "figure-731",
+                "expected_token_count": 2,
+                "found_token_count": 2
+              },
+              {
+                "check_id": "protocol-cell",
+                "expected_token_count": 1,
+                "found_token_count": 1
+              },
+              {
+                "check_id": "protocol-token",
+                "expected_token_count": 4,
+                "found_token_count": 4
+              }
+            ],
+            "all_selected_tokens_present": true
+          },
+          "samples": [
+            {
+              "phase": "cold",
+              "index": 0,
+              "status": "success",
+              "convert_export_write_seconds": 1.426203750015702,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 1,
+              "status": "success",
+              "convert_export_write_seconds": 1.3581170830293559,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 2,
+              "status": "success",
+              "convert_export_write_seconds": 1.3457619170076214,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 3,
+              "status": "success",
+              "convert_export_write_seconds": 1.3643817499978468,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 4,
+              "status": "success",
+              "convert_export_write_seconds": 1.3519617919810116,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 5,
+              "status": "success",
+              "convert_export_write_seconds": 1.349775375041645,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            }
+          ]
+        },
+        {
+          "engine": "docling",
+          "status": "success",
+          "version_check": {
+            "expected": "2.126.0",
+            "actual": "2.126.0"
+          },
+          "packages": {
+            "docling": "2.126.0",
+            "docling-core": "2.96.0",
+            "torch": "2.14.0",
+            "transformers": "5.17.0"
+          },
+          "models": {
+            "file_count": 66,
+            "tree_sha256": "ca18521cf91fa51c73898763323eb3e524a9acc794bd2a0d5bc814d40e059c58"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 3.1449723329860717,
+          "setup_seconds": 2.8137697500060312,
+          "process_wall_seconds": 36.77087033301359,
+          "peak_rss": {
+            "bytes": 2397405184,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "summary": {
+            "warm_success_count": 5,
+            "warm_complete": true,
+            "warm_median_seconds": 4.910518332966603,
+            "warm_min_seconds": 4.783180375001393,
+            "warm_max_seconds": 5.187447667005472
+          },
+          "input_identity_verified": true,
+          "source_token_smoke": {
+            "scope": "selected_tokens_document_wide_only",
+            "page_cell_order_and_geometry": "not_evaluated",
+            "checks": [
+              {
+                "check_id": "figure-729",
+                "expected_token_count": 2,
+                "found_token_count": 2
+              },
+              {
+                "check_id": "figure-730",
+                "expected_token_count": 2,
+                "found_token_count": 2
+              },
+              {
+                "check_id": "figure-731",
+                "expected_token_count": 2,
+                "found_token_count": 2
+              },
+              {
+                "check_id": "protocol-cell",
+                "expected_token_count": 1,
+                "found_token_count": 1
+              },
+              {
+                "check_id": "protocol-token",
+                "expected_token_count": 4,
+                "found_token_count": 4
+              }
+            ],
+            "all_selected_tokens_present": true
+          },
+          "samples": [
+            {
+              "phase": "cold",
+              "index": 0,
+              "status": "success",
+              "convert_export_write_seconds": 5.174221791967284,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 1,
+              "status": "success",
+              "convert_export_write_seconds": 5.187447667005472,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 2,
+              "status": "success",
+              "convert_export_write_seconds": 4.910518332966603,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 3,
+              "status": "success",
+              "convert_export_write_seconds": 5.09842579200631,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 4,
+              "status": "success",
+              "convert_export_write_seconds": 4.783180375001393,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 5,
+              "status": "success",
+              "convert_export_write_seconds": 4.827670167025644,
+              "counts": {
+                "tables": 3,
+                "pictures": 3,
+                "pages": 5
+              }
+            }
+          ]
+        },
+        {
+          "engine": "pymupdf",
+          "status": "success",
+          "version_check": {
+            "expected": "1.27.2.2",
+            "actual": "1.27.2.2"
+          },
+          "packages": {
+            "pymupdf4llm": "1.27.2.2",
+            "pymupdf": "1.27.2.2",
+            "pymupdf-layout": "1.27.2.2",
+            "onnxruntime": "1.30.0"
+          },
+          "models": {
+            "file_count": 4,
+            "tree_sha256": "0c3fdbaeaafa35eddc5359e532002ac1b096d7cdf443274e2bd89a614f38cc0f"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 0.4198354580439627,
+          "setup_seconds": 0.03024795901728794,
+          "process_wall_seconds": 12.193851249990985,
+          "peak_rss": {
+            "bytes": 526761984,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "summary": {
+            "warm_success_count": 5,
+            "warm_complete": true,
+            "warm_median_seconds": 1.9144422499812208,
+            "warm_min_seconds": 1.9123179159942083,
+            "warm_max_seconds": 1.916487791982945
+          },
+          "input_identity_verified": true,
+          "source_token_smoke": {
+            "scope": "selected_tokens_document_wide_only",
+            "page_cell_order_and_geometry": "not_evaluated",
+            "checks": [
+              {
+                "check_id": "figure-729",
+                "expected_token_count": 2,
+                "found_token_count": 2
+              },
+              {
+                "check_id": "figure-730",
+                "expected_token_count": 2,
+                "found_token_count": 2
+              },
+              {
+                "check_id": "figure-731",
+                "expected_token_count": 2,
+                "found_token_count": 2
+              },
+              {
+                "check_id": "protocol-cell",
+                "expected_token_count": 1,
+                "found_token_count": 1
+              },
+              {
+                "check_id": "protocol-token",
+                "expected_token_count": 4,
+                "found_token_count": 4
+              }
+            ],
+            "all_selected_tokens_present": true
+          },
+          "samples": [
+            {
+              "phase": "cold",
+              "index": 0,
+              "status": "success",
+              "convert_export_write_seconds": 1.972580374975223,
+              "counts": {
+                "pages": 5,
+                "tables": 0,
+                "pictures": 3
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 1,
+              "status": "success",
+              "convert_export_write_seconds": 1.9144422499812208,
+              "counts": {
+                "pages": 5,
+                "tables": 0,
+                "pictures": 3
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 2,
+              "status": "success",
+              "convert_export_write_seconds": 1.914714583021123,
+              "counts": {
+                "pages": 5,
+                "tables": 0,
+                "pictures": 3
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 3,
+              "status": "success",
+              "convert_export_write_seconds": 1.9123179159942083,
+              "counts": {
+                "pages": 5,
+                "tables": 0,
+                "pictures": 3
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 4,
+              "status": "success",
+              "convert_export_write_seconds": 1.9136928750085644,
+              "counts": {
+                "pages": 5,
+                "tables": 0,
+                "pictures": 3
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 5,
+              "status": "success",
+              "convert_export_write_seconds": 1.916487791982945,
+              "counts": {
+                "pages": 5,
+                "tables": 0,
+                "pictures": 3
+              }
+            }
+          ]
+        },
+        {
+          "engine": "marker",
+          "status": "unavailable",
+          "version_check": {
+            "expected": "2.0.0",
+            "actual": "2.0.0"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 0.0027955410187132657,
+          "process_wall_seconds": 0.07491833402309567,
+          "peak_rss": {
+            "bytes": 28884992,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "unavailable_reason": "marker_fast_requires_local_llama_server_missing",
+          "error": {
+            "stage": "import",
+            "type": "ExternalUnavailable"
+          },
+          "input_identity_verified": true,
+          "samples": []
+        }
+      ]
+    },
+    "sgl_figures_tables": {
+      "source_sha256": "1fefe74693a264aa1134ed217d40d4630cb0100347f471613307cd397dca0749",
+      "slice_sha256": "1fefe74693a264aa1134ed217d40d4630cb0100347f471613307cd397dca0749",
+      "source_pages": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "method": {
+        "cold_runs": 1,
+        "warm_runs": 5,
+        "cold_definition": "first_conversion_after_explicit_setup",
+        "warm_definition": "same_process_and_engine_fresh_output_directory",
+        "timed_region": "convert_export_write",
+        "os_cache_cleared": false,
+        "download_policy": "preprovisioned_local_models_only",
+        "input_preparation_method": "byte_copy"
+      },
+      "timing_samples_complete": false,
+      "engines": [
+        {
+          "engine": "native",
+          "status": "success",
+          "packages": {
+            "pdf2md": "0.1.0",
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.9.2",
+            "pypdfium2": "5.6.0"
+          },
+          "source_code_identity": {
+            "file_count": 68,
+            "tree_sha256": "745dfb84dcb0295bab5ef7dd6d70e86d5e4716f63b94d786a66fb68b431d5c8a"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 0.7075521250371821,
+          "setup_seconds": 0.04413400002522394,
+          "process_wall_seconds": 7.5350249169860035,
+          "peak_rss": {
+            "bytes": 216088576,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "summary": {
+            "warm_success_count": 5,
+            "warm_complete": true,
+            "warm_median_seconds": 1.085728542006109,
+            "warm_min_seconds": 1.0807205000310205,
+            "warm_max_seconds": 1.1098416249733418
+          },
+          "input_identity_verified": true,
+          "source_token_smoke": {
+            "scope": "selected_tokens_document_wide_only",
+            "page_cell_order_and_geometry": "not_evaluated",
+            "checks": [
+              {
+                "check_id": "nested-figure-118",
+                "expected_token_count": 5,
+                "found_token_count": 5
+              },
+              {
+                "check_id": "nested-figure-119",
+                "expected_token_count": 5,
+                "found_token_count": 5
+              },
+              {
+                "check_id": "critical-length-token",
+                "expected_token_count": 1,
+                "found_token_count": 1
+              }
+            ],
+            "all_selected_tokens_present": true
+          },
+          "samples": [
+            {
+              "phase": "cold",
+              "index": 0,
+              "status": "success",
+              "convert_export_write_seconds": 1.1500681669567712,
+              "counts": {
+                "tables": 10,
+                "pictures": 1,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 1,
+              "status": "success",
+              "convert_export_write_seconds": 1.0807205000310205,
+              "counts": {
+                "tables": 10,
+                "pictures": 1,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 2,
+              "status": "success",
+              "convert_export_write_seconds": 1.1042729169712402,
+              "counts": {
+                "tables": 10,
+                "pictures": 1,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 3,
+              "status": "success",
+              "convert_export_write_seconds": 1.085728542006109,
+              "counts": {
+                "tables": 10,
+                "pictures": 1,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 4,
+              "status": "success",
+              "convert_export_write_seconds": 1.1098416249733418,
+              "counts": {
+                "tables": 10,
+                "pictures": 1,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 5,
+              "status": "success",
+              "convert_export_write_seconds": 1.0841666249907576,
+              "counts": {
+                "tables": 10,
+                "pictures": 1,
+                "pages": 4
+              }
+            }
+          ]
+        },
+        {
+          "engine": "docling",
+          "status": "success",
+          "version_check": {
+            "expected": "2.126.0",
+            "actual": "2.126.0"
+          },
+          "packages": {
+            "docling": "2.126.0",
+            "docling-core": "2.96.0",
+            "torch": "2.14.0",
+            "transformers": "5.17.0"
+          },
+          "models": {
+            "file_count": 66,
+            "tree_sha256": "ca18521cf91fa51c73898763323eb3e524a9acc794bd2a0d5bc814d40e059c58"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 2.9668813750031404,
+          "setup_seconds": 2.7288921249564737,
+          "process_wall_seconds": 89.52539949998027,
+          "peak_rss": {
+            "bytes": 2235875328,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "summary": {
+            "warm_success_count": 5,
+            "warm_complete": true,
+            "warm_median_seconds": 13.8416700840462,
+            "warm_min_seconds": 13.677588500024285,
+            "warm_max_seconds": 13.92736283299746
+          },
+          "input_identity_verified": true,
+          "source_token_smoke": {
+            "scope": "selected_tokens_document_wide_only",
+            "page_cell_order_and_geometry": "not_evaluated",
+            "checks": [
+              {
+                "check_id": "nested-figure-118",
+                "expected_token_count": 5,
+                "found_token_count": 5
+              },
+              {
+                "check_id": "nested-figure-119",
+                "expected_token_count": 5,
+                "found_token_count": 5
+              },
+              {
+                "check_id": "critical-length-token",
+                "expected_token_count": 1,
+                "found_token_count": 1
+              }
+            ],
+            "all_selected_tokens_present": true
+          },
+          "samples": [
+            {
+              "phase": "cold",
+              "index": 0,
+              "status": "success",
+              "convert_export_write_seconds": 14.217624999990221,
+              "counts": {
+                "tables": 10,
+                "pictures": 0,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 1,
+              "status": "success",
+              "convert_export_write_seconds": 13.92736283299746,
+              "counts": {
+                "tables": 10,
+                "pictures": 0,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 2,
+              "status": "success",
+              "convert_export_write_seconds": 13.8416700840462,
+              "counts": {
+                "tables": 10,
+                "pictures": 0,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 3,
+              "status": "success",
+              "convert_export_write_seconds": 13.677588500024285,
+              "counts": {
+                "tables": 10,
+                "pictures": 0,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 4,
+              "status": "success",
+              "convert_export_write_seconds": 13.69000987499021,
+              "counts": {
+                "tables": 10,
+                "pictures": 0,
+                "pages": 4
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 5,
+              "status": "success",
+              "convert_export_write_seconds": 13.850460583984386,
+              "counts": {
+                "tables": 10,
+                "pictures": 0,
+                "pages": 4
+              }
+            }
+          ]
+        },
+        {
+          "engine": "pymupdf",
+          "status": "success",
+          "version_check": {
+            "expected": "1.27.2.2",
+            "actual": "1.27.2.2"
+          },
+          "packages": {
+            "pymupdf4llm": "1.27.2.2",
+            "pymupdf": "1.27.2.2",
+            "pymupdf-layout": "1.27.2.2",
+            "onnxruntime": "1.30.0"
+          },
+          "models": {
+            "file_count": 4,
+            "tree_sha256": "0c3fdbaeaafa35eddc5359e532002ac1b096d7cdf443274e2bd89a614f38cc0f"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 0.38260745897423476,
+          "setup_seconds": 0.026870291971135885,
+          "process_wall_seconds": 9.810732917045243,
+          "peak_rss": {
+            "bytes": 500383744,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "summary": {
+            "warm_success_count": 5,
+            "warm_complete": true,
+            "warm_median_seconds": 1.536737209011335,
+            "warm_min_seconds": 1.5217306669801474,
+            "warm_max_seconds": 1.5417443750193343
+          },
+          "input_identity_verified": true,
+          "source_token_smoke": {
+            "scope": "selected_tokens_document_wide_only",
+            "page_cell_order_and_geometry": "not_evaluated",
+            "checks": [
+              {
+                "check_id": "nested-figure-118",
+                "expected_token_count": 5,
+                "found_token_count": 5
+              },
+              {
+                "check_id": "nested-figure-119",
+                "expected_token_count": 5,
+                "found_token_count": 5
+              },
+              {
+                "check_id": "critical-length-token",
+                "expected_token_count": 1,
+                "found_token_count": 1
+              }
+            ],
+            "all_selected_tokens_present": true
+          },
+          "samples": [
+            {
+              "phase": "cold",
+              "index": 0,
+              "status": "success",
+              "convert_export_write_seconds": 1.5783376249601133,
+              "counts": {
+                "pages": 4,
+                "tables": 9,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 1,
+              "status": "success",
+              "convert_export_write_seconds": 1.5313710419577546,
+              "counts": {
+                "pages": 4,
+                "tables": 9,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 2,
+              "status": "success",
+              "convert_export_write_seconds": 1.5217306669801474,
+              "counts": {
+                "pages": 4,
+                "tables": 9,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 3,
+              "status": "success",
+              "convert_export_write_seconds": 1.5417443750193343,
+              "counts": {
+                "pages": 4,
+                "tables": 9,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 4,
+              "status": "success",
+              "convert_export_write_seconds": 1.5395412090001628,
+              "counts": {
+                "pages": 4,
+                "tables": 9,
+                "pictures": 0
+              }
+            },
+            {
+              "phase": "warm",
+              "index": 5,
+              "status": "success",
+              "convert_export_write_seconds": 1.536737209011335,
+              "counts": {
+                "pages": 4,
+                "tables": 9,
+                "pictures": 0
+              }
+            }
+          ]
+        },
+        {
+          "engine": "marker",
+          "status": "unavailable",
+          "version_check": {
+            "expected": "2.0.0",
+            "actual": "2.0.0"
+          },
+          "runtime": {
+            "python": "3.11.15",
+            "platform": "macOS-26.6.2-arm64-arm-64bit",
+            "worker_count": 1,
+            "threads_requested": 4,
+            "thread_environment": {
+              "OMP_NUM_THREADS": "4",
+              "OMP_THREAD_LIMIT": "4",
+              "OPENBLAS_NUM_THREADS": "4",
+              "MKL_NUM_THREADS": "4",
+              "NUMEXPR_NUM_THREADS": "4"
+            }
+          },
+          "import_seconds": 0.002929584006778896,
+          "process_wall_seconds": 0.07423579203896224,
+          "peak_rss": {
+            "bytes": 28803072,
+            "scope": "engine_process_lifetime_excludes_children",
+            "method": "getrusage"
+          },
+          "unavailable_reason": "marker_fast_requires_local_llama_server_missing",
+          "error": {
+            "stage": "import",
+            "type": "ExternalUnavailable"
+          },
+          "input_identity_verified": true,
+          "samples": []
+        }
+      ]
+    }
+  }
+}

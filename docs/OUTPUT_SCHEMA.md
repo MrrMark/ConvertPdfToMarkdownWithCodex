@@ -40,6 +40,16 @@
 - `docs/schema/corpus_evidence_trend_report.schema.json`
 - `docs/schema/source_quality_report.schema.json`
 - `docs/schema/source_quality_truth.schema.json`
+- `docs/schema/fair_benchmark_report.schema.json`
+
+Q156 `fair_benchmark_report.json`은 원본/slice hash, source_pages, 준비 시간, 계측 method,
+engine별 상태·버전·유효 옵션·cold/warm 표본·peak RSS와 warm 집계를 갖는다.
+`timing_samples_complete`는 모든 요청 engine의 6회 성공·입력 일치를 의미한다.
+`feature_parity_assumed=false`이며 원문 quality는 별도 평가 전 `not_evaluated`다.
+Unavailable·failed·partial_success를 정상 표본으로 집계하지 않으며, 불완전한 warm median은 null이다.
+상세 범위와 nullable 메모리/모델 식별 계약은 `Q156_FAIR_BENCHMARK_IMPLEMENTATION.md`를 따른다.
+Q157은 engine 열거형에 `pymupdf`, `marker`를 추가했다. 지정 버전 검증 결과와
+명시적 실행 불가 사유를 기록하며 `source_token_smoke`는 별도 corpus 집계에만 저장한다.
 
 Schema 파일은 다음 명령으로 재생성하거나 검증한다.
 

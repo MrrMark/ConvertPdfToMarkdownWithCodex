@@ -1,0 +1,163 @@
+{
+  "$defs": {
+    "BenchmarkEngine": {
+      "additionalProperties": true,
+      "properties": {
+        "engine": {
+          "enum": [
+            "native",
+            "docling",
+            "pymupdf",
+            "marker"
+          ],
+          "title": "Engine",
+          "type": "string"
+        },
+        "input_identity_verified": {
+          "title": "Input Identity Verified",
+          "type": "boolean"
+        },
+        "process_wall_seconds": {
+          "minimum": 0,
+          "title": "Process Wall Seconds",
+          "type": "number"
+        },
+        "runs": {
+          "items": {
+            "$ref": "#/$defs/BenchmarkSample"
+          },
+          "title": "Runs",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "success",
+            "incomplete",
+            "unavailable",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "engine",
+        "status",
+        "input_identity_verified",
+        "process_wall_seconds"
+      ],
+      "title": "BenchmarkEngine",
+      "type": "object"
+    },
+    "BenchmarkSample": {
+      "additionalProperties": true,
+      "properties": {
+        "convert_export_write_seconds": {
+          "minimum": 0,
+          "title": "Convert Export Write Seconds",
+          "type": "number"
+        },
+        "index": {
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "phase": {
+          "enum": [
+            "cold",
+            "warm"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "success",
+            "partial_success",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "phase",
+        "index",
+        "status",
+        "convert_export_write_seconds"
+      ],
+      "title": "BenchmarkSample",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "engines": {
+      "items": {
+        "$ref": "#/$defs/BenchmarkEngine"
+      },
+      "title": "Engines",
+      "type": "array"
+    },
+    "feature_parity_assumed": {
+      "const": false,
+      "default": false,
+      "title": "Feature Parity Assumed",
+      "type": "boolean"
+    },
+    "input_preparation_seconds": {
+      "minimum": 0,
+      "title": "Input Preparation Seconds",
+      "type": "number"
+    },
+    "method": {
+      "additionalProperties": true,
+      "title": "Method",
+      "type": "object"
+    },
+    "purpose": {
+      "const": "fair_conversion_benchmark",
+      "default": "fair_conversion_benchmark",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "slice_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Slice Sha256",
+      "type": "string"
+    },
+    "source_pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Source Pages",
+      "type": "array"
+    },
+    "source_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Sha256",
+      "type": "string"
+    },
+    "timing_samples_complete": {
+      "title": "Timing Samples Complete",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "source_sha256",
+    "slice_sha256",
+    "source_pages",
+    "input_preparation_seconds",
+    "method",
+    "engines",
+    "timing_samples_complete"
+  ],
+  "title": "FairBenchmarkReport",
+  "type": "object"
+}

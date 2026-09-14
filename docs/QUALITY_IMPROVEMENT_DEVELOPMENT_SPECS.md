@@ -31,30 +31,6 @@
 - 각 Q 작업의 회귀 검사를 먼저 작성하고, 변경 후 unit/integration/CLI/golden 검사를 실행한다.
 - 기존 무결성 검사 통과를 원문 품질 통과로 해석하지 않는다.
 
-### Q154. 빈 표 억제 및 벡터 도식 보존
-
-셀 내용과 경계를 함께 검사하여 전부 빈 표를 확정 단계에서 제외하고 진단을 남긴다. 표 제외만으로 도식으로 승격하지 않는다. 원문 캡션과 도형 증거가 있는 경우 기존 crop 로직을 활용한다.
-
-- 확정된 실제 표와 겹치는 Figure 캡션은 crop에서 제외한다.
-- crop 성공 시 도식 내부 조각난 텍스트를 일반 본문에서 제거하되 figure evidence로 보존한다. 실패·불확실 시 원문 유지와 warning을 우선한다.
-- 최종 빈 HTML 표는 fallback 여부와 무관하게 integrity 오류로 처리한다.
-- 검증: controller 페이지 3의 빈 표 4개 제거와 도식 3개 보존, 페이지 4 실제 표 3개 유지, SGL 표 유지.
-
-2026-09-14 구현 및 로컬 검증 완료. 구현 범위·실제 문서 결과·제한사항은
-[Q154 구현 결과](Q154_VECTOR_FIGURE_IMPLEMENTATION.md)에 기록한다. PR merge까지 이 항목을 유지한다.
-
-### Q155. 중첩 표 구조 보존
-
-내부 셀 모델은 row/column/span/bbox/raw text/children을 가진다. 단순 bbox 겹침이 아닌 경계와 포함 관계로 중첩을 판정한다.
-
-- 부모 `<td>` 내부에 실제 HTML `<table>`을 직렬화하고 병합 셀은 HTML로 보존한다.
-- `TableAsset.cell_structure` 및 선택적 row `cell_refs`를 추가한다. 기존 cells/row_text/최상위 table ID를 유지한다.
-- 자식 ID는 부모 ID와 구조 위치에서 결정한다. 자식 표를 별도의 동일 검색 청크로 중복 생성하지 않는다.
-- 확정 불가 시 원문 fallback과 actionable `structure_loss`를 기록한다.
-- 검증: Figure 118/119 byte 15 안의 07:04/03:00 중첩 관계, 단순 표 불변, 순환·누락·중복 방지.
-
-2026-09-14 구현 및 로컬 검증 완료. [Q155 구현 결과](Q155_NESTED_TABLE_IMPLEMENTATION.md)에
-원문 품질·회귀 결과와 화면 검증 제한을 기록한다. PR merge까지 이 항목을 유지한다.
 
 ### Q156. 비교 벤치마크 공정성
 
@@ -65,6 +41,11 @@
 - cold 1회와 warm 5회의 중앙값 및 범위를 사용한다. 소표본 p95는 보고하지 않는다.
 - 원문 품질, 처리량, 기능 지원을 분리하며 미지원 기능을 품질 0점으로 환산하지 않는다.
 
+2026-09-14 구현·로컬 검증 완료. 새 성능 계측 진입점은 `scripts/benchmark_fair_comparison.py`다.
+전체 575개 테스트 통과. [Q156 구현 결과](Q156_FAIR_BENCHMARK_IMPLEMENTATION.md)에
+공통 slice·독립 프로세스·계측 범위·버전/메모리 계약과 실제 native smoke 결과를 기록했다.
+Docling 실제 변환은 모델 준비 후 Q157에서 수행한다. PR merge까지 이 항목을 유지한다.
+
 ### Q157. 외부 CPU 도구 비교 실험
 
 별도 환경에 Docling 2.126, Marker 2.0 fast, PyMuPDF4LLM 1.27.2.2를 고정하여 Q152 corpus를 비교한다. 각 버전 설치 가능 여부부터 확인하고 정확한 패치 버전을 실행 기록에 남긴다.
@@ -72,6 +53,11 @@
 - 원본은 로컬에서만 파싱하고 모델 다운로드는 계측에서 제외한다.
 - 설치·실행 불가 시 사유를 기록한다. 임의 버전 변경 또는 클라우드 대체 실행은 하지 않는다.
 - MinerU/Paddle VLM/GPU는 필수 비교에서 제외한다. 결과는 향후 채택 판단용이며 제품 backend 통합은 별도 작업이다.
+
+2026-09-14 구현·로컬 검증 완료, PR merge 대기.
+Native·Docling 2.126.0·PyMuPDF4LLM 1.27.2.2를 3개 corpus에서 각 6회 실행했고,
+Marker 2.0.0은 로컬 llama-server 부재를 명시했다. 전체 테스트 582개 통과.
+상세 결과·재현·한계는 [Q157 실험 보고서](Q157_EXTERNAL_CPU_EXPERIMENT.md)에 기록했다.
 
 ### Q158. 한글 검색 평가 및 회귀 마감
 
@@ -81,6 +67,10 @@
 - Recall@5, MRR@5, citation 및 중요 토큰 보존을 평가한다. embedding/reranker/LLM 평가는 범위 밖이다.
 - 로컬 Mac, Windows CPU CI, 기존 Linux CI를 검증한다.
 - 전체 회귀와 release gate를 실행하고 원문 품질과 내부 무결성 결과를 각각 보고한다.
+
+2026-09-14 BM25 및 별도 한·영 평가 CLI 구현. 질문 30개는 로컬 검토 초안이며 사람 검토 대기다.
+Windows CPU CI 조합을 추가했고 원격 실행 확인은 PR 단계에 남긴다.
+진행 결과와 잠정 지표는 [Q158 보고서](Q158_BILINGUAL_RETRIEVAL_EVALUATION.md)에 기록한다.
 
 ### Q159. Visual sidecar 참조 계약 검증
 
@@ -93,4 +83,4 @@ Q153 실측 중 이전 버전부터 존재하던 visual 계약 오류를 발견�
 
 ## 완료 명세 Archive
 
-완료된 Q34-Q153 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.
+완료된 Q34-Q155 품질 개선 명세와 구현 결과는 `docs/QUALITY_IMPROVEMENT_IMPLEMENTED_SPECS.md`에 보관한다.

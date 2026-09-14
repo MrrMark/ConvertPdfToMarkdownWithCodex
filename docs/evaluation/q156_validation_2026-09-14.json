@@ -1,0 +1,66 @@
+{
+  "source_sha256": "5a6aa491db9dbcb46b21a1bcf901cc03e1ffd927dc57a6011d5e904551992185",
+  "slice_sha256": "8af4e259482eebc56f1f8243673f593143e26fb600255bed7d08112459bd991c",
+  "source_pages": [
+    3,
+    4
+  ],
+  "timing_samples_complete": false,
+  "task": "Q156",
+  "date": "2026-09-14",
+  "validation": {
+    "tests_passed": 575,
+    "new_test_cases": 9,
+    "ruff_passed": true,
+    "schema_check_passed": true,
+    "cli_help_passed": true
+  },
+  "engines": [
+    {
+      "engine": "native",
+      "status": "success",
+      "packages": {
+        "pdf2md": "0.1.0",
+        "pdfplumber": "0.11.9",
+        "pypdf": "6.9.2",
+        "pypdfium2": "5.6.0"
+      },
+      "summary": {
+        "warm_success_count": 5,
+        "warm_complete": true,
+        "warm_median_seconds": 0.9720578750129789,
+        "warm_min_seconds": 0.947410041000694,
+        "warm_max_seconds": 0.9947070420021191
+      },
+      "peak_rss": {
+        "bytes": 169295872,
+        "scope": "engine_process_lifetime_excludes_children",
+        "method": "getrusage"
+      },
+      "source_code_identity": {
+        "file_count": 68,
+        "tree_sha256": "e369f9b5382da04cb832bf7006804ec42fa72d095c9787618258c43e0de68b0f"
+      }
+    },
+    {
+      "engine": "docling",
+      "status": "unavailable",
+      "packages": {
+        "docling": "2.103.0",
+        "docling-core": "2.83.0",
+        "torch": "2.12.1",
+        "transformers": "5.8.1"
+      },
+      "unavailable_reason": "local_model_directory_required",
+      "error": {
+        "stage": "setup",
+        "type": "FileNotFoundError"
+      },
+      "peak_rss": {
+        "bytes": 493551616,
+        "scope": "engine_process_lifetime_excludes_children",
+        "method": "getrusage"
+      }
+    }
+  ]
+}

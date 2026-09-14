@@ -5,6 +5,9 @@ quality-improvement implementation notes in `docs/QUALITY_IMPROVEMENT_IMPLEMENTE
 
 ## Unreleased
 
+- Add Q156 isolated CPU comparison with one shared PDF slice, CLI-resolved native options, setup-separated conversion/export/write timing, actual Docling object counts, and cold/warm reporting. / Q156 공통 slice·독립 프로세스·동일 계측 구간과 버전·옵션·메모리 기록을 추가했다.
+- Add Q157 pinned CPU experiments, PyMuPDF layout adapter, Marker prerequisite reporting, source-token smoke and reproducible results. / Q157 고정 버전 CPU 실측·원문 토큰 검사·재현 기록을 추가했다. Marker는 로컬 추론 런타임 부재를 기록했다.
+- Add Q158 local Unicode/Hangul BM25 evaluation and Windows CPU CI configuration. / Q158 한·영 BM25 평가와 Windows CPU CI 구성을 추가했다. 질문 초안의 사람 검토와 원격 CI 확인은 대기 중이다.
 - Preserve Q155 child tables inside verified parent cells with HTML spans, deterministic cell IDs and row references; retain flat RAG text and report uncertain ownership. / Q155 중첩 표·병합 셀·셀 참조를 보존하고, 기존 검색 텍스트 유지 및 구조 손실 진단을 추가했다.
 - Preserve Q154 captioned vector diagrams as referenced crops, reject empty table candidates, retain original diagram text as evidence, and detect empty final HTML tables. / Q154 캡션·도형 근거가 있는 벡터 도식을 보존하고 빈 표를 제외하며 원문 evidence와 최종 HTML 검사를 추가했다.
 - Reduce Q153 region OCR work by skipping excluded decorative figures and sharing bounded page/crop caches across figure and table targets. Preserve source artifacts and expose actual work counters. / Q153 장식 후보 OCR 제외, 그림·표 렌더 및 결과 재사용, 실제 작업량 지표를 추가했다.
