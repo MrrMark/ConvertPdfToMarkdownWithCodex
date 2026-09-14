@@ -91,7 +91,7 @@ def test_gui_smoke_evidence_stores_only_sanitized_counts_and_labels(
     evidence = smoke.run_smoke(output_dir, state_path)
     serialized = json.dumps(evidence, ensure_ascii=False, sort_keys=True)
 
-    assert evidence["status"] == "passed"
+    assert evidence["status"] == "passed", evidence["summary"]
     assert evidence["runtime"]["kind"] == "gui_runtime_doctor"
     assert evidence["runtime"]["advisory_count"] == 1
     assert all("action" in diagnostic for diagnostic in evidence["runtime"]["diagnostics"])

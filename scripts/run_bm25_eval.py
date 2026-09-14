@@ -7,6 +7,7 @@ from collections import Counter
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 import sys
 import unicodedata
@@ -27,6 +28,16 @@ def has_bbox(ref: dict) -> bool:
     return (isinstance(bbox, (list, tuple)) and len(bbox) == 4
             and all(isinstance(v, (int, float)) and math.isfinite(v) for v in bbox)
             and bbox[0] < bbox[2] and bbox[1] < bbox[3])
+
+
+def contains_critical_token(text: str, token: str) -> bool:
+    """Match exact NFC text without accepting 0h inside 10h or _tcp inside _tcpx."""
+    token = unicodedata.normalize("NFC", token)
+    if not token:
+        return False
+    left = r"(?<!\w)" if re.match(r"\w", token[0]) else ""
+    right = r"(?!\w)" if re.match(r"\w", token[-1]) else ""
+    return re.search(left + re.escape(token) + right, unicodedata.normalize("NFC", text)) is not None
 
 
 def evaluate(chunks: list[dict], dataset: dict) -> dict:
@@ -60,7 +71,7 @@ def evaluate(chunks: list[dict], dataset: dict) -> dict:
                                  if all(k in ref for k in ("source_type", "source_id", "page"))
                                  and has_bbox(ref) and ref_key(ref) in matched)
                     text = unicodedata.normalize("NFC", str(chunk.get("text") or ""))
-                    preserved.update(token for token in q["critical_tokens"] if unicodedata.normalize("NFC", token) in text)
+                    preserved.update(token for token in q["critical_tokens"] if contains_critical_token(text, token))
             rows.append({
                 "query_id": q["query_id"], "language": q["language"], "method": method,
                 "recall_at_5": len(covered) / len(expected), "mrr_at_5": 1 / first if first else 0,

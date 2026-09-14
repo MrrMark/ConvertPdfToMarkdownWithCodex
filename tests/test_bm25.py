@@ -80,3 +80,11 @@ def test_citation_requires_finite_nonempty_bbox():
     for bbox in ([0, 0, 0, 1], [0, 0, float("inf"), 1], [0], "bbox"):
         assert not has_bbox({"bbox": bbox})
     assert has_bbox({"bbox": [0, 0, 1, 1]})
+
+
+def test_critical_token_is_not_a_substring_of_another_identifier():
+    chunks = [{"chunk_id": "a", "text": "alpha 10h", "source_refs": [
+        {"source_type": "requirement", "source_id": "r1", "page": 1, "bbox": [0, 0, 1, 1]}]}]
+    report = evaluate(chunks, dataset())
+    for method in ("bm25", "lexical"):
+        assert report["metrics"][method]["all"]["critical_token_preservation_at_5"] == 0
