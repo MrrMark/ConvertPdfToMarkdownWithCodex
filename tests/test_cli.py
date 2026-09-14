@@ -679,7 +679,8 @@ def test_cli_batch_mode_generates_per_pdf_outputs(
     assert batch_report["summary"]["skipped_count"] == 0
     alpha_entry = next(item for item in batch_report["documents"] if Path(item["input_pdf"]).name == "alpha.pdf")
     beta_entry = next(item for item in batch_report["documents"] if Path(item["input_pdf"]).name == "beta.pdf")
-    alpha_entry["files"] = {key: Path(value).as_posix() for key, value in alpha_entry["files"].items()}
+    alpha_entry["files"] = {key: Path(value).as_posix() if value is not None else None
+                            for key, value in alpha_entry["files"].items()}
     assert alpha_entry["files"]["markdown"].endswith("alpha/alpha.md")
     assert beta_entry["status"] == "failed"
     assert alpha_entry["duration_ms"] >= 0
